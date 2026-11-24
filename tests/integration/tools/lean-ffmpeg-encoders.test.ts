@@ -27,7 +27,7 @@ import {
  * libx264 stays visible so resolveEncoder("h264") (covered by #1092) can't fail
  * first and mask a hardcoded site further along the same command line.
  */
-const HIDDEN = ["libmp3lame", "libvorbis", "libtheora", "libwebp_anim"];
+const HIDDEN = ["libmp3lame", "libvorbis", "libtheora", "libwebp_anim", "libsvtav1", "libaom-av1"];
 
 /** A binary on PATH, or "" when absent (including when `which` itself is missing). */
 function onPath(name: string): string {
@@ -83,6 +83,7 @@ const WAV = readFixture(fixtures.audio.tiny("wav"));
 const MP3 = readFixture(fixtures.audio.tiny("mp3"));
 const MP4 = readFixture(fixtures.video.tiny("mp4"));
 const OGV = readFixture(fixtures.video.tiny("ogv"));
+const ANIMATED_GIF = readFixture(fixtures.image.animated.gif);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -145,6 +146,7 @@ const wav = (name = "tiny.wav"): Upload => ({
 const mp3: Upload = { filename: "tiny.mp3", contentType: "audio/mpeg", content: MP3 };
 const mp4: Upload = { filename: "tiny.mp4", contentType: "video/mp4", content: MP4 };
 const ogv: Upload = { filename: "tiny.ogv", contentType: "video/ogg", content: OGV };
+const gif: Upload = { filename: "animated.gif", contentType: "image/gif", content: ANIMATED_GIF };
 
 function namesEncoder(message: string, encoder: string): void {
   expect(message).toContain(`has no ${encoder} encoder`);
@@ -166,6 +168,8 @@ describe.skipIf(!canRun)("tools on an ffmpeg without external encoders (#1270)",
     ["reverse-audio keeping mp3", "audio/reverse-audio", {}, [mp3], "libmp3lame"],
     ["convert-video to avi", "video/convert-video", { format: "avi" }, [mp4], "libmp3lame"],
     ["video-to-webp", "video/video-to-webp", {}, [mp4], "libwebp_anim"],
+    ["video-to-avif", "video/video-to-avif", {}, [mp4], "libsvtav1"],
+    ["convert animated GIF to avif", "image/convert", { format: "avif" }, [gif], "libaom-av1"],
     ["reverse-video keeping ogv", "video/reverse-video", {}, [ogv], "libtheora"],
     ["stabilize-video keeping ogv", "video/stabilize-video", {}, [ogv], "libtheora"],
   ] as const)(

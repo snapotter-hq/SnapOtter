@@ -27,6 +27,8 @@ export const ANALYTICS_EVENTS = {
   PIPELINE_STEP_ADDED: "pipeline_step_added",
   PIPELINE_SAVED: "pipeline_saved",
   PIPELINE_TEMPLATE_SELECTED: "pipeline_template_selected",
+  // A tool link in the home page's first-run starter block was clicked (#4909).
+  STARTER_JOB_CLICKED: "starter_job_clicked",
   AUTH_LOGIN: "auth_login",
   AUTH_LOGIN_FAILED: "auth_login_failed",
   // Feedback prompt lifecycle (client-side). Fired when any feedback surface is
@@ -44,6 +46,13 @@ export const ANALYTICS_EVENTS = {
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
+/**
+ * Steps of a multi-request tool that report their own outcome without being a
+ * run. Passport Photo's analyze is its AI step; generate is the run (#4886).
+ */
+export const TOOL_USED_STEPS = ["analyze"] as const;
+export type ToolUsedStep = (typeof TOOL_USED_STEPS)[number];
+
 export interface ToolUsedProperties {
   tool_id: string;
   status: "completed" | "failed";
@@ -60,6 +69,8 @@ export interface ToolUsedProperties {
   error_code?: string;
   /** Coarse failure reason so "why do tools fail" is answerable without messages. */
   error_kind?: "input" | "operational" | "bug" | "timeout" | "cancelled";
+  /** Set only on a step event, so run counts filter on step not being set. */
+  step?: ToolUsedStep;
 }
 
 export interface SearchProperties {
@@ -93,10 +104,23 @@ export const AI_INSTALL_ERROR_KINDS = [
 
 export type AiInstallErrorKind = (typeof AI_INSTALL_ERROR_KINDS)[number];
 
+/** Every `ai_bundle_action` action. The allowlist drops any other value, and the
+ * telemetry docs test checks each one is documented. */
+export const AI_BUNDLE_ACTIONS = [
+  "install_started",
+  "installed",
+  "install_failed",
+  "uninstalled",
+  "reset_environment",
+  "imported",
+] as const;
+
+export type AiBundleAction = (typeof AI_BUNDLE_ACTIONS)[number];
+
 export interface AiBundleActionProperties {
   bundle_id: string;
-  action: "install_started" | "installed" | "install_failed" | "uninstalled";
-  /** Time since the install started; 0 for `install_started`. */
+  action: AiBundleAction;
+  /** Time since the install started on `installed` and `install_failed`; 0 otherwise. */
   duration_ms: number;
   /** Only on `install_failed`. */
   error_kind?: AiInstallErrorKind;

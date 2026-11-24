@@ -472,7 +472,7 @@ Un point de terminaison d'analyse supplémentaire est disponible à `POST /api/v
 **Route de l'outil :** `content-aware-resize`  
 **Moteur :** binaire Go `caire` (pas Python : aucun bénéfice GPU)
 
-Redimensionne intelligemment les images en supprimant les coutures à faible énergie, en préservant le contenu important.
+Redimensionne intelligemment les images en supprimant ou en insérant des coutures à faible énergie, en préservant le contenu important. Chaque côté peut atteindre au plus le double de sa taille d'origine.
 
 | Paramètre | Type | Par défaut | Description |
 |-----------|------|---------|-------------|

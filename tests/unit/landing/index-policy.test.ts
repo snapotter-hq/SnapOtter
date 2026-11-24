@@ -1,4 +1,10 @@
-import { SUPPORTED_LOCALES, TOOLS, toolSection } from "@snapotter/shared";
+import {
+  COMPRESS_PRESET_BY_ID,
+  CONVERSION_PRESET_BY_ID,
+  SUPPORTED_LOCALES,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { ALTERNATIVES } from "../../../apps/landing/src/data/alternatives.js";
 import {
@@ -8,7 +14,9 @@ import {
 } from "../../../apps/landing/src/lib/index-policy.js";
 
 const NON_ENGLISH = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
+const PEER_SLUGS = ["bentopdf", "vert", "it-tools", "squoosh", "gotenberg"];
 const toolPath = (t: (typeof TOOLS)[number]) => `/tools/${toolSection(t)}/${t.id}/`;
+const isPreset = (id: string) => id in CONVERSION_PRESET_BY_ID || id in COMPRESS_PRESET_BY_ID;
 
 describe("landing index policy (#4833)", () => {
   it("keeps every page on the keep-list indexed", () => {
@@ -24,16 +32,31 @@ describe("landing index policy (#4833)", () => {
     }
   });
 
-  it("noindexes every x-to-y converter and preset tool page, and no other tool page", () => {
-    const converters = TOOLS.filter((t) => t.id.includes("-to-"));
-    expect(converters.length).toBeGreaterThan(100);
+  it("noindexes every generated preset tool page, and no other tool page", () => {
+    const presets = TOOLS.filter((t) => isPreset(t.id));
+    expect(presets.length).toBeGreaterThan(90);
     for (const tool of TOOLS) {
-      expect(isNoindexPath(toolPath(tool)), tool.id).toBe(tool.id.includes("-to-"));
+      expect(isNoindexPath(toolPath(tool)), tool.id).toBe(isPreset(tool.id));
     }
     expect(isNoindexPath("/tools/image/jpg-to-png/")).toBe(true);
     expect(isNoindexPath("/tools/image/compress-image-to-100kb/")).toBe(true);
     expect(isNoindexPath("/tools/pdf/compress-pdf-to-1mb/")).toBe(true);
     expect(isNoindexPath("/tools/image/resize/")).toBe(false);
+  });
+
+  it("keeps the hand-written x-to-y tools indexed (#4913)", () => {
+    const handWritten = TOOLS.filter((t) => t.id.includes("-to-") && !isPreset(t.id));
+    expect(handWritten.map((t) => t.id)).toEqual(
+      expect.arrayContaining(["pdf-to-word", "word-to-pdf", "image-to-pdf", "video-to-gif"]),
+    );
+    for (const tool of handWritten) {
+      expect(isNoindexPath(toolPath(tool)), tool.id).toBe(false);
+    }
+    const paths = handWritten.map(toolPath);
+    for (const path of ["/tools/pdf/pdf-to-word/", "/tools/video/video-to-gif/"]) {
+      expect(paths, path).toContain(path);
+      expect(isNoindexPath(path), path).toBe(false);
+    }
   });
 
   it("noindexes every localized alternatives page except the Russian Acrobat page", () => {
@@ -50,6 +73,17 @@ describe("landing index policy (#4833)", () => {
     expect(isNoindexPath("/alternatives/")).toBe(false);
     for (const alt of ALTERNATIVES) {
       expect(isNoindexPath(`/alternatives/${alt.slug}/`), alt.slug).toBe(false);
+    }
+  });
+
+  it("indexes the English open-source peer pages and noindexes every locale copy (#5029)", () => {
+    const slugs = new Set(ALTERNATIVES.map((a) => a.slug));
+    for (const slug of PEER_SLUGS) {
+      expect(slugs.has(slug), slug).toBe(true);
+      expect(isNoindexPath(`/alternatives/${slug}/`), slug).toBe(false);
+      for (const code of NON_ENGLISH) {
+        expect(isNoindexPath(`/${code}/alternatives/${slug}/`), `${code}/${slug}`).toBe(true);
+      }
     }
   });
 

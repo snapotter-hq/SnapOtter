@@ -2,13 +2,19 @@
  * Integration tests for the content-aware resize (seam carving via caire) API endpoint.
  *
  * This tool uses the caire Go binary. In environments where caire is not
- * installed the route returns 503 ENGINE_UNAVAILABLE. Tests gracefully handle
+ * installed the job fails with 503 ENGINE_UNAVAILABLE. Tests gracefully handle
  * both scenarios while still verifying route existence and input validation.
+ *
+ * The route runs through createToolRoute with executionHint "long", so a valid
+ * request answers 202 and the carve runs on the queue (#4338). settle() waits
+ * on the durable job row and hands back the old synchronous shape: 200 with
+ * the result, or the status and error body the worker recorded.
  */
 
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { settleAcceptedResponse as settle } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -35,7 +41,7 @@ afterAll(async () => {
 });
 
 describe("Content-Aware Resize", () => {
-  it("route exists and responds to POST", async () => {
+  it("answers 202 with a job id, then settles on the queue (#4338)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
       {
@@ -44,7 +50,7 @@ describe("Content-Aware Resize", () => {
       },
     ]);
 
-    const res = await app.inject({
+    const accepted = await app.inject({
       method: "POST",
       url: "/api/v1/tools/image/content-aware-resize",
       headers: {
@@ -53,6 +59,12 @@ describe("Content-Aware Resize", () => {
       },
       body,
     });
+    expect(accepted.statusCode, accepted.body).toBe(202);
+    const acceptedBody = JSON.parse(accepted.body);
+    expect(acceptedBody).toMatchObject({ async: true, jobId: expect.any(String) });
+    expect(acceptedBody.progressUrl).toBe(`/api/v1/jobs/${acceptedBody.jobId}/progress`);
+
+    const res = await settle(accepted);
 
     // 200 = caire available, 503 = caire not found (ENGINE_UNAVAILABLE)
     expect([200, 503]).toContain(res.statusCode);
@@ -118,7 +130,8 @@ describe("Content-Aware Resize", () => {
 
     expect(res.statusCode).toBe(400);
     const resBody = JSON.parse(res.body);
-    expect(resBody.error).toContain("width, height, or square");
+    expect(resBody.error).toBe("Invalid settings");
+    expect(resBody.details).toContain("width, height, or square");
   });
 
   it("processes with only width specified", async () => {
@@ -127,15 +140,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     // Accept 200 (caire available) or 503 (caire not available)
     expect([200, 503]).toContain(res.statusCode);
@@ -155,15 +170,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ height: 120, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -182,15 +199,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 300, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     // 200 = caire enlarged successfully, 503 = caire not available
     expect([200, 503]).toContain(res.statusCode);
@@ -218,15 +237,17 @@ describe("Content-Aware Resize", () => {
       },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -245,15 +266,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ square: true, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -364,15 +387,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     // HEIC decode or caire may not be available (503 ENGINE_UNAVAILABLE)
     expect([200, 503]).toContain(res.statusCode);
@@ -394,15 +419,17 @@ describe("Content-Aware Resize", () => {
       },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -422,15 +449,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 150, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -467,7 +496,7 @@ describe("Content-Aware Resize", () => {
 
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
-    expect(result.error).toMatch(/no image/i);
+    expect(result.error).toMatch(/file is empty/i);
   });
 
   it("processes JPEG input", async () => {
@@ -476,15 +505,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 80, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -502,15 +533,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 180, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
 
@@ -534,15 +567,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 160 }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
     if (res.statusCode === 503) {
@@ -559,15 +594,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ square: true, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     // 1x1 may fail with 422 if caire can't shrink further, 503 if caire is absent, or 200
     expect([200, 422, 503]).toContain(res.statusCode);
@@ -585,21 +622,28 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 400, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    // Carving the stress fixture is CPU-bound and outlasts settle()'s 25 s
+    // default on a busy runner (#5099). The vitest timeout covers the 30 s
+    // sync window, this wait, and the cancel settle() runs on a stuck job, so
+    // a hung carve is canceled rather than leaked into later tests.
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+      90_000,
+    );
 
     expect([200, 503]).toContain(res.statusCode);
     if (res.statusCode === 503) {
       expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
     }
-  }, 120_000);
+  }, 180_000);
 
   it("processes WebP input", async () => {
     const { readFileSync } = await import("node:fs");
@@ -610,15 +654,17 @@ describe("Content-Aware Resize", () => {
       { name: "settings", content: JSON.stringify({ width: 40, protectFaces: false }) },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
     if (res.statusCode === 503) {
@@ -708,15 +754,17 @@ describe("Content-Aware Resize", () => {
       },
     ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/content-aware-resize",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
+    const res = await settle(
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      }),
+    );
 
     expect([200, 503]).toContain(res.statusCode);
     if (res.statusCode === 503) {

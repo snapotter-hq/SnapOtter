@@ -402,7 +402,7 @@ See the [complete format list](/guide/supported-formats) for details on every su
 
 - **Content-aware resize** crashes on large images (>5 MP) due to a limitation in the caire binary. Works fine with smaller images.
 - **HEIF decode** takes 13-23 seconds. HEIC (Apple's variant) is much faster at 0.3-0.9 seconds.
-- **Upscale** times out on CPU for anything beyond small images. GPU required for practical use.
+- **Upscale** without a GPU shrinks an input that's over the CPU ceiling (4 MP by default, lower at high scale factors) before upscaling, and it runs much slower than on a GPU. [`MAX_CPU_UPSCALE_MP`](/guide/configuration#processing-limits) raises or removes that ceiling if the host has the RAM for it.
 - **CodeFormer** face enhancement is significantly slower than GFPGAN (53s vs 2s on GPU). GFPGAN is recommended for most use cases.
 
 ### AI bundle installs with several replicas {#ai-bundle-installs-with-several-replicas}
@@ -515,6 +515,8 @@ services:
 ```
 
 Keep the proxy credentials outside the Compose file (for example in a protected `.env` file or secret). Do not disable TLS verification: the signed OCR index authenticates release metadata, while normal TLS validation still protects transport and every other outbound request.
+
+If huggingface.co itself is blocked or throttled rather than needing a proxy, point AI downloads at a Hugging Face mirror with `HF_ENDPOINT` (for example `HF_ENDPOINT: https://hf-mirror.com`). See [Downloading through a mirror](/api/ai#downloading-through-a-mirror).
 
 ## Health Check {#health-check}
 
@@ -716,7 +718,7 @@ Semantic-release determines the version from commit history. The `latest` Docker
 
 ## Analytics {#analytics}
 
-SnapOtter includes anonymous product analytics (tool usage patterns, error reports) to help catch bugs and improve features. It is on by default. Your files, file names, and personal data are never part of this. SnapOtter works normally with analytics disabled.
+SnapOtter includes anonymous product analytics (tool usage patterns, error reports) to help catch bugs and improve features. A new instance asks its administrator on first run and sends nothing until answered. Your files, file names, and personal data are never part of this. SnapOtter works normally with analytics disabled.
 
 ### Disabling analytics {#disabling-analytics}
 

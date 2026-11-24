@@ -1,40 +1,52 @@
 ---
-description: "SnapOtter कौन सा अनाम usage data एकत्र करता है, इसे कब भेजा जाता है, और instance-wide product analytics को कैसे बंद करें।"
-i18n_source_hash: 1a68d9371570
+description: "SnapOtter कौन-सा अनाम उपयोग डेटा एकत्र करता है, वह कब भेजा जाता है, पहली बार चलाने पर विकल्प कैसे काम करता है, और पूरे इंस्टेंस के लिए प्रोडक्ट एनालिटिक्स कैसे बंद करें।"
+i18n_source_hash: 784b2a0c06eb
 i18n_provenance: machine
-i18n_output_hash: 26977ce70891
+i18n_output_hash: 58b44cc1fad7
 i18n_hash_version: 2
 ---
 
-# What SnapOtter collects {#what-snapotter-collects}
+# SnapOtter क्या एकत्र करता है {#what-snapotter-collects}
 
-Anonymous Product Analytics default रूप से चालू है और एक administrator द्वारा पूरे instance के लिए सेट किया जाता है। इसे Settings > System > Privacy के तहत बंद करें।
+Anonymous Product Analytics को एडमिनिस्ट्रेटर पूरे इंस्टेंस के लिए सेट करता है। नया इंस्टेंस पहली बार चलने पर पूछता है और जब तक कोई जवाब न दे, कुछ नहीं भेजता। इसे कभी भी Settings > System > Privacy में बदला जा सकता है।
 
-## Events we send (when enabled) {#events-we-send-when-enabled}
+एनालिटिक्स चालू होने पर SnapOtter, PostHog को यह भेजता है कि कौन-से टूल और पाइपलाइन चले, उन्हें कितना समय लगा, वे सफल रहे या नहीं, एरर कोड और फ़ाइलों की संख्या, साथ ही इंस्टेंस की अनाम आईडी, उसका वर्शन, CPU आर्किटेक्चर, ऑपरेटिंग सिस्टम, इंस्टॉल का प्रकार और GPU है या नहीं। क्रैश रिपोर्ट Sentry को भेजी जाती हैं, जिनमें से फ़ाइल नाम, पाथ, ईमेल और उद्धरण चिह्नों में बंद मान हटा दिए जाते हैं। यह आपकी फ़ाइलें, उनके नाम या पाथ, उनकी सामग्री, OCR आउटपुट या निकाला गया टेक्स्ट, इमेज मेटाडेटा या आपके अकाउंट की पहचान कभी नहीं भेजता। PostHog और Sentry ही वे दो जगहें हैं जहाँ यह कुछ भेजता है, और एनालिटिक्स बंद होने पर इन दोनों में से किसी को भी कुछ नहीं भेजता।
 
-- tool_used: tool id, status, duration, category, यह एक AI tool है या नहीं, विफलता पर एक error code।
+- tool_used: tool id, status, duration, category, यह एक AI tool है या नहीं, विफलता पर एक error code, और उस tool के लिए step का नाम जो किसी एक चरण की अलग से रिपोर्ट करता है (Passport Photo का analyze step)।
 - pipeline_executed: step count, tool ids, batch flag, file count, duration, status।
-- ai_bundle_action: bundle id, action, duration।
+- ai_bundle_action: bundle id, action (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), duration, और इंस्टॉल विफल होने पर एक तय सूची से विफलता की श्रेणी (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`)। इंस्टॉलर का आउटपुट, पाथ और त्रुटि संदेश कभी नहीं भेजे जाते।
 - Frontend usage: कौन से tool pages खुलते हैं, जोड़ी गई files (केवल counts), tool शुरू हुआ, downloads, saves, search (केवल result count), batch processed।
 - Crash reports: error type, एक redacted error message (file names, paths, emails और quoted values हटाकर), file basenames के साथ एक source stack, और AI tools के लिए केवल file basenames वाला एक Python traceback।
 
-## What we never collect {#what-we-never-collect}
+जब कोई एडमिनिस्ट्रेटर पहली बार नया इंस्टेंस खोलता है, तो SnapOtter पूछता है: "क्या अनाम उपयोग आँकड़े और क्रैश रिपोर्ट भेजें? आपकी फ़ाइलें कभी नहीं भेजी जातीं।" दोनों जवाबों का वज़न बराबर है और कोई भी पहले से चुना हुआ नहीं है। जवाब दिए बिना प्रॉम्प्ट बंद करने पर एनालिटिक्स बंद रहता है और अगली बार खोलने पर फिर पूछा जाता है। इसे केवल एडमिनिस्ट्रेटर देखता है। `AUTH_ENABLED=false` के साथ कोई अकाउंट नहीं होते और लोकल यूज़र एडमिनिस्ट्रेटर की तरह काम करता है, इसलिए जो भी ऐप खोलता है वही जवाब देता है। डेस्कटॉप ऐप भी इसी तरह पूछता है।
 
-- File names या paths
-- File contents
-- OCR output text
-- Image metadata (EXIF)
-- Extracted document text
-- आपकी account identity
+जो इंस्टेंस इस प्रॉम्प्ट के आने से पहले से चल रहा था, उससे नहीं पूछा जाता। वह अपनी पुरानी एनालिटिक्स सेटिंग रखता है: चालू, जब तक किसी एडमिनिस्ट्रेटर या `SNAPOTTER_ANALYTICS_DEFAULT=off` ने उसे बंद न किया हो।
 
-किसी भी सर्वर की तरह, PostHog हर request के आने वाले IP address को देखता है। हमारा PostHog project उसे स्टोर करने के बजाय हटा देता है, और SnapOtter के अपने server events उसकी जगह एक placeholder भेजते हैं।
+## हम कौन-से इवेंट भेजते हैं (चालू होने पर) {#events-we-send-when-enabled}
+
+- tool_used: टूल आईडी, स्थिति, अवधि, श्रेणी, वह AI टूल है या नहीं, और विफल होने पर एरर कोड।
+- pipeline_executed: चरणों की संख्या, टूल आईडी, बैच फ़्लैग, फ़ाइलों की संख्या, अवधि, स्थिति।
+- ai_bundle_action: बंडल आईडी, कार्रवाई, अवधि।
+- फ़्रंटएंड उपयोग: कौन-से टूल पेज खुलते हैं, जोड़ी गई फ़ाइलें (केवल संख्या), शुरू किया गया टूल, डाउनलोड, सेव, खोज (केवल परिणामों की संख्या), प्रोसेस किया गया बैच।
+- क्रैश रिपोर्ट: एरर का प्रकार, छिपाया गया एरर संदेश (फ़ाइल नाम, पाथ, ईमेल और उद्धरण चिह्नों में बंद मान हटाए गए), फ़ाइल बेसनेम वाला सोर्स स्टैक, और AI टूल के लिए केवल फ़ाइल बेसनेम वाला Python ट्रेसबैक।
+
+## हम कभी क्या एकत्र नहीं करते {#what-we-never-collect}
+
+- फ़ाइल नाम या पाथ
+- फ़ाइल की सामग्री
+- OCR आउटपुट टेक्स्ट
+- इमेज मेटाडेटा (EXIF)
+- दस्तावेज़ से निकाला गया टेक्स्ट
+- आपके अकाउंट की पहचान
+
+PostHog को हर अनुरोध का IP पता दिखता है, जैसा किसी भी सर्वर को दिखता है। हमारा PostHog प्रोजेक्ट उसे सहेजने के बजाय हटा देता है, और SnapOtter के अपने सर्वर इवेंट उसकी जगह एक प्लेसहोल्डर भेजते हैं।
 
 ## अपडेट सूचनाएँ {#update-notices}
 
-जब तक एनालिटिक्स चालू है, सर्वर हर कुछ घंटों में इंस्टेंस की अनाम आईडी और उसके संस्करण के साथ PostHog से पूछता है कि SnapOtter का सबसे नया रिलीज़ कौन-सा है। नया रिलीज़ उपलब्ध होने पर एडमिन को रिलीज़ नोट्स के लिंक के साथ एक सूचना दिखती है। इसे बंद करने पर यह अगले रिलीज़ तक छिपी रहती है। आपकी ओर से कुछ भी इंस्टॉल या डाउनलोड नहीं किया जाता, और एनालिटिक्स बंद होने पर सर्वर कभी नहीं पूछता।
+एनालिटिक्स चालू रहने पर सर्वर हर कुछ घंटों में PostHog से पूछता है कि SnapOtter का सबसे नया रिलीज़ कौन-सा है, इसके लिए वह इंस्टेंस की अनाम आईडी और उसका वर्शन इस्तेमाल करता है। नया रिलीज़ होने पर एडमिन को रिलीज़ नोट्स के लिंक के साथ एक सूचना दिखती है। उसे हटा देने पर वह अगले रिलीज़ तक छिपी रहती है। आपके लिए कुछ भी इंस्टॉल या डाउनलोड नहीं होता, और एनालिटिक्स बंद होने पर सर्वर कभी नहीं पूछता।
 
-## Turning it off {#turning-it-off}
+## इसे बंद करना {#turning-it-off}
 
-Admins: Settings > System > Privacy, "Anonymous Product Analytics" को बंद कर दें। यह तुरंत रुक जाता है, instance-wide। एक ऐसी image बनाने के लिए जो कभी emit न कर सके, `SNAPOTTER_ANALYTICS=off` build arg सेट करें।
+एडमिन: Settings > System > Privacy में जाकर "Anonymous Product Analytics" बंद करें। यह तुरंत, पूरे इंस्टेंस में रुक जाता है। ऐसा इमेज बनाने के लिए जो कभी कुछ न भेज सके, `SNAPOTTER_ANALYTICS=off` बिल्ड आर्ग सेट करें। सर्वर के एनवायरनमेंट में `SNAPOTTER_TELEMETRY=off` सेट करने से रनटाइम पर यही असर होता है और यह ऐप में सहेजे किसी भी जवाब पर भारी पड़ता है।
 
-किसी नए instance को शुरू से ही analytics बंद रखकर चलाने के लिए, उसके पहले boot से पहले server के environment में `SNAPOTTER_ANALYTICS_DEFAULT=off` जोड़ें। Docker Compose के साथ इसे app service के `environment:` के अंतर्गत रखें, क्योंकि इसे सिर्फ़ `.env` में सेट करने से यह container तक नहीं पहुँचता।
+पहली बार चलाने पर पूछे जाने वाले सवाल का जवाब पहले से देने के लिए, सर्वर के पहले बूट से पहले उसके एनवायरनमेंट में `SNAPOTTER_ANALYTICS_DEFAULT=off` (या `on`) जोड़ें, फिर किसी से नहीं पूछा जाएगा। Docker Compose में इसे ऐप सर्विस के `environment:` के अंतर्गत रखें, क्योंकि इसे केवल `.env` में सेट करने से यह कंटेनर तक नहीं पहुँचता।

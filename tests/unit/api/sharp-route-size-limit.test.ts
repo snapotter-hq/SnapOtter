@@ -159,6 +159,7 @@ describe("every sharp tool route maps libvips size caps (#4699)", () => {
     "gif-tools.ts",
     "image-enhancement.ts",
     "noise-removal.ts",
+    "red-eye-removal.ts",
     "remove-gif-background.ts",
     "restore-photo.ts",
     "strip-metadata.ts",

@@ -21,7 +21,7 @@ const NAME_BY_ID = new Map(TOOLS.map((t) => [t.id, t.name]));
  * Shipped tools with no docs page. Adding a page means deleting the id here.
  * Adding a tool without a page means this list grows, which is the point.
  */
-const UNDOCUMENTED = new Set(["remove-gif-background", "rounded-crop"]);
+const UNDOCUMENTED = new Set(["aspect-ratio-calculator", "remove-gif-background", "rounded-crop"]);
 
 interface Leaf {
   label: string;
@@ -94,7 +94,7 @@ describe("tool pages", () => {
     const documented = new Set(PAGES.map((f) => path.basename(f, ".md")));
     const missing = TOOLS.filter((t) => !documented.has(t.id))
       .map((t) => t.id)
-      // The 83 conversion presets are covered collectively by
+      // Conversion presets are covered collectively by
       // apps/docs/tools/conversion-presets.md rather than one page each.
       .filter((id) => !id.includes("-to-"));
     expect(missing.sort()).toEqual([...UNDOCUMENTED].sort());

@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 8df34fa0c217
+i18n_output_hash: 97c92876c859
 i18n_hash_version: 2
-i18n_source_hash: e1ea853b4dd1
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -150,11 +150,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Ustawienia wstępne konwersji {#conversion-presets}
 
-Wspólny katalog zawiera 83 dedykowane punkty końcowe ustawień wstępnych konwersji, takie jak `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` i `excel-to-csv`. Ustawienia wstępne to pełnoprawne trasy narzędzi:
+Wspólny katalog zawiera 121 dedykowanych punktów końcowych ustawień wstępnych konwersji, takie jak `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` i `excel-to-csv`. Ustawienia wstępne to pełnoprawne trasy narzędzi:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Każde ustawienie wstępne blokuje format wyjściowy i deleguje do narzędzia bazowego, takiego jak `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` lub `convert-spreadsheet`. Zobacz [Ustawienia wstępne konwersji](/pl/tools/conversion-presets), aby uzyskać kompletną tabelę tras i opcjonalne ustawienia.
+
+Ustawienia wstępne kompresji działają tak samo. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` i `compress-image-to-500kb` uruchamiają `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` i `compress-pdf-to-2mb` uruchamiają `compress-pdf`. Każde z nich blokuje `mode` na `targetSize`, a `targetSizeKb` na rozmiarze podanym w jego nazwie.
 
 ### Podstawy {#essentials}
 
@@ -196,6 +198,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | ID narzędzia | Nazwa | Model AI | Kluczowe ustawienia |
 |---------|------|---------|-------------|
 | `remove-background` | Usuwanie tła | rembg (BiRefNet / U2-Net) | Etap 1: `model`, `edgeRefine` (0-3), `decontaminate`. Etap 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` i potoki: `backgroundType` (transparent/color/gradient/blur oraz image na `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Usuwanie tła GIF | rembg, klatka po klatce | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Powiększanie obrazu | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Wymazywanie obiektów | LaMa (ONNX) | Maska wysyłana jako druga część pliku (nazwa pola `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstrakcja tekstu | Tesseract (szybki); RapidOCR + PP-OCR ONNX (zrównoważony/najlepszy) | `quality` (szybki/zrównoważony/najlepszy), `language`, `enhance` |
@@ -239,6 +242,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `histogram` | Histogram | `scale` (linear/log) - zwraca wykres histogramu RGB + statystyki dla poszczególnych kanałów |
 | `lqip-placeholder` | Symbol zastępczy LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Generator kodów kreskowych | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Treść JSON, bez przesyłania pliku. |
+| `aspect-ratio-calculator` | Kalkulator proporcji obrazu | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Treść JSON, bez przesyłania pliku; zwraca brakującą wartość. |
 
 ### Układ i kompozycja {#layout-composition}
 
@@ -250,6 +254,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `border` | Obramowanie i ramka | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Upiększanie zrzutu ekranu | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Kadrowanie okrągłe | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Kadrowanie zaokrąglone | `shape` (rounded-square/squircle), `cornerRadius` (0-50, procent krótszego boku), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Dopełnianie obrazu | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Arkusz duszków | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - wieloplikowe (2-64 obrazy) |
 
@@ -268,7 +273,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 |---------|------|-------------|
 | `convert-video` | Konwersja wideo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Kompresja wideo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Przycinanie wideo | `startS`, `endS`, `precise` (bool, cięcie z dokładnością do klatki) |
+| `trim-video` | Przycinanie wideo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, cięcie z dokładnością do klatki) |
 | `mute-video` | Wyciszanie wideo | - |
 | `video-to-gif` | Wideo do GIF | `fps` (1-30), `width`, `startS`, `durationS` (maks. 60 s) |
 | `resize-video` | Zmiana rozmiaru wideo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -285,12 +290,14 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `stabilize-video` | Stabilizacja wideo | `smoothing` (5-60, w klatkach) |
 | `gif-to-video` | GIF do wideo | `format` (mp4/webm/mov) |
 | `video-to-webp` | Wideo do WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Wideo na AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (maks. 60 s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Wideo do klatek | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Łączenie wideo | - (wieloplikowe, znormalizowane do rozdzielczości pierwszego wideo) |
 | `replace-audio` | Zamiana dźwięku | - (plik wideo + audio, dwa pliki) |
 | `burn-subtitles` | Wypalanie napisów | `fontSize` (8-72) - plik wideo + napisy |
 | `embed-subtitles` | Osadzanie napisów | `language` (kod ISO 639-2/B) - plik wideo + napisy |
 | `extract-subtitles` | Wyodrębnianie napisów | - (na wyjściu SRT) |
+| `convert-subtitles` | Konwertuj napisy | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Obrazy do wideo | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - wieloplikowe |
 | `video-metadata` | Czyszczenie metadanych wideo | - |
 | `auto-subtitles` | Automatyczne napisy (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -301,7 +308,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | ID narzędzia | Nazwa | Kluczowe ustawienia |
 |---------|------|-------------|
 | `convert-audio` | Konwersja dźwięku | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Przycinanie dźwięku | `startS`, `endS` |
+| `trim-audio` | Przycinanie dźwięku | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Regulacja głośności | `gainDb` (-30 do 30) |
 | `normalize-audio` | Normalizacja dźwięku | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Wyciszanie/wzmacnianie dźwięku | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -329,6 +336,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `extract-pages` | Wyodrębnianie stron | `range` (składnia qpdf, np. "1-5,8,10-z") |
 | `remove-pages` | Usuwanie stron | `pages` (zakres qpdf do usunięcia) |
 | `organize-pdf` | Organizacja PDF | `order` (kolejność stron qpdf, np. "3,1,2,5-z") |
+| `multi-tool-pdf` | Narzędzie wielofunkcyjne PDF | `items` (plan stron, `[{doc, page, rot}]`, do 1200 stron), `pageCounts` - wieloplikowe (do 20 plików PDF) |
 | `protect-pdf` | Ochrona PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Odblokowanie PDF | `password` |
 | `repair-pdf` | Naprawa PDF | - |
@@ -336,6 +344,7 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `grayscale-pdf` | PDF w skali szarości | - |
 | `pdfa-convert` | Konwersja do PDF/A | - (archiwalny PDF/A-2) |
 | `crop-pdf` | Kadrowanie PDF | `margin` (0-2000 punktów) |
+| `resize-pdf-pages` | Zmień rozmiar stron PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Broszura PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Znak wodny PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -345,7 +354,8 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `sign-pdf` | Podpisywanie PDF | Niestandardowa trasa multipart z plikiem PDF `file`, plikami podpisu `sig0`, `sig1` oraz tablicą JSON `placements` |
 | `pdf-to-text` | PDF do tekstu | - |
 | `pdf-to-word` | PDF do Word | - |
-| `pdf-metadata` | Metadane PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF na Markdown | - (zwraca plik `.md`) |
+| `pdf-metadata` | Metadane PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Konwersja dokumentu | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Konwersja prezentacji | `format` (pptx/odp) |
 | `convert-spreadsheet` | Konwersja arkusza kalkulacyjnego | `format` (xlsx/ods/csv) |
@@ -374,9 +384,18 @@ Wszystkie narzędzia AI działają na Twoim sprzęcie: domyślnie na CPU lub na 
 | `json-xml` | JSON do XML | `pretty` (bool) - dwukierunkowe |
 | `split-csv` | Dzielenie CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Łączenie plików CSV | - (wieloplikowe, pasujące kolumny) |
+| `merge-text` | Scal pliki tekstowe | `separator` (blank-line/rule/filename-heading) - wieloplikowe, 2-50 plików |
 | `yaml-json` | YAML / JSON | - (dwukierunkowe) |
 | `xml-to-csv` | XML do CSV | - (automatyczne wyszukiwanie powtarzających się elementów) |
+| `convert-font` | Konwertuj czcionkę | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Zmień wielkość liter | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (znacznik BCP 47). Treść JSON, bez przesyłania pliku; zwraca przekonwertowany tekst. |
+| `proportion-calculator` | Kalkulator proporcji | `a`, `b`, `c`, `mode` (direct/inverse). Treść JSON, bez przesyłania pliku; zwraca brakującą wartość. |
+| `base64` | Kodowanie / dekodowanie Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Treść JSON, bez przesyłania pliku; zwraca przekonwertowany tekst. |
 | `excel-to-csv` | Excel do CSV | dedykowane ustawienie wstępne konwersji oparte na `convert-spreadsheet` |
+| `otf-to-ttf` | OTF do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `woff-to-ttf` | WOFF do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `woff2-to-ttf` | WOFF2 do TTF | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
+| `ttf-to-woff2` | TTF do WOFF2 | dedykowane ustawienie wstępne konwersji oparte na `convert-font` |
 | `create-zip` | Utwórz ZIP | - (wieloplikowe, 2-50 plików) |
 | `extract-zip` | Wypakuj ZIP | - (ochrona przed bombą) |
 
@@ -397,6 +416,7 @@ Przechwyć stronę internetową jako obraz. W przeciwieństwie do innych narzęd
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Niestandardowa szerokość okna widoku 320-3840 |
 | `viewportHeight` | number | `720` | Niestandardowa wysokość okna widoku 320-2160 |
+| `clientJobId` | string | (generowany) | Własny identyfikator zadania, aby otworzyć strumień postępu, zanim nadejdzie odpowiedź |
 
 **Przykład:**
 
@@ -417,6 +437,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Przechwytywanie działa jako zadanie w kolejce. Jeśli zakończy się w oknie oczekiwania synchronicznego, otrzymasz powyższy wynik z kodem `200`. Wolniejsze przechwytywanie odpowiada `202` z `{"jobId":"...","async":true}`; śledź je zgodnie z opisem w sekcji [Śledzenie postępu](#progress-tracking). Do wersji 2.3.0 ten endpoint zawsze czekał i odpowiadał `200`, więc skrypty obsługujące tylko `200` powinny obsługiwać też `202`.
 
 ### Podtrasy narzędzi {#tool-sub-routes}
 
@@ -539,6 +561,7 @@ Trwałe przechowywanie plików z historią wersji.
 | `GET` | `/api/v1/files/:id/download` | Pobierz plik |
 | `GET` | `/api/v1/files/:id/thumbnail` | Pobierz miniaturę JPEG 300px |
 | `DELETE` | `/api/v1/files` | Zbiorczo usuń pliki i ich łańcuchy wersji (treść: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Pobierz kilka plików jako jeden ZIP (treść: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Pobierz zdalne adresy URL do obszaru roboczego dla importów opartych na URL |
 | `POST` | `/api/v1/preview` | Wygeneruj podgląd WebP zgodny z przeglądarką (dla formatów HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Przesyłaj strumieniowo podgląd zgodny z przeglądarką z pamięci podręcznej lub wygenerowany dla zapisanego pliku PDF, dokumentu biurowego, wideo lub audio |

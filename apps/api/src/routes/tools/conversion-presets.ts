@@ -60,6 +60,27 @@ function delegateToBase(
 }
 
 /**
+ * The base's pre-enqueue check, run on the settings the base will see. A
+ * preset without it queues input the base refuses up front, so a non-font sent
+ * to otf-to-ttf became a failed job instead of a 400 (#5053).
+ */
+function delegatePreValidate(
+  baseConfig: AnyToolRouteConfig,
+  locked: Record<string, unknown>,
+): AnyToolRouteConfig["preValidate"] {
+  const preValidate = baseConfig.preValidate;
+  if (!preValidate) return undefined;
+  return ({ inputs, settings }) =>
+    preValidate({
+      inputs,
+      settings: baseConfig.settingsSchema.parse({
+        ...locked,
+        ...(settings as Record<string, unknown>),
+      }),
+    });
+}
+
+/**
  * Register all conversion-preset routes. Registry-group presets delegate to the
  * base tool's registered processV2 with their locked settings merged in, so they
  * MUST be registered after the base tools (ensured by index.ts ordering). The
@@ -113,7 +134,11 @@ export function registerConversionPresets(
     }
     createToolRoute(app, {
       toolId: preset.id,
+      // A subtitle preset's .srt/.vtt/.ass upload must go through the subtitle
+      // input handler its base uses, not the video one its modality implies.
+      inputKinds: baseConfig.inputKinds,
       settingsSchema: presetSchema(preset.base),
+      preValidate: delegatePreValidate(baseConfig, preset.locked),
       process: async () => {
         throw new Error(`${preset.id} is v2-only`);
       },

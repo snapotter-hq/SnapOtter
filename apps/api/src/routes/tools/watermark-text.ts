@@ -47,7 +47,7 @@ export function registerWatermarkText(app: FastifyInstance) {
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         // The watermark is composited, and a composite lands on the first frame
         // only, so animation is handled a frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const image = sharp(source);
           const metadata = await image.metadata();
           const width = metadata.width ?? 800;
@@ -113,14 +113,13 @@ export function registerWatermarkText(app: FastifyInstance) {
 
           const svgBuffer = Buffer.from(svgOverlay);
           const result = image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
-          return await result.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+          return await result.toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;
         try {
           buffer =
-            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-            (await core(inputBuffer));
+            (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }

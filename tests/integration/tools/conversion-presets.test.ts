@@ -11,6 +11,7 @@ import {
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -37,7 +38,7 @@ interface FixtureSpec {
 
 /**
  * Map a source extension to a REAL fixture on disk plus its mime type. Every
- * extension actually used as the first `sourceInputs` entry across the 83
+ * extension actually used as the first `sourceInputs` entry across the
  * presets is wired here. Returns null when no fixture is mapped, which makes
  * the affected preset skip loudly (see the missing-fixture tracking below)
  * instead of faking coverage.
@@ -91,12 +92,32 @@ function specForExt(ext: string): FixtureSpec | null {
       return { path: fixtures.audio.tiny("mp3"), mime: "audio/mpeg" };
     case ".flac":
       return { path: fixtures.audio.tiny("flac"), mime: "audio/flac" };
+    case ".opus":
+      return { path: fixtures.audio.tiny("opus"), mime: "audio/opus" };
+    case ".wma":
+      return { path: fixtures.audio.tiny("wma"), mime: "audio/x-ms-wma" };
+    case ".aiff":
+      return { path: fixtures.audio.tiny("aiff"), mime: "audio/aiff" };
+    case ".srt":
+      return { path: fixtures.video.subs.srt, mime: "application/x-subrip" };
+    case ".vtt":
+      return { path: fixtures.video.subs.vtt, mime: "text/vtt" };
+    case ".ass":
+      return { path: fixtures.video.subs.ass, mime: "text/x-ssa" };
     case ".xlsx":
     case ".xls":
       return {
         path: fixtures.document.tiny("xlsx"),
         mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       };
+    case ".ttf":
+      return { path: fixtures.data.ttf, mime: "font/ttf" };
+    case ".otf":
+      return { path: fixtures.data.otf, mime: "font/otf" };
+    case ".woff":
+      return { path: fixtures.data.woff, mime: "font/woff" };
+    case ".woff2":
+      return { path: fixtures.data.woff2, mime: "font/woff2" };
     default:
       return null;
   }
@@ -111,11 +132,13 @@ function needsFfmpeg(tool: Tool): boolean {
 /**
  * True when the preset's conversion can run given the system binaries present.
  * Mirrors the ffmpeg gate: spreadsheet conversions delegate to LibreOffice, so
- * the spreadsheet preset only runs where `soffice` is installed.
+ * the spreadsheet preset only runs where `soffice` is installed, and font
+ * presets need the fontTools the convert-font script imports.
  */
 function dependencyAvailable(preset: ConversionPreset, tool: Tool): boolean {
   if (needsFfmpeg(tool) && !ffmpegAvailable()) return false;
   if (preset.base === "convert-spreadsheet" && !sofficeAvailable()) return false;
+  if (findMissingGeneratedPythonPrerequisite(preset.base, preset.locked)) return false;
   return true;
 }
 
@@ -214,6 +237,35 @@ describe("conversion presets (all)", () => {
       90_000,
     );
   }
+});
+
+describe("Sony .hif input (#4825)", () => {
+  // Sony cameras name HEIF files .HIF; the bytes are the same ISO BMFF HEIF.
+  it("heic-to-jpg converts a HEIF file named .HIF", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "DSC00001.HIF",
+        contentType: "image/heif",
+        content: readFixture(fixtures.image.base.heic200),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/heic-to-jpg",
+      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
+      body,
+    });
+
+    expect([200, 202], res.body.slice(0, 500)).toContain(res.statusCode);
+    const { jobId } = JSON.parse(res.body);
+    expect(jobId).toBeTruthy();
+    if (res.statusCode === 202) {
+      const jobRow = await pollJob(jobId);
+      expect(jobRow?.status, JSON.stringify(jobRow?.error)).toBe("completed");
+    }
+  }, 90_000);
 });
 
 describe("PDF to image conversion presets", () => {

@@ -1,19 +1,21 @@
 ---
-description: "Ganti nama beberapa berkas menggunakan templat pola dan unduh sebagai ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Ganti nama beberapa gambar menggunakan templat pola dan unduh sebagai ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 76f871222bea
 ---
 
 # Ganti Nama Massal {#bulk-rename}
 
-Ganti nama beberapa berkas menggunakan templat pola dengan placeholder untuk indeks, indeks berpad, dan nama berkas asli. Mengembalikan arsip ZIP yang berisi semua berkas yang telah diganti namanya.
+Ganti nama beberapa gambar menggunakan templat pola dengan placeholder untuk indeks, indeks berpad, dan nama berkas asli. Mengembalikan arsip ZIP yang berisi semua gambar yang telah diganti namanya.
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Menerima data formulir multipart dengan beberapa berkas dan bidang JSON `settings`.
+Menerima data formulir multipart dengan beberapa berkas gambar dan bidang JSON `settings`.
+
+Setiap unggahan harus berupa gambar. Header tiap berkas diperiksa sebelum ZIP dimulai, lalu byte-nya dimasukkan ke ZIP apa adanya (tanpa dienkode ulang). Jika ada berkas yang bukan gambar yang dikenali, atau melebihi `MAX_MEGAPIXELS`, seluruh permintaan gagal dengan `400` dan pesan galat yang menyebut berkas tersebut, misalnya `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameter {#parameters}
 

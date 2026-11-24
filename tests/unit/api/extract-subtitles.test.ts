@@ -43,10 +43,14 @@ async function withScratch<T>(fn: (scratchDir: string) => Promise<T>): Promise<T
   }
 }
 
-function createCtx(scratchDir: string, filename = "clip.mkv"): ToolProcessCtxV2 {
+function createCtx(
+  scratchDir: string,
+  filename = "clip.mkv",
+  settings: Record<string, unknown> = {},
+): ToolProcessCtxV2 {
   return {
     inputs: [{ buffer: Buffer.from("mkv-bytes"), filename, ref: "uploads/job/input" }],
-    settings: {},
+    settings,
     scratchDir,
     signal: new AbortController().signal,
     report: vi.fn(),
@@ -95,6 +99,37 @@ describe("extract-subtitles route processor (#3361)", () => {
   });
 
   it.each([
+    ["vtt", "Movie Clip.vtt", "text/vtt"],
+    ["ass", "Movie Clip.ass", "text/x-ssa"],
+    ["srt", "Movie Clip.srt", "application/x-subrip"],
+  ])(
+    "writes the %s output format with its extension and content type (#5052)",
+    async (format, filename, contentType) => {
+      const config = getToolConfig("extract-subtitles");
+
+      await withScratch(async (scratchDir) => {
+        const ctx = createCtx(scratchDir, "Movie Clip.mkv", { format });
+        const result = await config?.processV2?.(ctx);
+
+        const stagedIn = join(scratchDir, "media", "in-0-Movie_Clip.mkv");
+        const expectedOut = join(scratchDir, "media", filename);
+        expect(runFfmpegWithProgressMock).toHaveBeenCalledWith(
+          ctx,
+          ["-i", stagedIn, "-map", "0:s:0", expectedOut],
+          12.5,
+        );
+        expect(result).toEqual({ scratchPath: expectedOut, filename, contentType });
+      });
+    },
+  );
+
+  it("defaults the output format to SRT and rejects formats it can't write (#5052)", () => {
+    const config = getToolConfig("extract-subtitles");
+    expect(config?.settingsSchema.parse({})).toEqual({ format: "srt" });
+    expect(config?.settingsSchema.safeParse({ format: "sub" }).success).toBe(false);
+  });
+
+  it.each([
     ["FFmpeg 5/6 stream map", "ffmpeg exited 1: Stream map '0:s:0' matches no streams."],
     [
       "FFmpeg 7/8 empty-token stream map",
@@ -134,7 +169,7 @@ describe("extract-subtitles route processor (#3361)", () => {
       expect(err).toMatchObject({
         name: "InputValidationError",
         statusCode: 422,
-        message: "Image-based subtitle tracks cannot be converted to SRT without OCR",
+        message: "Image-based subtitle tracks cannot be converted to text subtitles without OCR",
       });
     });
   });

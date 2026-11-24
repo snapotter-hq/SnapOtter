@@ -15,6 +15,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const storage = vi.hoisted(() => new Map<string, string>());
 const apiGet = vi.hoisted(() => vi.fn());
+// The before/after slider re-measures its layers through a ResizeObserver,
+// which jsdom lacks.
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    disconnect() {}
+  },
+);
 vi.stubGlobal("localStorage", {
   getItem: (k: string) => storage.get(k) ?? null,
   setItem: (k: string, v: string) => void storage.set(k, v),
@@ -43,13 +52,16 @@ import { AutosaveRecoveryBanner } from "@/components/editor/common/export-dialog
 import { BrushOptions } from "@/components/editor/options/brush-options";
 import { FileListItem } from "@/components/files/file-list-item";
 import { ApiKeysSection, AuditLogSection } from "@/components/settings/settings-dialog";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format, formatDate, formatDateTime } from "@/lib/format";
 import { PrivacyPolicyPage } from "@/pages/privacy-policy-page";
 import { useEditorStore } from "@/stores/editor-store";
 
 function renderDe(ui: React.ReactNode) {
   localStorage.setItem("snapotter-locale", "de");
+  // The real de chunk is a dynamic import that a slow host can't finish inside
+  // findByText's 1 s budget (#5193); i18n-context.test.tsx covers the real load.
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 
@@ -60,6 +72,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("web-wide i18n sweep (#909)", () => {

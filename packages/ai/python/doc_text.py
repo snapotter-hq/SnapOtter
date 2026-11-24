@@ -1,4 +1,8 @@
-"""Extract plain text. Args: {"path": in, "out": out-txt-path}. Prints {"chars": N, "hasText": bool}."""
+"""Extract plain text. Args: {"path": in, "out": out-txt-path}.
+
+Prints {"chars": N, "hasText": bool, "pages": N, "emptyPages": N, "unreadablePages": N,
+"partlyUnreadablePages": N}.
+"""
 import json
 import re
 import sys
@@ -65,6 +69,65 @@ def has_readable_text(text):
         and unicodedata.category(char) not in ("Cc", "Cf")
         for char in text
     )
+
+
+# A readable page needs this many unreadable characters in its verdict text
+# before it counts as partly unreadable, so a stray U+FFFD or control code in
+# otherwise good text doesn't raise a warning.
+_MIN_UNREADABLE_CHARS = 3
+
+
+def unreadable_char_count(text):
+    """How many characters has_readable_text would reject as unreadable: U+FFFD and control codes.
+
+    Format codepoints stay out, unlike in has_readable_text: Arabic and Persian
+    text carries zero-width joiners and bidi marks as a matter of course, and
+    counting them would warn on a page that reads fine.
+    """
+    return sum(
+        1
+        for char in text
+        if char == "\uFFFD" or (not char.isspace() and unicodedata.category(char) == "Cc")
+    )
+
+
+def tally_pages(parts, judged, glyph_id_pages=None):
+    """Count the pages that gave back nothing and the pages whose text can't be read.
+
+    parts is each page's extracted text, judged the text its readability
+    verdict was made on (see main). A page with no readable text is empty
+    when its extraction was blank, the shape of a scanned or image-only page
+    (#589), and unreadable when it returned characters that failed the test:
+    control codes (#724) or glyph ids (#955). The route words its 422 from
+    the difference and reports unreadable pages on a document that otherwise
+    extracted, rather than assume a scan for both (#954).
+
+    A readable page can still hold a line in an unreadable font next to the
+    text that passed. glyph_id_pages says, per page, whether fonts that came
+    out as glyph ids were left out of its verdict text (#1566), and a run of
+    U+FFFD or control codes left in that text is a font MuPDF couldn't map.
+    Either makes the page partly unreadable (#4947). That count never touches
+    hasText: the page does have usable text.
+    """
+    if glyph_id_pages is None:
+        glyph_id_pages = [False] * len(parts)
+    empty = unreadable = partly = 0
+    for part, verdict_text, had_glyph_ids in zip(parts, judged, glyph_id_pages):
+        if has_readable_text(verdict_text):
+            if had_glyph_ids or unreadable_char_count(verdict_text) >= _MIN_UNREADABLE_CHARS:
+                partly += 1
+            continue
+        if part.strip():
+            unreadable += 1
+        else:
+            empty += 1
+    return {
+        "pages": len(parts),
+        "emptyPages": empty,
+        "unreadablePages": unreadable,
+        "partlyUnreadablePages": partly,
+        "hasText": len(parts) > empty + unreadable,
+    }
 
 
 # Leading object number of an indirect reference such as "10 0 R" or "[10 0 R]".
@@ -459,7 +522,7 @@ def main():
         unmapped_as_fffd = fitz.TEXTFLAGS_TEXT & ~fitz.TEXT_CID_FOR_UNKNOWN_UNICODE
         doc = fitz.open(path)
         try:
-            parts, judged = [], []
+            parts, judged, glyph_id_pages = [], [], []
             for page in doc:
                 part = normalize_presentation_forms(page.get_text())
                 parts.append(part)
@@ -479,6 +542,9 @@ def main():
                     judged.append(page.get_text(flags=unmapped_as_fffd))
                 else:
                     judged.append(part)
+                # Text in glyph-id fonts left the verdict, but it's still in
+                # the .txt, so the page is at best partly readable (#4947).
+                glyph_id_pages.append(readable is not None)
         finally:
             doc.close()
         text = "\n".join(parts)
@@ -488,11 +554,12 @@ def main():
         # map returns raw glyph ids that render blank (#724), and a composite
         # font with no map returns glyph ids that look like letters (#955).
         # len(text) alone can't tell any of them apart, so the caller uses this
-        # to offer OCR instead of handing back a file the user can't read.
-        has_text = any(has_readable_text(part) for part in judged)
+        # to offer OCR instead of handing back a file the user can't read. The
+        # page counts say which of those it was, and on how many pages (#954).
+        tally = tally_pages(parts, judged, glyph_id_pages)
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(text)
-        print(json.dumps({"chars": len(text), "hasText": has_text}))
+        print(json.dumps({"chars": len(text), **tally}))
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
         sys.exit(1)

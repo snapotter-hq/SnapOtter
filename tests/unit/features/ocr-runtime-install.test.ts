@@ -1448,6 +1448,89 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(canceled).toHaveBeenCalledOnce();
   });
 
+  it("downloads from the HF_ENDPOINT mirror and trusts redirects within it (#4843)", async () => {
+    vi.stubEnv("HF_ENDPOINT", "https://hf-mirror.example/");
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-mirror-"));
+    temporaryDirectories.push(directory);
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://cdn.hf-mirror.example/blob/runtime" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+
+    const result = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl,
+    });
+
+    expect(fetchImpl.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://hf-mirror.example/snapotter-hq/feature-bundles/resolve/main/v2.1.0/v3/ocr-runtime-index.json",
+      `https://hf-mirror.example/snapotter-hq/feature-bundles/resolve/main/v2.1.0/v3/ocr-${TARGET}.tar.gz`,
+      "https://cdn.hf-mirror.example/blob/runtime",
+    ]);
+    expect(readFileSync(result.archivePath)).toEqual(ARCHIVE_BYTES);
+  });
+
+  it("keeps refusing hosts outside the mirror and Hugging Face when HF_ENDPOINT is set (#4843)", async () => {
+    vi.stubEnv("HF_ENDPOINT", "https://hf-mirror.example");
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-mirror-evil-"));
+    temporaryDirectories.push(directory);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://hf-mirror.example.attacker.invalid/runtime" },
+      }),
+    );
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl,
+      }),
+    ).rejects.toThrow("redirect is not trusted");
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["plain http", "http://hf-mirror.example"],
+    ["credentials", "https://user:secret@hf-mirror.example"],
+    ["not a URL", "hf-mirror.example"],
+  ])("rejects an HF_ENDPOINT with %s before any request (#4843)", async (_label, endpoint) => {
+    vi.stubEnv("HF_ENDPOINT", endpoint);
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-mirror-bad-"));
+    temporaryDirectories.push(directory);
+    const fetchImpl = vi.fn<typeof fetch>();
+
+    const error = await downloadVerifiedRuntimeRelease({
+      aiDataDir: directory,
+      bundleRepo: "snapotter-hq/feature-bundles",
+      version: "2.1.0",
+      target: TARGET,
+      trustKeys: [fixture.trustKey],
+      fetchImpl,
+    }).catch((caught: unknown) => caught);
+
+    expect((error as Error).message).toContain("HF_ENDPOINT");
+    expect((error as Error).message).not.toContain("secret");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("does not retry a malformed redirect location", async () => {
     const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-malformed-redirect-"));
     temporaryDirectories.push(directory);

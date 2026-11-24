@@ -52,6 +52,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "html-to-image": "no-dropzone",
   "barcode-read": "before-after",
   "barcode-generate": "no-dropzone",
+  "aspect-ratio-calculator": "no-dropzone",
   "image-to-base64": "custom-results",
 
   // Layout & composition
@@ -132,12 +133,14 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "stabilize-video": "media-player",
   "gif-to-video": "media-player",
   "video-to-webp": "media-player",
+  "video-to-avif": "media-player",
   "video-to-frames": "media-player",
   "merge-videos": "media-player",
   "replace-audio": "media-player",
   "burn-subtitles": "media-player",
   "embed-subtitles": "media-player",
   "extract-subtitles": "media-player",
+  "convert-subtitles": "no-comparison",
   "images-to-video": "media-player",
   "video-metadata": "media-player",
 
@@ -178,6 +181,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "unlock-pdf": "document",
   "repair-pdf": "document",
   "crop-pdf": "document",
+  "resize-pdf-pages": "document",
   "nup-pdf": "document",
   "booklet-pdf": "document",
   "watermark-pdf": "document",
@@ -189,6 +193,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "redact-pdf": "document",
   "sign-pdf": "interactive-sign",
   "pdf-to-text": "no-comparison",
+  "pdf-to-markdown": "no-comparison",
   "pdf-to-word": "no-comparison",
   "pdf-metadata": "no-comparison",
   "powerpoint-to-pdf": "document",
@@ -206,14 +211,19 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "json-xml": "no-comparison",
   "split-csv": "no-comparison",
   "merge-csvs": "no-comparison",
+  "merge-text": "no-comparison",
   "yaml-json": "no-comparison",
   "xml-to-csv": "no-comparison",
+  "convert-font": "no-comparison",
+  "convert-case": "no-dropzone",
+  "proportion-calculator": "no-dropzone",
+  base64: "no-dropzone",
   "create-zip": "no-comparison",
   "extract-zip": "no-comparison",
 };
 
 // Each conversion preset mirrors the display mode of its base tool (e.g.
-// jpg-to-png follows "convert"). Generated here so the 83 presets never drift
+// jpg-to-png follows "convert"). Generated here so the presets never drift
 // from the static map above. Every displayBase is one of the keys defined
 // statically, so the lookup always resolves.
 for (const preset of CONVERSION_PRESETS) {
@@ -248,6 +258,7 @@ const multiFileTools = new Set<string>([
   "merge-audio",
   "merge-csvs",
   "merge-pdf",
+  "merge-text",
   "multi-tool-pdf",
   "merge-videos",
   "replace-audio",
@@ -277,6 +288,7 @@ const reorderableTools = new Set<string>([
   "merge-audio",
   "merge-videos",
   "merge-csvs",
+  "merge-text",
   "images-to-video",
   "sprite-sheet",
   "stitch",

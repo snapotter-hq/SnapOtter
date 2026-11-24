@@ -4,7 +4,7 @@ description: Dedicated conversion preset endpoints generated from the SnapOtter 
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter exposes 83 dedicated conversion preset endpoints in addition to the base converter tools. Each preset locks the output format and delegates to its base processing pipeline, so the behavior, validation, and output contract match the base tool listed below.
+SnapOtter exposes 121 dedicated conversion preset endpoints in addition to the base converter tools. Each preset locks the output format and delegates to its base processing pipeline, so the behavior, validation, and output contract match the base tool listed below.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -25,9 +25,9 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `jpg-to-avif` | JPG to AVIF | `/api/v1/tools/image/jpg-to-avif` | `convert` | `.jpg`, `.jpeg` | quality |
 | `png-to-avif` | PNG to AVIF | `/api/v1/tools/image/png-to-avif` | `convert` | `.png` | quality |
 | `webp-to-avif` | WebP to AVIF | `/api/v1/tools/image/webp-to-avif` | `convert` | `.webp` | quality |
-| `heic-to-jpg` | HEIC to JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`, `.heif` | quality |
-| `heic-to-png` | HEIC to PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`, `.heif` | quality |
-| `heic-to-avif` | HEIC to AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`, `.heif` | quality |
+| `heic-to-jpg` | HEIC to JPG | `/api/v1/tools/image/heic-to-jpg` | `convert` | `.heic`, `.heif`, `.hif` | quality |
+| `heic-to-png` | HEIC to PNG | `/api/v1/tools/image/heic-to-png` | `convert` | `.heic`, `.heif`, `.hif` | quality |
+| `heic-to-avif` | HEIC to AVIF | `/api/v1/tools/image/heic-to-avif` | `convert` | `.heic`, `.heif`, `.hif` | quality |
 | `jpg-to-gif` | JPG to GIF | `/api/v1/tools/image/jpg-to-gif` | `convert` | `.jpg`, `.jpeg` | quality |
 | `png-to-gif` | PNG to GIF | `/api/v1/tools/image/png-to-gif` | `convert` | `.png` | quality |
 | `gif-to-jpg` | GIF to JPG | `/api/v1/tools/image/gif-to-jpg` | `convert` | `.gif` | quality |
@@ -52,7 +52,7 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `svg-to-jpg` | SVG to JPG | `/api/v1/tools/image/svg-to-jpg` | `svg-to-raster` | `.svg`, `.svgz` | quality, width, height, dpi, backgroundColor |
 | `jpg-to-pdf` | JPG to PDF | `/api/v1/tools/image/jpg-to-pdf` | `image-to-pdf` | `.jpg`, `.jpeg` | pageSize, orientation, margin, targetSize, collate |
 | `png-to-pdf` | PNG to PDF | `/api/v1/tools/image/png-to-pdf` | `image-to-pdf` | `.png` | pageSize, orientation, margin, targetSize, collate |
-| `heic-to-pdf` | HEIC to PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`, `.heif` | pageSize, orientation, margin, targetSize, collate |
+| `heic-to-pdf` | HEIC to PDF | `/api/v1/tools/image/heic-to-pdf` | `image-to-pdf` | `.heic`, `.heif`, `.hif` | pageSize, orientation, margin, targetSize, collate |
 | `tiff-to-pdf` | TIFF to PDF | `/api/v1/tools/image/tiff-to-pdf` | `image-to-pdf` | `.tiff`, `.tif` | pageSize, orientation, margin, targetSize, collate |
 | `webp-to-pdf` | WebP to PDF | `/api/v1/tools/image/webp-to-pdf` | `image-to-pdf` | `.webp` | pageSize, orientation, margin, targetSize, collate |
 | `gif-to-pdf` | GIF to PDF | `/api/v1/tools/image/gif-to-pdf` | `image-to-pdf` | `.gif` | pageSize, orientation, margin, targetSize, collate |
@@ -90,6 +90,10 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `mp4-to-wav` | MP4 to WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV to WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 to OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT to VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT to SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS to SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT to ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 
@@ -105,6 +109,36 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | `wav-to-mp3` | WAV to MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | none |
 | `mp3-to-wav` | MP3 to WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | none |
 | `flac-to-mp3` | FLAC to MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | none |
+| `mp3-to-flac` | MP3 to FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | none |
+| `mp3-to-ogg` | MP3 to OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | none |
+| `mp3-to-m4a` | MP3 to M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | none |
+| `wav-to-flac` | WAV to FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | none |
+| `wav-to-ogg` | WAV to OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | none |
+| `wav-to-m4a` | WAV to M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | none |
+| `flac-to-wav` | FLAC to WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | none |
+| `flac-to-ogg` | FLAC to OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | none |
+| `flac-to-m4a` | FLAC to M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | none |
+| `ogg-to-flac` | OGG to FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | none |
+| `ogg-to-m4a` | OGG to M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | none |
+| `m4a-to-flac` | M4A to FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | none |
+| `m4a-to-ogg` | M4A to OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | none |
+| `aac-to-ogg` | AAC to OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | none |
+| `aac-to-m4a` | AAC to M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | none |
+| `opus-to-mp3` | Opus to MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | none |
+| `opus-to-wav` | Opus to WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | none |
+| `opus-to-flac` | Opus to FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | none |
+| `opus-to-ogg` | Opus to OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | none |
+| `opus-to-m4a` | Opus to M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | none |
+| `wma-to-mp3` | WMA to MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | none |
+| `wma-to-wav` | WMA to WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | none |
+| `wma-to-flac` | WMA to FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | none |
+| `wma-to-ogg` | WMA to OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | none |
+| `wma-to-m4a` | WMA to M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | none |
+| `aiff-to-mp3` | AIFF to MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | none |
+| `aiff-to-wav` | AIFF to WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | none |
+| `aiff-to-flac` | AIFF to FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | none |
+| `aiff-to-ogg` | AIFF to OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | none |
+| `aiff-to-m4a` | AIFF to M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | none |
 
 ## PDF Presets {#pdf-presets}
 
@@ -119,6 +153,10 @@ Send `multipart/form-data` with a `file` part and optional `settings` JSON strin
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel to CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF to TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF to TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 to TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF to WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Notes {#notes}
 

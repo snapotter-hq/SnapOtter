@@ -4,6 +4,7 @@ import {
   getOcrRuntimeCapability,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
+  type OcrResult,
 } from "@snapotter/ai";
 import { getOptionalBundleForTool, TOOL_OPTIONAL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -18,6 +19,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { NO_TEXT_DETECTED_WARNING } from "../../lib/empty-result-warnings.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
@@ -29,6 +31,7 @@ import {
   ocrUploadErrorStatus,
   resolveOcrEncodedInputLimit,
 } from "../../lib/ocr-limits.js";
+import { extractTiffPages, tiffPageCount } from "../../lib/ocr-tiff-pages.js";
 import { hasPersistedJobRow, settleUnenqueuedAlias } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -85,28 +88,38 @@ async function processOcrJob(
   ctx.signal.throwIfAborted();
   ctx.report(10, "Preparing OCR");
 
-  let result: Awaited<ReturnType<typeof extractText>>;
-  try {
-    result = await extractText(
-      prepared.buffer,
-      ctx.scratchDir,
-      {
-        quality,
-        language: settings.language,
-        enhance: settings.enhance ?? quality === "best",
-        signal: ctx.signal,
-      },
-      (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
-    );
-  } catch (err) {
-    throw await asInputErrorIfUndecodable(prepared.buffer, err);
+  const ocrOptions = {
+    quality,
+    language: settings.language,
+    enhance: settings.enhance ?? quality === "best",
+    signal: ctx.signal,
+  };
+  // autoOrient rewrites a rotated TIFF as its first page alone, so the pages
+  // come from the upload whenever preparation kept it a TIFF. renderTiffPage
+  // orients each page itself. Formats that preparation converted (DNG, which
+  // sharp also reads as TIFF) stay on the prepared buffer.
+  const pageCount = (await tiffPageCount(prepared.buffer)) > 0 ? await tiffPageCount(input) : 0;
+  let result: OcrResult;
+  if (pageCount > 1) {
+    result = await extractTiffPages(input, pageCount, ocrOptions, ctx);
+  } else {
+    try {
+      result = await extractText(prepared.buffer, ctx.scratchDir, ocrOptions, (percent, stage) =>
+        ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
+      );
+    } catch (err) {
+      throw await asInputErrorIfUndecodable(prepared.buffer, err);
+    }
   }
   const base = prepared.filename.replace(/\.[^.]+$/, "");
   return {
     buffer: Buffer.from(result.text, "utf-8"),
     filename: `${base}_ocr.txt`,
     contentType: "text/plain",
-    resultPayload: { ...result },
+    resultPayload: {
+      ...result,
+      ...(result.text.trim() === "" && { warning: NO_TEXT_DETECTED_WARNING }),
+    },
   };
 }
 

@@ -212,6 +212,11 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    const writesAnalytics = entries.some((e) => e.key === "analyticsEnabled");
+    // Read before the write: once it lands the prompt no longer reads as pending.
+    const consentWasPending =
+      writesAnalytics && (await import("../lib/analytics-gate.js")).analyticsConsentPending();
+
     // Pass 2: write all entries now that all have passed validation
     if (entries.length > 0) {
       const sortedEntries = [...entries].sort((a, b) =>
@@ -280,7 +285,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    if (entries.some((e) => e.key === "analyticsEnabled")) {
+    if (writesAnalytics) {
       // The setting is already persisted. A Redis hiccup here must not turn a
       // successful save into a 500; the TTL refresh converges replicas anyway.
       try {
@@ -291,6 +296,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         await publishAnalyticsGateInvalidation(); // all other replicas
       } catch (err) {
         request.log.warn({ err }, "analytics gate invalidation failed (save still applied)");
+      }
+      // The boot census was dropped while this fresh install was undecided, so
+      // the first answer is when it gets counted. A "no" sends nothing (#5014).
+      if (consentWasPending) {
+        const { trackInstanceStarted } = await import("../lib/instance-started.js");
+        await trackInstanceStarted();
       }
     }
 

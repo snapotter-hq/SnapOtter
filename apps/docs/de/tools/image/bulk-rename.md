@@ -1,19 +1,21 @@
 ---
-description: "Mehrere Dateien mit einer Muster-Vorlage umbenennen und als ZIP herunterladen."
-i18n_source_hash: 2776dcc2f71c
+description: "Mehrere Bilder mit einer Muster-Vorlage umbenennen und als ZIP herunterladen."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 482df91186ca
 ---
 
 # Massenumbenennung {#bulk-rename}
 
-Benennt mehrere Dateien mit einer Muster-Vorlage um, die Platzhalter für Index, aufgefüllten Index und ursprünglichen Dateinamen enthält. Gibt ein ZIP-Archiv mit allen umbenannten Dateien zurück.
+Benennt mehrere Bilder mit einer Muster-Vorlage um, die Platzhalter für Index, aufgefüllten Index und ursprünglichen Dateinamen enthält. Gibt ein ZIP-Archiv mit allen umbenannten Bildern zurück.
 
 ## API-Endpunkt {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Nimmt Multipart-Formulardaten mit mehreren Dateien und einem JSON-Feld `settings` entgegen.
+Nimmt Multipart-Formulardaten mit mehreren Bilddateien und einem JSON-Feld `settings` entgegen.
+
+Jeder Upload muss ein Bild sein. Der Header jeder Datei wird geprüft, bevor das ZIP beginnt, und die Bytes werden danach unverändert gepackt (keine Neucodierung). Ist eine Datei kein erkanntes Bild oder überschreitet sie `MAX_MEGAPIXELS`, schlägt die gesamte Anfrage mit `400` und einer Fehlermeldung fehl, die die Datei nennt, zum Beispiel `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameter {#parameters}
 

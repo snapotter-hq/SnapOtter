@@ -176,6 +176,7 @@ describe("HTML to Image", () => {
         viewportWidth: 375,
         viewportHeight: 812,
         isMobile: true,
+        signal: expect.any(AbortSignal),
       });
     });
   });
@@ -294,15 +295,24 @@ describe("HTML to Image", () => {
     });
   });
 
+  // Captures run as image-pool jobs (#4337), which retry a 5xx failure once.
+  // A page-load timeout is the exception: it fails on the first attempt, so a
+  // slow page doesn't hold the slot for a second full timeout. A browser crash
+  // fails both attempts. A 422 is not retried.
   describe("capture errors", () => {
-    it("returns 504 on page load timeout", async () => {
+    it("returns 504 on page load timeout without retrying the capture", async () => {
       const { capturePage } = await import("../../../../apps/api/src/lib/browser-service.js");
-      (capturePage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Timeout 30000ms exceeded"),
-      );
+      const capture = capturePage as ReturnType<typeof vi.fn>;
+      capture.mockClear();
+      capture.mockRejectedValueOnce(new Error("Timeout 30000ms exceeded"));
 
       const res = await post({ url: "https://example.com" }, adminToken);
       expect(res.statusCode).toBe(504);
+      expect(JSON.parse(res.body)).toMatchObject({
+        error: "Page took too long to load",
+        code: "PAGE_LOAD_TIMEOUT",
+      });
+      expect(capture).toHaveBeenCalledTimes(1);
     });
 
     it("returns 422 on generic capture failure", async () => {
@@ -317,13 +327,15 @@ describe("HTML to Image", () => {
 
     it("returns 503 when browser service is crashed", async () => {
       const { capturePage } = await import("../../../../apps/api/src/lib/browser-service.js");
-      (capturePage as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Browser service permanently disabled after repeated crashes"),
-      );
+      const capture = capturePage as ReturnType<typeof vi.fn>;
+      const crashed = new Error("Browser service permanently disabled after repeated crashes");
+      capture.mockClear();
+      capture.mockRejectedValueOnce(crashed).mockRejectedValueOnce(crashed);
 
       const res = await post({ url: "https://example.com" }, adminToken);
       expect(res.statusCode).toBe(503);
       expect(JSON.parse(res.body).code).toBe("BROWSER_CRASHED");
+      expect(capture).toHaveBeenCalledTimes(2);
     });
   });
 

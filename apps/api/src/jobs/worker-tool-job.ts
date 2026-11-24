@@ -37,7 +37,11 @@ import {
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
 } from "../routes/progress.js";
-import { getToolConfig, type ToolProcessCtx } from "../routes/tool-factory.js";
+import {
+  getDirectJobProcessFn,
+  getToolConfig,
+  type ToolProcessCtx,
+} from "../routes/tool-factory.js";
 import {
   hasAiJobHandler,
   hasAiPathJobHandler,
@@ -52,7 +56,7 @@ import {
   userCancelSignal,
   wasUserCanceled,
 } from "./cancel.js";
-import { createMonotonicReporter } from "./monotonic-progress.js";
+import { createMonotonicReporter, type ProgressReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
 import {
   type AutoSaveTx,
@@ -154,7 +158,15 @@ export function isTimeoutAbortError(err: unknown): boolean {
   return ABORT_ERROR_MESSAGE.test(message.trim());
 }
 
-export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
+/**
+ * `onProgress` sees every percent the tool reports, after the monotonic clamp.
+ * A pipeline step uses it to mirror the tool's progress onto the pipeline's
+ * own channel, since the step runs with clientJobId cleared (#4345).
+ */
+export async function processToolJob(
+  job: Job<ToolJobData>,
+  onProgress?: ProgressReporter,
+): Promise<ToolJobResult> {
   const data = job.data;
   const { jobId } = data;
   const startTime = Date.now();
@@ -285,6 +297,7 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
           ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
         writeJobProgress({ percent, stage });
+        onProgress?.(percent, stage);
       });
 
       // Check for cancellation before dispatching
@@ -335,11 +348,19 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
         extraOutputs = aiResult.extraOutputs;
       } else {
         const config = getToolConfig(data.toolId);
-        if (!config) throw new Error(`No tool config for ${data.toolId}`);
+        // A custom route's direct-only process fn runs for that route's own
+        // jobs, ahead of the tool's pipeline config: passport-photo's generate
+        // queues a cutout the pipeline fn would analyze all over again. It
+        // never runs for a pipeline step or batch child, whose input is not
+        // what it was written for.
+        const directProcess = data.kind === "tool" ? getDirectJobProcessFn(data.toolId) : undefined;
+        const processV2 = directProcess ?? config?.processV2;
+        if (!config && !processV2) throw new Error(`No tool config for ${data.toolId}`);
 
         // Use the resolved v2 process function (adapter or native)
-        if (!config.processV2) throw new Error(`No processV2 for ${data.toolId}`);
-        const result = await config.processV2({
+        if (!processV2) throw new Error(`No processV2 for ${data.toolId}`);
+        const result = await processV2({
+          jobId,
           inputs,
           settings: data.settings,
           scratchDir,
@@ -642,14 +663,15 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
           },
           data.analyticsDistinctId,
         );
-        // Mark the instance's first successful processing so the onboarding
-        // survey only appears once the admin has produced a real result
-        // (shouldShowUsageSurvey gate in web feedback.ts). First-write-wins, so
-        // the timestamp reflects the genuine first job and later jobs no-op.
-        void setSettingIfAbsent(ONBOARDING_FIRST_PROCESSED_KEY, new Date().toISOString()).catch(
-          () => {},
-        );
       }
+
+      // Mark the instance's first successful processing. The onboarding survey
+      // waits for it and the home page's starter block hides on it, so it is
+      // written whether or not analytics is on: it is a local setting, not
+      // egress. First-write-wins, so later jobs no-op.
+      void setSettingIfAbsent(ONBOARDING_FIRST_PROCESSED_KEY, new Date().toISOString()).catch(
+        (err) => logger.warn({ err }, "worker: could not record the first processed job"),
+      );
 
       // Record queue wait time and completion on the OTel span
       const waitedMs = jobAgeMs(job);
@@ -726,8 +748,17 @@ export async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResu
         (isSafeMessageError(err) ||
           (err instanceof Error && err.name === "InputValidationError")) &&
         (err as { code?: unknown }).code === "ENGINE_UNAVAILABLE";
+      // A page that timed out loading once will time out again (#4337).
+      const isPageLoadTimeout =
+        err instanceof Error &&
+        err.name === "InputValidationError" &&
+        (err as { code?: unknown }).code === "PAGE_LOAD_TIMEOUT";
       const isUnrecoverable =
-        isCanceled || isValidationError || isInputMissing || isEngineUnavailable;
+        isCanceled ||
+        isValidationError ||
+        isInputMissing ||
+        isEngineUnavailable ||
+        isPageLoadTimeout;
       const maxAttempts = job.opts.attempts ?? 1;
       const willRetry = !isUnrecoverable && job.attemptsMade + 1 < maxAttempts;
 

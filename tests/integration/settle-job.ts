@@ -7,7 +7,9 @@ import { requestCancel } from "../../apps/api/src/jobs/cancel.js";
 import { waitForJob } from "../../apps/api/src/jobs/enqueue.js";
 import { getQueue } from "../../apps/api/src/jobs/queues.js";
 import type { Pool, ToolJobResult } from "../../apps/api/src/jobs/types.js";
+import { EMPTY_RESULT_WARNINGS } from "../../apps/api/src/lib/empty-result-warnings.js";
 import { resolveToolPool } from "../../apps/api/src/lib/pool.js";
+import type { SettledJobOutcome } from "../helpers/generated-case-accounting.js";
 
 const LIVE_DATABASE_STATUSES = new Set(["queued", "processing"]);
 const TERMINAL_QUEUE_STATES = new Set(["completed", "failed"]);
@@ -135,6 +137,58 @@ export async function settleAsyncFallback(
 }
 
 /**
+ * Resolve a long tool's 202 into the answer its synchronous route used to give
+ * (#4338): 200 with the job's result, or the status, message and code the
+ * worker recorded on the failed row. Any other response passes through. A job
+ * still running at the deadline is canceled so it can't starve later tests.
+ */
+export async function settleAcceptedResponse(
+  res: { statusCode: number; body: string },
+  timeoutMs = 25_000,
+): Promise<{ statusCode: number; body: string }> {
+  if (res.statusCode !== 202) return res;
+
+  const { jobId } = JSON.parse(res.body) as { jobId: string };
+  const deadline = Date.now() + timeoutMs;
+  let row:
+    | {
+        status: string;
+        pool: string | null;
+        progress: unknown;
+        error: { message?: string; httpStatus?: number; code?: string } | null;
+      }
+    | undefined;
+
+  while (Date.now() < deadline) {
+    [row] = await db
+      .select({
+        status: schema.jobs.status,
+        pool: schema.jobs.pool,
+        progress: schema.jobs.progress,
+        error: schema.jobs.error,
+      })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, jobId));
+    if (row && TERMINAL_DATABASE_STATUSES.has(row.status)) break;
+    await delay(100);
+  }
+
+  if (!row || !TERMINAL_DATABASE_STATUSES.has(row.status)) {
+    await cancelAcceptedJobAndWait(jobId, (row?.pool as Pool | undefined) ?? "image");
+    throw new AcceptedJobTimeoutError(jobId, timeoutMs);
+  }
+
+  if (row.status === "completed") {
+    const result = (row.progress as { result?: Record<string, unknown> } | null)?.result ?? {};
+    return { statusCode: 200, body: JSON.stringify(result) };
+  }
+  return {
+    statusCode: row.error?.httpStatus ?? 422,
+    body: JSON.stringify({ error: row.error?.message, code: row.error?.code }),
+  };
+}
+
+/**
  * Wait for an accepted job to succeed. If the observation window expires,
  * cancel and fully drain the job before failing the test so timed-out work can
  * never starve another integration fork.
@@ -173,10 +227,17 @@ async function downloadCompletedJobArtifact(
       `${toolId}: completed job ${jobId} artifact download returned ${download.statusCode}`,
     );
   }
-  if (download.rawPayload.length === 0) {
+  // An empty transcript or OCR result is correct for input with no speech or
+  // text, but only when the result says so (#4923).
+  const warning = result.resultPayload?.warning;
+  const explainedEmpty = typeof warning === "string" && EMPTY_RESULT_WARNINGS.has(warning);
+  if (download.rawPayload.length === 0 && !explainedEmpty) {
     throw new Error(`${toolId}: completed job ${jobId} produced an empty artifact`);
   }
-  if (result.processedSize <= 0 || download.rawPayload.length !== result.processedSize) {
+  if (
+    (result.processedSize <= 0 && !explainedEmpty) ||
+    download.rawPayload.length !== result.processedSize
+  ) {
     throw new Error(
       `${toolId}: completed job ${jobId} artifact size mismatch ` +
         `(worker=${result.processedSize}, downloaded=${download.rawPayload.length})`,
@@ -251,4 +312,17 @@ export async function waitForGeneratedJobArtifact(
     throw new Error(`${toolId}: completed job ${jobId} returned a failure payload${suffix}`);
   }
   return result;
+}
+
+/**
+ * Read how a job ended from its durable row. The worker commits the failed row
+ * before BullMQ reports the failure, so by the time `waitForGeneratedJobArtifact`
+ * rethrows, the recorded status is already there for `isRecordedRejection`.
+ */
+export async function settledJobRow(jobId: string): Promise<SettledJobOutcome | undefined> {
+  const [row] = await db
+    .select({ status: schema.jobs.status, error: schema.jobs.error })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, jobId));
+  return row;
 }

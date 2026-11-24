@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { apiToolPath, TOOLS, toolSection } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -142,7 +142,15 @@ describe("API docs", () => {
     }
     expect([...perSection.values()].reduce((sum, count) => sum + count, 0)).toBe(TOOLS.length);
     expect(deployment).not.toContain("All 138 non-AI tools");
-    expect(architecture).toContain("254 tool routes");
+    // An exact route count here went stale with every new tool and made
+    // parallel tool PRs conflict. The translations carry the same figure.
+    expect(architecture).toContain("200+ tool routes");
+    const docsRoot = join(root, "apps/docs");
+    for (const locale of readdirSync(docsRoot)) {
+      const translated = join(docsRoot, locale, "guide/architecture.md");
+      if (!existsSync(translated)) continue;
+      expect(readFileSync(translated, "utf8"), translated).toContain("200+");
+    }
   });
 
   it("serves an LLM summary with live catalog tools", async () => {
@@ -152,7 +160,10 @@ describe("API docs", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("## Tools");
-    expect(res.body).toContain("- Image (112 tools)");
+    // Counted the way /llms.txt counts it, so adding a tool doesn't mean
+    // editing this line.
+    const imageTools = TOOLS.filter((tool) => toolSection(tool) === "image").length;
+    expect(res.body).toContain(`- Image (${imageTools} tools)`);
     expect(res.body).toContain("Resize Image - Resize by pixels");
     expect(res.body).toContain("Sign PDF -");
   });

@@ -99,6 +99,9 @@ export const fixtures = {
       // Two TIFF pages of different sizes (80x30, then 50x50), which libvips
       // refuses to load as one page stack (#4419).
       multipageMixedSizesTiff: p("image/edge/multipage-mixed-sizes.tiff"),
+      // Two TIFF pages of different sizes (40x20, then 30x10), both tagged
+      // orientation 6, so autoOrient can't rejoin them as one stack (#4849).
+      multipageMixedSizesOrientedTiff: p("image/edge/multipage-mixed-sizes-oriented.tiff"),
     },
     formats: (ext: string) => p(`image/formats/sample.${ext}`),
     multipageTiff: p("image/formats/multipage.tiff"),
@@ -144,6 +147,9 @@ export const fixtures = {
     gap: p("audio/formats/tone-gap.wav"),
     tiny: (ext: string) => p(`audio/formats/tiny.${ext}`),
     hostileEmpty: { zeroByte: p("audio/hostile/zero-byte.wav") },
+    // speech.ogg plus a zero-length Vorbis packet on its last page: ffmpeg
+    // plays it, PyAV refuses it (#4980).
+    zeroLengthPacketOgg: p("audio/edge/speech-zero-length-packet.ogg"),
   },
   document: {
     pdfMulti: p("document/valid/multipage-6.pdf"),
@@ -169,6 +175,11 @@ export const fixtures = {
     yaml: p("data/valid/tiny.yaml"),
     tsv: p("data/valid/tiny.tsv"),
     zip: p("data/valid/tiny.zip"),
+    // Self-made 3-glyph fonts (.notdef, space, O), fsType 8.
+    ttf: p("data/valid/tiny.ttf"),
+    otf: p("data/valid/tiny.otf"),
+    woff: p("data/valid/tiny.woff"),
+    woff2: p("data/valid/tiny.woff2"),
   },
   security: {
     svgXxeFile: p("security/svg-xxe-file-read.svg"),

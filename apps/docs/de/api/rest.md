@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 75bf1a2260d1
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 510342e9d266
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Konvertierungs-Presets {#conversion-presets}
 
-Der gemeinsame Katalog enthält 83 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
+Der gemeinsame Katalog enthält 121 dedizierte Konvertierungs-Preset-Endpunkte wie `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` und `excel-to-csv`. Presets sind vollwertige Tool-Routen:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Jedes Preset legt das Ausgabeformat fest und delegiert an ein Basis-Tool wie `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` oder `convert-spreadsheet`. Die vollständige Routentabelle und die optionalen Einstellungen finden Sie unter [Konvertierungs-Presets](/de/tools/conversion-presets).
+
+Kompressions-Presets funktionieren genauso. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` und `compress-image-to-500kb` führen `compress` aus; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` und `compress-pdf-to-2mb` führen `compress-pdf` aus. Jedes legt `mode` auf `targetSize` und `targetSizeKb` auf die im Namen genannte Größe fest.
 
 ### Grundlagen {#essentials}
 
@@ -195,6 +197,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | Tool-ID | Name | KI-Modell | Wichtige Einstellungen |
 |---------|------|---------|-------------|
 | `remove-background` | Hintergrund entfernen | rembg (BiRefNet / U2-Net) | Phase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` und Pipelines: `backgroundType` (transparent/color/gradient/blur, plus image auf `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | GIF-Hintergrund entfernen | rembg, Bild für Bild | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Bild-Hochskalierung | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objekt-Radierer | LaMa (ONNX) | Maske als zweiter Datei-Teil gesendet (Feldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Textextraktion | Tesseract (schnell); RapidOCR + PP-OCR ONNX (ausgewogen/am besten) | `quality` (schnell/ausgewogen/am besten), `language`, `enhance` |
@@ -238,6 +241,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `histogram` | Histogramm | `scale` (linear/log) - gibt RGB-Histogramm-Diagramm + Statistiken pro Kanal zurück |
 | `lqip-placeholder` | LQIP-Platzhalter | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode-Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON-Body, kein Datei-Upload. |
+| `aspect-ratio-calculator` | Seitenverhältnis-Rechner | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON-Body, kein Datei-Upload; gibt den fehlenden Wert zurück. |
 
 ### Layout & Komposition {#layout-composition}
 
@@ -249,6 +253,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `border` | Rand & Rahmen | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Screenshot verschönern | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Kreis-Zuschnitt | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Abgerundeter Zuschnitt | `shape` (rounded-square/squircle), `cornerRadius` (0-50, Prozent der kürzeren Seite), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Bild auffüllen | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite-Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - Mehrfachdatei (2-64 Bilder) |
 
@@ -267,7 +272,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 |---------|------|-------------|
 | `convert-video` | Video konvertieren | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Video komprimieren | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Video zuschneiden | `startS`, `endS`, `precise` (bool, bildgenauer Schnitt) |
+| `trim-video` | Video zuschneiden | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, bildgenauer Schnitt) |
 | `mute-video` | Video stummschalten | - |
 | `video-to-gif` | Video zu GIF | `fps` (1-30), `width`, `startS`, `durationS` (max. 60s) |
 | `resize-video` | Video-Größe ändern | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `stabilize-video` | Video stabilisieren | `smoothing` (5-60, in Frames) |
 | `gif-to-video` | GIF zu Video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video zu WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video zu AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max. 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video zu Frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Videos zusammenführen | - (Mehrfachdatei, auf die Auflösung des ersten Videos normalisiert) |
 | `replace-audio` | Audio ersetzen | - (Video- + Audiodatei, zwei Dateien) |
 | `burn-subtitles` | Untertitel einbrennen | `fontSize` (8-72) - Video- + Untertiteldatei |
 | `embed-subtitles` | Untertitel einbetten | `language` (ISO-639-2/B-Code) - Video- + Untertiteldatei |
 | `extract-subtitles` | Untertitel extrahieren | - (gibt SRT aus) |
+| `convert-subtitles` | Untertitel konvertieren | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Bilder zu Video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - Mehrfachdatei |
 | `video-metadata` | Video-Metadaten bereinigen | - |
 | `auto-subtitles` | Auto-Untertitel (KI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | Tool-ID | Name | Wichtige Einstellungen |
 |---------|------|-------------|
 | `convert-audio` | Audio konvertieren | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Audio zuschneiden | `startS`, `endS` |
+| `trim-audio` | Audio zuschneiden | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Lautstärke anpassen | `gainDb` (-30 bis 30) |
 | `normalize-audio` | Audio normalisieren | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Audio ein-/ausblenden | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `extract-pages` | Seiten extrahieren | `range` (qpdf-Syntax, z.B. \"1-5,8,10-z\") |
 | `remove-pages` | Seiten entfernen | `pages` (zu entfernender qpdf-Bereich) |
 | `organize-pdf` | PDF organisieren | `order` (qpdf-Seitenreihenfolge, z.B. \"3,1,2,5-z\") |
+| `multi-tool-pdf` | PDF-Multi-Tool | `items` (Seitenplan, `[{doc, page, rot}]`, bis zu 1200 Seiten), `pageCounts` - Mehrfachdatei (bis zu 20 PDFs) |
 | `protect-pdf` | PDF schützen | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | PDF entsperren | `password` |
 | `repair-pdf` | PDF reparieren | - |
@@ -335,6 +343,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `grayscale-pdf` | PDF in Graustufen | - |
 | `pdfa-convert` | PDF/A konvertieren | - (Archiv-PDF/A-2) |
 | `crop-pdf` | PDF zuschneiden | `margin` (0-2000 Punkte) |
+| `resize-pdf-pages` | PDF-Seitengröße ändern | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Broschüren-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF mit Wasserzeichen | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `sign-pdf` | PDF signieren | Benutzerdefinierte multipart-Route mit PDF `file`, Signaturdateien `sig0`, `sig1` und `placements` JSON-Array |
 | `pdf-to-text` | PDF zu Text | - |
 | `pdf-to-word` | PDF zu Word | - |
-| `pdf-metadata` | PDF-Metadaten | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF zu Markdown | - (gibt eine `.md`-Datei aus) |
+| `pdf-metadata` | PDF-Metadaten | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Dokument konvertieren | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Präsentation konvertieren | `format` (pptx/odp) |
 | `convert-spreadsheet` | Tabellenkalkulation konvertieren | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 | `json-xml` | JSON zu XML | `pretty` (bool) - bidirektional |
 | `split-csv` | CSV aufteilen | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSVs zusammenführen | - (Mehrfachdatei, übereinstimmende Spalten) |
+| `merge-text` | Textdateien zusammenführen | `separator` (blank-line/rule/filename-heading) - Mehrfachdatei, 2-50 Dateien |
 | `yaml-json` | YAML / JSON | - (bidirektional) |
 | `xml-to-csv` | XML zu CSV | - (findet automatisch sich wiederholende Elemente) |
+| `convert-font` | Schrift konvertieren | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Groß-/Kleinschreibung ändern | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP-47-Tag). JSON-Body, kein Datei-Upload; gibt den umgewandelten Text zurück. |
+| `proportion-calculator` | Dreisatzrechner | `a`, `b`, `c`, `mode` (direct/inverse). JSON-Body, kein Datei-Upload; gibt den fehlenden Wert zurück. |
+| `base64` | Base64 kodieren / dekodieren | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-Body, kein Datei-Upload; gibt den umgewandelten Text zurück. |
 | `excel-to-csv` | Excel zu CSV | dediziertes Konvertierungs-Preset, gestützt auf `convert-spreadsheet` |
+| `otf-to-ttf` | OTF zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `woff-to-ttf` | WOFF zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `woff2-to-ttf` | WOFF2 zu TTF | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
+| `ttf-to-woff2` | TTF zu WOFF2 | dediziertes Konvertierungs-Preset, gestützt auf `convert-font` |
 | `create-zip` | ZIP erstellen | - (Mehrfachdatei, 2-50 Dateien) |
 | `extract-zip` | ZIP extrahieren | - (Bomben-geschützt) |
 
@@ -396,6 +415,7 @@ Eine Webseite als Bild erfassen. Anders als andere Tools akzeptiert dieser Endpu
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Benutzerdefinierte Viewport-Breite 320-3840 |
 | `viewportHeight` | number | `720` | Benutzerdefinierte Viewport-Höhe 320-2160 |
+| `clientJobId` | string | (generiert) | Eigene Job-ID, damit Sie den Fortschrittsstream öffnen können, bevor die Antwort eintrifft |
 
 **Beispiel:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Die Aufnahme läuft als Job in der Warteschlange. Ist sie innerhalb des synchronen Wartefensters fertig, erhalten Sie das obige Ergebnis mit `200`. Eine langsamere Aufnahme antwortet mit `202` und `{"jobId":"...","async":true}`; verfolgen Sie sie wie unter [Fortschrittsverfolgung](#progress-tracking) beschrieben. Bis Version 2.3.0 hat dieser Endpunkt immer gewartet und mit `200` geantwortet. Skripte, die nur `200` behandeln, sollten daher auch `202` behandeln.
 
 ### Tool-Unterrouten {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ Dauerhafte Dateispeicherung mit Versionsverlauf.
 | `GET` | `/api/v1/files/:id/download` | Datei herunterladen |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px-JPEG-Thumbnail abrufen |
 | `DELETE` | `/api/v1/files` | Dateien und ihre Versionsketten massenhaft löschen (Body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Mehrere Dateien als eine ZIP-Datei herunterladen (Body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Remote-URLs in den Arbeitsbereich abrufen für URL-basierte Importe |
 | `POST` | `/api/v1/preview` | Eine browserkompatible WebP-Vorschau erzeugen (für HEIC/HEIF/RAW-Formate) |
 | `GET` | `/api/v1/files/:id/preview` | Eine zwischengespeicherte oder erzeugte browserkompatible Vorschau für eine gespeicherte PDF-, Office-Dokument-, Video- oder Audiodatei streamen |

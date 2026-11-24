@@ -67,6 +67,7 @@ export {
   fastLanguageUnsupportedReason,
   MAX_OCR_INPUT_DIMENSION,
   MAX_OCR_INPUT_PIXELS,
+  MAX_OCR_OUTPUT_BYTES,
 } from "./ocr.js";
 export type {
   OcrRuntimeRunOptions,
@@ -155,6 +156,11 @@ export {
 export type { TranscribeOptions, TranscriptionResult, TranscriptSegment } from "./transcription.js";
 export { transcribeAudio } from "./transcription.js";
 export type { UpscaleOptions, UpscaleResult } from "./upscaling.js";
-export { MAX_CPU_UPSCALE_MP, MAX_CPU_UPSCALE_OUTPUT_MP, upscale } from "./upscaling.js";
+export {
+  MAX_CPU_UPSCALE_MP,
+  MAX_CPU_UPSCALE_OUTPUT_MP,
+  resolveMaxCpuUpscaleMp,
+  upscale,
+} from "./upscaling.js";
 export { acquireVenvLock } from "./venv-lock.js";
 export { resolveAiVenvPath } from "./venv-path.js";

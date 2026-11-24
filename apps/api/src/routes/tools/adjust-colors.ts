@@ -146,10 +146,11 @@ async function processColorAdjustments(
   // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
   // would flatten a multi-frame strip into a single tall frame. Those go frame
   // by frame; the rest keep the cheaper single pass over the whole animation
-  // (#1083, #3120, #3133, #3469, #3473).
-  if (settings.sharpness > 0 || needsRecombMaterialize) {
+  // (#1083, #3120, #3133, #3469, #3473). TIFF output always materialises
+  // through PNG at the end, so a multi-page TIFF goes page by page too (#4850).
+  if (settings.sharpness > 0 || needsRecombMaterialize || outputFormat.format === "tiff") {
     try {
-      const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
+      const perFrame = await runPerFrame(inputBuffer, outputFormat, async (frame) => {
         const result = await processColorAdjustments(frame, settings, filename);
         return result.buffer;
       });

@@ -14,16 +14,16 @@ describe("toolSection", () => {
     expect(toolSection({ modality: "document", acceptedInputs: [".docx", ".odt"] })).toBe("files");
   });
 
-  it("partitions the catalog into exactly 35 PDF and 23 Files tools", () => {
+  it("partitions the catalog into exactly 37 PDF and 32 Files tools", () => {
     const bySection = (s: Section) =>
       TOOLS.filter((t) => toolSection(t) === s)
         .map((t) => t.id)
         .sort();
-    expect(TOOLS.filter((t) => toolSection(t) === "image")).toHaveLength(112);
-    expect(TOOLS.filter((t) => toolSection(t) === "video")).toHaveLength(57);
-    expect(TOOLS.filter((t) => toolSection(t) === "audio")).toHaveLength(27);
-    expect(bySection("pdf")).toHaveLength(35);
-    expect(bySection("files")).toHaveLength(23);
+    expect(TOOLS.filter((t) => toolSection(t) === "image")).toHaveLength(113);
+    expect(TOOLS.filter((t) => toolSection(t) === "video")).toHaveLength(63);
+    expect(TOOLS.filter((t) => toolSection(t) === "audio")).toHaveLength(57);
+    expect(bySection("pdf")).toHaveLength(37);
+    expect(bySection("files")).toHaveLength(32);
     expect(bySection("pdf")).toContain("sign-pdf");
     expect(bySection("pdf")).toContain("merge-pdf");
     expect(bySection("pdf")).toContain("ocr-pdf");

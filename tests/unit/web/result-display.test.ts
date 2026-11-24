@@ -134,6 +134,7 @@ describe("videoAreaView (#4666)", () => {
     ["", "player"],
     ["loop.gif", "image"],
     ["clip.webp", "image"],
+    ["clip.avif", "image"],
     ["frame.png", "image"],
     ["clip.mkv", "server-preview"],
     ["clip.avi", "server-preview"],

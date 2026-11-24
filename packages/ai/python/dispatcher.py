@@ -95,11 +95,13 @@ DOCS_SCRIPTS = {
     "doc_flatten",
     "doc_redact",
     "doc_text",
+    "doc_markdown",
     "doc_to_word",
     "doc_metadata",
     "doc_html_pdf",
     "doc_sign",
     "doc_scrub_meta",
+    "font_convert",
 }
 
 if DISPATCHER_PROFILE == "docs":

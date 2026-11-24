@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
+import {
+  TrimFields,
+  type TrimValue,
+  trimPayload,
+  trimProblem,
+  trimValueFrom,
+} from "@/components/common/trim-fields";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
+
+const DEFAULT_TRIM: TrimValue = { mode: "range", startS: 0, endS: 10, cutStartS: 0, cutEndS: 0 };
+const DEFAULT_PIPELINE_TRIM: TrimValue = { ...DEFAULT_TRIM, endS: 0 };
 
 export function TrimAudioSettings() {
   const { t } = useTranslation();
@@ -12,15 +22,15 @@ export function TrimAudioSettings() {
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("trim-audio");
 
-  const [startS, setStartS] = useState(0);
-  const [endS, setEndS] = useState(10);
+  const [trim, setTrim] = useState<TrimValue>(DEFAULT_TRIM);
+  const [textValid, setTextValid] = useState(true);
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
-  const rangeValid = endS > startS;
+  const trimValid = textValid && trimProblem(trim) === null;
 
   const handleProcess = () => {
-    const settings = { startS, endS };
+    const settings = trimPayload(trim);
     if (hasMultiple) {
       processAllFiles(files, settings);
     } else {
@@ -30,40 +40,13 @@ export function TrimAudioSettings() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <label htmlFor="ta-start" className="text-xs text-muted-foreground">
-          {s.start}
-        </label>
-        <input
-          id="ta-start"
-          type="number"
-          min={0}
-          step={0.1}
-          value={startS}
-          onChange={(e) => setStartS(Number(e.target.value))}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="ta-end" className="text-xs text-muted-foreground">
-          {s.end}
-        </label>
-        <input
-          id="ta-end"
-          type="number"
-          min={0}
-          step={0.1}
-          value={endS}
-          onChange={(e) => setEndS(Number(e.target.value))}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
-        {!rangeValid && (
-          <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
-            {s.endTimeMustBeAfter}
-          </p>
-        )}
-      </div>
+      <TrimFields
+        idPrefix="ta"
+        value={trim}
+        onChange={setTrim}
+        labels={s}
+        onTextValidityChange={setTextValid}
+      />
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
@@ -81,7 +64,7 @@ export function TrimAudioSettings() {
           type="button"
           data-testid="trim-audio-submit"
           onClick={handleProcess}
-          disabled={!hasFile || processing || !rangeValid}
+          disabled={!hasFile || processing || !trimValid}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {hasMultiple ? format(s.submitBatch, { count: files.length }) : s.submit}
@@ -99,15 +82,13 @@ export interface TrimAudioControlsProps {
 export function TrimAudioControls({ settings: initial, onChange }: TrimAudioControlsProps) {
   const { t } = useTranslation();
   const s = t.toolSettings["trim-audio"];
-  const [startS, setStartS] = useState(0);
-  const [endS, setEndS] = useState(0);
+  const [trim, setTrim] = useState<TrimValue>(DEFAULT_PIPELINE_TRIM);
 
   const initializedRef = useRef(false);
   useEffect(() => {
     if (!initial || initializedRef.current) return;
     initializedRef.current = true;
-    if (initial.startS != null) setStartS(Number(initial.startS));
-    if (initial.endS != null) setEndS(Number(initial.endS));
+    setTrim(trimValueFrom(initial, DEFAULT_PIPELINE_TRIM));
   }, [initial]);
 
   const onChangeRef = useRef(onChange);
@@ -115,39 +96,12 @@ export function TrimAudioControls({ settings: initial, onChange }: TrimAudioCont
     onChangeRef.current = onChange;
   });
   useEffect(() => {
-    onChangeRef.current?.({ startS, endS });
-  }, [startS, endS]);
+    onChangeRef.current?.(trimPayload(trim));
+  }, [trim]);
 
   return (
     <div className="space-y-4">
-      <div>
-        <label htmlFor="tap-start" className="text-xs text-muted-foreground">
-          {s.start}
-        </label>
-        <input
-          id="tap-start"
-          type="number"
-          min={0}
-          step={0.1}
-          value={startS}
-          onChange={(e) => setStartS(Number(e.target.value))}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
-      </div>
-      <div>
-        <label htmlFor="tap-end" className="text-xs text-muted-foreground">
-          {s.end}
-        </label>
-        <input
-          id="tap-end"
-          type="number"
-          min={0}
-          step={0.1}
-          value={endS}
-          onChange={(e) => setEndS(Number(e.target.value))}
-          className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
-        />
-      </div>
+      <TrimFields idPrefix="tap" value={trim} onChange={setTrim} labels={s} />
     </div>
   );
 }

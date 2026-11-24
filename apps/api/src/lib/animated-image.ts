@@ -3,6 +3,7 @@ import sharp, { type Metadata, type Sharp } from "sharp";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload, MAX_GIF_FRAMES } from "./gif-limits.js";
 import { logger } from "./logger.js";
+import { type EncoderOptions, type OutputFormat, outputFormatFor } from "./output-format.js";
 
 /**
  * Animation-aware plumbing for the Sharp-backed image tools (issue #1083).
@@ -54,7 +55,7 @@ const STILL: FrameInfo = { animated: false, pages: 1, pageHeight: 0, width: 0 };
  * Multi-frame input is pushed through the same `assertGifWorkload` cap the GIF
  * tools use, rather than introducing a second limit.
  */
-async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
+export async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
   let meta: Metadata;
   try {
     meta = await sharp(buffer).metadata();
@@ -100,20 +101,24 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
  * taller than the original, so a 100x100 GIF converted to JPEG comes out as a
  * 100x300 contact sheet. Reporting the input as a still keeps those conversions
  * on the single-frame path, which is the correct result for them anyway.
+ * (convert is the one exception for AVIF: it sends an animation to ffmpeg
+ * through animated-avif.ts instead.)
  */
 export async function readAnimationFor(buffer: Buffer, outputFormat: string): Promise<FrameInfo> {
-  if (!animatedContainerFor(outputFormat)) return STILL;
+  const container = animatedContainerFor(outputFormat);
+  if (!container) return STILL;
+  if (container === "tiff") return await readTiffPagesFor(buffer, outputFormat);
   return await readAnimation(buffer);
 }
 
 /**
  * Page stack for a multi-page TIFF that is going back out as TIFF (#4419).
  *
- * TIFF pages are not an animation, so readAnimationFor leaves them out and a
- * TIFF converted to a still format keeps page 1, like an animated GIF does.
+ * A TIFF converted to a still format keeps page 1, like an animated GIF does.
  * TIFF out is different: dropping every page after the first there is silent
- * data loss. This is for page-aware pipelines (`resize`, `extract`), which
- * handle the stacked strip that `openAnimated` gives them on their own.
+ * data loss, so readAnimationFor and runPerFrame answer through here whenever
+ * the output is TIFF (#4850). Pages carry no delay or loop, so the stack goes
+ * through the same strip handling an animation does.
  *
  * libvips only stacks pages that share one size, so a TIFF with mixed page
  * sizes is refused with the page count rather than cut down to page 1.
@@ -172,17 +177,63 @@ export async function isAnimated(buffer: Buffer): Promise<boolean> {
   return (await readAnimation(buffer)).animated;
 }
 
+/**
+ * Whether the input is a multi-page TIFF that is going back out as TIFF.
+ *
+ * For the same tools as isAnimated: TIFF carries an alpha channel, so a page
+ * stack can keep its container when a setting needs alpha, where switching to
+ * PNG would keep page 1 alone (#4877).
+ */
+export async function isMultiPageTiff(buffer: Buffer, outputFormat: string): Promise<boolean> {
+  return (await readTiffPagesFor(buffer, outputFormat)).animated;
+}
+
+/**
+ * Refuse a multi-frame input headed for a container that would keep its frames.
+ *
+ * For the AI tools, which run a model once per call (#5104). Running it once
+ * per page would multiply GPU or CPU time by the page count, and an animated
+ * GIF can have hundreds of frames, so they refuse the input rather than return
+ * frame 1 with a 200. The rule matches readAnimationFor: a GIF or WebP going
+ * out as GIF or WebP, or a TIFF going out as TIFF. Anything bound for a still
+ * format keeps frame 1, as convert does.
+ */
+export async function assertSingleFrameFor(buffer: Buffer, outputFormat: string): Promise<void> {
+  const container = animatedContainerFor(outputFormat);
+  if (!container) return;
+  let meta: Metadata;
+  try {
+    meta = await sharp(buffer).metadata();
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    // The tool decodes the same buffer next and reports its own error.
+    return;
+  }
+  const pages = meta.pages ?? 1;
+  if (pages <= 1) return;
+  const isTiff = meta.format === "tiff";
+  const keepsFrames =
+    container === "tiff" ? isTiff : meta.format === "gif" || meta.format === "webp";
+  if (!keepsFrames) return;
+  throw new ToolInputError(
+    `This file has ${pages} ${isTiff ? "pages" : "frames"}, and this tool edits one image at a time. Split it into separate images and try again.`,
+    { code: "MULTI_FRAME_UNSUPPORTED" },
+  );
+}
+
 /** Open a pipeline that keeps every frame; stills get the plain handle. */
 export function openAnimated(buffer: Buffer, info: FrameInfo): Sharp {
   return info.animated ? sharp(buffer, { animated: true }) : sharp(buffer);
 }
 
-/** Containers that can actually hold an animation on the way out. */
-type AnimatedContainer = "gif" | "webp";
+/** Containers that can hold more than one frame or page on the way out. */
+type AnimatedContainer = "gif" | "webp" | "tiff";
 
 function animatedContainerFor(format: string): AnimatedContainer | undefined {
   if (format === "gif") return "gif";
   if (format === "webp") return "webp";
+  if (format === "tiff") return "tiff";
   return undefined;
 }
 
@@ -215,11 +266,14 @@ function assertOutputWorkload(width: number, height: number, pages: number): voi
  * Frames travel as PNG in both directions so nothing is lost on the way in or
  * out; every caller resolves its output format from the original buffer before
  * splitting, so no tool needs the frame to arrive in a particular container.
+ * The join is the encode the user downloads, so it takes the route's encoder
+ * options; without them WebP fell back to Sharp's quality 80 (#5103).
  */
 async function mapFrames(
   buffer: Buffer,
   info: FrameInfo,
   container: AnimatedContainer,
+  encoderOptions: EncoderOptions,
   transform: (frame: Buffer, index: number) => Promise<Buffer>,
 ): Promise<Buffer> {
   const rebuilt: Buffer[] = [];
@@ -237,9 +291,12 @@ async function mapFrames(
   }
 
   const joined = sharp(rebuilt, { join: { across: 1, animated: true } });
+  // LZW to match outputFormatFor's TIFF encoder; Sharp's own default is JPEG,
+  // which would cost every page a lossy generation.
+  if (container === "tiff") return await joined.tiff({ compression: "lzw" }).toBuffer();
   return container === "gif"
-    ? await joined.gif({ delay: info.delay, loop: info.loop }).toBuffer()
-    : await joined.webp({ delay: info.delay, loop: info.loop }).toBuffer();
+    ? await joined.gif({ ...encoderOptions, delay: info.delay, loop: info.loop }).toBuffer()
+    : await joined.webp({ ...encoderOptions, delay: info.delay, loop: info.loop }).toBuffer();
 }
 
 /**
@@ -250,21 +307,35 @@ async function mapFrames(
  * output format that cannot hold an animation. Converting an animated GIF to
  * JPEG really does produce a still, so that case is not a failure.
  *
- * `still` is the tool's own logic, unchanged, receiving one frame at a time.
+ * `still` is the tool's own logic, receiving one frame at a time.
+ * `outputFormat` is the whole resolved format rather than its name so the
+ * route's encoder options reach the final join (#5103).
+ *
+ * `still` also gets the format to encode its frame with, which is always PNG.
+ * The join is the encode the user downloads, so a frame the tool had already
+ * encoded to its lossy output format paid a second generation that a still
+ * never pays (#5125). Tools share one function between both paths by taking
+ * that format as a parameter that defaults to their own output format.
  */
 export async function runPerFrame(
   inputBuffer: Buffer,
-  outputFormat: string,
-  still: (frame: Buffer) => Promise<Buffer>,
+  outputFormat: Pick<OutputFormat, "format" | "encoderOptions">,
+  still: (frame: Buffer, frameFormat: OutputFormat) => Promise<Buffer>,
 ): Promise<Buffer | undefined> {
   // Container first: reading the animation applies the frame cap, and an input
   // headed for a still format should not be rejected over a frame count that is
   // about to be discarded anyway. readAnimationFor gates in the same order.
-  const container = animatedContainerFor(outputFormat);
+  const container = animatedContainerFor(outputFormat.format);
   if (!container) return undefined;
 
-  const info = await readAnimation(inputBuffer);
+  const info =
+    container === "tiff"
+      ? await readTiffPagesFor(inputBuffer, outputFormat.format)
+      : await readAnimation(inputBuffer);
   if (!info.animated) return undefined;
 
-  return await mapFrames(inputBuffer, info, container, (frame) => still(frame));
+  const frameFormat = outputFormatFor("png");
+  return await mapFrames(inputBuffer, info, container, outputFormat.encoderOptions, (frame) =>
+    still(frame, frameFormat),
+  );
 }

@@ -53,12 +53,12 @@ export function isEngineUnavailableResponse(statusCode: number, body: string): b
  * spawned. Match each engine's own "not found" wording, which it raises before
  * spawning anything. The lean docker test image ships without pdfcpu,
  * LibreOffice (soffice), and pandoc as well as ffmpeg, so all four gate the
- * same way. A real crash carries an exit code and stderr and has to stay a
- * failure.
+ * same way. CI shards have no caire, so content-aware-resize gates here too.
+ * A real crash carries an exit code and stderr and has to stay a failure.
  */
 export function isEngineUnavailableFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\b[^"]*?\bbinary not found\b/i.test(message)) {
+  if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc|caire)\b[^"]*?\bbinary not found\b/i.test(message)) {
     return true;
   }
   // A job payload carries the worker's fixed sentence, not the cause: it swaps
@@ -73,6 +73,37 @@ export function isEngineUnavailableFailure(error: unknown): boolean {
     return true;
   }
   return /spawn\s+\S*(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\S*\s+ENOENT/i.test(message);
+}
+
+/** The parts of a settled job row that say how it ended. */
+export interface SettledJobOutcome {
+  status: string;
+  error: unknown;
+}
+
+/**
+ * True when an accepted job failed because the worker refused its input.
+ *
+ * A long tool answers 202, so a file it correctly refuses never comes back as
+ * a 4xx response: the job fails, and the worker records the status the sync
+ * route would have sent on the failed row (`failureStatus` in
+ * apps/api/src/jobs/worker-shared.ts). pdf-to-word refusing a scanned PDF is
+ * the case that made this matter (#5038). Read the recorded status, never the
+ * message, since the copy gets reworded. Only a 4xx the matrix already allows
+ * counts; a server fault or a failure with no recorded status stays a failure.
+ */
+export function isRecordedRejection(
+  row: SettledJobOutcome | undefined,
+  allowedStatuses: ReadonlySet<number>,
+): boolean {
+  if (row?.status !== "failed") return false;
+  const httpStatus = (row.error as { httpStatus?: unknown } | null)?.httpStatus;
+  return (
+    typeof httpStatus === "number" &&
+    httpStatus >= 400 &&
+    httpStatus < 500 &&
+    allowedStatuses.has(httpStatus)
+  );
 }
 
 export type GeneratedSkipCategory = (typeof GENERATED_SKIP_CATEGORIES)[number];
@@ -193,4 +224,41 @@ export function featureUnavailableDisposition({
     throw new Error(`${toolId}: required AI feature returned 501 ${String(code)}`);
   }
   return "skip";
+}
+
+export type RequiredAiGate =
+  | { kind: "run" }
+  | { kind: "skip"; reason: string }
+  | { kind: "fail"; reason: string };
+
+interface RequiredAiGateInput {
+  requireAiFeatures: boolean;
+  /** First bundle the tool needs that DATA_DIR lacks, or null when none is missing. */
+  firstMissingBundle: (toolId: string) => string | null;
+  dataDir: string | undefined;
+}
+
+/**
+ * Whether a generated matrix runs an AI tool. Ordinary runs skip them: each
+ * fork's DATA_DIR is fresh, so no bundle is ever installed there. The strict
+ * lane (REQUIRE_AI_FEATURES=1, the ubuntu_gpu release preflight) runs them
+ * against a provisioned DATA_DIR, and a bundle missing from it fails the tool
+ * by name before any request, so a half-provisioned host can't pass.
+ */
+export function requiredAiGate(
+  toolId: string,
+  { requireAiFeatures, firstMissingBundle, dataDir }: RequiredAiGateInput,
+): RequiredAiGate {
+  if (!requireAiFeatures) {
+    return {
+      kind: "skip",
+      reason: `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
+    };
+  }
+  const missing = firstMissingBundle(toolId);
+  if (!missing) return { kind: "run" };
+  return {
+    kind: "fail",
+    reason: `${toolId}: REQUIRE_AI_FEATURES=1 but bundle "${missing}" is not installed in DATA_DIR=${dataDir || "(unset)"}`,
+  };
 }

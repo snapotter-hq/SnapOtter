@@ -1,7 +1,9 @@
 /**
  * Focused unit coverage for the system-jobs sweep, scheduling, and cron-monitor
  * branches that the integration suite exercises only on the happy path:
- *   - storageTtlSweep: legal-hold users/teams, deleteAfter sweep (ok + error),
+ *   - storageTtlSweep: legal-hold users/teams, team retention deadline
+ *     backfill (#4938) and stale deadline clearing (#5121), deleteAfter
+ *     sweep (ok + error),
  *     maxAgeMs<=0 and empty-dir early returns, per-dir deletePrefix failure,
  *     legal-hold skip on expired dirs, and what each outcome logs.
  *   - retentionSweep: jobs/audit retention on and off, tamper-resistant guard.
@@ -43,6 +45,14 @@ const parseNumericSettingValueMock = vi.hoisted(() =>
 const analyticsEnabledMock = vi.hoisted(() => vi.fn());
 const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbUpdateMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn());
+const enterpriseFeatureMock = vi.hoisted(() => vi.fn());
+
+// db.update(jobs).set().from().<join>().where().returning() resolves to the
+// next queued rows (the team retention backfill, then the stale deadline
+// clear), or rejects on THROW.
+const updateQueue = vi.hoisted(() => [] as unknown[]);
+const updateCalls = vi.hoisted(() => [] as { set: unknown }[]);
 
 // -- Fluent db.select() mock --------------------------------------------------
 // Each call to db.select(cols).from(table) pulls the next queued result for
@@ -58,7 +68,7 @@ const selectQueues = vi.hoisted(() => ({
 
 const schemaMock = vi.hoisted(() => ({
   users: { id: "users.id", legalHold: "users.legalHold", team: "users.team" },
-  teams: { id: "teams.id", legalHold: "teams.legalHold" },
+  teams: { id: "teams.id", legalHold: "teams.legalHold", retentionHours: "teams.retentionHours" },
   jobs: {
     id: "jobs.id",
     userId: "jobs.userId",
@@ -114,6 +124,27 @@ function makeBuilder() {
   return builder;
 }
 
+function makeUpdateBuilder() {
+  const next: unknown = updateQueue.length > 0 ? updateQueue.shift() : [];
+  const builder: Record<string, unknown> = {
+    set(values: unknown) {
+      updateCalls.push({ set: values });
+      return builder;
+    },
+    from: () => builder,
+    innerJoin: () => builder,
+    leftJoin: () => builder,
+    where: () => builder,
+    returning: () => builder,
+    // biome-ignore lint/suspicious/noThenProperty: intentional thenable mocking an awaitable Drizzle query builder
+    then(onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) {
+      if (next === THROW) return Promise.reject(THROW.__throw).then(onFulfilled, onRejected);
+      return Promise.resolve(next).then(onFulfilled, onRejected);
+    },
+  };
+  return builder;
+}
+
 function queueSelect(table: TableName, rows: unknown[] | typeof THROW): void {
   selectQueues[table].push(rows as unknown[]);
 }
@@ -122,6 +153,8 @@ function resetSelectQueues(): void {
   selectQueues.users = [];
   selectQueues.teams = [];
   selectQueues.jobs = [];
+  updateQueue.length = 0;
+  updateCalls.length = 0;
 }
 
 async function loadSystemJobs(
@@ -140,18 +173,23 @@ async function loadSystemJobs(
   analyticsEnabledMock.mockReset();
   dbExecuteMock.mockReset();
   dbUpdateMock.mockReset();
+  reportErrorMock.mockReset();
+  enterpriseFeatureMock.mockReset();
 
   // Sensible defaults; individual tests override.
   deletePrefixMock.mockResolvedValue(undefined);
   listJobDirsMock.mockResolvedValue([]);
   dbExecuteMock.mockResolvedValue(undefined);
   analyticsEnabledMock.mockReturnValue(true);
+  dbUpdateMock.mockImplementation(() => makeUpdateBuilder());
+  enterpriseFeatureMock.mockResolvedValue(true);
 
   vi.doMock("drizzle-orm", () => ({
     and: vi.fn(() => "and"),
     eq: vi.fn(() => "eq"),
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
+    isNull: vi.fn(() => "isNull"),
     lt: vi.fn(() => "lt"),
     ne: vi.fn(() => "ne"),
     sql: vi.fn(() => "sql"),
@@ -215,7 +253,11 @@ async function loadSystemJobs(
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   vi.doMock("../../../../apps/api/src/lib/enterprise-feature.js", () => ({
-    isEnterpriseFeatureEnabled: vi.fn().mockResolvedValue(true),
+    isEnterpriseFeatureEnabled: enterpriseFeatureMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
   }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");
@@ -1198,5 +1240,268 @@ describe("storageTtlSweep keeps dirs of in-flight jobs (#1412)", () => {
       "failed",
       "canceled",
     ]);
+  });
+});
+
+// #4938: a failed computeDeleteAfter at enqueue left delete_after NULL, so the
+// job's files fell back to the global TTL instead of the team's retention.
+describe("storageTtlSweep team retention deadline backfill (#4938)", () => {
+  it("backfills missing deadlines, logs and reports each once, and deletes none of them in the same pass", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const deadline = new Date(Date.now() - 60_000);
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push([{ id: "job-backfilled", deleteAfter: deadline }]);
+    // The backfilled deadline has already passed, so the deadline select sees
+    // it next to a job whose own deadline expired.
+    queueSelect("jobs", [
+      { id: "job-backfilled", userId: "u1" },
+      { id: "job-expired", userId: "u2" },
+    ]);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 0 });
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-expired");
+    expect(deletePrefixMock).not.toHaveBeenCalledWith("uploads/job-backfilled");
+    expect(deletePrefixMock).not.toHaveBeenCalledWith("outputs/job-backfilled");
+
+    const backfillLogs = warnSpy.mock.calls.filter((c) =>
+      String(c[1]).includes("backfilled a missing team retention deadline"),
+    );
+    expect(backfillLogs).toEqual([
+      [
+        { jobId: "job-backfilled", deleteAfter: deadline },
+        "Storage TTL: backfilled a missing team retention deadline",
+      ],
+    ]);
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    const [err, ctx] = reportErrorMock.mock.calls[0];
+    expect((err as Error).name).toBe("SafeError");
+    expect(ctx).toEqual({
+      source: "cron",
+      subsystem: "retention",
+      jobId: "job-backfilled",
+      periodic: true,
+      job: SYSTEM_JOBS.storageTtl,
+    });
+    warnSpy.mockRestore();
+  });
+
+  it("deletes a backfilled job on the next pass once its deadline has passed", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    // First pass backfills it and leaves it alone.
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push([{ id: "job-late", deleteAfter: new Date(Date.now() - 60_000) }]);
+    queueSelect("jobs", [{ id: "job-late", userId: "u1" }]);
+    getMaxAgeMsMock.mockResolvedValue(0);
+    expect(await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never)).toEqual({
+      removed: 0,
+      failed: 0,
+    });
+
+    // Second pass: nothing left to backfill, so the deadline is honored.
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push([]);
+    queueSelect("jobs", [{ id: "job-late", userId: "u1" }]);
+    expect(await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never)).toEqual({
+      removed: 1,
+      failed: 0,
+    });
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-late");
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fills only finished jobs with no deadline whose team has a retention override, from created_at", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const drizzle = await import("drizzle-orm");
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(dbUpdateMock).toHaveBeenCalledWith(schemaMock.jobs);
+    expect(drizzle.eq).toHaveBeenCalledWith("teams.id", "users.team");
+    expect(drizzle.eq).toHaveBeenCalledWith("jobs.userId", "users.id");
+    expect(drizzle.isNull).toHaveBeenCalledWith("jobs.deleteAfter");
+    expect(drizzle.isNotNull).toHaveBeenCalledWith("teams.retentionHours");
+    expect(drizzle.inArray).toHaveBeenCalledWith("jobs.status", [
+      "completed",
+      "failed",
+      "canceled",
+    ]);
+    const sqlCall = vi
+      .mocked(drizzle.sql)
+      .mock.calls.find((c) => (c[0] as unknown as string[]).join("?").includes("make_interval"));
+    expect(sqlCall, "the deadline expression was not built").toBeDefined();
+    expect(sqlCall?.slice(1)).toEqual(["jobs.createdAt", "teams.retentionHours"]);
+    // The backfill is the first update; the #5121 clear follows it.
+    expect(updateCalls[0]).toEqual({ set: { deleteAfter: "sql" } });
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the backfill when team retention overrides are not licensed", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    enterpriseFeatureMock.mockResolvedValue(false);
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(enterpriseFeatureMock).toHaveBeenCalledWith("team_retention_overrides", "cron");
+    expect(dbUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed backfill and still runs the deadline and global sweeps", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push(THROW);
+    queueSelect("jobs", [{ id: "job-expired", userId: null }]);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 0 });
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-expired");
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: THROW.__throw },
+      "Storage TTL: team retention deadline backfill failed",
+    );
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+});
+
+// #5121: before #5100, enqueue wrote a FILE_MAX_AGE_HOURS deadline for a team
+// with no override, so those files expired on the env value instead of the
+// global tempFileMaxAgeHours setting.
+describe("storageTtlSweep clears deadlines no team override backs (#5121)", () => {
+  it("clears a deadline whose team has no override, or no team row, before the deadline sweep", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const infoSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const drizzle = await import("drizzle-orm");
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push([]); // backfill
+    updateQueue.push([{ id: "job-stale-1" }, { id: "job-stale-2" }]);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(updateCalls).toEqual([{ set: { deleteAfter: "sql" } }, { set: { deleteAfter: null } }]);
+    expect(drizzle.isNotNull).toHaveBeenCalledWith("jobs.deleteAfter");
+    expect(drizzle.isNull).toHaveBeenCalledWith("teams.retentionHours");
+    expect(infoSpy).toHaveBeenCalledWith(
+      "Storage TTL: cleared 2 team retention deadlines with no team override behind them",
+    );
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    infoSpy.mockRestore();
+  });
+
+  it("joins teams with a left join so a member of a missing team is cleared too", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const builders: Record<string, ReturnType<typeof vi.fn>>[] = [];
+    dbUpdateMock.mockImplementation(() => {
+      const b = makeUpdateBuilder() as Record<string, unknown>;
+      const spied = {
+        innerJoin: vi.fn(b.innerJoin as () => unknown),
+        leftJoin: vi.fn(b.leftJoin as () => unknown),
+      };
+      Object.assign(b, spied);
+      builders.push(spied);
+      return b;
+    });
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(builders).toHaveLength(2);
+    expect(builders[1].leftJoin).toHaveBeenCalledWith(schemaMock.teams, "eq");
+    expect(builders[1].innerJoin).not.toHaveBeenCalled();
+  });
+
+  it("logs nothing when there is nothing to clear", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const infoSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(updateCalls).toHaveLength(2);
+    expect(
+      infoSpy.mock.calls.filter((c) => String(c[0]).includes("team retention deadline")),
+    ).toEqual([]);
+    infoSpy.mockRestore();
+  });
+
+  it("leaves deadlines alone when team retention overrides are not licensed", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    enterpriseFeatureMock.mockResolvedValue(false);
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(dbUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed clear and still runs the deadline and global sweeps", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    updateQueue.push([]); // backfill
+    updateQueue.push(THROW);
+    queueSelect("jobs", [{ id: "job-expired", userId: null }]);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 0 });
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-expired");
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: THROW.__throw },
+      "Storage TTL: clearing team retention deadlines with no override failed",
+    );
+    errSpy.mockRestore();
   });
 });

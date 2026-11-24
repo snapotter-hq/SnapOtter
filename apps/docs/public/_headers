@@ -1,0 +1,8 @@
+# Cloudflare also serves the docs on the Pages hostnames. Canonicals point at
+# docs.snapotter.com, but a canonical is only a hint, so keep the mirrors out of
+# search outright (#5030). Absolute rules match the pages.dev hosts only.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex

@@ -175,6 +175,12 @@ export function ImageToBase64Settings() {
           const body = await res.json().catch(() => ({}));
           if (isCanceled()) break;
           if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
+          // When no file succeeds the server answers 400 but keeps the
+          // per-file reasons it would have sent with a 200 (#4409).
+          if (isBase64Response(body)) {
+            for (const e of body.errors) addError({ ...e, entryId });
+            continue;
+          }
           addError({
             entryId,
             filename: file.name,

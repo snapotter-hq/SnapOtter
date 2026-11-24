@@ -27,6 +27,8 @@ export interface CaptureOptions {
   viewportWidth: number;
   viewportHeight: number;
   isMobile?: boolean;
+  /** The job's cancel and deadline signal: aborting it closes the page. */
+  signal?: AbortSignal;
 }
 
 export function isBrowserAvailable(): boolean {
@@ -153,108 +155,146 @@ async function getBrowser(): Promise<Browser> {
   return browser;
 }
 
+/**
+ * Close the page as soon as the job is canceled or hits its deadline, so the
+ * load stops instead of holding the page and a worker slot until it times out
+ * (#5004). Closing a page leaves the browser connected, so the capture's catch
+ * never counts a cancel toward the crash window. The queue frees the slot when
+ * the signal aborts, so the next capture may open its page while this one is
+ * still closing: a one-page overshoot that lasts as long as the close.
+ */
+function closeOnAbort(page: Page, signal: AbortSignal | undefined): () => void {
+  if (!signal) return () => {};
+  const close = () => {
+    page.close().catch(() => {});
+  };
+  if (signal.aborted) close();
+  else signal.addEventListener("abort", close, { once: true });
+  return () => signal.removeEventListener("abort", close);
+}
+
 export async function capturePage(url: string, options: CaptureOptions): Promise<Buffer> {
-  return queue.add(async () => {
-    let b: Browser;
-    try {
-      b = await getBrowser();
-    } catch (err) {
-      recordCrash();
-      throw err;
-    }
-
-    const page = await b.newPage({
-      viewport: { width: options.viewportWidth, height: options.viewportHeight },
-      isMobile: options.isMobile,
-      serviceWorkers: "block",
-    });
-    await installNetworkGuard(page);
-
-    try {
-      await page.goto(url, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });
-      await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE }).catch(() => {});
-
-      if (options.fullPage) {
-        const scrollHeight = await page.evaluate(() => document.body.scrollHeight);
-        const targetHeight = Math.min(scrollHeight, MAX_FULL_PAGE_HEIGHT);
-        await page.setViewportSize({
-          width: options.viewportWidth,
-          height: targetHeight,
-        });
-      }
-
-      const type = options.format === "jpg" ? "jpeg" : options.format;
-      const screenshotOpts: Parameters<typeof page.screenshot>[0] = {
-        type: type as "jpeg" | "png",
-        fullPage: false,
-      };
-      if (options.format !== "png") {
-        screenshotOpts.quality = options.quality;
-      }
-
-      return (await page.screenshot(screenshotOpts)) as Buffer;
-    } catch (err) {
-      if (!b.isConnected()) {
+  return queue.add(
+    async () => {
+      let b: Browser;
+      try {
+        b = await getBrowser();
+      } catch (err) {
         recordCrash();
-        browser = null;
+        throw err;
       }
-      throw err;
-    } finally {
-      await page.close().catch(() => {});
-    }
-  }) as Promise<Buffer>;
+
+      const page = await b.newPage({
+        viewport: { width: options.viewportWidth, height: options.viewportHeight },
+        isMobile: options.isMobile,
+        serviceWorkers: "block",
+      });
+      const stopWatching = closeOnAbort(page, options.signal);
+
+      try {
+        options.signal?.throwIfAborted();
+        await installNetworkGuard(page);
+        await page.goto(url, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });
+        await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE }).catch(() => {});
+
+        if (options.fullPage) {
+          const scrollHeight = await page.evaluate(() => document.body.scrollHeight);
+          const targetHeight = Math.min(scrollHeight, MAX_FULL_PAGE_HEIGHT);
+          await page.setViewportSize({
+            width: options.viewportWidth,
+            height: targetHeight,
+          });
+        }
+
+        const type = options.format === "jpg" ? "jpeg" : options.format;
+        const screenshotOpts: Parameters<typeof page.screenshot>[0] = {
+          type: type as "jpeg" | "png",
+          fullPage: false,
+        };
+        if (options.format !== "png") {
+          screenshotOpts.quality = options.quality;
+        }
+
+        options.signal?.throwIfAborted();
+        return (await page.screenshot(screenshotOpts)) as Buffer;
+      } catch (err) {
+        if (!b.isConnected()) {
+          recordCrash();
+          browser = null;
+        }
+        // The page closed under a cancel or the deadline: "Target page closed"
+        // would read as a failed capture, so surface the abort itself.
+        options.signal?.throwIfAborted();
+        throw err;
+      } finally {
+        stopWatching();
+        await page.close().catch(() => {});
+      }
+    },
+    { signal: options.signal },
+  ) as Promise<Buffer>;
 }
 
 export async function captureHtml(html: string, options: CaptureOptions): Promise<Buffer> {
-  return queue.add(async () => {
-    let b: Browser;
-    try {
-      b = await getBrowser();
-    } catch (err) {
-      recordCrash();
-      throw err;
-    }
-
-    const page = await b.newPage({
-      viewport: { width: options.viewportWidth, height: options.viewportHeight },
-      isMobile: options.isMobile,
-      serviceWorkers: "block",
-    });
-    await installNetworkGuard(page);
-
-    try {
-      await page.setContent(html, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });
-      await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE }).catch(() => {});
-
-      if (options.fullPage) {
-        const scrollHeight = await page.evaluate(() => document.body.scrollHeight);
-        const targetHeight = Math.min(scrollHeight, MAX_FULL_PAGE_HEIGHT);
-        await page.setViewportSize({
-          width: options.viewportWidth,
-          height: targetHeight,
-        });
-      }
-
-      const type = options.format === "jpg" ? "jpeg" : options.format;
-      const screenshotOpts: Parameters<typeof page.screenshot>[0] = {
-        type: type as "jpeg" | "png",
-        fullPage: false,
-      };
-      if (options.format !== "png") {
-        screenshotOpts.quality = options.quality;
-      }
-
-      return (await page.screenshot(screenshotOpts)) as Buffer;
-    } catch (err) {
-      if (!b.isConnected()) {
+  return queue.add(
+    async () => {
+      let b: Browser;
+      try {
+        b = await getBrowser();
+      } catch (err) {
         recordCrash();
-        browser = null;
+        throw err;
       }
-      throw err;
-    } finally {
-      await page.close().catch(() => {});
-    }
-  }) as Promise<Buffer>;
+
+      const page = await b.newPage({
+        viewport: { width: options.viewportWidth, height: options.viewportHeight },
+        isMobile: options.isMobile,
+        serviceWorkers: "block",
+      });
+      const stopWatching = closeOnAbort(page, options.signal);
+
+      try {
+        options.signal?.throwIfAborted();
+        await installNetworkGuard(page);
+        await page.setContent(html, { waitUntil: "load", timeout: PAGE_LOAD_TIMEOUT });
+        await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE }).catch(() => {});
+
+        if (options.fullPage) {
+          const scrollHeight = await page.evaluate(() => document.body.scrollHeight);
+          const targetHeight = Math.min(scrollHeight, MAX_FULL_PAGE_HEIGHT);
+          await page.setViewportSize({
+            width: options.viewportWidth,
+            height: targetHeight,
+          });
+        }
+
+        const type = options.format === "jpg" ? "jpeg" : options.format;
+        const screenshotOpts: Parameters<typeof page.screenshot>[0] = {
+          type: type as "jpeg" | "png",
+          fullPage: false,
+        };
+        if (options.format !== "png") {
+          screenshotOpts.quality = options.quality;
+        }
+
+        options.signal?.throwIfAborted();
+        return (await page.screenshot(screenshotOpts)) as Buffer;
+      } catch (err) {
+        if (!b.isConnected()) {
+          recordCrash();
+          browser = null;
+        }
+        // The page closed under a cancel or the deadline: "Target page closed"
+        // would read as a failed capture, so surface the abort itself.
+        options.signal?.throwIfAborted();
+        throw err;
+      } finally {
+        stopWatching();
+        await page.close().catch(() => {});
+      }
+    },
+    { signal: options.signal },
+  ) as Promise<Buffer>;
 }
 
 export async function shutdownBrowser(): Promise<void> {

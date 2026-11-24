@@ -1,19 +1,21 @@
 ---
-description: "Renomeie vários arquivos usando um modelo de padrão e baixe como ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Renomeie várias imagens usando um modelo de padrão e baixe como ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: e37bffd2121d
 ---
 
 # Renomear em Lote {#bulk-rename}
 
-Renomeie vários arquivos usando um modelo de padrão com marcadores para índice, índice com preenchimento de zeros e nome de arquivo original. Retorna um arquivo ZIP contendo todos os arquivos renomeados.
+Renomeie várias imagens usando um modelo de padrão com marcadores para índice, índice com preenchimento de zeros e nome de arquivo original. Retorna um arquivo ZIP contendo todas as imagens renomeadas.
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Aceita dados de formulário multipart com vários arquivos e um campo JSON `settings`.
+Aceita dados de formulário multipart com vários arquivos de imagem e um campo JSON `settings`.
+
+Todo upload deve ser uma imagem. O cabeçalho de cada arquivo é verificado antes de o ZIP começar, e os bytes são compactados sem alterações (sem recodificar). Se algum arquivo não for uma imagem reconhecida, ou exceder `MAX_MEGAPIXELS`, a requisição inteira falha com `400` e um erro que nomeia esse arquivo, por exemplo `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parâmetros {#parameters}
 

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ffmpegAvailable } from "@snapotter/media-engine";
@@ -56,6 +56,41 @@ function probeSampleRate(payload: Buffer, filename: string): string {
     probeFile,
   ]);
   return result.stdout.toString().trim();
+}
+
+function probeAudioCodec(payload: Buffer, filename: string): string {
+  const tmpDir = mkdtempSync(join(tmpdir(), "convert-audio-test-"));
+  const probeFile = join(tmpDir, filename);
+  writeFileSync(probeFile, payload);
+  const result = spawnSync("ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "a:0",
+    "-show_entries",
+    "stream=codec_name",
+    "-of",
+    "csv=p=0",
+    probeFile,
+  ]);
+  return result.stdout.toString().trim();
+}
+
+/** The audio fixtures are all 16-bit, so 24-bit sources are generated (#4969). */
+function sineSource(filename: string, codecArgs: string[]): Buffer {
+  const out = join(mkdtempSync(join(tmpdir(), "convert-audio-src-")), filename);
+  const result = spawnSync("ffmpeg", [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "sine=frequency=440:duration=1",
+    ...codecArgs,
+    out,
+  ]);
+  if (result.status !== 0) throw new Error(result.stderr.toString());
+  return readFileSync(out);
 }
 
 describe.skipIf(!ffmpegAvailable())("convert-audio (requires ffmpeg)", () => {
@@ -161,5 +196,30 @@ describe.skipIf(!ffmpegAvailable())("convert-audio (requires ffmpeg)", () => {
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.length).toBeGreaterThan(100);
     expect((envelope.downloadUrl.split("/").pop() as string).endsWith(".ogg")).toBe(true);
+  }, 60_000);
+
+  it.each([
+    ["in24.flac", ["-c:a", "flac", "-sample_fmt", "s32", "-bits_per_raw_sample", "24"]],
+    ["in24.aiff", ["-c:a", "pcm_s24be"]],
+  ])(
+    "keeps %s at 24 bits when converting to wav (#4969)",
+    async (filename, codecArgs) => {
+      const res = await runTool({ format: "wav" }, sineSource(filename, codecArgs), filename);
+      expect(res.statusCode).toBe(200);
+      const envelope = JSON.parse(res.body);
+      const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+      expect(dl.statusCode).toBe(200);
+      expect(probeAudioCodec(dl.rawPayload, "out.wav")).toBe("pcm_s24le");
+    },
+    60_000,
+  );
+
+  it("writes a lossy mp3 as 16-bit wav", async () => {
+    const res = await runTool({ format: "wav" }, MP3, "tiny.mp3");
+    expect(res.statusCode).toBe(200);
+    const envelope = JSON.parse(res.body);
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    expect(probeAudioCodec(dl.rawPayload, "out.wav")).toBe("pcm_s16le");
   }, 60_000);
 });

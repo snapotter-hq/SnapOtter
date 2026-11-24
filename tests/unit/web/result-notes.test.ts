@@ -26,6 +26,34 @@ describe("pickResultNotes: chart rows", () => {
   });
 });
 
+// #954: pdf-to-text says how many pages had no readable text layer.
+describe("pickResultNotes: unreadable PDF pages", () => {
+  it("keeps the counts and nothing malformed", () => {
+    expect(pickResultNotes({ chars: 52, unreadablePages: { count: 2, total: 5 } })).toEqual({
+      unreadablePages: { count: 2, total: 5 },
+    });
+    expect(pickResultNotes({ unreadablePages: { count: "2", total: 5 } })).toBeNull();
+  });
+
+  it("doesn't put a resize badge on them", () => {
+    expect(hasResultWarning({ unreadablePages: { count: 2, total: 5 } })).toBe(false);
+  });
+});
+
+// #4947: and how many readable pages also held a line in an unreadable font.
+describe("pickResultNotes: partly unreadable PDF pages", () => {
+  it("keeps the counts and nothing malformed", () => {
+    expect(pickResultNotes({ chars: 52, partlyUnreadablePages: { count: 1, total: 3 } })).toEqual({
+      partlyUnreadablePages: { count: 1, total: 3 },
+    });
+    expect(pickResultNotes({ partlyUnreadablePages: { count: 1, total: "3" } })).toBeNull();
+  });
+
+  it("doesn't put a resize badge on them", () => {
+    expect(hasResultWarning({ partlyUnreadablePages: { count: 1, total: 3 } })).toBe(false);
+  });
+});
+
 // #1292: the notes a result carries beyond the file itself.
 describe("pickResultNotes", () => {
   it("keeps resizedTo, targetKb and targetMet and nothing else", () => {

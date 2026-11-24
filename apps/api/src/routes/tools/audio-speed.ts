@@ -22,8 +22,15 @@ export function registerAudioSpeed(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}_speed${out.ext}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath) => {
-        return ["-i", inPath, "-af", buildAtempoChain(settings.factor), ...out.encodeArgs, outPath];
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, outPath, { audio }) => {
+        return [
+          "-i",
+          inPath,
+          "-af",
+          buildAtempoChain(settings.factor),
+          ...audioOutputFor(origExt, audio).encodeArgs,
+          outPath,
+        ];
       });
       return { scratchPath: outPath, filename: outName, contentType: out.contentType };
     },

@@ -2113,13 +2113,6 @@
     "outputHash": "d7b62c82fdde",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "Si vous ne touchez qu'aux PDF, Stirling-PDF est excellent et mérite un coup d'œil. Si vous redimensionnez aussi des images, convertissez de la vidéo, transcrivez de l'audio ou traitez des fichiers par lots, SnapOtter gère tout cela dans un seul déploiement, au lieu de faire tourner plusieurs outils côte à côte.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "d96930e79791",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "Ce peut être le cas si vous voulez une seule pile pour bien plus que les PDF. La couverture PDF de SnapOtter est large, et il ajoute les outils image, vidéo, audio et fichier. Pour une installation dédiée aux seuls PDF, Stirling-PDF est un choix solide et ciblé.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "2291bf41b374",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "Les deux projets sont open source et auto-hébergeables. SnapOtter est sous AGPLv3 et ajoute une offre entreprise payante optionnelle pour le SSO, la journalisation d'audit et des contrôles similaires.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "e37005309bd4",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "Sont-ils tous deux gratuits et open source ?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "da92a558a1ce",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF et SnapOtter sont tous deux auto-hébergés et open source : dans les deux cas, les fichiers restent sur votre serveur. La différence tient à l'étendue : Stirling-PDF se concentre sur les PDF, tandis que SnapOtter couvre les cinq types de fichiers.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "e6713e1fb21f",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF est une solide boîte à outils PDF auto-hébergée. SnapOtter couvre aussi les PDF, plus les outils image, vidéo, audio et fichier dans une même pile. Les deux sont open source.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "e514f1a65c8f",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "Oui",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "0a90407639c4",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "Oui",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "f0e87e3fceb2",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "Plus de 60 opérations PDF",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "f060628bd808",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

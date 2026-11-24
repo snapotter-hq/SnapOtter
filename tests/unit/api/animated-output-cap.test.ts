@@ -24,6 +24,7 @@ vi.mock("@snapotter/image-engine", async (importOriginal) => ({
 }));
 
 import { runPerFrame } from "../../../apps/api/src/lib/animated-image.js";
+import { outputFormatFor } from "../../../apps/api/src/lib/output-format.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerGifWebp } from "../../../apps/api/src/routes/tools/gif-webp.js";
@@ -71,7 +72,9 @@ describe("runPerFrame output cap (#1183)", () => {
   it("rejects a transform that grows the animation past the pixel cap", async () => {
     const grow = growTo(64);
 
-    const error = await runPerFrame(await threeFrameGif(), "gif", grow).catch((e: unknown) => e);
+    const error = await runPerFrame(await threeFrameGif(), outputFormatFor("gif"), grow).catch(
+      (e: unknown) => e,
+    );
 
     expect(isToolInputError(error)).toBe(true);
     expect((error as Error).message).toMatch(/too large \(3 frames at 64x64\)/);
@@ -80,7 +83,7 @@ describe("runPerFrame output cap (#1183)", () => {
   it("stops after the first frame instead of transforming the rest", async () => {
     const grow = growTo(64);
 
-    await runPerFrame(await threeFrameGif(), "gif", grow).catch(() => undefined);
+    await runPerFrame(await threeFrameGif(), outputFormatFor("gif"), grow).catch(() => undefined);
 
     expect(grow).toHaveBeenCalledTimes(1);
   });
@@ -88,7 +91,7 @@ describe("runPerFrame output cap (#1183)", () => {
   it("still rebuilds an animation whose output stays under the cap", async () => {
     const grow = growTo(16); // 3 x 256 = 768 px
 
-    const out = await runPerFrame(await threeFrameGif(), "gif", grow);
+    const out = await runPerFrame(await threeFrameGif(), outputFormatFor("gif"), grow);
 
     expect(out).toBeDefined();
     const meta = await sharp(out as Buffer).metadata();

@@ -50,6 +50,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
 }
 ```
 
+A large or detailed color trace can outlast the synchronous wait window. The route then answers `202` with `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` instead. Follow `progressUrl` over SSE (or poll `statusUrl`) and download the SVG when the job completes. See [Progress Tracking](/api/rest#progress-tracking).
+
 ## Notes {#notes}
 
 - Output is always an SVG file regardless of input format.

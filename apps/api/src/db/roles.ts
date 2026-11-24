@@ -24,12 +24,24 @@ function assertSafeRole(role: string): void {
 // that name the same server over pure cosmetics.
 const DEFAULT_PG_PORT = "5432";
 
+// node-postgres takes ?host= and ?port= over the URL authority and decodes a
+// percent-encoded socket directory in the host, so compare the server it would
+// actually reach. docker/wait-for-postgres.mjs resolves the socket the same way.
+// Socket paths are case-sensitive; only DNS names get lowercased.
+// node-postgres copies query params in order, so a repeated one's last value wins.
+function lastParam(u: URL, name: string): string | undefined {
+  return u.searchParams.getAll(name).at(-1);
+}
+
+function effectiveTarget(u: URL): string {
+  const host = lastParam(u, "host") || decodeURIComponent(u.hostname);
+  const port = lastParam(u, "port") || u.port || DEFAULT_PG_PORT;
+  const normalizedHost = host.startsWith("/") ? host.replace(/\/+$/, "") : host.toLowerCase();
+  return JSON.stringify([normalizedHost, port, u.pathname]);
+}
+
 function sameTarget(a: URL, b: URL): boolean {
-  return (
-    a.hostname.toLowerCase() === b.hostname.toLowerCase() &&
-    (a.port || DEFAULT_PG_PORT) === (b.port || DEFAULT_PG_PORT) &&
-    a.pathname === b.pathname
-  );
+  return effectiveTarget(a) === effectiveTarget(b);
 }
 
 export function resolveRoleSplit(runtimeUrl: string, migrationUrl: string): RoleSplit {

@@ -16,8 +16,10 @@ import { BASE_CONFIG, CONVERSION_PRESETS } from "./conversion-presets.js";
  */
 export const LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS: ReadonlySet<string> = new Set([
   // Custom routes without fileId/saveMode handling
+  "aspect-ratio-calculator",
   "barcode-generate",
   "barcode-read",
+  "base64",
   "beautify",
   "bulk-rename",
   "collage",
@@ -25,6 +27,7 @@ export const LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS: ReadonlySet<string> = new Set(
   "compare",
   "compose",
   "content-aware-resize",
+  "convert-case",
   "edit-metadata",
   "favicon",
   "find-duplicates",
@@ -38,6 +41,7 @@ export const LIBRARY_SAVE_MODE_UNSUPPORTED_TOOLS: ReadonlySet<string> = new Set(
   "optimize-for-web",
   "passport-photo",
   "pdf-to-image",
+  "proportion-calculator",
   "qr-generate",
   "split",
   "stitch",

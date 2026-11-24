@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   isVaapiEncoder,
+  type MediaStreamInfo,
   probeMedia,
   resolveEncoder,
   runFfmpeg,
@@ -122,6 +123,7 @@ const EXT_AUDIO_CONTENT_TYPES: Record<string, string> = {
   ".opus": "audio/opus",
   ".wma": "audio/x-ms-wma",
   ".aiff": "audio/aiff",
+  ".aif": "audio/aiff",
 };
 
 /** Content type for a preserved-container audio output; mpeg fallback. */
@@ -161,6 +163,30 @@ export interface AudioOutput {
   encodeArgs: string[];
 }
 
+/** Narrowest first, so the index doubles as a rank when sources are mixed. */
+const WAV_PCM_CODECS = ["pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le"] as const;
+
+function wavPcmRank(stream: MediaStreamInfo | undefined): number {
+  const bits = stream?.bitsPerSample;
+  // Lossy codecs probe with no depth: more than 16 bits buys nothing there.
+  if (!bits || bits <= 16) return 0;
+  if (/^(flt|dbl)/.test(stream?.sampleFmt ?? "")) return 3;
+  return bits > 24 ? 2 : 1;
+}
+
+/**
+ * WAV PCM codec that keeps the resolution of the widest source, so a 24-bit
+ * FLAC or AIFF doesn't come back truncated to 16 bits (#4969).
+ */
+export function wavPcmCodec(streams: Array<MediaStreamInfo | undefined>): string {
+  return WAV_PCM_CODECS[Math.max(0, ...streams.map(wavPcmRank))];
+}
+
+/** AIFF is big-endian PCM, so it takes WAV's depth in the matching be codec. */
+function aiffPcmCodec(stream: MediaStreamInfo | undefined): string {
+  return wavPcmCodec([stream]).replace(/le$/, "be");
+}
+
 /**
  * `encodeArgs` is a function so the encoder is resolved when a job builds its
  * command line, not when this module loads: resolving probes the ffmpeg
@@ -168,14 +194,20 @@ export interface AudioOutput {
  */
 const AUDIO_OUTPUTS: Record<
   string,
-  Omit<AudioOutput, "encodeArgs"> & { encodeArgs: () => string[] }
+  Omit<AudioOutput, "encodeArgs"> & {
+    encodeArgs: (audio: MediaStreamInfo | undefined) => string[];
+  }
 > = {
   ".mp3": {
     ext: ".mp3",
     contentType: "audio/mpeg",
     encodeArgs: () => ["-c:a", resolveEncoder("mp3"), "-b:a", "192k"],
   },
-  ".wav": { ext: ".wav", contentType: "audio/wav", encodeArgs: () => ["-c:a", "pcm_s16le"] },
+  ".wav": {
+    ext: ".wav",
+    contentType: "audio/wav",
+    encodeArgs: (audio) => ["-c:a", wavPcmCodec([audio])],
+  },
   ".ogg": {
     ext: ".ogg",
     contentType: "audio/ogg",
@@ -200,16 +232,27 @@ const AUDIO_OUTPUTS: Record<
     contentType: "audio/mp4",
     encodeArgs: () => ["-c:a", "aac", "-b:a", "192k"],
   },
-  ".aiff": { ext: ".aiff", contentType: "audio/aiff", encodeArgs: () => ["-c:a", "pcm_s16be"] },
+  ".aiff": {
+    ext: ".aiff",
+    contentType: "audio/aiff",
+    encodeArgs: (audio) => ["-c:a", aiffPcmCodec(audio)],
+  },
+  ".aif": {
+    ext: ".aif",
+    contentType: "audio/aiff",
+    encodeArgs: (audio) => ["-c:a", aiffPcmCodec(audio)],
+  },
 };
 
 /**
  * Encoder selection for filtered (re-encoded) audio outputs, keyed by the
  * SOURCE extension. Decode-only sources (wma/amr/ape/...) fall back to mp3.
+ * Pass the probed source stream so WAV and AIFF keep its bit depth (#5123);
+ * without one they're 16-bit.
  */
-export function audioOutputFor(srcExt: string): AudioOutput {
+export function audioOutputFor(srcExt: string, audio?: MediaStreamInfo): AudioOutput {
   const spec = AUDIO_OUTPUTS[srcExt.toLowerCase()] ?? AUDIO_OUTPUTS[".mp3"];
-  return { ext: spec.ext, contentType: spec.contentType, encodeArgs: spec.encodeArgs() };
+  return { ext: spec.ext, contentType: spec.contentType, encodeArgs: spec.encodeArgs(audio) };
 }
 
 export interface MediaRunResult {
@@ -262,7 +305,12 @@ export async function runMediaTool(
   argsFor: (
     inPath: string,
     outPath: string,
-    info: { durationS: number | null; audioSampleRate: number | null; hasAudio: boolean },
+    info: {
+      durationS: number | null;
+      audioSampleRate: number | null;
+      hasAudio: boolean;
+      audio: MediaStreamInfo | undefined;
+    },
   ) => string[],
   opts: { timeoutMs?: number } = {},
 ): Promise<MediaRunResult> {
@@ -279,6 +327,7 @@ export async function runMediaTool(
       durationS: info.durationS,
       audioSampleRate: audio?.sampleRate ?? null,
       hasAudio: audio !== undefined,
+      audio,
     }),
     info.durationS,
     opts,

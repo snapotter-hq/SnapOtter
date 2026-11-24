@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,6 +14,10 @@ import {
   isSvgzClientError,
   sanitizeSvg,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
+
+// fast-xml-parser is an apps/api dependency, so resolve it from there.
+const require = createRequire(path.resolve(__dirname, "../../../apps/api/package.json"));
+const { XMLValidator } = require("fast-xml-parser") as typeof import("fast-xml-parser");
 
 describe("sanitizeSvg", () => {
   it("removes DOCTYPE declarations", () => {
@@ -365,8 +371,18 @@ describe("sanitizeSvg: bounded work on unterminated markup", () => {
     expect(ms).toBeLessThan(1000);
   });
 
-  it("counts entity-encoded openings toward the element cap", () => {
-    const { run } = timed(`${SVG_OPEN}${"&#60;set".repeat(6000)}</svg>`);
+  it("leaves entity-encoded openings as text instead of counting them (#5102)", () => {
+    // `&#60;` stays encoded, so it never becomes an opening for the scanners
+    // to chase and has no reason to count toward the element cap.
+    const { ms, run } = timed(`${SVG_OPEN}${"&#60;set".repeat(6000)}</svg>`);
+    const out = run();
+    expect(out).not.toMatch(/<set/i);
+    expect(out).toContain("&#60;set");
+    expect(ms).toBeLessThan(1000);
+  });
+
+  it("still counts raw openings toward the element cap", () => {
+    const { run } = timed(`${SVG_OPEN}${"<set".repeat(6000)}</svg>`);
     expect(run).toThrow("maximum element count of 5000");
   });
 
@@ -391,6 +407,110 @@ describe("sanitizeSvg: bounded work on unterminated markup", () => {
     expect(run).toThrow(
       expect.objectContaining({ statusCode: 400, message: "SVG nesting is too deep to sanitize" }),
     );
+  });
+});
+
+describe("sanitizeSvg: character references that encode XML syntax (#5102)", () => {
+  const clean = (svg: string) => sanitizeSvg(Buffer.from(svg)).toString("utf-8");
+
+  it.each([
+    ["&#34; in a double-quoted attribute", '<svg><rect fill="url(&#34;#grad&#34;)"/></svg>'],
+    ["&#x22; in a double-quoted attribute", '<svg><rect fill="url(&#x22;#grad&#x22;)"/></svg>'],
+    [
+      "&#39; in a single-quoted attribute",
+      "<svg><text font-family='&#39;Open Sans&#39;'>a</text></svg>",
+    ],
+    [
+      "&#x27; in a single-quoted attribute",
+      "<svg><text font-family='&#x27;Open Sans&#x27;'>a</text></svg>",
+    ],
+    ["&#60; in text", "<svg><text>a &#60; b</text></svg>"],
+    ["&#x3C; in text", "<svg><text>a &#x3C; b</text></svg>"],
+    ["&#38; in text", "<svg><text>R&#38;D</text></svg>"],
+    ["&#x26; in text", "<svg><text>R&#x26;D</text></svg>"],
+    ["&#60; in an attribute", '<svg><rect data-x="a &#60; b"/></svg>'],
+    ["&#62; in text", "<svg><text>]]&#62;</text></svg>"],
+  ])("keeps %s well-formed", (_label, input) => {
+    expect(XMLValidator.validate(input)).toBe(true);
+    const out = clean(input);
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toBe(input);
+  });
+
+  it("does not turn an encoded quote into a new attribute", () => {
+    const out = clean('<svg><rect fill="x&#34; stroke=&#34;red"/></svg>');
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toContain('fill="x&#34; stroke=&#34;red"');
+    expect(out).not.toContain('stroke="red"');
+  });
+
+  it("does not turn encoded markup into an element", () => {
+    const out = clean("<svg><text>&#60;script>alert(1)&#60;/script></text></svg>");
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).not.toMatch(/<script/i);
+  });
+
+  it("does not decode an encoded ampersand a second time", () => {
+    // XML reads `&#38;#106;` as the literal text `&#106;`, not as `j`.
+    const out = clean('<svg><a href="&#38;#106;avascript:x"><text>c</text></a></svg>');
+    expect(out).toContain('href="&#38;#106;avascript:x"');
+  });
+
+  it("decodes a code point above U+FFFF whole instead of truncating it", () => {
+    // String.fromCharCode wrapped these to 16 bits: &#65570; came out as `"`.
+    const out = clean('<svg><rect data-x="&#65570;"/><text>&#x1F600;</text></svg>');
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toBe(
+      `<svg><rect data-x="${String.fromCodePoint(65570)}"/><text>${String.fromCodePoint(0x1f600)}</text></svg>`,
+    );
+  });
+
+  it("leaves a reference past U+10FFFF untouched", () => {
+    const out = clean("<svg><text>&#x110000;&#99999999;</text></svg>");
+    expect(out).toContain("&#x110000;&#99999999;");
+  });
+
+  it.each([
+    ["a decoded digit", '<svg><a href="&#&#49;06;avascript:alert(1)"><text>c</text></a></svg>'],
+    ["a decoded #", '<svg><a href="&&#35;x6A;avascript:alert(1)"><text>c</text></a></svg>'],
+    ["an uppercase X", '<svg><a href="&#X6A;avascript:alert(1)"><text>c</text></a></svg>'],
+  ])("catches a scheme hidden behind %s", (_label, input) => {
+    const out = clean(input);
+    expect(out).not.toMatch(/javascript:/i);
+    expect(out).not.toMatch(/&#[xX]?[0-9a-fA-F]+;avascript/);
+  });
+
+  it("rejects references nested deeper than the decode pass cap", () => {
+    // Each level encodes the first digit, so it needs one more pass to decode.
+    let ref = "&#106;";
+    for (let level = 0; level < 6; level++) {
+      const i = ref.search(/\d/);
+      ref = `${ref.slice(0, i)}&#${ref.charCodeAt(i)};${ref.slice(i + 1)}`;
+    }
+    expect(() => clean(`<svg><text>${ref}</text></svg>`)).toThrow(
+      expect.objectContaining({ statusCode: 400 }),
+    );
+  });
+
+  it.each([
+    ["&#34;", '<svg><rect fill="url(&#34;https://evil.test/x&#34;)"/></svg>', "&#34;"],
+    ["&#x22;", '<svg><rect fill="url(&#x22;file:///etc/passwd&#x22;)"/></svg>', "&#x22;"],
+    ["&#39;", "<svg><rect style='fill:url(&#39;data:text/html,x&#39;)'/></svg>", "&#39;"],
+    ["&#X27;", "<svg><rect style='fill:url(&#X27;https://evil.test/x&#X27;)'/></svg>", "&#X27;"],
+  ])("blocks an external url() quoted with %s", (_label, input, quote) => {
+    // A renderer reads the reference as a quote, so this is a quoted external URL.
+    const out = clean(input);
+    expect(out).toContain(`url(${quote}data:,`);
+    expect(out).not.toMatch(/https:\/\/|file:\/\/|data:text/);
+    expect(XMLValidator.validate(out)).toBe(true);
+  });
+
+  it("still decodes letters so an encoded scheme is caught", () => {
+    const out = clean(
+      '<svg><rect fill="&#34;"/><a href="&#106;avascript:alert(1)"><text>c</text></a></svg>',
+    );
+    expect(out).toContain('fill="&#34;"');
+    expect(out).not.toMatch(/javascript:/i);
   });
 });
 
@@ -587,5 +707,197 @@ describe("isSvgClientError (#3580)", () => {
     expect(isSvgClientError(null)).toBe(false);
     expect(isSvgClientError(undefined)).toBe(false);
     expect(isSvgClientError("string error")).toBe(false);
+  });
+});
+
+describe("sanitizeSvg: base64 raster data URIs on <image> (#5101)", () => {
+  const clean = (svg: string) => sanitizeSvg(Buffer.from(svg)).toString("utf-8");
+  // Real 3x2 files written by sharp.
+  const PNG =
+    "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWP4z8DQAMMMyBwAeUMI+0cxNA0AAAAASUVORK5CYII=";
+  const JPEG =
+    "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAMDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABQf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCDgBlJf//Z";
+  const GIF = "R0lGODlhAwACAIAAAExpcf8AACH5BAUAAAAALAAAAAADAAIAAAICjF8AOw==";
+  const WEBP =
+    "UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoDAAIAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=";
+  const SVG_B64 = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+  ).toString("base64");
+
+  /** A PNG signature and IHDR declaring `width` x `height`, then `pad` zero bytes. */
+  function pngHeader(width: number, height: number, pad = 0): string {
+    const buf = Buffer.alloc(33 + pad);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf, 0);
+    buf.writeUInt32BE(13, 8);
+    buf.write("IHDR", 12, "latin1");
+    buf.writeUInt32BE(width, 16);
+    buf.writeUInt32BE(height, 20);
+    buf[24] = 8;
+    buf[25] = 6;
+    return buf.toString("base64");
+  }
+
+  const kept = (out: string, payload: string) => out.includes(payload) && !out.includes("data:,");
+
+  it.each([
+    ["png on href", `<image href="data:image/png;base64,${PNG}" width="1" height="1"/>`, PNG],
+    ["png on xlink:href", `<image xlink:href="data:image/png;base64,${PNG}"/>`, PNG],
+    ["jpeg", `<image href="data:image/jpeg;base64,${JPEG}"/>`, JPEG],
+    ["gif", `<image href="data:image/gif;base64,${GIF}"/>`, GIF],
+    ["webp", `<image href="data:image/webp;base64,${WEBP}"/>`, WEBP],
+    ["single quotes", `<image href='data:image/png;base64,${PNG}'/>`, PNG],
+    ["mixed case scheme and type", `<image href="DATA:Image/PNG;Base64,${PNG}"/>`, PNG],
+    ["leading whitespace", `<image href="  data:image/png;base64,${PNG}"/>`, PNG],
+    [
+      "spaces in base64",
+      `<image href="data:image/png;base64,${PNG.slice(0, 20)} ${PNG.slice(20)}"/>`,
+      PNG.slice(20),
+    ],
+    ["namespace-prefixed element", `<svg:image href="data:image/png;base64,${PNG}"/>`, PNG],
+    ["href after other attributes", `<image x="0" y="0" href="data:image/png;base64,${PNG}">`, PNG],
+    ["entity-encoded data:", `<image href="&#100;ata:image/png;base64,${PNG}"/>`, PNG],
+    [
+      "a quoted > earlier in the tag",
+      `<image title="a > b" href="data:image/png;base64,${PNG}"/>`,
+      PNG,
+    ],
+    [
+      "after a comment with a quote",
+      `<!-- it's --><image href="data:image/png;base64,${PNG}"/>`,
+      PNG,
+    ],
+  ])("keeps a raster: %s", (_label, image, payload) => {
+    expect(kept(clean(`<svg>${image}</svg>`), payload)).toBe(true);
+  });
+
+  it("keeps a line-wrapped raster", () => {
+    // The control-character pass already joins the lines inside an href value.
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG.slice(0, 20)}\n  ${PNG.slice(20)}"/></svg>`,
+    );
+    expect(out).toContain(`href="data:image/png;base64,${PNG.slice(0, 20)}  ${PNG.slice(20)}"`);
+  });
+
+  it.each([
+    ["svg+xml base64", `<image href="data:image/svg+xml;base64,${SVG_B64}"/>`],
+    ["svg+xml plain", '<image href="data:image/svg+xml,<svg onload=alert(1)/>"/>'],
+    ["entity-encoded svg+xml", `<image href="&#100;ata:image/svg+xml;base64,${SVG_B64}"/>`],
+    ["upper-case svg+xml", `<image href="DATA:IMAGE/SVG+XML;BASE64,${SVG_B64}"/>`],
+    ["text/html", '<image href="data:text/html;base64,PHNjcmlwdD4="/>'],
+    ["svg bytes labelled png", `<image href="data:image/png;base64,${SVG_B64}"/>`],
+    ["jpeg bytes labelled png", `<image href="data:image/png;base64,${JPEG}"/>`],
+    ["png bytes labelled webp", `<image href="data:image/webp;base64,${PNG}"/>`],
+    ["truncated png", `<image href="data:image/png;base64,${PNG.slice(0, 12)}"/>`],
+    ["empty payload", '<image href="data:image/png;base64,"/>'],
+    ["non-base64 png", '<image href="data:image/png,rawbytes"/>'],
+    ["charset parameter", `<image href="data:image/png;charset=utf-8;base64,${PNG}"/>`],
+    ["parameter after base64", `<image href="data:image/png;base64;x=y,${PNG}"/>`],
+    ["parameter before base64", `<image href="data:image/png;x=1;base64,${PNG}"/>`],
+    ["lookalike type", `<image href="data:image/pngx;base64,${PNG}"/>`],
+    ["image/jpg", `<image href="data:image/jpg;base64,${JPEG}"/>`],
+    ["space before ;base64", `<image href="data:image/png ;base64,${PNG}"/>`],
+    ["non-base64 payload character", `<image href="data:image/png;base64,${PNG})"/>`],
+    ["named entity in payload", `<image href="data:image/png;base64,${PNG}&amp;"/>`],
+    ["unicode whitespace", `<image href="\u00a0data:image/png;base64,${PNG}"/>`],
+    ["unquoted value", `<image href=data:image/png;base64,${PNG}/>`],
+    ["unterminated value", `<image href="data:image/png;base64,${PNG}/>`],
+    ["mismatched quotes", `<image href="data:image/png;base64,${PNG}'/>`],
+    ["on <a href>", `<a href="data:image/png;base64,${PNG}"><text>x</text></a>`],
+    ["on <use>", `<use href="data:image/png;base64,${PNG}"/>`],
+    ["on a lookalike element", `<imagex href="data:image/png;base64,${PNG}"/>`],
+    ["on a lookalike attribute", `<image data-href="data:image/png;base64,${PNG}"/>`],
+    ["on a prefixed attribute", `<image x:href="data:image/png;base64,${PNG}"/>`],
+    ["outside any tag", `href="data:image/png;base64,${PNG}"`],
+    ["inside a comment", `<!-- <image href="data:image/png;base64,${PNG}"/> -->`],
+    [
+      "an <image> inside another tag's quoted value",
+      `<a title=">" <image href="data:image/png;base64,${PNG}">x</a>`,
+    ],
+    [
+      "an <image> inside a <use> tag's quoted value",
+      `<use title=">" <image href="data:image/png;base64,${PNG}"/>`,
+    ],
+    [
+      "an <a> after a stray quote that does not open a value",
+      `<image title=x"y > <a href="data:image/png;base64,${PNG}">" >`,
+    ],
+  ])("still blocks: %s", (_label, markup) => {
+    const out = clean(`<svg>${markup}</svg>`);
+    expect(out).not.toMatch(/href\s*=\s*["']?[\s\u00a0]*data:[^,]/i);
+  });
+
+  it("still strips <feImage> with a raster data URI", () => {
+    const out = clean(`<svg><filter><feImage href="data:image/png;base64,${PNG}"/></filter></svg>`);
+    expect(out).not.toContain("feImage");
+  });
+
+  it("neutralizes javascript: on the same element while keeping the raster", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG}" xlink:href="javascript:alert(1)"/></svg>`,
+    );
+    expect(out).toContain(`href="data:image/png;base64,${PNG}"`);
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain('xlink:href="data:,');
+  });
+
+  it("neutralizes javascript: before a raster on the same element", () => {
+    const out = clean(
+      `<svg><image xlink:href="javascript:alert(1)" href="data:image/png;base64,${PNG}"/></svg>`,
+    );
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain(`href="data:image/png;base64,${PNG}"`);
+  });
+
+  it("does not let a raster prefix carry an event handler", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${PNG}&#34; onload=&#34;alert(1)"/></svg>`,
+    );
+    expect(out).not.toMatch(/\bonload\s*=/i);
+  });
+
+  it("blocks a raster wider than the side ceiling", () => {
+    const out = clean(`<svg><image href="data:image/png;base64,${pngHeader(16384, 1)}"/></svg>`);
+    expect(out).toContain('href="data:,');
+  });
+
+  it("blocks a raster that declares more pixels than the budget", () => {
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${pngHeader(10000, 10000)}"/></svg>`,
+    );
+    expect(out).toContain('href="data:,');
+  });
+
+  it("shares the pixel budget across every raster in the document", () => {
+    // 6000 x 6000 is 36 MP: one fits the 64 MP budget, the second does not.
+    const big = pngHeader(6000, 6000);
+    const out = clean(
+      `<svg><image href="data:image/png;base64,${big}"/><image href="data:image/png;base64,${big}"/>` +
+        `<image href="data:image/png;base64,${PNG}"/></svg>`,
+    );
+    expect(out.split(`data:image/png;base64,${big}`)).toHaveLength(2);
+    expect(out).toContain(`data:image/png;base64,${PNG}`);
+    expect(out).toContain('href="data:,');
+  });
+
+  it("allows rasters on many <image> tags in linear time", () => {
+    const image = `<image href="data:image/png;base64,${pngHeader(1, 1, 1500)}"/>`;
+    const start = performance.now();
+    const out = clean(`<svg>${image.repeat(4000)}</svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.includes("data:,")).toBe(false);
+  });
+
+  it("does unbounded-quote raster scans in linear time", () => {
+    const start = performance.now();
+    const out = clean(`<svg><image ${'href="data:image/png;base64,AAAA '.repeat(20_000)}/></svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.includes("data:,")).toBe(true);
+  });
+
+  it("scans many unterminated quoted values in linear time", () => {
+    const start = performance.now();
+    const out = clean(`<svg>${'<image a="'.repeat(4000)}${"x".repeat(1_000_000)}</svg>`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out.length).toBeGreaterThan(1_000_000);
   });
 });

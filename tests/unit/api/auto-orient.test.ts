@@ -11,6 +11,8 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import { MAX_GIF_FRAMES } from "../../../apps/api/src/lib/gif-limits.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 beforeEach(() => {
   loggerMock.warn.mockReset();
@@ -50,6 +52,48 @@ async function createDetailedJpegWithOrientation(orientation: number): Promise<B
     .withMetadata({ orientation })
     .jpeg()
     .toBuffer();
+}
+
+const PAGE_COLORS: [number, number, number][] = [
+  [255, 0, 0],
+  [0, 255, 0],
+  [0, 0, 255],
+];
+
+/**
+ * A 3-page TIFF of 32x24 pages tagged with `orientation`. Each page has its
+ * left half (x < 16) in its page color and its right half black, so a turn
+ * shows up in where the color lands and a reordered stack in which color.
+ */
+async function createOrientedMultipageTiff(orientation: number): Promise<Buffer> {
+  const pages = await Promise.all(
+    PAGE_COLORS.map(async ([r, g, b]) => {
+      const raw = Buffer.alloc(32 * 24 * 3, 0);
+      for (let y = 0; y < 24; y++) {
+        for (let x = 0; x < 16; x++) {
+          const idx = (y * 32 + x) * 3;
+          raw[idx] = r;
+          raw[idx + 1] = g;
+          raw[idx + 2] = b;
+        }
+      }
+      return sharp(raw, { raw: { width: 32, height: 24, channels: 3 } })
+        .png()
+        .toBuffer();
+    }),
+  );
+  return sharp(pages, { join: { across: 1, animated: true } })
+    .withMetadata({ orientation })
+    .tiff({ compression: "lzw" })
+    .toBuffer();
+}
+
+async function pixelAt(buffer: Buffer, page: number, x: number, y: number): Promise<number[]> {
+  const { data, info } = await sharp(buffer, { page, pages: 1 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const idx = (y * info.width + x) * info.channels;
+  return [data[idx], data[idx + 1], data[idx + 2]];
 }
 
 describe("autoOrient", () => {
@@ -597,6 +641,117 @@ describe("autoOrient", () => {
       } finally {
         secondMetaSpy.mockRestore();
       }
+    }
+  });
+
+  it("rotates every page of a multi-page TIFF and keeps them all (#4849)", async () => {
+    const tiff = await createOrientedMultipageTiff(6);
+    const before = await sharp(tiff).metadata();
+    expect(before.pages).toBe(3);
+    expect(before.orientation).toBe(6);
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe("tiff");
+    expect(meta.pages).toBe(3);
+    expect(meta.orientation === undefined || meta.orientation === 1).toBe(true);
+    for (let page = 0; page < 3; page++) {
+      const pageMeta = await sharp(result, { page, pages: 1 }).metadata();
+      expect([pageMeta.width, pageMeta.height]).toEqual([24, 32]);
+      // 90 CW moves the colored left half to the top.
+      expect(await pixelAt(result, page, 12, 4)).toEqual(PAGE_COLORS[page]);
+      expect(await pixelAt(result, page, 12, 28)).toEqual([0, 0, 0]);
+    }
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps page order when rotating a multi-page TIFF 180 degrees (#4849)", async () => {
+    const result = await autoOrient(await createOrientedMultipageTiff(3));
+
+    expect((await sharp(result).metadata()).pages).toBe(3);
+    for (let page = 0; page < 3; page++) {
+      // 180 moves the colored left half to the right.
+      expect(await pixelAt(result, page, 28, 12)).toEqual(PAGE_COLORS[page]);
+      expect(await pixelAt(result, page, 4, 12)).toEqual([0, 0, 0]);
+    }
+  });
+
+  it("rotates page 1 and says so when a multi-page TIFF's pages differ in size (#4849)", async () => {
+    const tiff = readFixture(fixtures.image.edge.multipageMixedSizesOrientedTiff);
+    const before = await sharp(tiff).metadata();
+    expect(before.pages).toBe(2);
+    expect(before.orientation).toBe(6);
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe("tiff");
+    expect(meta.pages ?? 1).toBe(1);
+    expect([meta.width, meta.height]).toEqual([20, 40]);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ pages: 2, orientation: 6 }),
+      expect.stringContaining("different sizes"),
+    );
+  });
+
+  it("rotates page 1 and says so when a multi-page TIFF is over the workload cap (#4849)", async () => {
+    // One page more than MAX_GIF_FRAMES; tiny pages keep the fixture cheap.
+    const page = await sharp({
+      create: { width: 4, height: 2, channels: 3, background: { r: 0, g: 0, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+    const tiff = await sharp(Array(MAX_GIF_FRAMES + 1).fill(page), {
+      join: { across: 1, animated: true },
+    })
+      .withMetadata({ orientation: 6 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.pages ?? 1).toBe(1);
+    expect([meta.width, meta.height]).toEqual([2, 4]);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ pages: MAX_GIF_FRAMES + 1, orientation: 6 }),
+      expect.stringContaining("workload cap"),
+    );
+  });
+
+  it("keeps 16-bit samples when rotating a multi-page TIFF (#4849)", async () => {
+    // A Uint16Array input is read as 16-bit; 40000 isn't n * 257, so an 8-bit
+    // round trip anywhere would change it.
+    const samples = new Uint16Array(32 * 24 * 3).fill(40000);
+    const page = await sharp(samples, { raw: { width: 32, height: 24, channels: 3 } })
+      .toColorspace("rgb16")
+      .png()
+      .toBuffer();
+    const tiff = await sharp([page, page], { join: { across: 1, animated: true } })
+      .toColorspace("rgb16")
+      .withMetadata({ orientation: 6 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    const firstSample16 = async (buffer: Buffer, page: number) => {
+      const { data, info } = await sharp(buffer, { page, pages: 1 })
+        .toColorspace("rgb16")
+        .raw({ depth: "ushort" })
+        .toBuffer({ resolveWithObject: true });
+      return { info, rgb: Array.from(new Uint16Array(data.buffer, data.byteOffset, 3)) };
+    };
+    expect((await sharp(tiff).metadata()).depth).toBe("ushort");
+    expect((await firstSample16(tiff, 0)).rgb).toEqual([40000, 40000, 40000]);
+
+    const result = await autoOrient(tiff);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.pages).toBe(2);
+    expect(meta.depth).toBe("ushort");
+    for (let page = 0; page < 2; page++) {
+      const after = await firstSample16(result, page);
+      expect([after.info.width, after.info.height]).toEqual([24, 32]);
+      expect(after.rgb).toEqual([40000, 40000, 40000]);
     }
   });
 });

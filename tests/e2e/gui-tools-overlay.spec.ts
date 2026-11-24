@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
+import { en } from "@snapotter/shared";
 import {
   expect,
   getE2eRunRoot,
@@ -222,14 +223,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.locator("#text-overlay-color")).toBeVisible();
     });
 
-    test("shows position dropdown with three options", async ({ loggedInPage: page }) => {
+    test("shows position dropdown with four options", async ({ loggedInPage: page }) => {
       await page.goto("/image/text-overlay");
       await uploadTestImage(page);
 
       const select = page.locator("#text-overlay-position");
       await expect(select).toBeVisible();
       const options = select.locator("option");
-      await expect(options).toHaveCount(3); // top, center, bottom
+      await expect(options).toHaveCount(4); // top, center, bottom, custom
     });
 
     test("shows drop shadow checkbox", async ({ loggedInPage: page }) => {
@@ -477,10 +478,14 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await page.getByTestId("compose-submit").click();
 
+      // The server's 400 carries no error code, so the card shows the panel's
+      // translated fallback rather than the English "Invalid image" (#4447).
       // Scope to the preview card: the settings panel repeats the copy and the
       // sr-only live region announces "Processing failed" (#4097).
       await expect(
-        page.locator("section[aria-label='Preview area']").getByText(/Invalid image|error/i),
+        page
+          .locator("section[aria-label='Preview area']")
+          .getByText(en.errors.processingFailedWithStatus),
       ).toBeVisible({ timeout: 15_000 });
     });
   });

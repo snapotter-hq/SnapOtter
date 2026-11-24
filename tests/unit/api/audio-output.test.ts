@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  audioContentType,
   audioEncodeArgsForContainer,
   audioOutputFor,
   videoEncodeArgsForContainer,
@@ -56,10 +57,49 @@ describe("audioOutputFor", () => {
     expect(out.encodeArgs).toContain("aac");
   });
 
+  it("keeps .aif input as AIFF instead of falling back to mp3 (#5161)", () => {
+    for (const ext of [".aif", ".AIF"]) {
+      const out = audioOutputFor(ext);
+      expect(out.ext).toBe(".aif");
+      expect(out.contentType).toBe("audio/aiff");
+      expect(out.encodeArgs).toEqual(["-c:a", "pcm_s16be"]);
+    }
+  });
+
   it("keeps the encoder-specific options next to each encoder", () => {
     expect(audioOutputFor(".ogg").encodeArgs).toEqual(["-c:a", "libvorbis", "-q:a", "6"]);
     expect(audioOutputFor(".opus").encodeArgs).toEqual(["-c:a", "libopus", "-b:a", "128k"]);
     expect(audioOutputFor(".mp3").encodeArgs).toEqual(["-c:a", "libmp3lame", "-b:a", "192k"]);
+  });
+
+  it("writes PCM outputs as 16-bit when no source stream is given", () => {
+    expect(audioOutputFor(".wav").encodeArgs).toEqual(["-c:a", "pcm_s16le"]);
+    expect(audioOutputFor(".aiff").encodeArgs).toEqual(["-c:a", "pcm_s16be"]);
+  });
+
+  /** #5123: the filter tools used to drop a 24-bit source to 16 bits. */
+  it.each([
+    [".wav", 24, "s32", "pcm_s24le"],
+    [".wav", 32, "flt", "pcm_f32le"],
+    [".aiff", 24, "s32", "pcm_s24be"],
+    [".aiff", 32, "s32", "pcm_s32be"],
+    [".aiff", 32, "flt", "pcm_f32be"],
+    [".AIFF", 16, "s16", "pcm_s16be"],
+    [".aif", 24, "s32", "pcm_s24be"],
+  ])("writes a %s source of %i bits (%s) with %s", (ext, bitsPerSample, sampleFmt, codec) => {
+    const stream = { type: "audio" as const, codec: "pcm", bitsPerSample, sampleFmt };
+    expect(audioOutputFor(ext, stream).encodeArgs).toEqual(["-c:a", codec]);
+  });
+
+  it("ignores the source stream for lossy and FLAC outputs", () => {
+    const deep = {
+      type: "audio" as const,
+      codec: "pcm_s24le",
+      bitsPerSample: 24,
+      sampleFmt: "s32",
+    };
+    expect(audioOutputFor(".flac", deep).encodeArgs).toEqual(["-c:a", "flac"]);
+    expect(audioOutputFor(".mp3", deep).encodeArgs).toEqual(["-c:a", "libmp3lame", "-b:a", "192k"]);
   });
 });
 
@@ -113,5 +153,17 @@ describe("media-tool encoders on a build that lacks them (#1270)", () => {
     setEncoderInventoryForTests(null);
     expect(audioOutputFor(".mp3").encodeArgs).toContain("libmp3lame");
     expect(videoEncodeArgsForContainer(".ogv")).toContain("libtheora");
+  });
+});
+
+describe("audioContentType", () => {
+  it("serves AIFF under both extensions (#5161)", () => {
+    expect(audioContentType(".aiff")).toBe("audio/aiff");
+    expect(audioContentType(".aif")).toBe("audio/aiff");
+    expect(audioContentType(".AIF")).toBe("audio/aiff");
+  });
+
+  it("falls back to audio/mpeg for an unknown extension", () => {
+    expect(audioContentType(".xyz")).toBe("audio/mpeg");
   });
 });

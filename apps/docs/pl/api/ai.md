@@ -472,7 +472,7 @@ Dodatkowy punkt końcowy analizy jest dostępny pod `POST /api/v1/tools/image/im
 **Trasa narzędzia:** `content-aware-resize`  
 **Silnik:** binarka Go `caire` (nie Python - brak korzyści z GPU)
 
-Inteligentnie zmienia rozmiar obrazów, usuwając szwy o niskiej energii i zachowując ważną treść.
+Inteligentnie zmienia rozmiar obrazów, usuwając lub wstawiając szwy o niskiej energii i zachowując ważną treść. Każdy bok może urosnąć maksymalnie do dwukrotności oryginalnego rozmiaru.
 
 | Parametr | Typ | Domyślnie | Opis |
 |-----------|------|---------|-------------|

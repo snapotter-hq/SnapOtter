@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: 4baf9d79932f
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 77e99b408f4f
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### 변환 프리셋 {#conversion-presets}
 
-공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 83개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
+공유 카탈로그에는 `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, `excel-to-csv`과 같은 121개의 전용 변환 프리셋 엔드포인트가 포함되어 있습니다. 프리셋은 일급 도구 경로입니다:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 각 프리셋은 출력 형식을 고정하고 `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, `convert-spreadsheet`과 같은 기본 도구에 위임합니다. 전체 경로 표와 선택적 설정은 [변환 프리셋](/ko/tools/conversion-presets)을 참고하세요.
+
+압축 프리셋도 같은 방식으로 동작합니다. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb`, `compress-image-to-500kb`는 `compress`를 실행하고, `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb`, `compress-pdf-to-2mb`는 `compress-pdf`를 실행합니다. 각 프리셋은 `mode`를 `targetSize`로 고정하고 `targetSizeKb`를 이름에 들어 있는 크기로 고정합니다.
 
 ### 필수 도구 {#essentials}
 
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 도구 ID | 이름 | AI 모델 | 주요 설정 |
 |---------|------|---------|-------------|
 | `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | 1단계: `model`, `edgeRefine`(0-3), `decontaminate`. 2단계(`/api/v1/tools/image/remove-background/effects`), `/batch` 및 파이프라인: `backgroundType`(transparent/color/gradient/blur, `/effects`에서는 image 추가), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`(png/webp/avif) |
+| `remove-gif-background` | GIF 배경 제거 | rembg(프레임별) | `model`, `outputFormat`(webp/gif/apng), `backgroundType`(transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity`(0-100), `shadowEnabled`, `shadowOpacity`(0-100), `edgeRefine`(0-3), `decontaminate` |
 | `upscale` | 이미지 업스케일 | RealESRGAN | `scale`(2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | 오브젝트 지우개 | LaMa(ONNX) | 마스크는 두 번째 파일 파트로 전송(필드명 `mask`), `format`, `quality` |
 | `ocr` | OCR / 텍스트 추출 | Tesseract(빠름); RapidOCR + PP-OCR ONNX(균형 잡힌/최고) | `quality`(빠름/균형/최고), `language`, `enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | 히스토그램 | `scale`(linear/log) - RGB 히스토그램 차트 + 채널별 통계 반환 |
 | `lqip-placeholder` | LQIP 플레이스홀더 | `width`(4-64), `blur`, `strategy`(blur/pixelate/solid), `format`(webp/png/jpeg), `quality` |
 | `barcode-generate` | 바코드 생성기 | `text`, `type`(code128/ean13/upca/code39/itf14/datamatrix), `scale`(1-8), `includeText`(bool). JSON 본문, 파일 업로드 없음. |
+| `aspect-ratio-calculator` | 화면 비율 계산기 | `width`, `height`, `newWidth`, `newHeight`, `round`(bool). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
 
 ### 레이아웃 및 합성 {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | 테두리 및 프레임 | `width`, `color`, `style`(solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | 스크린샷 꾸미기 | `backgroundType`(solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame`(none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset`(none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | 원형 자르기 | `zoom`(1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background`(transparent/hex), `outputSize` |
+| `rounded-crop` | 둥근 모서리 크롭 | `shape`(rounded-square/squircle), `cornerRadius`(0-50, 짧은 변 기준 백분율), `zoom`(1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background`(transparent/hex), `outputSize` |
 | `image-pad` | 이미지 패딩 | `target`(16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background`(color/transparent/blur), `color`(hex), `padding`(0-50%) |
 | `sprite-sheet` | 스프라이트 시트 | `columns`(1-16), `padding`, `background`(hex), `format`(png/webp/jpeg), `quality` - 다중 파일(2-64개 이미지) |
 
@@ -267,7 +272,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | 비디오 변환 | `format`(mp4/mov/webm/avi/mkv), `quality`(high/balanced/small) |
 | `compress-video` | 비디오 압축 | `quality`(light/balanced/strong), `resolution`(original/1080p/720p/480p) |
-| `trim-video` | 비디오 자르기 | `startS`, `endS`, `precise`(bool, 프레임 단위 정밀 컷) |
+| `trim-video` | 비디오 자르기 | `mode`(range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise`(bool, 프레임 단위 정밀 컷) |
 | `mute-video` | 비디오 음소거 | - |
 | `video-to-gif` | 비디오를 GIF로 | `fps`(1-30), `width`, `startS`, `durationS`(최대 60초) |
 | `resize-video` | 비디오 크기 조정 | `width`, `height`, `preset`(custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | 비디오 안정화 | `smoothing`(5-60, 프레임 단위) |
 | `gif-to-video` | GIF를 비디오로 | `format`(mp4/webm/mov) |
 | `video-to-webp` | 비디오를 WebP로 | `fps`, `width`, `quality`, `loop`(bool) |
+| `video-to-avif` | 동영상을 AVIF로 | `fps`(1-30), `width`(64-1280), `startS`, `durationS`(최대 60초), `quality`(1-100), `loop`(bool) |
 | `video-to-frames` | 비디오를 프레임으로 | `mode`(all/nth/timestamps), `n`, `timestamps`, `format`(png/jpg) |
 | `merge-videos` | 비디오 병합 | - (다중 파일, 첫 번째 비디오의 해상도로 정규화됨) |
 | `replace-audio` | 오디오 교체 | - (비디오 + 오디오 파일, 두 개 파일) |
 | `burn-subtitles` | 자막 굽기 | `fontSize`(8-72) - 비디오 + 자막 파일 |
 | `embed-subtitles` | 자막 임베드 | `language`(ISO 639-2/B 코드) - 비디오 + 자막 파일 |
 | `extract-subtitles` | 자막 추출 | - (SRT 출력) |
+| `convert-subtitles` | 자막 변환 | `format`(srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | 이미지를 비디오로 | `secondsPerImage`(0.5-10), `resolution`(1080p/720p/square), `fps` - 다중 파일 |
 | `video-metadata` | 비디오 메타데이터 정리 | - |
 | `auto-subtitles` | 자동 자막(AI) | `language`(auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format`(srt/vtt) |
@@ -300,7 +307,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 도구 ID | 이름 | 주요 설정 |
 |---------|------|-------------|
 | `convert-audio` | 오디오 변환 | `format`(mp3/wav/ogg/flac/m4a), `bitrateKbps`(32-320) |
-| `trim-audio` | 오디오 자르기 | `startS`, `endS` |
+| `trim-audio` | 오디오 자르기 | `mode`(range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | 볼륨 조정 | `gainDb`(-30 ~ 30) |
 | `normalize-audio` | 오디오 정규화 | - (EBU R128, -16 LUFS) |
 | `fade-audio` | 오디오 페이드 | `fadeInS`(0-30), `fadeOutS`(0-30) |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | 페이지 추출 | `range`(qpdf 구문, 예: "1-5,8,10-z") |
 | `remove-pages` | 페이지 제거 | `pages`(제거할 qpdf 범위) |
 | `organize-pdf` | PDF 정리 | `order`(qpdf 페이지 순서, 예: "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF 멀티 도구 | `items`(페이지 계획, `[{doc, page, rot}]`, 최대 1200페이지), `pageCounts` - 다중 파일(최대 20개 PDF) |
 | `protect-pdf` | PDF 보호 | `userPassword`, `ownerPassword`(AES-256) |
 | `unlock-pdf` | PDF 잠금 해제 | `password` |
 | `repair-pdf` | PDF 복구 | - |
@@ -335,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF 흑백화 | - |
 | `pdfa-convert` | PDF/A 변환 | - (보존용 PDF/A-2) |
 | `crop-pdf` | PDF 자르기 | `margin`(0-2000 포인트) |
+| `resize-pdf-pages` | PDF 페이지 크기 조정 | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet`(2/3/4/8/9/12/16) |
 | `booklet-pdf` | 소책자 PDF | `perSheet`(2/4/6/8) |
 | `watermark-pdf` | PDF 워터마크 | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF 서명 | PDF `file`, 서명 파일 `sig0`, `sig1`, `placements` JSON 배열을 사용하는 커스텀 멀티파트 경로 |
 | `pdf-to-text` | PDF를 텍스트로 | - |
 | `pdf-to-word` | PDF를 Word로 | - |
-| `pdf-metadata` | PDF 메타데이터 | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF를 Markdown으로 | - (`.md` 파일 출력) |
+| `pdf-metadata` | PDF 메타데이터 | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | 문서 변환 | `format`(docx/odt/rtf/txt) |
 | `convert-presentation` | 프레젠테이션 변환 | `format`(pptx/odp) |
 | `convert-spreadsheet` | 스프레드시트 변환 | `format`(xlsx/ods/csv) |
@@ -373,9 +383,18 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON을 XML로 | `pretty`(bool) - 양방향 |
 | `split-csv` | CSV 분할 | `rowsPerFile`(1-1000000), `keepHeader`(bool) |
 | `merge-csvs` | CSV 병합 | - (다중 파일, 일치하는 열) |
+| `merge-text` | 텍스트 파일 병합 | `separator`(blank-line/rule/filename-heading) - 다중 파일, 2-50개 파일 |
 | `yaml-json` | YAML / JSON | - (양방향) |
 | `xml-to-csv` | XML을 CSV로 | - (반복 요소 자동 탐지) |
+| `convert-font` | 글꼴 변환 | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | 대소문자 변환 | `text`, `mode`(upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale`(BCP 47 태그). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
+| `proportion-calculator` | 비례식 계산기 | `a`, `b`, `c`, `mode`(direct/inverse). JSON 본문, 파일 업로드 없음. 빠진 값을 반환합니다. |
+| `base64` | Base64 인코딩 / 디코딩 | `text`, `mode`(encode/decode), `urlSafe`(bool). JSON 본문, 파일 업로드 없음. 변환된 텍스트를 반환합니다. |
 | `excel-to-csv` | Excel을 CSV로 | `convert-spreadsheet`로 지원되는 전용 변환 프리셋 |
+| `otf-to-ttf` | OTF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff-to-ttf` | WOFF을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `woff2-to-ttf` | WOFF2을 TTF로 | `convert-font`로 지원되는 전용 변환 프리셋 |
+| `ttf-to-woff2` | TTF을 WOFF2로 | `convert-font`로 지원되는 전용 변환 프리셋 |
 | `create-zip` | ZIP 생성 | - (다중 파일, 2-50개 파일) |
 | `extract-zip` | ZIP 추출 | - (봄 보호) |
 
@@ -396,6 +415,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | 커스텀 뷰포트 너비 320-3840 |
 | `viewportHeight` | number | `720` | 커스텀 뷰포트 높이 320-2160 |
+| `clientJobId` | string | (자동 생성) | 직접 지정하는 작업 ID로, 응답이 오기 전에 진행 상황 스트림을 열 수 있습니다 |
 
 **예시:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+캡처는 대기열 작업으로 실행됩니다. 동기 대기 시간 안에 끝나면 위의 결과를 `200`으로 받습니다. 더 오래 걸리는 캡처는 `{"jobId":"...","async":true}`와 함께 `202`를 반환합니다. [진행 상황 추적](#progress-tracking)에 설명된 대로 추적하세요. 2.3.0까지 이 엔드포인트는 항상 완료를 기다린 뒤 `200`을 반환했으므로, `200`만 처리하는 스크립트는 `202`도 처리해야 합니다.
 
 ### 도구 하위 경로 {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | 파일 다운로드 |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG 썸네일 획득 |
 | `DELETE` | `/api/v1/files` | 파일 및 버전 체인 일괄 삭제(본문: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | 여러 파일을 ZIP 하나로 다운로드(본문: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | URL 기반 가져오기를 위해 원격 URL을 워크스페이스로 페치 |
 | `POST` | `/api/v1/preview` | 브라우저 호환 WebP 미리보기 생성(HEIC/HEIF/RAW 형식용) |
 | `GET` | `/api/v1/files/:id/preview` | 저장된 PDF, 오피스 문서, 비디오 또는 오디오 파일에 대해 캐시되었거나 생성된 브라우저 호환 미리보기 스트리밍 |

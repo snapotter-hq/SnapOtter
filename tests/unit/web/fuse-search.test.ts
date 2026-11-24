@@ -26,6 +26,17 @@ describe("app fuzzy search finds converters by variation", () => {
   });
 });
 
+describe("font conversions lead with their dedicated preset (#5053)", () => {
+  it.each([
+    ["otf to ttf", "otf-to-ttf"],
+    ["woff to ttf", "woff-to-ttf"],
+    ["woff2 to ttf", "woff2-to-ttf"],
+    ["ttf to woff2", "ttf-to-woff2"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+});
+
 describe("the normalizer keeps the words that name a tool (#1327)", () => {
   // "convert image" used to normalize to "image", which ranked the five
   // compress-image-to-N-kb presets first and Convert Image sixth.
@@ -36,6 +47,12 @@ describe("the normalizer keeps the words that name a tool (#1327)", () => {
     ["jpgtopng", "jpg-to-png"],
   ])("%s leads with %s", (q, id) => {
     expect(search(q)[0]).toBe(id);
+  });
+});
+
+describe("a plural alias searches like its singular (#4900)", () => {
+  it("resize photos leads with resize", () => {
+    expect(search("resize photos")[0]).toBe("resize");
   });
 });
 
@@ -80,8 +97,8 @@ describe("compress-pdf outranks its size presets (#1070)", () => {
 
 describe("a format we accept finds a tool that takes it (#4818)", () => {
   it.each([
-    ["opus", "convert-audio"],
-    ["wma", "convert-audio"],
+    ["amr", "convert-audio"],
+    ["ac3", "convert-audio"],
     ["nef", "convert"],
     ["arw", "convert"],
     ["cr2", "convert"],
@@ -108,7 +125,7 @@ describe("a format we accept finds a tool that takes it (#4818)", () => {
 
 describe("an x-to-y query no preset handles leads with the converter (#4818)", () => {
   it.each([
-    ["mp3 to ogg", "convert-audio"],
+    ["wav to aac", "convert-audio"],
     ["mp3 to opus", "convert-audio"],
     ["jpg to bmp", "convert"],
     ["nef to jpg", "convert"],
@@ -116,15 +133,38 @@ describe("an x-to-y query no preset handles leads with the converter (#4818)", (
     expect(search(q)[0]).toBe(id);
   });
 
+  it.each([
+    ["hif to jpg", "heic-to-jpg"],
+    ["hif2png", "heic-to-png"],
+  ])("Sony's hif finds the HEIC converter: %s leads with %s (#4825)", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
   it("never offers a converter the caller filtered out (a disabled tool)", () => {
     const visible = TOOLS.filter((tool) => tool.id !== "convert-audio");
-    const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "mp3 to ogg");
+    const results = searchToolList(new Fuse(visible, FUSE_OPTIONS), visible, "wav to aac");
     expect(results.map((tool) => tool.id)).not.toContain("convert-audio");
   });
 
   it("leaves a pair with its own preset alone", () => {
     expect(search("mp4 to mp3")[0]).toBe("mp4-to-mp3");
     expect(search("jpg to png")[0]).toBe("jpg-to-png");
+  });
+});
+
+describe("the audio preset matrix answers the searches that found nothing (#1099)", () => {
+  it.each([
+    ["opus to mp3", "opus-to-mp3"],
+    ["mp3 to ogg", "mp3-to-ogg"],
+    ["wav to flac", "wav-to-flac"],
+    ["wma to mp3", "wma-to-mp3"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
+  it.each(["opus", "wma", "aiff"])("a bare %s query leads with a preset that takes it", (ext) => {
+    const top = searchToolList(fuse, TOOLS, ext)[0];
+    expect(top?.acceptedInputs).toEqual([`.${ext}`]);
   });
 });
 
@@ -143,7 +183,7 @@ describe("a remove query doesn't rank the tools that add the thing (#4818)", () 
 
 describe("a query with no real match reaches the empty state (#4818)", () => {
   // Tools we don't have: the empty state's feedback prompt is how we hear about them.
-  it.each(["font", "email", "discord", "youtube", "curve text", "base64 decode", "text to audio"])(
+  it.each(["email", "discord", "youtube", "curve text", "text to audio"])(
     "%s finds nothing",
     (q) => {
       expect(search(q)).toEqual([]);
@@ -165,7 +205,20 @@ describe("a query with no real match reaches the empty state (#4818)", () => {
     ["make pdf smaller", "compress-pdf"],
     ["make video smaller", "compress-video"],
     ["jpg naar png", "jpg-to-png"],
+    ["ttf to otf", "convert-font"],
+    ["base64 decode", "base64"],
   ])("a typo or synonym like %s still finds %s", (q, id) => {
     expect(search(q).slice(0, 3)).toContain(id);
   });
+});
+
+describe("joining stills into an animation finds images-to-video (#4826)", () => {
+  // These used to land on png-to-gif and jpg-to-gif, which turn one still
+  // into one still GIF.
+  it.each(["images to gif", "multiple png to gif", "animated gif", "animated webp", "gif maker"])(
+    "%s finds images-to-video",
+    (q) => {
+      expect(search(q).slice(0, 5)).toContain("images-to-video");
+    },
+  );
 });

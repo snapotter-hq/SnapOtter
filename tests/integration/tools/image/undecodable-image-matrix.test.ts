@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import { defaultSettingsFor } from "../../../helpers/tool-default-settings.js";
+import { settleAcceptedResponse } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -46,6 +47,7 @@ const FACTORY_SINGLE_IMAGE_TOOLS = [
   "gif-tools",
   "image-enhancement",
   "strip-metadata",
+  "vectorize",
 ] as const;
 
 // Non-preset image tools in TOOLS that are NOT in FACTORY_SINGLE_IMAGE_TOOLS:
@@ -57,8 +59,8 @@ const EXEMPT_IMAGE_TOOLS = new Set([
   "collage",
   "meme-generator",
   "beautify",
-  "vectorize",
   "split",
+  // executionHint "long": answers 202, so it has its own queued block below
   "content-aware-resize",
   // Input-agnostic / metadata-only / generator / custom-contract routes
   "edit-metadata",
@@ -76,6 +78,7 @@ const EXEMPT_IMAGE_TOOLS = new Set([
   "barcode-read",
   "image-to-base64",
   "barcode-generate",
+  "aspect-ratio-calculator",
   "stitch",
   "svg-to-raster",
   // AI bundle-gated routes (tested at worker/registry level in image-error.test.ts)
@@ -233,9 +236,7 @@ describe("Undecodable image input matrix (#949)", () => {
       settings: { textBoxes: [{ id: "top", text: "HI" }] },
     },
     { toolId: "beautify", settings: {} },
-    { toolId: "vectorize", settings: {} },
     { toolId: "split", settings: { columns: 2, rows: 2 } },
-    { toolId: "content-aware-resize", settings: { width: 50 } },
   ])(
     "custom route $toolId surfaces UNDECODABLE_IMAGE_MESSAGE in 422 details",
     async ({ toolId, settings }) => {
@@ -259,4 +260,27 @@ describe("Undecodable image input matrix (#949)", () => {
       expect(res.json().details).toBe(UNDECODABLE_IMAGE_MESSAGE);
     },
   );
+
+  it("content-aware-resize queues truncated.jpg and fails the job with 400 UNDECODABLE_IMAGE_MESSAGE (#4338)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "truncated.jpg",
+        contentType: "image/jpeg",
+        content: TRUNCATED_JPG,
+      },
+      { name: "settings", content: JSON.stringify({ width: 50 }) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: apiToolPath("content-aware-resize"),
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode, res.body).toBe(202);
+
+    const settled = await settleAcceptedResponse(res);
+    expect(settled.statusCode, settled.body).toBe(400);
+    expect(JSON.parse(settled.body).error).toBe(UNDECODABLE_IMAGE_MESSAGE);
+  }, 60_000);
 });

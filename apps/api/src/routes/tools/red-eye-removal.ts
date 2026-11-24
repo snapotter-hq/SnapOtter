@@ -3,6 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { removeRedEye } from "@snapotter/ai";
+import type { SharpFormat } from "@snapotter/image-engine";
 import {
   getBundleForTool,
   hasServerErrorStatus,
@@ -10,6 +11,7 @@ import {
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
@@ -24,6 +26,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { encodeJxl } from "../../lib/format-encoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -38,6 +41,7 @@ import {
   normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -52,9 +56,56 @@ import { registerToolProcessFn } from "../tool-factory.js";
 const settingsSchema = z.object({
   sensitivity: z.number().min(0).max(100).default(50),
   strength: z.number().min(0).max(100).default(70),
-  format: z.string().optional(),
+  format: z.enum(["original", "png", "jpeg", "jpg", "webp", "avif", "jxl"]).default("original"),
   quality: z.number().min(1).max(100).default(90),
 });
+
+type RedEyeSettings = z.infer<typeof settingsSchema>;
+
+// The sidecar's Pillow writer only encodes these; asked for anything else, it
+// writes PNG. "jpg" fell through to PNG that way, and the route then labelled
+// every result PNG whatever was asked for (#4363).
+const SIDECAR_FORMATS = new Set<SharpFormat>(["png", "jpeg", "webp"]);
+
+// The bridge hands the sidecar PNG bytes whatever was uploaded, so the
+// sidecar's own "original" always meant PNG. Resolve it here from the input,
+// as noise-removal does (#4469).
+async function resolveRedEyeFormat(
+  input: Buffer,
+  format: RedEyeSettings["format"],
+): Promise<SharpFormat> {
+  if (format === "jpg") return "jpeg";
+  if (format !== "original") return format;
+  return (await resolveOutputFormat(input, "")).format;
+}
+
+function sidecarFormat(format: SharpFormat) {
+  return SIDECAR_FORMATS.has(format) ? format : "png";
+}
+
+async function finishRedEyeOutput(
+  result: Awaited<ReturnType<typeof removeRedEye>>,
+  format: SharpFormat,
+  quality: number,
+  filename: string,
+) {
+  const output = outputFormatFor(format, quality);
+  let buffer = result.buffer;
+  if (format === "jxl") {
+    buffer = await encodeJxl(result.buffer, quality);
+  } else if (!SIDECAR_FORMATS.has(format)) {
+    buffer = await sharp(result.buffer).toFormat(format, output.encoderOptions).toBuffer();
+  }
+  return {
+    buffer,
+    filename: `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.${output.extension}`,
+    contentType: output.contentType,
+    resultPayload: {
+      facesDetected: result.facesDetected,
+      eyesCorrected: result.eyesCorrected,
+    },
+  };
+}
 
 // ── AI job handler ────────────────────────────────────────────────
 registerAiJobHandler(
@@ -64,6 +115,7 @@ registerAiJobHandler(
     () => "red-eye-removal",
     async (input, data, ctx) => {
       const settings = settingsSchema.parse(data.settings);
+      const format = await resolveRedEyeFormat(input, settings.format);
 
       let result: Awaited<ReturnType<typeof removeRedEye>>;
       try {
@@ -73,7 +125,7 @@ registerAiJobHandler(
           {
             sensitivity: settings.sensitivity,
             strength: settings.strength,
-            format: settings.format,
+            format: sidecarFormat(format),
             quality: settings.quality,
             signal: ctx.signal,
           },
@@ -83,17 +135,7 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(input, err);
       }
 
-      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-
-      return {
-        buffer: result.buffer,
-        filename: outputFilename,
-        contentType: "image/png",
-        resultPayload: {
-          facesDetected: result.facesDetected,
-          eyesCorrected: result.eyesCorrected,
-        },
-      };
+      return finishRedEyeOutput(result, format, settings.quality, data.filename);
     },
   ),
 );
@@ -269,22 +311,12 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
   // Register in the pipeline/batch registry
   registerToolProcessFn({
     toolId: "red-eye-removal",
-    settingsSchema: z.object({
-      sensitivity: z.number().min(0).max(100).default(50),
-      strength: z.number().min(0).max(100).default(70),
-      format: z.string().optional(),
-      quality: z.number().min(1).max(100).default(90),
-    }),
+    settingsSchema,
     process: withImageEncodeContext(
       "Red-eye removal failed",
       () => "red-eye-removal",
       async (inputBuffer, settings, filename, ctx) => {
-        const s = settings as {
-          sensitivity?: number;
-          strength?: number;
-          format?: string;
-          quality?: number;
-        };
+        const s = settingsSchema.parse(settings);
         const validation = await validateImageBuffer(inputBuffer, filename);
         const ext = extname(filename).toLowerCase().replace(/^\./, "");
         const format = validation.valid
@@ -298,6 +330,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           rasterizeSvg: true,
         });
         const orientedBuffer = prepared.buffer;
+        const outFormat = await resolveRedEyeFormat(orientedBuffer, s.format);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
@@ -308,10 +341,10 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
               orientedBuffer,
               scratchDir,
               {
-                sensitivity: s.sensitivity ?? 50,
-                strength: s.strength ?? 70,
-                format: s.format,
-                quality: s.quality ?? 90,
+                sensitivity: s.sensitivity,
+                strength: s.strength,
+                format: sidecarFormat(outFormat),
+                quality: s.quality,
                 signal: ctx?.signal,
               },
               ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
@@ -319,16 +352,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           } catch (err) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
-          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-          return {
-            buffer: result.buffer,
-            filename: outputFilename,
-            contentType: "image/png",
-            resultPayload: {
-              facesDetected: result.facesDetected,
-              eyesCorrected: result.eyesCorrected,
-            },
-          };
+          return finishRedEyeOutput(result, outFormat, s.quality, filename);
         } finally {
           if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }

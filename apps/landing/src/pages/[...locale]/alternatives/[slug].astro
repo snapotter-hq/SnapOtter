@@ -138,6 +138,8 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
           </a>
           <a
             href="https://demo.snapotter.com"
+            data-cta="live-demo"
+            data-cta-location="alternatives"
             target="_blank"
             rel="noopener noreferrer"
             class="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-background-alt"
@@ -252,7 +254,7 @@ const allJsonLd = [breadcrumbJsonLd, ...(faqJsonLd ? [faqJsonLd] : [])];
           <div class="reveal">
             <h2 class="font-display text-2xl font-bold tracking-tight md:text-3xl">Run it yourself</h2>
             <div class="mt-8">
-              <QuickstartBlock docker={alt.dockerSnippet ?? ""} curl={alt.apiSnippet} />
+              <QuickstartBlock docker={alt.dockerSnippet ?? ""} curl={alt.apiSnippet} ctaLocation="alternatives" />
             </div>
           </div>
         </div>

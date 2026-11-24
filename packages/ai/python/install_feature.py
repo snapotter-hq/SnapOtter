@@ -24,11 +24,13 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -113,6 +115,46 @@ def release_venv_write_lock() -> None:
     with contextlib.suppress(OSError):
         sys.stderr.write(json.dumps({"venvLock": "release"}) + "\n")
         sys.stderr.flush()
+
+
+class InstallCancelled(BaseException):
+    """Raised from the SIGINT handler when the server cancels the install.
+
+    A BaseException so the many `except Exception` blocks on the download and
+    extract paths let it through to main(), which removes the partial files
+    (#4763). Their `finally` blocks still run on the way out.
+    """
+
+
+INSTALL_CANCELLED = "Install canceled"
+
+
+def _on_cancel_signal(signum, _frame) -> None:
+    # The server cancels with SIGINT, and only while the venv writer lock is
+    # free; its watchdog uses SIGTERM, whose default action keeps the partial
+    # download for the retry to resume. Should SIGINT arrive with the lock held
+    # anyway, die at once like a watchdog kill, so the venv.writing marker sends
+    # the venv to a reseed on the next boot instead of cleanup code running
+    # against a half-written venv.
+    if _venv_lock_held[0]:
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+        return
+    raise InstallCancelled()
+
+
+def remove_cancelled_install_files(ai_dir: str, bundle_id: str, keep_path: str = "") -> None:
+    """Remove what a canceled install left behind: the extract staging tree and
+    the downloaded archive with its resume sidecars. Nothing has been written
+    to the venv or recorded in installed.json before the venv lock, so these
+    are the only traces. `keep_path` is an archive the admin supplied through
+    SNAPOTTER_BUNDLE_LOCAL_PATH, which is theirs and stays."""
+    shutil.rmtree(os.path.join(ai_dir, f"staging-{bundle_id}"), ignore_errors=True)
+    tar_path = os.path.join(ai_dir, "staging", f"{bundle_id}-{detect_arch()}.tar.gz")
+    for path in (tar_path, tar_path + ".partial", tar_path + ".meta"):
+        if keep_path and os.path.abspath(path) == os.path.abspath(keep_path):
+            continue
+        _unlink_quietly(path)
 
 
 # -- Architecture detection --
@@ -648,6 +690,9 @@ def download_with_hf_hub(
                 repo_type="model",
                 local_dir=local_dir,
             )
+    except InstallCancelled:
+        _cleanup_hf_local_dir(local_dir, archive_file)
+        raise
     except Exception as e:
         emit_progress(
             progress_start,
@@ -852,6 +897,13 @@ def _retry_or_raise(err, attempt, max_retries, bytes_downloaded, meta_path,
         raise RuntimeError(f"Failed to download after {max_retries} attempts: {err}")
 
 
+def hf_endpoint() -> str:
+    """Base URL for Hugging Face downloads, read the way huggingface_hub reads
+    it, so a mirror set in HF_ENDPOINT covers the sequential fallback and the
+    manual hint as well as the accelerated client (#4843)."""
+    return (os.environ.get("HF_ENDPOINT", "").strip() or "https://huggingface.co").rstrip("/")
+
+
 def download_and_verify(
     bundle_repo: str,
     archive_file: str,
@@ -871,10 +923,14 @@ def download_and_verify(
     (When the accelerated client was unavailable, the first attempt was
     already sequential and the retry is simply a fresh download.)
     """
-    url = f"https://huggingface.co/{bundle_repo}/resolve/main/{archive_file}"
+    url = f"{hf_endpoint()}/{bundle_repo}/resolve/main/{archive_file}"
+    # The hint lands in the install error the admin UI shows and the logs keep,
+    # so a mirror's user:password never goes into it.
+    parts = urllib.parse.urlsplit(url)
+    display_url = parts._replace(netloc=parts.netloc.rpartition("@")[2]).geturl()
     manual_hint = (
         f"You can download the bundle manually from:\n"
-        f"  {url}\n"
+        f"  {display_url}\n"
         f"Then upload it via Settings > AI Features > Offline Import."
     )
 
@@ -2580,6 +2636,17 @@ def main() -> None:
     os.environ["TRANSFORMERS_OFFLINE"] = "0"
     try:
         _install()
+    except InstallCancelled:
+        # A second cancel must not interrupt the cleanup; the server's SIGKILL
+        # escalation still ends a cleanup that hangs.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        if len(sys.argv) >= 4:
+            remove_cancelled_install_files(
+                os.path.dirname(sys.argv[3]),
+                sys.argv[1],
+                os.environ.get("SNAPOTTER_BUNDLE_LOCAL_PATH", ""),
+            )
+        fail(INSTALL_CANCELLED)
     finally:
         for key, value in saved.items():
             if value is None:
@@ -3245,4 +3312,7 @@ def _install() -> None:
 
 
 if __name__ == "__main__":
+    # Only as a script: signal handlers can only be set from the main thread,
+    # and an in-process caller keeps its own SIGINT handling.
+    signal.signal(signal.SIGINT, _on_cancel_signal)
     main()

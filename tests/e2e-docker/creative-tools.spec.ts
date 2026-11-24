@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { expect, type Page, test } from "@playwright/test";
+import { settleToolResponse } from "./settle-tool-response.js";
 
 // ─── Creative Tools ─────────────────────────────────────────────────
 // Tests for: collage, stitch, split, border, compose, watermark-text,
@@ -656,16 +657,17 @@ test.describe("Content-Aware Resize", () => {
         settings: JSON.stringify({ width: 150, height: 150 }),
       },
     });
+    const settled = await settleToolResponse(request, res, token);
     // Content-aware resize uses caire binary: returns 503 if not installed
-    if (res.status() === 503) {
-      const body = await res.json();
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
       expect(body.processedSize).toBeGreaterThan(0);
     }
@@ -679,15 +681,16 @@ test.describe("Content-Aware Resize", () => {
         settings: JSON.stringify({ width: 80, height: 80 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
     }
   });

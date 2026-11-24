@@ -8,6 +8,7 @@ import {
 } from "../../../apps/api/src/lib/animated-image.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
+import { outputFormatFor } from "../../../apps/api/src/lib/output-format.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
@@ -940,27 +941,6 @@ describe("animation detection inspects buffer format, not filename extension or 
       expectedFilename: "multipage.gif",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
-    {
-      toolId: "replace-color",
-      settings: { makeTransparent: true },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage.png",
-      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
-    },
-    {
-      toolId: "image-pad",
-      settings: { background: "transparent" },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage_padded.png",
-      expectedShape: { pages: 1, width: 800, pageHeight: 800 },
-    },
-    {
-      toolId: "border",
-      settings: { borderWidth: 10, cornerRadius: 10 },
-      expectedContentType: "image/png",
-      expectedFilename: "multipage.png",
-      expectedShape: { pages: 1, width: 820, pageHeight: 620 },
-    },
   ])(
     "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",
     async ({ toolId, settings, expectedContentType, expectedFilename, expectedShape }) => {
@@ -998,7 +978,7 @@ describe("readAnimation rethrows DecoderOutOfMemoryError on metadata() OOM (#383
             () => readAnimationFor(source, "gif"),
             () => readAnimationFor(source, "webp"),
             () => isAnimated(source),
-            () => runPerFrame(source, "gif", async (frame) => frame),
+            () => runPerFrame(source, outputFormatFor("gif"), async (frame) => frame),
           ]) {
             const oomErr = buildErr();
             metaSpy.mockRejectedValueOnce(oomErr);

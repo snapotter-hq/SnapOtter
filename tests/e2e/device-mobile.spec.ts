@@ -10,7 +10,15 @@
 
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
+import {
+  compressToSlider,
+  expect,
+  getE2eRunRoot,
+  test,
+  touchDragCropHandle,
+  uploadTestImage,
+  waitForProcessing,
+} from "./helpers";
 
 // Six Letter pages: enough thumbnails to be taller than a phone's preview area.
 const ORGANIZE_PDF_FIXTURE = path.join(
@@ -903,58 +911,34 @@ test.describe("@mobile Responsive chrome", () => {
 // Touch interactions
 // ---------------------------------------------------------------------------
 test.describe("@mobile Touch interactions", () => {
-  test("before-after slider responds to touch drag", async ({ loggedInPage: page }) => {
-    await page.goto("/image/compress");
-    await uploadTestImage(page);
-
-    // Wait for processing to complete and the slider to appear
-    const processBtn = page.getByRole("button", { name: /process|apply/i }).first();
-    if (await processBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await processBtn.click();
-    }
-    await waitForProcessing(page);
-
-    // Look for the before-after comparison area
-    const slider = page
-      .locator("[class*='before-after'], [class*='BeforeAfter'], [class*='comparison']")
-      .first();
-    await slider.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {});
-
-    if (await slider.isVisible()) {
-      const box = await slider.boundingBox();
-      if (box) {
-        // Simulate a touch drag across the slider
-        const startX = box.x + box.width * 0.3;
-        const endX = box.x + box.width * 0.7;
-        const y = box.y + box.height / 2;
-
-        await page.touchscreen.tap(startX, y);
-        // Touch drag: move from left to right
-        await page.mouse.move(startX, y);
-        await page.mouse.down();
-        await page.mouse.move(endX, y, { steps: 10 });
-        await page.mouse.up();
-      }
-    }
-    // If slider not visible, processing may have been too fast for comparison mode
-    // -- this is acceptable; the test validates the touch mechanism when it appears
+  test("before-after slider responds to touch", async ({ loggedInPage: page }) => {
+    const slider = await compressToSlider(page);
+    const box = await slider.boundingBox();
+    if (!box) throw new Error("the slider has no bounding box");
+    // The divider moves up and down on a phone and side to side on a wider
+    // screen, so a tap a quarter of the way in on both axes lands it near 25
+    // either way.
+    await page.touchscreen.tap(box.x + box.width * 0.25, box.y + box.height * 0.25);
+    await expect
+      .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
+      .toBeLessThan(35);
   });
 
   test("crop canvas accepts touch input", async ({ loggedInPage: page }) => {
     await page.goto("/image/crop");
     await uploadTestImage(page);
-    await page.waitForTimeout(1000);
 
-    const canvas = page.locator("canvas").first();
-    await canvas.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    // The crop stage is react-image-crop over a plain <img>, not a canvas.
+    await expect(page.getByRole("img", { name: "Crop preview" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(".ReactCrop__crop-selection")).toBeVisible();
+    const original = page.getByText(/^Original: \d+ x \d+$/);
+    await expect(original).toBeVisible();
+    const fullSize = (await original.innerText()).replace("Original:", "Crop region:");
+    const region = page.getByText(/^Crop region: \d+ x \d+$/);
+    await expect(region).toHaveText(fullSize);
 
-    if (await canvas.isVisible()) {
-      const box = await canvas.boundingBox();
-      if (box) {
-        // Tap to interact with crop canvas
-        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-      }
-    }
+    await touchDragCropHandle(page, 0.4);
+    await expect(region).not.toHaveText(fullSize);
   });
 });
 

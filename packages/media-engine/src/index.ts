@@ -22,6 +22,7 @@ export {
   type MediaStreamInfo,
   type ProbeOptions,
   probeMedia,
+  runFfprobe,
 } from "./ffprobe.js";
 export { type FontRef, resolveFontFile } from "./fonts.js";
 export { type FfmpegProgress, parseProgressBlock } from "./progress.js";

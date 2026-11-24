@@ -1,8 +1,8 @@
 ---
-description: "使用 Docker 一条命令安装 SnapOtter。包含 Docker Compose 设置、从源码构建以及完整的功能概览。"
-i18n_source_hash: 2291f9ca0071
+description: "使用 Docker 一条命令安装 SnapOtter，登录并打开你的第一个工具。涵盖 GPU 加速、小型机器、Docker Compose 以及从源码构建。"
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: ccf50ed732c6
+i18n_output_hash: 0008912c671e
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## 快速开始 {#quick-start}
 
+运行一条命令：
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-这个单一容器包含运行所需的一切：未设置 `DATABASE_URL` 时，它会在回环接口上启动自己的 PostgreSQL 和 Redis（内嵌模式），并将所有数据保存在 `SnapOtter-data` 卷中。这是试用 SnapOtter 或在家庭实验室中自托管的最快方式。对于生产环境，请使用[标准 Docker Compose 堆栈](#docker-compose)，它将 PostgreSQL 和 Redis 放在各自的容器中。内嵌模式以 root 身份运行（默认），并且一旦你设置 `DATABASE_URL` 就会自动关闭。
+然后打开 [http://localhost:1349](http://localhost:1349)，使用 `admin` / `admin` 登录。首次登录时会要求你修改密码。
 
-任务结果不会保存在数据卷中，因此容器被替换时（例如升级镜像）它们会消失，对应的下载链接也会失效。部署指南的“卷”一节说明了如何保留它们。
+接下来打开一个工具。可以从侧边栏中选择，也可以直接进入[缩放](http://localhost:1349/image/resize)，放入一张图像，然后下载结果。
 
-要在 Raspberry Pi、旧笔记本电脑或小型 VPS 上安装？请参阅[低资源配置](/zh-CN/guide/low-resource)，了解经过调优的操作指南以及受限硬件上的预期表现。
+安装到此就完成了。这个单一容器包含运行所需的一切：未设置 `DATABASE_URL` 时，它会在回环接口上启动自己的 PostgreSQL 和 Redis（内嵌模式），并将所有数据保存在 `SnapOtter-data` 卷中。这是试用 SnapOtter 或在家庭实验室中自托管的最快方式。内嵌模式以 root 身份运行（默认），并且一旦你设置 `DATABASE_URL` 就会自动关闭。对于生产环境，请使用 [Docker Compose 堆栈](#docker-compose)，它将 PostgreSQL 和 Redis 放在各自的容器中。
 
-打开 [http://localhost:1349](http://localhost:1349)，使用 `admin` / `admin` 登录。首次登录时会要求你修改密码。
+任务结果不会保存在数据卷中，因此容器被替换时（例如升级镜像）它们会消失，对应的下载链接也会失效。部署指南中的[保留任务输出](/zh-CN/guide/deployment#keeping-job-output)说明了如何保留它们。
+
+::: tip 在 4 GB 或更少内存上运行
+在 Raspberry Pi、旧笔记本电脑或小型 VPS 上，请一次只运行一个任务，在上面的命令中加入 `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` 来限制图像线程池，并跳过体积较大的 AI 软件包。[低资源配置](/zh-CN/guide/low-resource#tuning-knobs)列出了其他值得设置的限制，以及受限硬件上的预期表现。
+:::
 
 ::: tip 匿名产品分析
 SnapOtter 默认包含匿名产品分析。要关闭它，请打开 **设置 → 系统 → 隐私**，并关闭 **匿名产品分析**。它会立即对整个实例停止。
@@ -36,25 +42,51 @@ SnapOtter 默认包含匿名产品分析。要关闭它，请打开 **设置 →
 有关收集内容的详细信息，请参阅 [SnapOtter 收集哪些数据](/zh-CN/guide/telemetry)。
 :::
 
-::: tip NVIDIA CUDA 加速
-添加 `--gpus all`，即可使用 NVIDIA CUDA 加速背景移除、放大、人脸增强和修复。OCR 仍基于 CPU，无论有无 GPU 访问权限，都可在同一个镜像中使用：
+## GPU 加速 {#gpu-acceleration}
+
+NVIDIA GPU 能大幅加快重型 AI 工具的速度：放大（约 47 倍）、人脸增强（约 12 倍）、转录和背景移除（各约 4 倍）。OCR、人脸检测和照片修复仍然依赖 CPU，因此 GPU 对它们没有帮助。同一个镜像同时支持两种情况，只需添加 `--gpus all`：
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-需要 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。CUDA 不可用时会自动回退到 CPU。目前不支持通过 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 集成显卡进行 AI 推理加速。基准测试请参阅 [Docker 标签](/zh-CN/guide/docker-tags)。如果尽管设置了 `--gpus all`，AI 工具仍在 CPU 上运行，请参阅[验证 GPU 加速](/zh-CN/guide/deployment#verify-gpu-acceleration)。
-:::
+这需要主机上安装 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。没有 CUDA 时，SnapOtter 会自动回退到 CPU。目前不支持通过 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 集成显卡进行 AI 推理加速。
 
-::: details 同时发布在 GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [硬件要求](/zh-CN/guide/deployment#full-ai-tools-on-nvidia-cuda)提供完整的 GPU 和 CPU 耗时，[Docker 镜像基准测试](/zh-CN/guide/docker-tags#benchmarks)提供热启动和冷启动数据。
+- 如果 AI 工具仍在 CPU 上运行，请参阅[验证 GPU 加速](/zh-CN/guide/deployment#verify-gpu-acceleration)。
+- 使用 Compose 时，请参阅部署指南中的 [NVIDIA CUDA 快速开始](/zh-CN/guide/deployment#quick-start-nvidia-cuda)。
+
+## 其他安装方式 {#other-ways-to-install}
+
+### 使用 Compose 的单容器 {#single-container-compose}
+
+与快速开始相同的内嵌模式容器，写成 Compose 文件，更便于管理和修改。将其保存为 `docker-compose.yml`，然后运行 `docker compose up -d`：
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-每次发布时，两个镜像仓库都会发布相同的镜像。
-:::
+与 `docker run` 命令一样，这适合试用 SnapOtter 和小型安装。[配置](/zh-CN/guide/configuration)中的所有设置都放在 `environment` 下。
 
-## Docker Compose {#docker-compose}
+### Docker Compose（生产环境） {#docker-compose}
 
 请使用随每个版本维护和测试的生产文件，而不要复制本页上简化的 Compose 示例：
 
@@ -80,7 +112,15 @@ docker compose -f docker-compose.yml up -d --no-build
 
 所有环境变量请参阅[配置](/zh-CN/guide/configuration)，密钥、网络策略和备份指南请参阅[安全与加固](/zh-CN/guide/security)。
 
-## 从源码构建 {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+每次发布时，Docker Hub 和 GHCR 都会发布相同的镜像。要从 GHCR 拉取，请替换镜像名称：
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### 从源码构建 {#build-from-source}
 
 **前提条件：** Node.js 22.22+、pnpm 9+、Docker（用于 Postgres + Redis）、Python 3.11+（用于 AI 功能）、Git。
 
@@ -102,10 +142,10 @@ pnpm dev
 | 类型 | 数量 | 示例工具 |
 |----------|-------|---------------|
 | **图像** | 112 | 缩放、裁剪、压缩、转换、移除背景、放大、OCR、水印、拼贴、上色、GIF 工具、格式预设 |
-| **视频** | 57 | 剪切、裁剪、压缩、转换、合并、提取音频、自动字幕、视频转 GIF、缩放、防抖、格式预设 |
-| **音频** | 27 | 剪切、合并、转换、标准化、降噪、转录、变调、淡入淡出、铃声制作、格式预设 |
-| **PDF / 文档** | 35 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、保护、修复 |
-| **文件** | 23 | CSV 转 JSON、JSON 转 XML、合并 CSV、拆分 CSV、创建 ZIP、提取 ZIP、图表制作、YAML/JSON |
+| **视频** | 63 | 剪切、裁剪、压缩、转换、合并、提取音频、自动字幕、视频转 GIF、缩放、防抖、格式预设 |
+| **音频** | 57 | 剪切、合并、转换、标准化、降噪、转录、变调、淡入淡出、铃声制作、格式预设 |
+| **PDF / 文档** | 37 | 合并、拆分、压缩、OCR、水印、涂黑、Word 转 PDF、Excel 转 PDF、旋转、保护、修复 |
+| **文件** | 25 | CSV 转 JSON、JSON 转 XML、合并 CSV、拆分 CSV、创建 ZIP、提取 ZIP、图表制作、YAML/JSON |
 
 ### 流水线 {#pipelines}
 

@@ -5,6 +5,7 @@ import EnterpriseSection from "@/components/EnterpriseSection.astro";
 import FeatureHighlights from "@/components/FeatureHighlights.astro";
 import Footer from "@/components/Footer.astro";
 import Hero from "@/components/Hero.astro";
+import HomeFaq from "@/components/HomeFaq.astro";
 import JsonLd from "@/components/JsonLd.astro";
 import Navbar from "@/components/Navbar.astro";
 import OpenSource from "@/components/OpenSource.astro";
@@ -131,12 +132,16 @@ const navSchema = {
   <Navbar locale={locale} />
 
   <main id="main">
+    <!-- What it is, that it's free, how to install and what it does all sit in
+         the hero; the quick answers and pricing follow, and the enterprise pitch
+         moves below the product sections (#5011). -->
     <Hero locale={locale} />
+    <HomeFaq locale={locale} />
     <ToolGrid locale={locale} />
-    <EnterpriseSection locale={locale} />
+    <Pricing locale={locale} />
     <FeatureHighlights locale={locale} />
     <Testimonials locale={locale} />
-    <Pricing locale={locale} />
+    <EnterpriseSection locale={locale} />
     <OpenSource locale={locale} />
   </main>
 

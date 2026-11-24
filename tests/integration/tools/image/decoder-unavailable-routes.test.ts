@@ -154,8 +154,13 @@ const ROUTES: RouteCase[] = [
       },
     ],
   },
-  // These two call the image input handler directly rather than through the
-  // factory, so they answer its 503 themselves.
+  {
+    name: "vectorize",
+    url: "/api/v1/tools/image/vectorize",
+    parts: (s) => [{ name: "file", ...s }, settings({})],
+  },
+  // This one calls the image input handler directly rather than through the
+  // factory, so it answers its 503 itself.
   {
     name: "compare",
     url: "/api/v1/tools/image/compare",
@@ -163,11 +168,6 @@ const ROUTES: RouteCase[] = [
       { name: "file", ...s },
       { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
     ],
-  },
-  {
-    name: "vectorize",
-    url: "/api/v1/tools/image/vectorize",
-    parts: (s) => [{ name: "file", ...s }, settings({})],
   },
   // #1453: multi-file, inline-decode, and batch routes that previously
   // swallowed a missing decoder into per-file errors/skips or raw uploads.

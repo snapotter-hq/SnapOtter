@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type Stats } from "sharp";
 import type {
   AnalysisResult,
   AnalysisScores,
@@ -15,7 +15,7 @@ import type {
  */
 const MAX_CLAHE_PIXELS = 16_000_000;
 
-/** Longest edge of the thumbnail the tone histogram is measured on. */
+/** Longest edge of the thumbnail the tone histogram and chroma are measured on. */
 const TONE_SAMPLE_EDGE = 256;
 
 /**
@@ -32,6 +32,14 @@ const BACKLIT_LIGHT_LEAD = 20;
 
 /** Channel-mean red/blue gap (0-255) below which white balance is left alone. */
 const WB_DEAD_ZONE = 12.5;
+
+/**
+ * Mean per-pixel chroma (max - min of R, G, B, 0-255) below which a photo is
+ * treated as neutral: a greyscale shot saved as RGB, or a page. It has no
+ * colour for a boost to bring out, so it's never boosted or flagged as
+ * desaturated (#4869).
+ */
+const NEUTRAL_CHROMA = 6;
 
 interface ToneDistribution {
   /** Share of pixels with luminance below 64. */
@@ -128,12 +136,13 @@ const PRESET_MULTIPLIERS: Record<
  * Uses Sharp's stats() for per-channel histogram statistics.
  */
 export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
-  const image = sharp(buffer);
-  const stats = await image.stats();
-  const meta = await image.metadata();
+  const meta = await sharp(buffer).metadata();
+  const stats = await measureChannels(buffer);
 
   const channels = stats.channels;
-  const isGrayscale = channels.length === 1;
+  // Grey stays grey once converted to sRGB (three equal channels), so the
+  // source decides; an alpha channel doesn't make grey+alpha a colour image.
+  const isGrayscale = (meta.channels ?? 3) - (meta.hasAlpha ? 1 : 0) === 1;
 
   const rCh = channels[0];
   const gCh = channels[Math.min(1, channels.length - 1)];
@@ -143,6 +152,7 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
   const meanLuminance = rCh.mean * 0.299 + gCh.mean * 0.587 + bCh.mean * 0.114;
   const stdevLuminance = rCh.stdev * 0.299 + gCh.stdev * 0.587 + bCh.stdev * 0.114;
 
+  const chroma = isGrayscale ? 0 : await measureChroma(buffer);
   const scores = computeScores(
     rCh,
     gCh,
@@ -151,7 +161,9 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
     stdevLuminance,
     isGrayscale,
     stats.entropy,
+    chroma,
   );
+  const neutral = isGrayscale || chroma < NEUTRAL_CHROMA;
   const tones = await measureTones(buffer);
   const backlit =
     tones.shadows >= BACKLIT_SHADOW_SHARE &&
@@ -161,11 +173,28 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
     redBlueGap: isGrayscale ? 0 : rCh.mean - bCh.mean,
     backlit,
     shadows: tones.shadows,
+    neutral,
   });
-  const issues = detectIssues(scores, backlit);
+  const issues = detectIssues(scores, backlit, neutral);
   const suggestedMode = suggestMode(scores, meta);
 
   return { scores, corrections, issues, suggestedMode };
+}
+
+/**
+ * Channel statistics on 8-bit sRGB pixels without alpha, so a 16-bit, CMYK or
+ * grey+alpha source scores like its 8-bit sRGB equivalent. stats() reads the
+ * decoded input and ignores pipeline operations, hence the raw round trip.
+ */
+async function measureChannels(buffer: Buffer): Promise<Stats> {
+  const { data, info } = await sharp(buffer)
+    .removeAlpha()
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  }).stats();
 }
 
 /**
@@ -211,6 +240,31 @@ async function measureTones(buffer: Buffer): Promise<ToneDistribution> {
   };
 }
 
+/**
+ * Mean per-pixel chroma (max - min of R, G, B) on a thumbnail. Unlike the
+ * spread of the channel means, it sees a vivid photo whose colours average
+ * out, and a uniform cast adds no more than its own spread (#4869).
+ */
+async function measureChroma(buffer: Buffer): Promise<number> {
+  const { data, info } = await sharp(buffer)
+    .removeAlpha()
+    .resize(TONE_SAMPLE_EDGE, TONE_SAMPLE_EDGE, { fit: "inside", withoutEnlargement: true })
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const pixels = width * height;
+  let sum = 0;
+  for (let i = 0; i < pixels; i++) {
+    const o = i * channels;
+    const r = data[o];
+    const g = data[o + 1];
+    const b = data[o + 2];
+    sum += Math.max(r, g, b) - Math.min(r, g, b);
+  }
+  return pixels > 0 ? sum / pixels : 0;
+}
+
 function computeScores(
   rCh: SharpChannelStats,
   gCh: SharpChannelStats,
@@ -219,6 +273,7 @@ function computeScores(
   stdevLum: number,
   isGrayscale: boolean,
   entropy: number,
+  chroma: number,
 ): AnalysisScores {
   const exposureScore = clamp(Math.round((meanLum / 255) * 100), 0, 100);
 
@@ -231,7 +286,8 @@ function computeScores(
   const channelSpread = Math.max(meanR, meanG, meanB) - Math.min(meanR, meanG, meanB);
   const wbScore = isGrayscale ? 50 : clamp(Math.round(50 - channelSpread * 0.8), 0, 100);
 
-  const satScore = isGrayscale ? 50 : clamp(Math.round(channelSpread * 1.2 + 20), 0, 100);
+  // Mean chroma 40, typical of a well-saturated photo, scores the ideal 50.
+  const satScore = isGrayscale ? 50 : clamp(Math.round(20 + chroma * 0.75), 0, 100);
 
   const sharpnessScore = clamp(Math.round(stdevLum * 0.8 + 10), 0, 100);
 
@@ -249,7 +305,7 @@ function computeScores(
 
 function computeCorrections(
   scores: AnalysisScores,
-  tone: { redBlueGap: number; backlit: boolean; shadows: number },
+  tone: { redBlueGap: number; backlit: boolean; shadows: number; neutral: boolean },
 ): CorrectionParams {
   // A backlit photo's mean is pulled up by the background, so the mean-based
   // correction would darken a subject that needs lifting. Lift in proportion
@@ -262,7 +318,7 @@ function computeCorrections(
   const temperature = whiteBalanceCorrection(tone.redBlueGap);
 
   const saturation =
-    scores.saturation < 40
+    scores.saturation < 40 && !tone.neutral
       ? clamp(Math.round((40 - scores.saturation) * 0.6), 0, 30)
       : scores.saturation > 60
         ? clamp(Math.round((60 - scores.saturation) * 0.4), -20, 0)
@@ -307,14 +363,14 @@ function deadZoneCorrection(score: number, lo: number, hi: number, factor: numbe
   return clamp(Math.round((hi - score) * factor), -60, 0);
 }
 
-function detectIssues(scores: AnalysisScores, backlit: boolean): string[] {
+function detectIssues(scores: AnalysisScores, backlit: boolean, neutral: boolean): string[] {
   const issues: string[] = [];
   if (scores.exposure < 35) issues.push("underexposed");
   // A backlit photo reads bright on average but its subject is dark.
   if (scores.exposure > 70 && !backlit) issues.push("overexposed");
   if (scores.contrast < 35) issues.push("low-contrast");
   if (scores.whiteBalance < 35) issues.push("color-cast");
-  if (scores.saturation < 30) issues.push("desaturated");
+  if (scores.saturation < 30 && !neutral) issues.push("desaturated");
   if (scores.sharpness < 35) issues.push("soft-focus");
   if (scores.noise < 30) issues.push("noisy");
   return issues;
@@ -381,12 +437,16 @@ export async function applyCorrections(
   // white and its text black, not lifted shadows (#4842).
   const backlit = corrections.backlit === true && mode !== "document";
 
+  // The base clip shrinks as intensity grows, so on its own intensity 0,
+  // which should leave the image alone, clipped hardest of all. Below the
+  // default the ramp scales it toward none, and a clip that rounds to 0 there
+  // skips the stretch: a 0-100 normalise is still a full min-max stretch (#4369).
   if (toggles.exposure !== false && !backlit) {
-    const baseClip = 5 - (intensity / 100) * 4.5;
+    const baseClip = (5 - (intensity / 100) * 4.5) * Math.min(1, intensity / 50);
     const clipPct = clamp(Math.round(baseClip * presets.normalise), 0, 10);
     const lower = clipPct;
     const upper = 100 - clipPct;
-    if (lower < upper) {
+    if (lower < upper && (clipPct > 0 || intensity >= 50)) {
       result = result.normalise({ lower, upper });
     }
   }

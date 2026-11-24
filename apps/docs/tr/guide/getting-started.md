@@ -1,8 +1,8 @@
 ---
-description: "SnapOtter'ı Docker ile tek komutta kurun. Docker Compose kurulumunu, kaynak koddan derlemeyi ve özelliklere tam bir genel bakışı içerir."
-i18n_source_hash: 2291f9ca0071
+description: "SnapOtter'ı Docker ile tek komutta kurun, giriş yapın ve ilk aracınızı açın. GPU hızlandırmayı, küçük makineleri, Docker Compose kurulumunu ve kaynak koddan derlemeyi kapsar."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 2b3adeca8c2d
+i18n_output_hash: 5c57b97d90a5
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ Tüm arayüzü [demo.snapotter.com](https://demo.snapotter.com) adresinde keşfe
 
 ## Hızlı Başlangıç {#quick-start}
 
+Tek bir komut çalıştırın:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [kanonik Docker Compose yığınını](#docker-compose) kullanın. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır.
+Ardından [http://localhost:1349](http://localhost:1349) adresini açın ve `admin` / `admin` ile giriş yapın. İlk girişte parolanızı değiştirmeniz istenir.
 
-İş sonuçları veri biriminde tutulmaz, bu yüzden kapsayıcı değiştirildiğinde (örneğin bir imaj yükseltmesinde) kaybolur ve indirme bağlantıları çalışmaz hale gelir. Dağıtım kılavuzunun Birimler bölümü bunları nasıl koruyacağınızı açıklar.
+Şimdi bir araç açın. Kenar çubuğundan birini seçin ya da doğrudan [Resize](http://localhost:1349/image/resize) aracına gidin, bir görsel bırakın ve sonucu indirin.
 
-Raspberry Pi, eski bir dizüstü bilgisayar veya küçük bir VPS üzerine mi kuruyorsunuz? Ayarlanmış bir adım adım kurulum ve kısıtlı donanımdan ne bekleyeceğiniz için [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource) sayfasına bakın.
+Kurulum bu kadar. Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [Docker Compose yığınını](#docker-compose) kullanın.
 
-[http://localhost:1349](http://localhost:1349) adresini açın ve `admin` / `admin` ile giriş yapın. İlk girişte parolanızı değiştirmeniz istenir.
+İş sonuçları veri biriminde tutulmaz, bu yüzden kapsayıcı değiştirildiğinde (örneğin bir imaj yükseltmesinde) kaybolur ve indirme bağlantıları çalışmaz hale gelir. Dağıtım kılavuzundaki [İş çıktısını saklama](/tr/guide/deployment#keeping-job-output) bölümü bunları nasıl koruyacağınızı açıklar.
+
+::: tip 4 GB veya daha az RAM ile çalıştırma
+Raspberry Pi, eski bir dizüstü bilgisayar ya da küçük bir VPS üzerinde aynı anda tek iş çalıştırın, yukarıdaki komuta `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` ekleyerek görsel iş parçacığı havuzunu sınırlayın ve ağır yapay zeka paketlerini atlayın. [Düşük Kaynaklı Kurulumlar](/tr/guide/low-resource#tuning-knobs) sayfası, ayarlamaya değer diğer sınırları ve kısıtlı donanımdan ne bekleyeceğinizi listeler.
+:::
 
 ::: tip Anonim Ürün Analitiği
 SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
@@ -36,25 +42,51 @@ Hata izleme, açık kaynak programı aracılığıyla SnapOtter'a sponsor olan [
 Nelerin toplandığı hakkında ayrıntılar için [SnapOtter'ın topladıkları](/tr/guide/telemetry) sayfasına bakın.
 :::
 
-::: tip NVIDIA CUDA hızlandırma
-NVIDIA CUDA ile hızlandırılmış arka plan kaldırma, büyütme, yüz iyileştirme ve restorasyon için `--gpus all` ekleyin. OCR CPU tabanlı kalır ve GPU erişimiyle ya da erişimsiz aynı imajda çalışır:
+## GPU Hızlandırma {#gpu-acceleration}
+
+Bir NVIDIA GPU, ağır yapay zeka araçlarını çok daha hızlı hale getirir: büyütme (yaklaşık 47 kat), yüz iyileştirme (yaklaşık 12 kat), yazıya dökme ve arka plan kaldırma (her biri yaklaşık 4 kat). OCR, yüz algılama ve fotoğraf restorasyonu CPU tabanlı kalır, bu yüzden GPU bunlara yardımcı olmaz. Aynı imaj ikisini de kapsar; `--gpus all` ekleyin:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerektirir. CUDA kullanılamadığında otomatik olarak CPU'ya döner. VA-API, Quick Sync veya OpenCL üzerinden Intel/AMD iGPU hızlandırma, yapay zeka çıkarımı için şu anda desteklenmemektedir. Kıyaslamalar için [Docker Etiketleri](/tr/guide/docker-tags) sayfasına bakın. `--gpus all` olmasına rağmen yapay zeka araçları CPU üzerinde çalışıyorsa [GPU hızlandırmayı doğrulama](/tr/guide/deployment#verify-gpu-acceleration) bölümüne bakın.
-:::
+Bunun için ana makinede [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) gerekir. CUDA yoksa SnapOtter kendiliğinden CPU'ya döner. VA-API, Quick Sync veya OpenCL üzerinden Intel/AMD iGPU hızlandırma, yapay zeka çıkarımı için şu anda desteklenmemektedir.
 
-::: details GHCR üzerinde de mevcut
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [Donanım Gereksinimleri](/tr/guide/deployment#full-ai-tools-on-nvidia-cuda) sayfasında tam GPU ve CPU süreleri, [Docker İmajı kıyaslamaları](/tr/guide/docker-tags#benchmarks) sayfasında ise sıcak ve soğuk başlangıç değerleri bulunur.
+- Yapay zeka araçları hâlâ CPU üzerinde çalışıyorsa [GPU hızlandırmayı doğrulama](/tr/guide/deployment#verify-gpu-acceleration) bölümüne bakın.
+- Compose için Dağıtım kılavuzundaki [NVIDIA CUDA Hızlı Başlangıç](/tr/guide/deployment#quick-start-nvidia-cuda) bölümünü kullanın.
+
+## Diğer Kurulum Yöntemleri {#other-ways-to-install}
+
+### Compose ile Tek Kapsayıcı {#single-container-compose}
+
+Hızlı Başlangıç'taki gömülü mod kapsayıcısının aynısı, takip etmesi ve değiştirmesi daha kolay olsun diye bir Compose dosyası olarak yazılmıştır. `docker-compose.yml` olarak kaydedin ve `docker compose up -d` çalıştırın:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Her iki kayıt defteri de her sürümde aynı imajı yayımlar.
-:::
+`docker run` komutu gibi bu da SnapOtter'ı denemek ve küçük kurulumlar içindir. [Yapılandırma](/tr/guide/configuration) sayfasındaki her ayar `environment` altına girer.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (üretim) {#docker-compose}
 
 Bu sayfadaki kısaltılmış bir Compose örneğini kopyalamak yerine, her sürümle birlikte bakımı yapılan ve test edilen üretim dosyasını kullanın:
 
@@ -76,11 +108,19 @@ docker compose -f docker-compose.yml up -d --no-build
 
 [http://localhost:1349](http://localhost:1349) adresini açın ve `admin` / `admin` ile giriş yapın.
 
-Kanonik [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) dört çalışma zamanı biriminin tamamını, sağlık denetimlerini, kaynak sınırlarını, kalıcı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek imajlarını ve güncel kapsayıcı sıkılaştırmasını içerir. İlk girişten hemen sonra varsayılan yönetici parolasını değiştirin. Tekrarlanabilir bir dağıtım için `latest` etiketini izlemek yerine SnapOtter uygulama imajını doğruladığınız sürüm etiketine veya özetine (digest) sabitleyin.
+Kanonik [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) dosyası dört çalışma zamanı birimini, sağlık kontrollerini, kaynak sınırlarını, kalıcı Redis yapılandırmasını, sabitlenmiş veritabanı/önbellek imajlarını ve güncel kapsayıcı sıkılaştırmasını içerir. İlk girişten hemen sonra varsayılan yönetici parolasını değiştirin. Tekrarlanabilir bir dağıtım için `latest` etiketini izlemek yerine, doğruladığınız sürüm etiketine veya digest değerine SnapOtter uygulama imajını sabitleyin.
 
-Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration), gizli bilgiler, ağ ilkesi ve yedekleme yönergeleri için [Güvenlik ve Sıkılaştırma](/tr/guide/security) sayfalarına bakın.
+Tüm ortam değişkenleri için [Yapılandırma](/tr/guide/configuration), gizli bilgiler, ağ politikası ve yedekleme önerileri için [Güvenlik ve Sıkılaştırma](/tr/guide/security) sayfasına bakın.
 
-## Kaynak Koddan Derleme {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Hem Docker Hub hem de GHCR her sürümde aynı imajı yayımlar. GHCR'den çekmek için imaj adını değiştirin:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Kaynak Koddan Derleme {#build-from-source}
 
 **Ön koşullar:** Node.js 22.22+, pnpm 9+, Docker (Postgres + Redis için), Python 3.11+ (yapay zeka özellikleri için), Git.
 
@@ -102,10 +142,10 @@ pnpm dev
 | Kategori | Sayı | Örnek Araçlar |
 |----------|-------|---------------|
 | **Görsel** | 112 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, biçim ön ayarları |
-| **Video** | 57 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazı, Videodan GIF'e, Yeniden Boyutlandır, Stabilize Et, biçim ön ayarları |
-| **Ses** | 27 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Yazıya Dök, Perde Değiştir, Solma, Zil Sesi Oluşturucu, biçim ön ayarları |
-| **PDF / Belge** | 35 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Karartma, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
-| **Dosyalar** | 23 | CSV'den JSON'a, JSON'dan XML'e, CSV Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
+| **Video** | 63 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazı, Videodan GIF'e, Yeniden Boyutlandır, Stabilize Et, biçim ön ayarları |
+| **Ses** | 57 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Yazıya Dök, Perde Değiştir, Solma, Zil Sesi Oluşturucu, biçim ön ayarları |
+| **PDF / Belge** | 37 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Karartma, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
+| **Dosyalar** | 25 | CSV'den JSON'a, JSON'dan XML'e, CSV Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
 
 ### İş Hatları {#pipelines}
 

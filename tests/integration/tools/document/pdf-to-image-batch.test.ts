@@ -255,6 +255,25 @@ describe("POST /api/v1/tools/pdf/:toolId/batch (issue #632)", () => {
     expect(JSON.parse(res.body).errors[0].error).toMatch(/password/i);
   });
 
+  it("names the DPI and size for a page too large to render, not mupdf's malloc text (#4424)", async () => {
+    const res = await postBatch(
+      "pdf-to-png",
+      [
+        { filename: "a.pdf", content: PDF_3PAGE },
+        { filename: "b.pdf", content: PDF_3PAGE },
+      ],
+      { dpi: 2400, pages: "1" },
+    );
+
+    expect(res.statusCode).toBe(422);
+    const data = JSON.parse(res.body);
+    expect(data.errors).toHaveLength(2);
+    for (const entry of data.errors) {
+      expect(entry.error).toMatch(/^Page 1 at 2400 DPI would render \d+ x \d+ px/);
+    }
+    expect(res.body).not.toMatch(/malloc/);
+  });
+
   it("echoes the client job id so the progress stream can be matched up", async () => {
     const res = await postBatch(
       "pdf-to-jpg",

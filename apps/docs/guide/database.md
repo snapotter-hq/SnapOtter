@@ -30,7 +30,7 @@ Active login sessions. Each row ties a session token to a user.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | varchar | Primary key (session token) |
+| `id` | varchar | Primary key (SHA-256 hash of the session token) |
 | `userId` | uuid | Foreign key to `users.id` |
 | `expiresAt` | timestamp | Expiry time |
 | `createdAt` | timestamp | Creation time |
@@ -185,6 +185,16 @@ On RDS, Supabase, Cloud SQL, or any cluster you run yourself, the split is opt-i
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Then, as a superuser or the role that ran that `CREATE ROLE`, let the owner role administer it:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+On Postgres 16 and later, `CREATEROLE` only lets a role change roles it created itself or holds `ADMIN OPTION` on. SnapOtter changes the runtime role's password only when it no longer matches `DATABASE_URL` (after a rotation, say), and without this grant that boot fails. `INHERIT FALSE, SET FALSE` hands over administration and nothing else. Plain `WITH ADMIN OPTION` would also give `snapotter` the runtime role's privileges. Postgres 15 and earlier don't need the grant and reject that syntax, so skip it there.
+
+When SnapOtter does set the password, it stores a SCRAM-SHA-256 verifier, even if the cluster's `password_encryption` is `md5`. Postgres accepts that through an `md5` line in `pg_hba.conf`, but a connection pooler that checks md5 hashes itself can't log in as the runtime role.
 
 Then hand SnapOtter both connection strings, pointed at the same host, port, and database:
 

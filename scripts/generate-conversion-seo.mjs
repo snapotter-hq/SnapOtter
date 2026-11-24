@@ -165,6 +165,27 @@ const A = {
     pick: "Choose FLAC when you want an exact archival copy at roughly half the size of WAV.",
     tip: "FLAC keeps the full dynamic range. If the destination is a phone or a car stereo, consider normalising while you convert.",
   },
+  Opus: {
+    full: "Opus",
+    lossy: true,
+    note: "the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video",
+    pick: "Choose Opus when you control the player and want the smallest file at a given quality.",
+    tip: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+  },
+  WMA: {
+    full: "Windows Media Audio",
+    lossy: true,
+    note: "Microsoft's legacy codec, which Apple devices and many players will not open",
+    pick: "Choose WMA only when an old Windows tool insists on it.",
+    tip: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+  },
+  AIFF: {
+    full: "AIFF",
+    lossy: false,
+    note: "Apple's uncompressed PCM format, the Mac counterpart of WAV",
+    pick: "Choose AIFF when the audio is going into Logic or another Mac tool that expects it.",
+    tip: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+  },
 };
 
 // Where a family differs only by its source container (four video-to-GIF pages,
@@ -712,7 +733,9 @@ function audioEntry(p) {
       ? "Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving."
       : a.lossy && !b.lossy
         ? `${to} is lossless, but it cannot rebuild what ${from} already threw away. You get a larger file containing exactly what the ${from} held, which helps before editing and achieves nothing as an archive upgrade.`
-        : `${from} is lossless and ${to} is lossy, so this discards audio data in exchange for a much smaller file.`;
+        : !a.lossy && !b.lossy
+          ? `Both formats are lossless, so every sample comes through untouched and only the container and the file size change.`
+          : `${from} is lossless and ${to} is lossy, so this discards audio data in exchange for a much smaller file.`;
   return {
     searchTitle: `${from} to ${to} Converter Online Free`,
     longDescription: `Convert ${a.full} audio to ${b.full}. You are starting from ${a.full}, which is ${a.note}. ${b.full} is ${b.note}. ${transcode} ${PRIVACY}`,
@@ -782,6 +805,129 @@ function spreadsheetEntry(p) {
   };
 }
 
+const SUB = {
+  SRT: {
+    full: "SubRip (SRT)",
+    home: "TVs, media players, and most video editors",
+    styling: "basic tags such as italics and bold",
+    use: "Play the subtitles on a TV or media player, or drop them into a video editor",
+    article: "an",
+  },
+  VTT: {
+    full: "WebVTT",
+    home: "HTML5 video players and streaming sites",
+    styling: "italics, bold and underline",
+    use: "Add the subtitles to an HTML5 video player or a streaming upload",
+    article: "a",
+  },
+  ASS: {
+    full: "Advanced SubStation Alpha (ASS)",
+    home: "Aegisub and styled-subtitle players such as mpv and VLC",
+    styling: "fonts, colours, positioning and karaoke effects",
+    use: "Restyle the subtitles in Aegisub, or play them styled in mpv or VLC",
+    article: "an",
+  },
+};
+
+function subtitleEntry(p) {
+  const { from, to } = p;
+  const a = SUB[from];
+  const b = SUB[to];
+  const loss =
+    from === "ASS"
+      ? `On-screen positioning, fonts and karaoke effects are dropped, since ${to} can't hold them; italics and bold survive.`
+      : to === "ASS"
+        ? `The cues get a default ASS style, ready for you to restyle in Aegisub or another editor.`
+        : `${b.full} keeps ${b.styling}, so anything fancier in the source is dropped.`;
+  return {
+    searchTitle: `${from} to ${to} Subtitle Converter Online Free`,
+    longDescription: `Convert ${a.full} subtitles to ${b.full}, the format ${b.home} expect. Cue timing and dialogue carry over unchanged. ${loss} ${PRIVACY}`,
+    useCases: [
+      b.use,
+      `Hand ${b.article} ${to} file to a video platform or editor that rejects ${from}`,
+      `Fix the encoding of an old ${from} file while converting it`,
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      `Writes UTF-8 ${to}, decoding legacy Windows-1252 ${from} files automatically`,
+      priv(from),
+    ],
+    faqs: [
+      {
+        q: `Does converting ${from} to ${to} change the timing?`,
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: `This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic ${from} files in a legacy encoding, use Convert Subtitles and pick the encoding there.`,
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  };
+}
+
+const FONT = {
+  TTF: "TrueType, the desktop format every operating system and design app installs",
+  OTF: "OpenType with CFF outlines, the cubic-curve flavour most type foundries ship",
+  WOFF: "a compressed web wrapper around a TTF or OTF",
+  WOFF2:
+    "the Brotli-compressed web wrapper every current browser loads, and the smallest of the four",
+};
+
+function fontEntry(p) {
+  const { from, to } = p;
+  const web = to === "WOFF2";
+  const outlines = web
+    ? "WOFF2 only wraps the font, so the outlines, kerning, and OpenType features come through untouched. TrueType and OpenType sources both work."
+    : from === "OTF"
+      ? "OTF stores cubic curves and TTF stores quadratic ones, so every glyph is redrawn. Each curve stays within one font unit of the original, which is invisible at any size you would set text."
+      : `Unwrapping ${from} gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original.`;
+  return {
+    searchTitle: `${from} to ${to} Converter Online Free`,
+    longDescription: `Convert ${from} fonts to ${to}. ${from} is ${FONT[from]}. ${to} is ${FONT[to]}. ${outlines} ${PRIVACY}`,
+    useCases: web
+      ? [
+          "Self-host a webfont with an @font-face rule instead of loading it from a font CDN",
+          "Cut a site's font payload by serving WOFF2 in place of a raw TTF",
+          "Ship a brand font with a web app without bloating the first page load",
+        ]
+      : [
+          `Install a font that only came as ${from} on a desktop or in a design app`,
+          "Get a font into software that only accepts TrueType",
+          "Inspect or edit a webfont in a desktop font editor",
+        ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      priv(from),
+    ],
+    faqs: [
+      {
+        q: `Will ${from} to ${to} change how the font looks?`,
+        a: web
+          ? "No. WOFF2 is a compressed container, so the glyphs inside are the same ones you uploaded."
+          : from === "OTF"
+            ? "Not visibly. The curves are approximated within one font unit, which is a fraction of a pixel at normal text sizes. Hinting is not carried over, so very small sizes on older Windows rendering may look slightly softer."
+            : "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: web
+          ? "Yes. A variable font keeps its axes when it is wrapped as WOFF2."
+          : "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  };
+}
+
 const BY_BASE = {
   convert: rasterEntry,
   vectorize: vectorizeEntry,
@@ -794,6 +940,8 @@ const BY_BASE = {
   "extract-audio": extractAudioEntry,
   "convert-audio": audioEntry,
   "convert-spreadsheet": spreadsheetEntry,
+  "convert-subtitles": subtitleEntry,
+  "convert-font": fontEntry,
 };
 
 function serialize(id, seo) {

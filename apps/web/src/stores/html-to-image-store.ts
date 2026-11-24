@@ -3,7 +3,18 @@ import { create } from "zustand";
 import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { currentTranslations } from "@/lib/current-translations";
+import {
+  acceptedJobId,
+  followQueuedJob,
+  QueuedJobFailed,
+  QueuedJobStalled,
+} from "@/lib/follow-queued-job";
+import { failedFrameMessage } from "@/lib/progress-frames";
+import { safeRandomUUID } from "@/lib/uuid";
+
+const TOOL_ID = "html-to-image";
 
 interface CaptureResponse {
   downloadUrl: string;
@@ -35,6 +46,10 @@ interface HtmlToImageState {
   viewportWidth: number;
   viewportHeight: number;
   capturing: boolean;
+  /** Percent from the job's progress stream once the server queued the capture. */
+  progress: number | null;
+  /** True once the server answered 202, so the capture can be canceled. */
+  queued: boolean;
   resultUrl: string | null;
   resultSize: number | null;
   error: string | null;
@@ -50,6 +65,8 @@ interface HtmlToImageState {
   setViewportHeight: (height: number) => void;
   /** `t` words a failed answer (#1915); the store has no locale of its own. */
   capture: (t?: TranslationKeys) => Promise<void>;
+  /** Stop a queued capture: closes its stream and cancels the server job. */
+  cancel: () => void;
   reset: () => void;
 }
 
@@ -64,6 +81,8 @@ const DEFAULTS = {
   viewportWidth: 1280,
   viewportHeight: 720,
   capturing: false,
+  progress: null as number | null,
+  queued: false,
   resultUrl: null as string | null,
   resultSize: null as number | null,
   error: null as string | null,
@@ -71,6 +90,27 @@ const DEFAULTS = {
 
 let captureController: AbortController | null = null;
 let captureRunId = 0;
+// The progress id of the capture the server queued, while it is running.
+let queuedJobId: string | null = null;
+// The run whose request is out and whose answer is not read yet. The server
+// may already have queued its job, so a stop in that window leaves the request
+// open and the run cancels by clientJobId if the answer is a 202 (#5115). A
+// cancel sent at the stop could land before the route stamps the alias and
+// miss the job (#886).
+let awaitingAnswerRunId: number | null = null;
+
+/** Abort the current run and cancel its server job if the server queued one. */
+function abortCurrentCapture() {
+  const keepRequest = awaitingAnswerRunId === captureRunId;
+  captureRunId++;
+  const controller = captureController;
+  captureController = null;
+  if (!keepRequest) controller?.abort();
+  if (queuedJobId) {
+    void cancelAbandonedJob(queuedJobId, TOOL_ID);
+    queuedJobId = null;
+  }
+}
 
 export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
   ...DEFAULTS,
@@ -102,9 +142,21 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     const runId = ++captureRunId;
     const isCurrent = () => runId === captureRunId && !controller.signal.aborted;
 
-    set({ capturing: true, error: null, resultUrl: null, resultSize: null });
+    set({
+      capturing: true,
+      progress: null,
+      queued: false,
+      error: null,
+      resultUrl: null,
+      resultSize: null,
+    });
+    // Names the job before the server answers. A 202 body names the stream to
+    // follow; this id is the fallback when it doesn't.
+    const clientJobId = safeRandomUUID();
+    let followedJobId: string | null = null;
 
     try {
+      awaitingAnswerRunId = runId;
       const res = await fetch(appUrl("/api/v1/tools/image/html-to-image"), {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
@@ -116,6 +168,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
           devicePreset: state.devicePreset,
           viewportWidth: state.viewportWidth,
           viewportHeight: state.viewportHeight,
+          clientJobId,
         }),
         signal: controller.signal,
       });
@@ -131,11 +184,27 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         return;
       }
 
-      const raw = await res.json().catch((err: unknown) => {
+      let raw = await res.json().catch((err: unknown) => {
         if (err instanceof SyntaxError) return null;
         throw err;
       });
-      if (!isCurrent()) return;
+      if (awaitingAnswerRunId === runId) awaitingAnswerRunId = null;
+      if (!isCurrent()) {
+        if (res.status === 202) void cancelAbandonedJob(clientJobId, TOOL_ID);
+        return;
+      }
+
+      // The capture outlasted the sync window: the server queued it and the
+      // result arrives on the job's progress stream.
+      if (res.status === 202) {
+        followedJobId = acceptedJobId(raw) ?? clientJobId;
+        queuedJobId = followedJobId;
+        set({ queued: true });
+        raw = await followQueuedJob(followedJobId, controller.signal, (percent) => {
+          if (isCurrent()) set({ progress: percent });
+        });
+        if (!isCurrent()) return;
+      }
       const data = resolveServerUrls(raw);
       if (!isCaptureResponse(data)) {
         throw new Error(t.errors.invalidServerResponse);
@@ -148,6 +217,19 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
       });
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
+      if (err instanceof QueuedJobFailed) {
+        set({
+          error: failedFrameMessage(err.frame, "Capture failed", t.errors.canceled),
+          capturing: false,
+        });
+        return;
+      }
+      if (err instanceof QueuedJobStalled) {
+        // The job may still be running with nobody left to collect it.
+        if (followedJobId) void cancelAbandonedJob(followedJobId, TOOL_ID);
+        set({ error: t.errors.jobTrackingFailed, capturing: false });
+        return;
+      }
       set({
         error: userErrorMessage(
           currentTranslations(),
@@ -157,16 +239,20 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         capturing: false,
       });
     } finally {
+      if (awaitingAnswerRunId === runId) awaitingAnswerRunId = null;
       if (captureController === controller) captureController = null;
-      if (isCurrent()) set({ capturing: false });
+      if (followedJobId && queuedJobId === followedJobId) queuedJobId = null;
+      if (isCurrent()) set({ capturing: false, progress: null, queued: false });
     }
   },
 
+  cancel: () => {
+    abortCurrentCapture();
+    set({ capturing: false, progress: null, queued: false });
+  },
+
   reset: () => {
-    captureRunId++;
-    const controller = captureController;
-    captureController = null;
-    controller?.abort();
+    abortCurrentCapture();
     set({ ...DEFAULTS });
   },
 }));

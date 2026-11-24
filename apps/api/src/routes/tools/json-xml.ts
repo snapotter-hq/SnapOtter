@@ -1,6 +1,7 @@
 import { XMLBuilder, XMLParser } from "fast-xml-parser";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { assertWellFormedXml } from "../../lib/well-formed-xml.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -70,6 +71,80 @@ export function assertScalarTextNodes(value: unknown, depth = 0): void {
   }
 }
 
+// Approximates the XML 1.0 Name production by Unicode category. Colons stay
+// legal past the first character so prefixed names from the XML-to-JSON
+// branch (`soap:Envelope`, `@_xmlns:soap`) round-trip.
+const XML_NAME_START = /[\p{L}\p{Nl}_]/u;
+const XML_NAME_CHAR = /[\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}_.:-]/u;
+const XML_NAME = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}_.:-]*$/u;
+
+// The builder turns `@_name` keys into attributes, but only a scalar under a
+// valid name makes one: an object or array there becomes a literal `<@_name>`
+// tag, so those go through renaming like any other key.
+function isAttribute(key: string, value: unknown): boolean {
+  return (
+    key.startsWith("@_") &&
+    XML_NAME.test(key.slice(2)) &&
+    (value === null || typeof value !== "object")
+  );
+}
+
+function toXmlName(key: string): string {
+  const chars = Array.from(key, (ch) => (XML_NAME_CHAR.test(ch) ? ch : "_"));
+  if (chars.length === 0 || !XML_NAME_START.test(chars[0])) chars.unshift("_");
+  return chars.join("");
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Puts the original key on an element whose tag had to be renamed. */
+function withKeyAttribute(value: unknown, key: string): unknown {
+  if (isPlainObject(value)) return { "@_key": key, ...value };
+  // `#text: null` makes the builder emit a `<#text/>` tag, so null stays empty.
+  if (value === null) return { "@_key": key };
+  return { "#text": value, "@_key": key };
+}
+
+/**
+ * Rewrite parsed JSON so every element name the builder emits is a valid XML
+ * name (#4859); the builder writes keys into tags without checking them. A
+ * renamed key keeps its original spelling in a `key` attribute (unless the
+ * value already has one), and an array
+ * nested directly in an array becomes `<item>` children instead of the numeric
+ * tags the builder would make from its indexes. `depth` counts emitted
+ * element levels, so this throws only for input the builder would also refuse.
+ */
+export function withXmlNames(value: unknown, depth = 0): unknown {
+  if (Array.isArray(value)) {
+    if (depth > MAX_NESTING) throw nestingTooDeep("JSON");
+    return value.map((item) =>
+      Array.isArray(item) ? { item: withXmlNames(item, depth + 1) } : withXmlNames(item, depth),
+    );
+  }
+  if (!isPlainObject(value)) return value;
+  if (depth > MAX_NESTING) throw nestingTooDeep("JSON");
+
+  // A Map keeps a JSON "__proto__" key as data rather than a prototype swap.
+  const out = new Map<string, unknown>();
+  for (const [key, child] of Object.entries(value)) {
+    const converted = withXmlNames(child, depth + 1);
+    let name = key;
+    let element = converted;
+    if (!isAttribute(key, child) && key !== "#text" && !XML_NAME.test(key)) {
+      name = toXmlName(key);
+      element = Array.isArray(converted)
+        ? converted.map((item) => withKeyAttribute(item, key))
+        : withKeyAttribute(converted, key);
+    }
+    // Two keys can sanitise to one name ("a b" and "a_b"); keep both as
+    // repeated elements rather than letting the second overwrite the first.
+    out.set(name, out.has(name) ? [out.get(name), element].flat() : element);
+  }
+  return Object.fromEntries(out);
+}
+
 const settingsSchema = z.object({
   pretty: z.boolean().default(true),
 });
@@ -90,6 +165,7 @@ export function registerJsonXml(app: FastifyInstance) {
 
       if (lower.endsWith(".xml")) {
         // xml -> json
+        assertWellFormedXml(text);
         const parser = new XMLParser({ ignoreAttributes: false, maxNestedTags: MAX_NESTING });
         let parsed: unknown;
         try {
@@ -120,10 +196,13 @@ export function registerJsonXml(app: FastifyInstance) {
         throw new InputValidationError("JSON must be an object or array to convert to XML");
       }
       assertScalarTextNodes(data);
-      const wrapped = withSingleRoot(data);
+      const wrapped = withSingleRoot(withXmlNames(data) as object);
       const builder = new XMLBuilder({
         format: settings.pretty,
         ignoreAttributes: false,
+        // Otherwise an attribute valued true or "true" is written bare (`<a x>`),
+        // which XML forbids.
+        suppressBooleanAttributes: false,
         maxNestedTags: MAX_NESTING,
       });
       let xml: string;

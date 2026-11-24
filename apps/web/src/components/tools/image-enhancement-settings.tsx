@@ -108,16 +108,6 @@ const PRESET_MULTIPLIERS: Record<EnhancementMode, Record<string, number>> = {
   },
 };
 
-const ISSUE_LABELS: Record<string, string> = {
-  underexposed: "Low Exposure",
-  overexposed: "Overexposed",
-  "low-contrast": "Flat Contrast",
-  "color-cast": "Color Cast",
-  desaturated: "Desaturated",
-  "soft-focus": "Soft Focus",
-  noisy: "Noisy",
-};
-
 const ISSUE_TO_TOGGLE: Record<string, string> = {
   underexposed: "exposure",
   overexposed: "exposure",
@@ -168,6 +158,15 @@ export function ImageEnhancementControls({
     "low-light": t.toolSettings.imageEnhancement.lowLight,
     food: t.toolSettings.imageEnhancement.food,
     document: t.toolSettings.imageEnhancement.document,
+  };
+  const issueLabels: Record<string, string> = {
+    underexposed: t.toolSettings.imageEnhancement.issueUnderexposed,
+    overexposed: t.toolSettings.imageEnhancement.issueOverexposed,
+    "low-contrast": t.toolSettings.imageEnhancement.issueLowContrast,
+    "color-cast": t.toolSettings.imageEnhancement.issueColorCast,
+    desaturated: t.toolSettings.imageEnhancement.issueDesaturated,
+    "soft-focus": t.toolSettings.imageEnhancement.issueSoftFocus,
+    noisy: t.toolSettings.imageEnhancement.issueNoisy,
   };
   const { files } = useFileStore();
   const [mode, setMode] = useState<EnhancementMode>("auto");
@@ -429,7 +428,7 @@ export function ImageEnhancementControls({
                         : "bg-muted text-muted-foreground line-through"
                     }`}
                   >
-                    {ISSUE_LABELS[issue] || issue}
+                    {issueLabels[issue] || issue}
                     {isEnabled && toggleKey && <X className="h-2.5 w-2.5 opacity-60" />}
                   </button>
                 );
@@ -441,12 +440,12 @@ export function ImageEnhancementControls({
           <div className="grid grid-cols-3 gap-x-3 gap-y-1 pt-1">
             {(
               [
-                ["Exposure", analysis.scores.exposure],
-                ["Contrast", analysis.scores.contrast],
-                ["White Bal", analysis.scores.whiteBalance],
-                ["Saturation", analysis.scores.saturation],
-                ["Sharpness", analysis.scores.sharpness],
-                ["Noise", analysis.scores.noise],
+                [t.toolSettings.imageEnhancement.scoreExposure, analysis.scores.exposure],
+                [t.toolSettings.imageEnhancement.scoreContrast, analysis.scores.contrast],
+                [t.toolSettings.imageEnhancement.scoreWhiteBalance, analysis.scores.whiteBalance],
+                [t.toolSettings.imageEnhancement.scoreSaturation, analysis.scores.saturation],
+                [t.toolSettings.imageEnhancement.scoreSharpness, analysis.scores.sharpness],
+                [t.toolSettings.imageEnhancement.scoreNoise, analysis.scores.noise],
               ] as const
             ).map(([label, score]) => (
               <div key={label} className="flex items-center gap-1.5">

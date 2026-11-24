@@ -97,10 +97,10 @@ const envSchema = z
       .refine((value) => value === "" || UUID_V4.test(value), {
         message: "SNAPOTTER_INSTANCE_ID must be a lowercase UUIDv4",
       }),
-    // "off" starts a new instance with analytics switched off, for any
-    // deployment that wants opt-in. It only seeds a missing setting, so an
-    // admin's later choice always stands.
-    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).default("on"),
+    // Unset, a new instance asks its admin on first run and sends nothing
+    // until answered (#4910). "on" or "off" answers that prompt in advance. It
+    // only seeds a missing setting, so an admin's later choice always stands.
+    SNAPOTTER_ANALYTICS_DEFAULT: z.enum(["on", "off"]).optional(),
     BASE_PATH: z
       .string()
       .default("")
@@ -184,6 +184,8 @@ const envSchema = z
     MAX_SVG_SIZE_MB: z.coerce.number().default(50),
     MAX_SETTINGS_PAYLOAD_KB: z.coerce.number().int().min(0).default(64),
     MAX_SUBTITLE_SIZE_MB: z.coerce.number().min(0).default(1),
+    // Longest value edit-metadata writes into one tag, in characters. 0 = unlimited.
+    MAX_METADATA_TAG_LENGTH: z.coerce.number().int().min(0).default(10_000),
     MAX_SPLIT_GRID: z.coerce.number().default(100),
     MAX_STORAGE_PER_USER_MB: z.coerce.number().default(5000),
     MAX_WORKSPACE_SIZE_GB: z.coerce.number().default(10),

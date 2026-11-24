@@ -11,6 +11,10 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(import.meta.dirname, "../../..");
 const workflowsDir = path.join(root, ".github/workflows");
 const FLEET_LABEL = "snapotter-fleet";
+// A small runner of its own for the needs-only gate jobs, so they never queue
+// behind heavy jobs on the fleet runners.
+const GATE_LABEL = "snapotter-gate";
+const GATE_JOBS = ["ai-sidecar-rembg-result", "test-integration-result", "test-unit-result"];
 
 interface Step {
   name?: string;
@@ -44,7 +48,8 @@ function unwrap(expression: string): string {
 }
 
 // Evaluates the subset of the Actions expression language these workflows use
-// (property paths, string literals, ==, !=, &&, ||, parentheses, fromJSON).
+// (property paths, string literals, ==, !=, &&, ||, parentheses, fromJSON,
+// format and endsWith).
 // Unknown properties resolve to null, the way GitHub resolves them.
 function evaluate(expression: string, context: Record<string, unknown>): unknown {
   const tokens = expression.match(/'(?:[^']|'')*'|==|!=|&&|\|\||[()]|[A-Za-z_][\w.-]*|\S/g) ?? [];
@@ -75,11 +80,20 @@ function evaluate(expression: string, context: Record<string, unknown>): unknown
     if (token.startsWith("'")) return token.slice(1, -1).replace(/''/g, "'");
     if (token === "true") return true;
     if (token === "false") return false;
-    if (token === "fromJSON") {
-      if (next() !== "(") throw new Error("expected ( after fromJSON");
-      const arg = or();
-      if (next() !== ")") throw new Error("expected ) after fromJSON");
-      return JSON.parse(String(arg));
+    if (token === "fromJSON" || token === "format" || token === "endsWith") {
+      if (next() !== "(") throw new Error(`expected ( after ${token}`);
+      const args = [or()];
+      while (peek() === ",") {
+        next();
+        args.push(or());
+      }
+      if (next() !== ")") throw new Error(`expected ) after ${token}`);
+      const text = (value: unknown) => (value === null ? "" : String(value));
+      if (token === "fromJSON") return JSON.parse(text(args[0]));
+      if (token === "endsWith") {
+        return text(args[0]).toLowerCase().endsWith(text(args[1]).toLowerCase());
+      }
+      return text(args[0]).replace(/\{(\d+)\}/g, (_m, i) => text(args[Number(i) + 1]));
     }
     if (/^[A-Za-z_]/.test(token)) return lookup(token);
     throw new Error(`unexpected token ${token}`);
@@ -119,13 +133,16 @@ function evaluate(expression: string, context: Record<string, unknown>): unknown
 
 const REPO = "snapotter-hq/SnapOtter";
 
-function pullRequest(headRepo: string, author = "snapotter-hq") {
+// Even by default: with FLEET_PR_SHARE unset, only even-numbered PRs use the fleet.
+function pullRequest(headRepo: string, author = "snapotter-hq", number = 4970) {
   return {
     github: {
       event_name: "pull_request",
       ref: "refs/pull/1/merge",
       repository: REPO,
-      event: { pull_request: { head: { repo: { full_name: headRepo } }, user: { login: author } } },
+      event: {
+        pull_request: { number, head: { repo: { full_name: headRepo } }, user: { login: author } },
+      },
     },
     vars: {},
   };
@@ -137,6 +154,40 @@ const EVENTS: Record<string, { context: Record<string, unknown>; fleet: boolean 
     fleet: true,
   },
   "same-repo PR": { context: pullRequest(REPO), fleet: true },
+  "odd same-repo PR (FLEET_PR_SHARE unset means even)": {
+    context: pullRequest(REPO, "snapotter-hq", 4971),
+    fleet: false,
+  },
+  "odd same-repo PR with FLEET_PR_SHARE=even": {
+    context: { ...pullRequest(REPO, "snapotter-hq", 5083), vars: { FLEET_PR_SHARE: "even" } },
+    fleet: false,
+  },
+  "odd same-repo PR with FLEET_PR_SHARE=all": {
+    context: { ...pullRequest(REPO, "snapotter-hq", 4971), vars: { FLEET_PR_SHARE: "all" } },
+    fleet: true,
+  },
+  "even same-repo PR with FLEET_PR_SHARE=none": {
+    context: { ...pullRequest(REPO, "snapotter-hq", 4970), vars: { FLEET_PR_SHARE: "none" } },
+    fleet: false,
+  },
+  "even fork PR with FLEET_PR_SHARE=all": {
+    context: {
+      ...pullRequest("someone/SnapOtter", "someone", 4970),
+      vars: { FLEET_PR_SHARE: "all" },
+    },
+    fleet: false,
+  },
+  "Dependabot PR with FLEET_PR_SHARE=all": {
+    context: { ...pullRequest(REPO, "dependabot[bot]", 4970), vars: { FLEET_PR_SHARE: "all" } },
+    fleet: false,
+  },
+  "push to main with FLEET_PR_SHARE=none": {
+    context: {
+      github: { event_name: "push", ref: "refs/heads/main", repository: REPO },
+      vars: { FLEET_PR_SHARE: "none" },
+    },
+    fleet: true,
+  },
   "fork PR": { context: pullRequest("someone/SnapOtter", "someone"), fleet: false },
   "fork PR from a fork named like the repo's owner": {
     context: pullRequest("snapotter-hq-fork/SnapOtter", "someone"),
@@ -214,9 +265,10 @@ const ci = readWorkflow("ci.yml");
 const fleetOutput = ci.jobs.changes.outputs?.fleet ?? "";
 
 function routedJobs(workflow: Workflow): [string, Job][] {
-  return Object.entries(workflow.jobs).filter(([, job]) =>
-    JSON.stringify(job["runs-on"] ?? "").includes(FLEET_LABEL),
-  );
+  return Object.entries(workflow.jobs).filter(([, job]) => {
+    const runsOn = JSON.stringify(job["runs-on"] ?? "");
+    return runsOn.includes(FLEET_LABEL) || runsOn.includes(GATE_LABEL);
+  });
 }
 
 // Every routed job but `changes` reads the decision from its output; `changes`
@@ -237,6 +289,18 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     (_name, { context, fleet }) => {
       // Job outputs are strings, so the routed jobs compare against 'true'.
       expect(String(evaluate(unwrap(fleetOutput), context))).toBe(String(fleet));
+    },
+  );
+
+  it.each([...Array(10).keys()])(
+    "a same-repo PR ending in %i goes to the fleet only when even (FLEET_PR_SHARE unset)",
+    (digit) => {
+      const context = pullRequest(REPO, "snapotter-hq", 5000 + digit);
+      expect(String(evaluate(unwrap(fleetOutput), context))).toBe(String(digit % 2 === 0));
+      const changesRunsOn = evaluate(unwrap(String(ci.jobs.changes["runs-on"])), context);
+      expect(changesRunsOn).toEqual(
+        digit % 2 === 0 ? ["self-hosted", FLEET_LABEL] : "ubuntu-latest",
+      );
     },
   );
 
@@ -284,9 +348,10 @@ describe("self-hosted fleet runner routing (#4965)", () => {
   );
 
   it.each(jobsReadingFleetOutput)(
-    "%s resolves to exactly the fleet labels when allowed",
-    (_id, job) => {
-      expect(resolveRunsOn(job, true)).toEqual(["self-hosted", FLEET_LABEL]);
+    "%s resolves to exactly its self-hosted labels when allowed",
+    (id, job) => {
+      const label = GATE_JOBS.includes(id) ? GATE_LABEL : FLEET_LABEL;
+      expect(resolveRunsOn(job, true)).toEqual(["self-hosted", label]);
     },
   );
 
@@ -307,12 +372,22 @@ describe("self-hosted fleet runner routing (#4965)", () => {
     }
   });
 
+  it.each(GATE_JOBS)("%s is a needs-only gate that fits the small gate runner", (id) => {
+    const job = ci.jobs[id];
+    expect([job.needs ?? []].flat().length).toBeGreaterThan(1);
+    // No checkout, no actions: only a shell check of the needs results.
+    expect((job.steps ?? []).every((step) => step.run && !step.uses)).toBe(true);
+  });
+
   it("only ci.yml routes jobs to the fleet", () => {
     // Release, publish and bundle workflows run with secrets and must never
     // land on a shared self-hosted host through this label.
     const others = readdirSync(workflowsDir)
       .filter((file) => /\.ya?ml$/.test(file) && file !== "ci.yml")
-      .filter((file) => readFileSync(path.join(workflowsDir, file), "utf8").includes(FLEET_LABEL));
+      .filter((file) => {
+        const text = readFileSync(path.join(workflowsDir, file), "utf8");
+        return text.includes(FLEET_LABEL) || text.includes(GATE_LABEL);
+      });
     expect(others).toEqual([]);
   });
 });

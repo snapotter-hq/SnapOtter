@@ -2113,13 +2113,6 @@
     "outputHash": "6d3db6aaeea7",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "Yalnızca PDF'lerle çalışıyorsanız Stirling-PDF mükemmeldir ve göz atmaya değer. Ayrıca görüntü yeniden boyutlandırıyor, video dönüştürüyor, ses yazıya döküyor veya dosyaları toplu işliyorsanız SnapOtter, birden fazla aracı yan yana çalıştırmak yerine bunların tümünü tek bir kurulumda halleder.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "2606cb9494c7",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "PDF'lerin ötesinde tek bir yığın istiyorsanız tutabilir. SnapOtter'ın PDF kapsamı geniştir ve buna görüntü, video, ses ile dosya araçları ekler. Yalnızca PDF'e yönelik bir kurulum içinse Stirling-PDF sağlam ve odaklı bir seçenektir.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "991903c70f61",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "Her iki proje de açık kaynaklıdır ve kendi sunucunuzda barındırılabilir. SnapOtter AGPLv3'tür ve SSO, denetim günlüğü ve benzeri kontroller için isteğe bağlı ücretli bir kurumsal katman ekler.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "1ae9627d418e",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "İkisi de ücretsiz ve açık kaynaklı mı?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "28d364788ad9",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF ve SnapOtter'ın ikisi de kendi sunucunuzda barındırılır ve açık kaynaklıdır; yani her iki durumda da dosyalar sunucunuzda kalır. Fark kapsamda: Stirling-PDF PDF'lere odaklanırken SnapOtter beş dosya türünün tümünü kapsar.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "4cd8313e0839",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF, güçlü ve kendi sunucunuzda barındırılan bir PDF araç setidir. SnapOtter da PDF'leri kapsar; ayrıca tek bir yığında görüntü, video, ses ve dosya araçları sunar. İkisi de açık kaynaklıdır.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "801aba3a0032",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "Evet",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "00e9738b77c7",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "Evet",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "b6abcad0b648",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60+ PDF işlemi",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "bc77c9422f2c",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

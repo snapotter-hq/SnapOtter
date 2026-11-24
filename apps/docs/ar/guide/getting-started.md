@@ -1,8 +1,8 @@
 ---
-description: "ثبّت SnapOtter باستخدام Docker بأمر واحد. يشمل إعداد Docker Compose، والبناء من المصدر، ونظرة عامة كاملة على الميزات."
-i18n_source_hash: 2291f9ca0071
+description: "ثبّت SnapOtter باستخدام Docker بأمر واحد، وسجّل الدخول، وافتح أول أداة. يشمل تسريع GPU والأجهزة الصغيرة وDocker Compose والبناء من المصدر."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: c959ff992908
+i18n_output_hash: 5c4276eae47c
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ i18n_hash_version: 2
 
 ## البدء السريع {#quick-start}
 
+شغّل أمراً واحداً:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-تشغّل هذه الحاوية الواحدة كل ما تحتاج إليه: عند عدم ضبط `DATABASE_URL`، تبدأ PostgreSQL وRedis الخاصتين بها على واجهة loopback (الوضع المضمَّن) وتحفظ جميع البيانات في وحدة التخزين `SnapOtter-data`. وهي أسرع طريقة لتجربة SnapOtter أو استضافته ذاتياً على خادم منزلي. للإنتاج، استخدم [حزمة Docker Compose المعتمدة](#docker-compose) التي تُبقي PostgreSQL وRedis في حاويتيهما الخاصتين. يعمل الوضع المضمَّن بصلاحيات root (الافتراضي) ويتوقف تلقائياً بمجرد ضبط `DATABASE_URL`.
+ثم افتح [http://localhost:1349](http://localhost:1349) وسجّل الدخول باستخدام `admin` / `admin`. ستُطالَب بتغيير كلمة المرور عند أول تسجيل دخول.
 
-لا تُحفظ نتائج المهام في وحدة تخزين البيانات، لذا تختفي عند استبدال الحاوية (عند ترقية الصورة مثلًا) وتتوقف روابط تنزيلها عن العمل. يشرح قسم وحدات التخزين في دليل النشر كيفية الاحتفاظ بها.
+الآن افتح أداة. اختر واحدة من الشريط الجانبي، أو انتقل مباشرة إلى [تغيير الحجم](http://localhost:1349/image/resize)، وأفلت صورة، ونزّل النتيجة.
 
-هل تثبّت على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير؟ راجع [الإعدادات منخفضة الموارد](/ar/guide/low-resource) للحصول على شرح مضبوط وما يمكن توقعه من العتاد المحدود.
+هذا هو التثبيت كله. تشغّل هذه الحاوية الواحدة كل ما تحتاج إليه: عند عدم ضبط `DATABASE_URL`، تبدأ PostgreSQL وRedis الخاصتين بها على واجهة loopback (الوضع المضمَّن) وتحفظ جميع البيانات في وحدة التخزين `SnapOtter-data`. وهي أسرع طريقة لتجربة SnapOtter أو استضافته ذاتياً على خادم منزلي. يعمل الوضع المضمَّن بصلاحيات root (الافتراضي) ويتوقف تلقائياً بمجرد ضبط `DATABASE_URL`. للإنتاج، استخدم [حزمة Docker Compose](#docker-compose) التي تُبقي PostgreSQL وRedis في حاويتيهما الخاصتين.
 
-افتح [http://localhost:1349](http://localhost:1349) وسجّل الدخول باستخدام `admin` / `admin`. ستُطالَب بتغيير كلمة المرور عند أول تسجيل دخول.
+لا تُحفظ نتائج المهام في وحدة تخزين البيانات، لذا تختفي عند استبدال الحاوية (عند ترقية الصورة مثلًا) وتتوقف روابط تنزيلها عن العمل. يشرح قسم [الاحتفاظ بمخرجات المهام](/ar/guide/deployment#keeping-job-output) في دليل النشر كيفية الاحتفاظ بها.
+
+::: tip التشغيل على 4 GB من الذاكرة أو أقل
+على Raspberry Pi أو حاسوب محمول قديم أو VPS صغير، شغّل مهمة واحدة في كل مرة وحدّد حجم مجموعة خيوط الصور بإضافة `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` إلى الأمر أعلاه، وتجنّب حزم الذكاء الاصطناعي الثقيلة. يعرض [الإعدادات منخفضة الموارد](/ar/guide/low-resource#tuning-knobs) الحدود الأخرى التي يستحسن ضبطها وما يمكن توقعه من العتاد المحدود.
+:::
 
 ::: tip التحليلات المجهولة للمنتج
 يتضمن SnapOtter تحليلات مجهولة للمنتج افتراضياً. لإيقافها، افتح **Settings → System → Privacy** وأوقف **Anonymous Product Analytics**. تتوقف فوراً على مستوى النسخة بالكامل.
@@ -36,25 +42,51 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 للاطلاع على تفاصيل ما يُجمع، راجع [ما الذي يجمعه SnapOtter](/ar/guide/telemetry).
 :::
 
-::: tip تسريع NVIDIA CUDA
-أضف `--gpus all` لإزالة الخلفية وتكبير الصور وتحسين الوجوه والاستعادة بتسريع NVIDIA CUDA. يبقى OCR معتمداً على وحدة المعالجة المركزية ويعمل في الصورة نفسها سواء توفر الوصول إلى GPU أم لا:
+## تسريع GPU {#gpu-acceleration}
+
+تجعل وحدة NVIDIA GPU أدوات الذكاء الاصطناعي الثقيلة أسرع بكثير: التكبير (نحو 47 مرة)، وتحسين الوجوه (نحو 12 مرة)، والتفريغ النصي، وإزالة الخلفية (نحو 4 مرات لكل منهما). أما OCR وكشف الوجوه واستعادة الصور فتبقى معتمدة على CPU، ولا يفيدها GPU. الصورة نفسها تخدم الحالتين؛ أضف `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-يتطلب [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). يعود تلقائياً إلى وحدة المعالجة المركزية عند عدم توفر CUDA. تسريع وحدات iGPU من Intel/AMD عبر VA-API أو Quick Sync أو OpenCL غير مدعوم حالياً في استدلال الذكاء الاصطناعي. راجع [وسوم Docker](/ar/guide/docker-tags) لمقاييس الأداء. إذا كانت أدوات الذكاء الاصطناعي تعمل على وحدة المعالجة المركزية رغم `--gpus all`، فراجع [التحقق من تسريع GPU](/ar/guide/deployment#verify-gpu-acceleration).
-:::
+يتطلب هذا [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) على المضيف. وعند غياب CUDA يعود SnapOtter تلقائياً إلى CPU. تسريع وحدات iGPU من Intel/AMD عبر VA-API أو Quick Sync أو OpenCL غير مدعوم حالياً في استدلال الذكاء الاصطناعي.
 
-::: details متوفرة أيضاً على GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- يعرض [متطلبات العتاد](/ar/guide/deployment#full-ai-tools-on-nvidia-cuda) توقيتات GPU وCPU كاملة، و[مقاييس صورة Docker](/ar/guide/docker-tags#benchmarks) أرقام التشغيل الدافئ والبارد.
+- إذا كانت أدوات الذكاء الاصطناعي ما زالت تعمل على CPU، فراجع [التحقق من تسريع GPU](/ar/guide/deployment#verify-gpu-acceleration).
+- لاستخدام Compose، راجع [البدء السريع مع NVIDIA CUDA](/ar/guide/deployment#quick-start-nvidia-cuda) في دليل النشر.
+
+## طرق تثبيت أخرى {#other-ways-to-install}
+
+### حاوية واحدة مع Compose {#single-container-compose}
+
+هي حاوية الوضع المضمَّن نفسها الواردة في البدء السريع، لكنها مكتوبة بصيغة ملف Compose ليسهل تتبعها وتعديلها. احفظها باسم `docker-compose.yml` ثم شغّل `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-يُنشر السجلان الصورة نفسها مع كل إصدار.
-:::
+مثل أمر `docker run`، هذا مخصص لتجربة SnapOtter وللتثبيتات الصغيرة. كل إعداد في [الإعدادات](/ar/guide/configuration) يوضع تحت `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (للإنتاج) {#docker-compose}
 
 استخدم ملف الإنتاج الذي يُصان ويُختبر مع كل إصدار بدلاً من نسخ مثال Compose مختصر من هذه الصفحة:
 
@@ -80,7 +112,15 @@ docker compose -f docker-compose.yml up -d --no-build
 
 راجع [الإعدادات](/ar/guide/configuration) لجميع متغيرات البيئة، و[الأمان والتحصين](/ar/guide/security) للأسرار وسياسة الشبكة وإرشادات النسخ الاحتياطي.
 
-## البناء من المصدر {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+يُنشر كل من Docker Hub وGHCR الصورة نفسها مع كل إصدار. للسحب من GHCR، بدّل اسم الصورة:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### البناء من المصدر {#build-from-source}
 
 **المتطلبات:** Node.js 22.22+ وpnpm 9+ وDocker (لـ Postgres وRedis) وPython 3.11+ (لميزات الذكاء الاصطناعي) وGit.
 
@@ -102,10 +142,10 @@ pnpm dev
 | النوع | العدد | أمثلة على الأدوات |
 |----------|-------|---------------|
 | **صور** | 112 | تغيير الحجم، القص، الضغط، التحويل، إزالة الخلفية، التكبير، OCR، العلامة المائية، الكولاج، التلوين، أدوات GIF، إعدادات مسبقة للصيغ |
-| **فيديو** | 57 | القص الزمني، الاقتصاص، الضغط، التحويل، الدمج، استخراج الصوت، الترجمة التلقائية، فيديو إلى GIF، تغيير الحجم، التثبيت، إعدادات مسبقة للصيغ |
-| **صوت** | 27 | القص الزمني، الدمج، التحويل، التسوية، تقليل الضوضاء، التفريغ النصي، تغيير النغمة، التلاشي، صانع النغمات، إعدادات مسبقة للصيغ |
-| **PDF / مستندات** | 35 | الدمج، التقسيم، الضغط، OCR، العلامة المائية، التنقيح، Word إلى PDF، Excel إلى PDF، التدوير، الحماية، الإصلاح |
-| **ملفات** | 23 | CSV إلى JSON، JSON إلى XML، دمج ملفات CSV، تقسيم CSV، إنشاء ZIP، استخراج ZIP، صانع المخططات، YAML/JSON |
+| **فيديو** | 63 | القص الزمني، الاقتصاص، الضغط، التحويل، الدمج، استخراج الصوت، الترجمة التلقائية، فيديو إلى GIF، تغيير الحجم، التثبيت، إعدادات مسبقة للصيغ |
+| **صوت** | 57 | القص الزمني، الدمج، التحويل، التسوية، تقليل الضوضاء، التفريغ النصي، تغيير النغمة، التلاشي، صانع النغمات، إعدادات مسبقة للصيغ |
+| **PDF / مستندات** | 37 | الدمج، التقسيم، الضغط، OCR، العلامة المائية، التنقيح، Word إلى PDF، Excel إلى PDF، التدوير، الحماية، الإصلاح |
+| **ملفات** | 25 | CSV إلى JSON، JSON إلى XML، دمج ملفات CSV، تقسيم CSV، إنشاء ZIP، استخراج ZIP، صانع المخططات، YAML/JSON |
 
 ### خطوط المعالجة (Pipelines) {#pipelines}
 

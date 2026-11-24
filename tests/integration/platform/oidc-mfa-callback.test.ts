@@ -32,6 +32,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { buildTestApp } = await import("../test-server.js");
 
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import type { TestApp } from "../test-server.js";
 
 let oidcApp: TestApp;
@@ -105,7 +106,7 @@ async function insertAndEnrollOidcUser(opts: { role?: string } = {}) {
 
   const sessionToken = randomUUID();
   await db.insert(schema.sessions).values({
-    id: sessionToken,
+    id: hashSessionToken(sessionToken),
     userId,
     expiresAt: new Date(Date.now() + 3_600_000),
   });
@@ -127,7 +128,7 @@ async function insertAndEnrollOidcUser(opts: { role?: string } = {}) {
 
   // This bootstrap session isn't the one under test; drop it so it can't
   // mask a bug where the OIDC callback fails to mint its own.
-  await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionToken));
+  await db.delete(schema.sessions).where(eq(schema.sessions.id, hashSessionToken(sessionToken)));
 
   return { userId, username, externalId, totpUri: uri };
 }
@@ -428,13 +429,13 @@ describe("OIDC callback MFA outcomes", () => {
     const t2 = randomUUID();
     await db.insert(schema.sessions).values([
       {
-        id: t1,
+        id: hashSessionToken(t1),
         userId,
         createdAt: new Date(Date.now() - 120_000),
         expiresAt: new Date(Date.now() + 3_600_000),
       },
       {
-        id: t2,
+        id: hashSessionToken(t2),
         userId,
         createdAt: new Date(Date.now() - 60_000),
         expiresAt: new Date(Date.now() + 3_600_000),
@@ -515,7 +516,7 @@ describe("OIDC callback MFA outcomes", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, userId))
         .orderBy(asc(schema.sessions.createdAt));
-      expect(midSessions.map((r) => r.id)).toEqual([t1, t2]);
+      expect(midSessions.map((r) => r.id)).toEqual([t1, t2].map(hashSessionToken));
 
       // 3. Normal OIDC callback succeeds and evicts the oldest session (t1).
       const okRes = await callbackAsUser(externalId);
@@ -531,7 +532,9 @@ describe("OIDC callback MFA outcomes", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, userId))
         .orderBy(asc(schema.sessions.createdAt));
-      expect(remaining.map((r) => r.id)).toEqual([t2, t3]);
+      expect(remaining.map((r) => r.id)).toEqual(
+        [t2, t3].map((t) => hashSessionToken(t as string)),
+      );
     } finally {
       await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
     }

@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 160370d9a3a2
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: de64318a0742
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### พรีเซ็ตการแปลง {#conversion-presets}
 
-แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 83 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
+แคตตาล็อกที่ใช้ร่วมกันมีเอนด์พอยต์พรีเซ็ตการแปลงเฉพาะ 121 รายการ เช่น `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` และ `excel-to-csv` พรีเซ็ตเป็นเส้นทางเครื่องมือระดับหนึ่ง:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 แต่ละพรีเซ็ตล็อกรูปแบบเอาต์พุตและมอบหมายให้เครื่องมือฐาน เช่น `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` หรือ `convert-spreadsheet` ดู [พรีเซ็ตการแปลง](/th/tools/conversion-presets) สำหรับตารางเส้นทางฉบับสมบูรณ์และการตั้งค่าที่ไม่บังคับ
+
+พรีเซ็ตการบีบอัดทำงานในแบบเดียวกัน `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` และ `compress-image-to-500kb` รัน `compress` ส่วน `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` และ `compress-pdf-to-2mb` รัน `compress-pdf` แต่ละพรีเซ็ตล็อก `mode` เป็น `targetSize` และล็อก `targetSizeKb` เป็นขนาดที่ระบุในชื่อ
 
 ### พื้นฐาน {#essentials}
 
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | โมเดล AI | การตั้งค่าหลัก |
 |---------|------|---------|-------------|
 | `remove-background` | ลบพื้นหลัง | rembg (BiRefNet / U2-Net) | ระยะที่ 1: `model`, `edgeRefine` (0-3), `decontaminate` ระยะที่ 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` และไปป์ไลน์: `backgroundType` (transparent/color/gradient/blur รวมถึง image บน `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | ลบพื้นหลัง GIF | rembg ทีละเฟรม | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | ขยายภาพ | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ลบวัตถุ | LaMa (ONNX) | ส่ง Mask เป็นส่วนไฟล์ที่สอง (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / การแยกข้อความ | Tesseract (เร็ว); RapidOCR + PP-OCR ONNX (สมดุล/ดีที่สุด) | `quality` (เร็ว/สมดุล/ดีที่สุด), `language`, `enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | ฮิสโทแกรม | `scale` (linear/log) - คืนค่าแผนภูมิฮิสโทแกรม RGB + สถิติต่อแชนเนล |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | ตัวสร้างบาร์โค้ด | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool) JSON body ไม่มีการอัปโหลดไฟล์ |
+| `aspect-ratio-calculator` | เครื่องคำนวณอัตราส่วนภาพ | `width`, `height`, `newWidth`, `newHeight`, `round` (bool) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
 
 ### เลย์เอาต์และการประกอบภาพ {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | ขอบและกรอบ | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | ตกแต่งภาพหน้าจอ | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | ครอปวงกลม | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | ครอปมุมมน | `shape` (rounded-square/squircle), `cornerRadius` (0-50, เปอร์เซ็นต์ของด้านที่สั้นกว่า), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | เติมขอบรูปภาพ | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - หลายไฟล์ (2-64 รูป) |
 
@@ -267,7 +272,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | แปลงวิดีโอ | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | บีบอัดวิดีโอ | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | ตัดวิดีโอ | `startS`, `endS`, `precise` (bool, ตัดแบบแม่นยำระดับเฟรม) |
+| `trim-video` | ตัดวิดีโอ | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, ตัดแบบแม่นยำระดับเฟรม) |
 | `mute-video` | ปิดเสียงวิดีโอ | - |
 | `video-to-gif` | วิดีโอเป็น GIF | `fps` (1-30), `width`, `startS`, `durationS` (สูงสุด 60 วินาที) |
 | `resize-video` | ปรับขนาดวิดีโอ | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | ทำวิดีโอให้นิ่ง | `smoothing` (5-60, เป็นเฟรม) |
 | `gif-to-video` | GIF เป็นวิดีโอ | `format` (mp4/webm/mov) |
 | `video-to-webp` | วิดีโอเป็น WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | วิดีโอเป็น AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (สูงสุด 60 วินาที), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | วิดีโอเป็นเฟรม | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | รวมวิดีโอ | - (หลายไฟล์ ปรับเป็นความละเอียดของวิดีโอแรก) |
 | `replace-audio` | แทนที่เสียง | - (วิดีโอ + ไฟล์เสียง สองไฟล์) |
 | `burn-subtitles` | ฝังคำบรรยาย (Burn) | `fontSize` (8-72) - วิดีโอ + ไฟล์คำบรรยาย |
 | `embed-subtitles` | ฝังคำบรรยาย (Embed) | `language` (รหัส ISO 639-2/B) - วิดีโอ + ไฟล์คำบรรยาย |
 | `extract-subtitles` | สกัดคำบรรยาย | - (ส่งออก SRT) |
+| `convert-subtitles` | แปลงคำบรรยาย | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | รูปภาพเป็นวิดีโอ | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - หลายไฟล์ |
 | `video-metadata` | ล้างเมทาดาทาวิดีโอ | - |
 | `auto-subtitles` | คำบรรยายอัตโนมัติ (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | การตั้งค่าหลัก |
 |---------|------|-------------|
 | `convert-audio` | แปลงเสียง | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | ตัดเสียง | `startS`, `endS` |
+| `trim-audio` | ตัดเสียง | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | ปรับระดับเสียง | `gainDb` (-30 ถึง 30) |
 | `normalize-audio` | ปรับระดับเสียงให้เท่ากัน | - (EBU R128, -16 LUFS) |
 | `fade-audio` | เฟดเสียง | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | สกัดหน้า | `range` (ไวยากรณ์ qpdf เช่น "1-5,8,10-z") |
 | `remove-pages` | ลบหน้า | `pages` (ช่วง qpdf ที่จะลบ) |
 | `organize-pdf` | จัดระเบียบ PDF | `order` (ลำดับหน้า qpdf เช่น "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF มัลติเครื่องมือ | `items` (แผนหน้า, `[{doc, page, rot}]`, สูงสุด 1200 หน้า), `pageCounts` - หลายไฟล์ (สูงสุด 20 PDF) |
 | `protect-pdf` | ป้องกัน PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | ปลดล็อก PDF | `password` |
 | `repair-pdf` | ซ่อมแซม PDF | - |
@@ -335,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF ระดับสีเทา | - |
 | `pdfa-convert` | แปลงเป็น PDF/A | - (PDF/A-2 สำหรับการเก็บถาวร) |
 | `crop-pdf` | ครอป PDF | `margin` (0-2000 จุด) |
+| `resize-pdf-pages` | ปรับขนาดหน้า PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | สมุดพับ PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | ลายน้ำ PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | ลงนาม PDF | เส้นทาง multipart กำหนดเองพร้อม PDF `file`, ไฟล์ลายเซ็น `sig0`, `sig1` และอาร์เรย์ JSON `placements` |
 | `pdf-to-text` | PDF เป็นข้อความ | - |
 | `pdf-to-word` | PDF เป็น Word | - |
-| `pdf-metadata` | เมทาดาทา PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF เป็น Markdown | - (ส่งคืนไฟล์ `.md`) |
+| `pdf-metadata` | เมทาดาทา PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | แปลงเอกสาร | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | แปลงงานนำเสนอ | `format` (pptx/odp) |
 | `convert-spreadsheet` | แปลงสเปรดชีต | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON เป็น XML | `pretty` (bool) - แบบสองทิศทาง |
 | `split-csv` | แยก CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | รวม CSV | - (หลายไฟล์ คอลัมน์ตรงกัน) |
+| `merge-text` | รวมไฟล์ข้อความ | `separator` (blank-line/rule/filename-heading) - หลายไฟล์ 2-50 ไฟล์ |
 | `yaml-json` | YAML / JSON | - (แบบสองทิศทาง) |
 | `xml-to-csv` | XML เป็น CSV | - (ค้นหาองค์ประกอบที่ซ้ำโดยอัตโนมัติ) |
+| `convert-font` | แปลงฟอนต์ | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | แปลงตัวพิมพ์ | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (แท็ก BCP 47) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
+| `proportion-calculator` | เครื่องคิดเลขสัดส่วน | `a`, `b`, `c`, `mode` (direct/inverse) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนค่าที่ขาดหายไป |
+| `base64` | เข้ารหัส / ถอดรหัส Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool) JSON body ไม่มีการอัปโหลดไฟล์ ส่งคืนข้อความที่แปลงแล้ว |
 | `excel-to-csv` | Excel เป็น CSV | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-spreadsheet` |
+| `otf-to-ttf` | OTF เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `woff-to-ttf` | WOFF เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `woff2-to-ttf` | WOFF2 เป็น TTF | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
+| `ttf-to-woff2` | TTF เป็น WOFF2 | พรีเซ็ตการแปลงเฉพาะที่รองรับโดย `convert-font` |
 | `create-zip` | สร้าง ZIP | - (หลายไฟล์ 2-50 ไฟล์) |
 | `extract-zip` | แตก ZIP | - (ป้องกัน bomb) |
 
@@ -396,6 +415,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | ความกว้าง viewport กำหนดเอง 320-3840 |
 | `viewportHeight` | number | `720` | ความสูง viewport กำหนดเอง 320-2160 |
+| `clientJobId` | string | (สร้างอัตโนมัติ) | รหัสงานของคุณเอง เพื่อให้เปิดสตรีมความคืบหน้าได้ก่อนที่คำตอบจะมาถึง |
 
 **ตัวอย่าง:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+การจับภาพทำงานเป็นงานในคิว หากเสร็จภายในช่วงเวลารอแบบซิงโครนัส คุณจะได้รับผลลัพธ์ด้านบนพร้อม `200` การจับภาพที่ช้ากว่าจะตอบ `202` พร้อม `{"jobId":"...","async":true}` ให้ติดตามตามที่อธิบายไว้ใน [การติดตามความคืบหน้า](#progress-tracking) จนถึงเวอร์ชัน 2.3.0 เอนด์พอยต์นี้จะรอเสมอและตอบ `200` ดังนั้นสคริปต์ที่รองรับเฉพาะ `200` ควรรองรับ `202` ด้วย
 
 ### เส้นทางย่อยของเครื่องมือ {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | ดาวน์โหลดไฟล์ |
 | `GET` | `/api/v1/files/:id/thumbnail` | รับภาพขนาดย่อ JPEG 300px |
 | `DELETE` | `/api/v1/files` | ลบไฟล์และสายเวอร์ชันของไฟล์แบบกลุ่ม (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | ดาวน์โหลดหลายไฟล์เป็น ZIP เดียว (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | ดึง URL ระยะไกลเข้าสู่ workspace สำหรับการนำเข้าแบบอิง URL |
 | `POST` | `/api/v1/preview` | สร้างตัวอย่าง WebP ที่เข้ากันได้กับเบราว์เซอร์ (สำหรับรูปแบบ HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | สตรีมตัวอย่างที่แคชไว้หรือสร้างขึ้นที่เข้ากันได้กับเบราว์เซอร์สำหรับ PDF, เอกสาร office, วิดีโอ หรือไฟล์เสียงที่บันทึกไว้ |

@@ -69,15 +69,14 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       if (settings.quality) return String(settings.quality);
       return "";
     }
-    case "trim-video": {
-      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
-      return "";
-    }
+    case "trim-video":
+      return trimSummary(settings);
     case "video-to-gif": {
       if (settings.fps) return `${settings.fps} fps`;
       return "";
     }
-    case "video-to-webp": {
+    case "video-to-webp":
+    case "video-to-avif": {
       if (settings.quality != null) return `Q${settings.quality}`;
       return "";
     }
@@ -122,10 +121,8 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       }
       return "";
     }
-    case "trim-audio": {
-      if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
-      return "";
-    }
+    case "trim-audio":
+      return trimSummary(settings);
     case "volume-adjust": {
       if (settings.gainDb != null) return `${settings.gainDb} dB`;
       return "";
@@ -170,6 +167,11 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
     case "organize-pdf": {
       return String(settings.order || "");
     }
+    case "resize-pdf-pages": {
+      if (settings.pageSize === "custom" && settings.width != null && settings.height != null)
+        return `${settings.width} x ${settings.height} ${settings.unit ?? "in"}`;
+      return settings.pageSize ? String(settings.pageSize) : "";
+    }
     case "nup-pdf": {
       if (settings.perSheet != null) return `${settings.perSheet}-up`;
       return "";
@@ -187,6 +189,7 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
       return "";
     }
     case "pdf-metadata": {
+      if (settings.stripAll) return "Remove metadata";
       if (settings.title || settings.author || settings.subject || settings.keywords)
         return "Metadata";
       return "";
@@ -204,4 +207,10 @@ export function getSettingsSummary(toolId: string, settings: Record<string, unkn
     default:
       return "";
   }
+}
+
+function trimSummary(settings: Record<string, unknown>): string {
+  if (settings.mode === "ends") return `-${settings.cutStartS ?? 0}s / -${settings.cutEndS ?? 0}s`;
+  if (settings.endS != null) return `${settings.startS ?? 0}-${settings.endS}s`;
+  return "";
 }

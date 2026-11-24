@@ -6,7 +6,7 @@ import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
 import { enableLazyAiDispatcher, getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
 import { configureSharpConcurrency } from "@snapotter/image-engine";
-import { ANALYTICS_EVENTS, APP_VERSION, SafeError } from "@snapotter/shared";
+import { APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
 import sharp from "sharp";
@@ -29,7 +29,7 @@ import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { routeAiLogsToPino } from "./lib/ai-log-sink.js";
-import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
+import { initAnalytics, shutdownAnalytics } from "./lib/analytics.js";
 import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
@@ -49,13 +49,14 @@ import {
 import { gpuBootLine } from "./lib/gpu-boot-line.js";
 import { HEALTH_PROBE_ROUTE } from "./lib/health-probe.js";
 import { ensureInstanceId } from "./lib/instance-id.js";
+import { trackInstanceStarted } from "./lib/instance-started.js";
 import { logger } from "./lib/logger.js";
 import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { redactUrl } from "./lib/redact-url.js";
 import { requestsInFlight, trackRequestsInFlight } from "./lib/requests-in-flight.js";
-import { ensureDefaultSettings } from "./lib/settings-helpers.js";
+import { classifyAnalyticsConsentOrigin, ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
 import { parseTrustProxy } from "./lib/trust-proxy.js";
@@ -228,6 +229,22 @@ try {
   });
 }
 
+// Decide, once, whether this database held an instance before the first-run
+// analytics consent prompt existed (#4910). It has to run after the 1.x import
+// (imported data counts as an upgrade) and before any other boot write, so the
+// rows it looks at can only have come from an earlier release. It must stay
+// fatal: carrying on without the marker would let this boot seed users and
+// settings, and the next boot would then read a fresh install as an upgrade.
+try {
+  await classifyAnalyticsConsentOrigin();
+} catch (err) {
+  console.error(
+    "FATAL: Could not record whether this is a new install, which decides whether analytics needs the admin's consent. Check the database connection.",
+  );
+  console.error(err);
+  process.exit(1);
+}
+
 // Seed built-in roles (admin, editor, user) that legacy SQLite migrations
 // inserted via data statements.  The pg baseline is DDL-only, so roles are
 // seeded here at boot time.  onConflictDoNothing makes this idempotent.
@@ -276,11 +293,7 @@ try {
   console.error(err);
   process.exit(1);
 }
-// ignoreSampleRate: this once-per-boot census must not be thinned by the
-// volume sample rate that exists to throttle high-frequency usage events.
-await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED, { ...gatherSystemProperties() }, undefined, {
-  ignoreSampleRate: true,
-});
+await trackInstanceStarted();
 
 // Enterprise features (license-gated)
 let enterpriseLicense: { org: string; plan: string } | null = null;

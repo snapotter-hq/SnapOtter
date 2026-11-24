@@ -956,4 +956,31 @@ describe("seamCarve", () => {
     );
     expect((err as SafeError).cause).toBe(killedErr);
   });
+
+  it("forwards the cancel signal to caire and rethrows its abort untouched (#4338)", async () => {
+    const { seamCarve } = await importFresh();
+    const controller = new AbortController();
+    const abortErr = Object.assign(new Error("The operation was aborted"), {
+      name: "AbortError",
+      code: "ABORT_ERR",
+      killed: true,
+    });
+    mockExecFileAsync
+      .mockResolvedValueOnce({ stdout: "", stderr: "" })
+      .mockRejectedValueOnce(abortErr);
+
+    const err = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+      width: 400,
+      signal: controller.signal,
+    }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBe(abortErr);
+    const caireCall = mockExecFileAsync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCall?.[2]).toEqual(expect.objectContaining({ signal: controller.signal }));
+  });
 });

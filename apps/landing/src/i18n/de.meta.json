@@ -233,6 +233,12 @@
     "outputHash": "b808f6e97075",
     "stale": false
   },
+  "banner.helpImprove": {
+    "sourceHash": "e97e4baffb35",
+    "provenance": "machine",
+    "outputHash": "6f4a42031125",
+    "stale": false
+  },
   "banner.localeRecall": {
     "sourceHash": "f14d32ca69c8",
     "provenance": "machine",
@@ -240,9 +246,9 @@
     "stale": false
   },
   "banner.machineTranslated": {
-    "sourceHash": "efec2514040c",
+    "sourceHash": "a807ae11d4ca",
     "provenance": "machine",
-    "outputHash": "0589780921fe",
+    "outputHash": "fa2327f1ed65",
     "stale": false
   },
   "banner.viewInEnglish": {
@@ -1092,9 +1098,9 @@
     "stale": false
   },
   "faq.q2.a": {
-    "sourceHash": "bfbe1ebc18ca",
+    "sourceHash": "ace3af49e7e5",
     "provenance": "machine",
-    "outputHash": "01eb1f53871b",
+    "outputHash": "c937d68d1572",
     "stale": false
   },
   "faq.q2.q": {
@@ -1104,9 +1110,9 @@
     "stale": false
   },
   "faq.q3.a": {
-    "sourceHash": "42bc2bb71c5d",
+    "sourceHash": "2813b2ad59b2",
     "provenance": "machine",
-    "outputHash": "b2fbef383534",
+    "outputHash": "6d6f67cd519d",
     "stale": false
   },
   "faq.q3.q": {
@@ -1140,9 +1146,9 @@
     "stale": false
   },
   "faq.q6.a": {
-    "sourceHash": "fa3161521426",
+    "sourceHash": "603f9acfab9d",
     "provenance": "machine",
-    "outputHash": "237739f41f90",
+    "outputHash": "f509e11d5865",
     "stale": false
   },
   "faq.q6.q": {
@@ -1173,6 +1179,18 @@
     "sourceHash": "1f6adabd77cb",
     "provenance": "machine",
     "outputHash": "46b88a1c9dec",
+    "stale": false
+  },
+  "faq.q9.a": {
+    "sourceHash": "f80f11232990",
+    "provenance": "machine",
+    "outputHash": "4d6e814a081c",
+    "stale": false
+  },
+  "faq.q9.q": {
+    "sourceHash": "c97cab035595",
+    "provenance": "machine",
+    "outputHash": "2d9b35c3aaa8",
     "stale": false
   },
   "faq.stillHave.body": {
@@ -1511,6 +1529,18 @@
     "outputHash": "fdd7aebb9cac",
     "stale": false
   },
+  "home.faq.more": {
+    "sourceHash": "5314becbd61c",
+    "provenance": "machine",
+    "outputHash": "41475fac0579",
+    "stale": false
+  },
+  "home.faq.title": {
+    "sourceHash": "c196cc1390f0",
+    "provenance": "machine",
+    "outputHash": "a575e5d61aae",
+    "stale": false
+  },
   "home.features.ai.bgReplace": {
     "sourceHash": "5fc4b6767cf1",
     "provenance": "machine",
@@ -1779,6 +1809,12 @@
     "sourceHash": "beafec79ffdd",
     "provenance": "machine",
     "outputHash": "8ebee9c2aa7e",
+    "stale": false
+  },
+  "home.hero.popularLabel": {
+    "sourceHash": "bc7ce76ee7ca",
+    "provenance": "machine",
+    "outputHash": "b41dff9aebb6",
     "stale": false
   },
   "home.hero.searchEmpty": {
@@ -2076,9 +2112,9 @@
     "stale": false
   },
   "home.pricing.subtitle": {
-    "sourceHash": "e7445f399d28",
+    "sourceHash": "af8b9de99a27",
     "provenance": "machine",
-    "outputHash": "1f10ee8483d4",
+    "outputHash": "29cf542f6e14",
     "stale": false
   },
   "home.pricing.title": {
@@ -2111,10 +2147,22 @@
     "outputHash": "b85d813d4653",
     "stale": false
   },
+  "home.quickstart.freeLine": {
+    "sourceHash": "fcb325be07a1",
+    "provenance": "machine",
+    "outputHash": "980b5ea3647a",
+    "stale": false
+  },
   "home.quickstart.label": {
     "sourceHash": "a13fd69781a3",
     "provenance": "machine",
     "outputHash": "416bb38b58fa",
+    "stale": false
+  },
+  "home.quickstart.loginHint": {
+    "sourceHash": "5d61a89c4037",
+    "provenance": "machine",
+    "outputHash": "18577d365103",
     "stale": false
   },
   "home.quickstart.tryDemo": {

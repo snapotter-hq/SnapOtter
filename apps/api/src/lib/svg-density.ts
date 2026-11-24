@@ -14,20 +14,105 @@ const UNITS_AT_72_DPI: Record<string, number> = {
   mm: 72 / 25.4,
 };
 
+/**
+ * em and ex at librsvg's default root font-size of 12 px, with ex as half an
+ * em. Only valid when nothing in the document sets the root's font-size.
+ */
+const FONT_UNITS_AT_72_DPI: Record<string, number> = { em: 12, ex: 6 };
+
 // Unambiguous on purpose: digits can only split at the "." and the exponent,
 // so a hostile value cannot make the match backtrack. Values longer than
 // MAX_LENGTH_CHARS are refused before matching.
-const LENGTH_PATTERN = /^(\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)(px|pt|pc|in|cm|mm)?$/;
+const LENGTH_PATTERN = /^(\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)(px|pt|pc|in|cm|mm|em|ex)?$/;
 const MAX_LENGTH_CHARS = 64;
 
-/** Parse a root width or height into density-72 px, or null for %, em and the like. */
-function lengthAt72Dpi(value: string): number | null {
+/**
+ * Parse a root width or height into density-72 px, or null for % and the
+ * like, and for em and ex unless the root keeps the default font-size.
+ */
+function lengthAt72Dpi(value: string, defaultFontSize: boolean): number | null {
   const trimmed = value.trim();
   if (trimmed.length > MAX_LENGTH_CHARS) return null;
   const match = LENGTH_PATTERN.exec(trimmed);
   if (!match) return null;
-  const length = Number(match[1]) * (UNITS_AT_72_DPI[match[2] ?? ""] ?? Number.NaN);
+  const unit = match[2] ?? "";
+  const unitSize =
+    UNITS_AT_72_DPI[unit] ?? (defaultFontSize ? FONT_UNITS_AT_72_DPI[unit] : undefined);
+  const length = Number(match[1]) * (unitSize ?? Number.NaN);
   return Number.isFinite(length) && length > 0 ? length : null;
+}
+
+const PERCENTAGE_PATTERN = /^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?%$/;
+
+/**
+ * Parse a root width or height into density-72 px. A missing or percentage
+ * size is "auto": with no outer viewport librsvg sizes it from the viewBox.
+ * Returns null for auto, em and ex with a non-default font-size, and anything
+ * else unparseable.
+ */
+function rootLength(
+  attr: AttributeValue | undefined,
+  defaultFontSize: boolean,
+): number | "auto" | null {
+  if (!attr) return "auto";
+  const trimmed = attr.value.trim();
+  if (trimmed.length <= MAX_LENGTH_CHARS && PERCENTAGE_PATTERN.test(trimmed)) return "auto";
+  return lengthAt72Dpi(trimmed, defaultFontSize);
+}
+
+// Linear: the prefix run can only start right after a "<", which it cannot contain.
+const STYLE_ELEMENT = /<(?:[\w.-]+:)?style[\s/>]/i;
+
+/** "font" in any case, or a CSS escape or XML reference that could spell it. */
+const POSSIBLE_FONT_STYLE = /font|[\\&]/i;
+
+/**
+ * Whether librsvg resolves the root's em and ex against its 12 px default:
+ * no font-size attribute, nothing in its style that could set a font, and no
+ * stylesheet or entity declaration anywhere that could add one. Conservative:
+ * a stylesheet that never touches the root still counts.
+ */
+function hasDefaultFontSize(text: string, attributes: Map<string, AttributeValue>): boolean {
+  if (attributes.has("font-size")) return false;
+  const style = attributes.get("style")?.value;
+  if (style !== undefined && POSSIBLE_FONT_STYLE.test(style)) return false;
+  return (
+    !text.includes("xml-stylesheet") && !text.includes("<!ENTITY") && !STYLE_ELEMENT.test(text)
+  );
+}
+
+const NUMBER_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+const MAX_VIEWBOX_CHARS = 256;
+
+/** Width and height of a viewBox, or null unless it is four numbers with a positive size. */
+function viewBoxSize(attr: AttributeValue | undefined): { width: number; height: number } | null {
+  if (!attr || attr.value.length > MAX_VIEWBOX_CHARS) return null;
+  const parts = attr.value.trim().split(/[\s,]+/);
+  if (parts.length !== 4 || !parts.every((part) => NUMBER_PATTERN.test(part))) return null;
+  const [width, height] = parts.slice(2).map(Number);
+  return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? { width, height }
+    : null;
+}
+
+/**
+ * Resolve the root size in density-72 px the way librsvg does: absolute
+ * lengths as given, an auto side from the viewBox, keeping its aspect ratio
+ * when the other side is absolute.
+ */
+function rootSizeAt72Dpi(
+  attributes: Map<string, AttributeValue>,
+  defaultFontSize: boolean,
+): { width: number; height: number } | null {
+  const width = rootLength(attributes.get("width"), defaultFontSize);
+  const height = rootLength(attributes.get("height"), defaultFontSize);
+  if (width === null || height === null) return null;
+  if (width !== "auto" && height !== "auto") return { width, height };
+  const viewBox = viewBoxSize(attributes.get("viewBox"));
+  if (!viewBox) return null;
+  if (width !== "auto") return { width, height: (width * viewBox.height) / viewBox.width };
+  if (height !== "auto") return { width: (height * viewBox.width) / viewBox.height, height };
+  return viewBox;
 }
 
 /** One quoted attribute, matched only where the previous one ended. */
@@ -110,8 +195,11 @@ function formatLength(n: number): string {
  * (density/72)^2: a 640pt SVG at 300 DPI came out 11111 px wide instead of
  * 2667 (#4423). At density 72 the two scales cancel, so the root is resized
  * to the target pixel size instead, with a viewBox added when missing so the
- * drawing scales with it. Roots sized in %, em or not at all are returned
- * untouched with the caller's density.
+ * drawing scales with it. A root with no absolute size takes it from its
+ * viewBox, as librsvg would (#4940). em and ex resolve against librsvg's
+ * 12 px default font-size (#5082). Roots sized in em or ex when something may
+ * set the root's font-size, or with neither an absolute size nor a viewBox,
+ * are returned untouched with the caller's density.
  */
 export function bakeSvgDensity(svg: Buffer, density: number): { buffer: Buffer; density: number } {
   const unchanged = { buffer: svg, density };
@@ -123,28 +211,32 @@ export function bakeSvgDensity(svg: Buffer, density: number): { buffer: Buffer; 
   const tag = text.slice(start, tagEnd);
 
   const attributes = readAttributes(tag);
-  const widthAttr = attributes?.get("width");
-  const heightAttr = attributes?.get("height");
-  if (!attributes || !widthAttr || !heightAttr) return unchanged;
-  const width = lengthAt72Dpi(widthAttr.value);
-  const height = lengthAt72Dpi(heightAttr.value);
-  if (width === null || height === null) return unchanged;
+  if (!attributes) return unchanged;
+  const size = rootSizeAt72Dpi(attributes, hasDefaultFontSize(text, attributes));
+  if (!size) return unchanged;
   const scale = density / 72;
-  if (!Number.isFinite(width * scale) || !Number.isFinite(height * scale)) return unchanged;
+  const width = size.width * scale;
+  const height = size.height * scale;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return unchanged;
 
-  const [first, second] = [
-    { span: widthAttr, text: formatLength(width * scale) },
-    { span: heightAttr, text: formatLength(height * scale) },
-  ].sort((a, b) => a.span.start - b.span.start);
-  let newTag =
-    tag.slice(0, first.span.start) +
-    first.text +
-    tag.slice(first.span.end, second.span.start) +
-    second.text +
-    tag.slice(second.span.end);
-  if (!attributes.has("viewBox")) {
-    newTag = `<svg viewBox="0 0 ${formatLength(width)} ${formatLength(height)}"${newTag.slice(4)}`;
+  const replacements: { span: AttributeValue; text: string }[] = [];
+  let inserted = "";
+  for (const [name, value] of [
+    ["width", width],
+    ["height", height],
+  ] as const) {
+    const span = attributes.get(name);
+    if (span) replacements.push({ span, text: formatLength(value) });
+    else inserted += ` ${name}="${formatLength(value)}"`;
   }
+  if (!attributes.has("viewBox")) {
+    inserted = ` viewBox="0 0 ${formatLength(size.width)} ${formatLength(size.height)}"${inserted}`;
+  }
+  let newTag = tag;
+  for (const { span, text: value } of replacements.sort((a, b) => b.span.start - a.span.start)) {
+    newTag = newTag.slice(0, span.start) + value + newTag.slice(span.end);
+  }
+  newTag = `<svg${inserted}${newTag.slice(4)}`;
 
   return {
     buffer: Buffer.from(text.slice(0, start) + newTag + text.slice(tagEnd), "utf-8"),

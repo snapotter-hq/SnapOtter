@@ -42,6 +42,28 @@ describe("normalizeSearchQuery", () => {
   it("expands synonyms jpeg -> jpg", () => {
     expect(normalizeSearchQuery("jpeg to png")).toBe("jpg to png");
   });
+  it("reads Sony's hif as heic (#4825)", () => {
+    expect(normalizeSearchQuery("hif to jpg")).toBe("heic to jpg");
+    expect(normalizeSearchQuery("hif2jpg")).toBe("heic to jpg");
+  });
+  // #4900: a plural alias used to stay as typed, so Fuse searched for "photos".
+  it.each([
+    ["photos", "image"],
+    ["pics", "image"],
+    ["pictures", "image"],
+    ["imgs", "image"],
+    ["jpegs", "jpg"],
+    ["docs", "word"],
+    ["resize photos", "resize image"],
+  ])("maps the plural alias %j like its singular", (query, expected) => {
+    expect(normalizeSearchQuery(query)).toBe(expected);
+  });
+  it.each(["ts", "ass", "images", "videos", "watermarks"])(
+    "leaves %j alone, since its singular isn't an alias",
+    (word) => {
+      expect(normalizeSearchQuery(word)).toBe(word);
+    },
+  );
   it("drops filler words convert/file/online but keeps formats", () => {
     expect(normalizeSearchQuery("convert mp4 to mp3 file online")).toBe("mp4 to mp3");
   });

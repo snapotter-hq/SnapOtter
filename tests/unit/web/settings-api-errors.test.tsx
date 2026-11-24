@@ -63,7 +63,7 @@ import {
 } from "@/components/settings/settings-dialog";
 import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
 import { ToolPalette } from "@/components/tools/tool-palette";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { ApiError } from "@/lib/api";
 import { format } from "@/lib/format";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -153,6 +153,9 @@ const apiKey = {
 beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "de");
+  // The real de chunk is a dynamic import that a slow host can't finish inside
+  // findByText's 1 s budget (#5193); i18n-context.test.tsx covers the real load.
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   useConnectionStore.setState({ status: "connected", failedSince: null, lastHealthCheck: null });
   useAuth.mockReturnValue({
     loading: false,

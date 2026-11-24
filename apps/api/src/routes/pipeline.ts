@@ -16,7 +16,11 @@ import {
   hasServerErrorStatus,
   isSafeMessageError,
   MODALITY_POOL,
+  type Modality,
+  modalityForExtension,
   TOOLS,
+  toolInputModality,
+  toolOutputModality,
 } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -97,7 +101,7 @@ import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
-import { inputHandlerFor } from "../modality/input-handler.js";
+import { inputHandlerForInput } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
@@ -175,6 +179,41 @@ export function resolvePipelineStepToolId(step: {
   return step.toolId === "resize" && step.settings?.contentAware
     ? "content-aware-resize"
     : step.toolId;
+}
+
+function resolvePipelineSteps(
+  steps: Array<{ toolId: string; settings?: Record<string, unknown> }>,
+): Array<{ toolId: string; resolvedToolId: string }> {
+  return steps.map((step) => ({
+    toolId: step.toolId,
+    resolvedToolId: resolvePipelineStepToolId(step),
+  }));
+}
+
+/**
+ * Reject a step that can't read what the previous step produces, before any
+ * step runs. Without this an image-to-audio chain ran the image step and then
+ * failed with a misleading duration error (#4343). Steps whose tool has no
+ * shared metadata, or that accept any extension, are not judged here.
+ *
+ * Document and file tools count as one family: their output format follows
+ * their settings (csv-excel writes .xlsx, excel-to-csv writes .csv, ocr writes
+ * .txt), so the declared modality can't tell a valid chain from a broken one.
+ */
+export function pipelineStepModalityError(
+  steps: Array<{ toolId: string; resolvedToolId: string }>,
+  index: number,
+): string | null {
+  if (index === 0) return null;
+  const prev = TOOLS.find((t) => t.id === steps[index - 1].resolvedToolId);
+  const tool = TOOLS.find((t) => t.id === steps[index].resolvedToolId);
+  if (!prev || !tool || tool.acceptedInputs.length === 0) return null;
+  const receives = toolOutputModality(prev);
+  const family = (m: Modality | null) => (m === "file" ? "document" : m);
+  if (tool.acceptedInputs.some((ext) => family(modalityForExtension(ext)) === family(receives))) {
+    return null;
+  }
+  return `Step ${index + 1} (${steps[index].toolId}): expects ${toolInputModality(tool)} input, but step ${index} (${steps[index - 1].toolId}) outputs ${receives}`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -594,14 +633,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             } else {
               // Non-image input: validate/decode via the tool's modality handler.
               try {
-                const prepared = await inputHandlerFor(inputModality).prepare(
-                  processBuffer,
-                  filename,
-                  {
-                    scratchDir,
-                    lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
-                  },
-                );
+                const firstConfig = getToolConfig(firstToolId ?? "");
+                const prepared = await inputHandlerForInput(
+                  inputModality,
+                  firstConfig?.inputKinds,
+                ).prepare(processBuffer, filename, {
+                  scratchDir,
+                  lenient: firstConfig?.skipStructuralValidation,
+                });
                 processBuffer = prepared.buffer;
                 filename = prepared.filename;
               } catch (err) {
@@ -639,12 +678,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           // Validate all tool IDs and settings; collect parsed steps
           const parsedSteps: ParsedStep[] = [];
+          const resolvedSteps = resolvePipelineSteps(pipeline.steps);
 
           for (let i = 0; i < pipeline.steps.length; i++) {
             const step = pipeline.steps[i];
 
-            // Route content-aware resize to its dedicated tool
-            const resolvedToolId = resolvePipelineStepToolId(step);
+            const resolvedToolId = resolvedSteps[i].resolvedToolId;
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
@@ -662,6 +701,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               return reply.status(400).send({
                 error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
+            }
+
+            const modalityError = pipelineStepModalityError(resolvedSteps, i);
+            if (modalityError) {
+              return reply.status(400).send({ error: modalityError });
             }
 
             const settingsResult = toolConfig.settingsSchema.safeParse(step.settings);
@@ -1070,9 +1114,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       }
 
       // Validate all tool IDs exist
+      const resolvedSteps = resolvePipelineSteps(steps);
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        const resolvedToolId = resolvePipelineStepToolId(step);
+        const resolvedToolId = resolvedSteps[i].resolvedToolId;
         const toolConfig = getToolConfig(resolvedToolId);
         if (!toolConfig) {
           return reply.status(400).send({
@@ -1088,6 +1133,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           return reply.status(400).send({
             error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
           });
+        }
+        const modalityError = pipelineStepModalityError(resolvedSteps, i);
+        if (modalityError) {
+          return reply.status(400).send({ error: modalityError });
         }
         // Same schema the tool route and /execute use, so a saved step can't fail at run time on settings.
         const settingsResult = toolConfig.settingsSchema.safeParse(step.settings);
@@ -1366,11 +1415,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           // Validate all tool IDs and settings
           const parsedSteps: ParsedStep[] = [];
+          const resolvedSteps = resolvePipelineSteps(pipeline.steps);
 
           for (let i = 0; i < pipeline.steps.length; i++) {
             const step = pipeline.steps[i];
 
-            const resolvedToolId = resolvePipelineStepToolId(step);
+            const resolvedToolId = resolvedSteps[i].resolvedToolId;
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
@@ -1388,6 +1438,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               return reply.status(400).send({
                 error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
+            }
+
+            const modalityError = pipelineStepModalityError(resolvedSteps, i);
+            if (modalityError) {
+              return reply.status(400).send({ error: modalityError });
             }
 
             const settingsResult = toolConfig.settingsSchema.safeParse(step.settings);
@@ -1869,15 +1924,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 }
               } else {
                 try {
-                  const prepared = await inputHandlerFor(batchModality).prepare(
-                    processBuffer,
-                    processFilename,
-                    {
-                      scratchDir,
-                      lenient: getToolConfig(parsedSteps[0]?.resolvedToolId ?? "")
-                        ?.skipStructuralValidation,
-                    },
-                  );
+                  const firstConfig = getToolConfig(parsedSteps[0]?.resolvedToolId ?? "");
+                  const prepared = await inputHandlerForInput(
+                    batchModality,
+                    firstConfig?.inputKinds,
+                  ).prepare(processBuffer, processFilename, {
+                    scratchDir,
+                    lenient: firstConfig?.skipStructuralValidation,
+                  });
                   processBuffer = prepared.buffer;
                   processFilename = prepared.filename;
                 } catch (err) {

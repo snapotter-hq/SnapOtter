@@ -1,14 +1,18 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import { getRegisteredToolIds, getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtureDir } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
+  isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
+import { formatMatrixPositiveControl } from "../../helpers/generated-fixtures.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPrerequisite } from "../../helpers/run-generated-tool.js";
 import {
@@ -17,7 +21,7 @@ import {
   pairwiseSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -54,6 +58,7 @@ const fixtureFiles = process.env.FULL_MATRIX ? ALL_FIXTURE_FILES : CORE_FORMATS;
 const ALLOWED_STATUSES = new Set([200, 202, 400, 413, 415, 422]);
 const REQUIRE_AI_FEATURES = process.env.REQUIRE_AI_FEATURES === "1";
 const CUSTOM_ROUTE_TOOLS = new Set([
+  "aspect-ratio-calculator",
   "barcode-generate",
   "chart-maker",
   "html-to-image",
@@ -157,10 +162,14 @@ export function registerToolFormatMatrix(part: number): void {
         continue;
       }
       it(`${toolId} handles every input format cleanly`, async (context) => {
-        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) && !REQUIRE_AI_FEATURES) {
-          return context.skip(
-            `${toolId}: optional AI prerequisite absent; set REQUIRE_AI_FEATURES=1 after install`,
-          );
+        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId)) {
+          const aiGate = requiredAiGate(toolId, {
+            requireAiFeatures: REQUIRE_AI_FEATURES,
+            firstMissingBundle: getFirstMissingBundleForTool,
+            dataDir: process.env.DATA_DIR,
+          });
+          if (aiGate.kind === "skip") return context.skip(aiGate.reason);
+          if (aiGate.kind === "fail") throw new Error(aiGate.reason);
         }
         const missingPrerequisite = await findMissingGeneratedPrerequisite(toolId);
         if (missingPrerequisite) return context.skip(`${toolId}: ${missingPrerequisite}`);
@@ -177,11 +186,17 @@ export function registerToolFormatMatrix(part: number): void {
         const toolFixtureFiles = process.env.FULL_MATRIX
           ? fixtureFiles
           : [...new Set([...fixtureFiles, ...(acceptedFixture ? [acceptedFixture] : [])])];
+        const positiveControl = formatMatrixPositiveControl(toolId);
+        const toolFixturePaths = [
+          ...toolFixtureFiles.map((filename) => join(fixtureDir.formats, filename)),
+          ...(positiveControl ? [positiveControl] : []),
+        ];
         const accounting = new GeneratedCaseAccounting(toolId, {
-          expectedAttempts: toolFixtureFiles.length,
+          expectedAttempts: toolFixturePaths.length,
         });
-        for (const fixture of toolFixtureFiles) {
-          const content = readFileSync(join(fixtureDir.formats, fixture));
+        for (const fixturePath of toolFixturePaths) {
+          const fixture = basename(fixturePath);
+          const content = readFileSync(fixturePath);
           const { body, contentType } = createMultipartPayload(
             buildGeneratedMultipartFields({
               toolId,
@@ -278,12 +293,23 @@ export function registerToolFormatMatrix(part: number): void {
           if (res.statusCode === 202) {
             const payload = JSON.parse(res.body) as { jobId?: string };
             expect(payload.jobId).toBeDefined();
-            await waitForGeneratedJobArtifact(
-              testApp.app,
-              adminToken,
-              toolId,
-              payload.jobId as string,
-            );
+            try {
+              await waitForGeneratedJobArtifact(
+                testApp.app,
+                adminToken,
+                toolId,
+                payload.jobId as string,
+              );
+            } catch (error) {
+              // A long tool refuses a bad file by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(payload.jobId as string), ALLOWED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
+              continue;
+            }
             accounting.accept();
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();

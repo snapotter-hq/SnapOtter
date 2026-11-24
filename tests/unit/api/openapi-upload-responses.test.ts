@@ -43,8 +43,18 @@ const OWN_413 = [
 // they do. Drop an entry, and add the 413, with its fix.
 const NO_413: Record<string, string> = {};
 
-// Catalog tools that make something from settings alone, so take no upload.
-const NO_UPLOAD_TOOLS = ["barcode-generate", "html-to-image", "passport-photo", "qr-generate"];
+// Catalog tools that make something from settings or a JSON body alone, so
+// take no upload.
+const NO_UPLOAD_TOOLS = [
+  "aspect-ratio-calculator",
+  "barcode-generate",
+  "base64",
+  "convert-case",
+  "html-to-image",
+  "passport-photo",
+  "proportion-calculator",
+  "qr-generate",
+];
 
 interface Operation {
   requestBody?: { content?: Record<string, unknown> };

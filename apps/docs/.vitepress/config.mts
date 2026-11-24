@@ -6,7 +6,11 @@ import { publicSiteAnalyticsScript } from "../../../packages/shared/src/analytic
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
 import { buildJsonLd } from "./jsonld.mts";
-import { pageOnlySidebar } from "./llms-sidebar.mjs";
+import {
+  llmsIgnorePatterns,
+  llmsSidebar,
+  stripHeadingIdsFromLlmsOutputs,
+} from "./llms-sidebar.mjs";
 
 const NON_EN = SUPPORTED_LOCALES.filter((l) => l.code !== "en");
 const HOSTNAME = "https://docs.snapotter.com";
@@ -129,6 +133,9 @@ function localizeSidebar(items: any[], locale: string): any[] {
 }
 
 export default defineConfig({
+  async buildEnd(siteConfig) {
+    await stripHeadingIdsFromLlmsOutputs(siteConfig.outDir);
+  },
   title: "SnapOtter",
   description:
     "Documentation for SnapOtter, the open-source file toolkit. 200+ tools for image, video, audio, PDF, and file processing. Local AI, pipelines, REST API.",
@@ -293,7 +300,8 @@ export default defineConfig({
       }),
       llmstxt({
         domain: "https://docs.snapotter.com",
-        sidebar: pageOnlySidebar,
+        sidebar: llmsSidebar,
+        ignoreFilesPerOutput: llmsIgnorePatterns(NON_EN.map((l) => l.code)),
         customLLMsTxtTemplate: `# {title}
 
 {description}
@@ -303,6 +311,10 @@ export default defineConfig({
 ## Docs
 
 {toc}
+
+## Tools
+
+Every tool has its own page at \`https://docs.snapotter.com/tools/<section>/<toolId>.md\`, for example [Resize Image](https://docs.snapotter.com/tools/image/resize.md), [Trim Video](https://docs.snapotter.com/tools/video/trim-video.md) or [Merge PDFs](https://docs.snapotter.com/tools/pdf/merge-pdf.md). Sections are \`image\`, \`video\`, \`audio\`, \`pdf\` and \`files\`. [Conversion Presets](https://docs.snapotter.com/tools/conversion-presets.md) lists the format converters, and [llms-full.txt](https://docs.snapotter.com/llms-full.txt) has every tool page in full.
 
 ## API Quick Reference
 
@@ -538,12 +550,14 @@ function buildBaseTheme() {
               { text: "Stabilize Video", link: "/tools/video/stabilize-video" },
               { text: "GIF to Video", link: "/tools/video/gif-to-video" },
               { text: "Video to WebP", link: "/tools/video/video-to-webp" },
+              { text: "Video to AVIF", link: "/tools/video/video-to-avif" },
               { text: "Video to Frames", link: "/tools/video/video-to-frames" },
               { text: "Merge Videos", link: "/tools/video/merge-videos" },
               { text: "Replace Audio", link: "/tools/video/replace-audio" },
               { text: "Burn Subtitles", link: "/tools/video/burn-subtitles" },
               { text: "Embed Subtitles", link: "/tools/video/embed-subtitles" },
               { text: "Extract Subtitles", link: "/tools/video/extract-subtitles" },
+              { text: "Convert Subtitles", link: "/tools/video/convert-subtitles" },
               { text: "Images to Video", link: "/tools/video/images-to-video" },
               { text: "Clean Video Metadata", link: "/tools/video/video-metadata" },
               { text: "Auto Subtitles", link: "/tools/video/auto-subtitles" },
@@ -591,6 +605,7 @@ function buildBaseTheme() {
               { text: "Grayscale PDF", link: "/tools/pdf/grayscale-pdf" },
               { text: "PDF/A Converter", link: "/tools/pdf/pdfa-convert" },
               { text: "Crop PDF", link: "/tools/pdf/crop-pdf" },
+              { text: "Resize PDF Pages", link: "/tools/pdf/resize-pdf-pages" },
               { text: "Pages Per Sheet (N-up)", link: "/tools/pdf/nup-pdf" },
               { text: "Booklet PDF", link: "/tools/pdf/booklet-pdf" },
               { text: "Watermark PDF", link: "/tools/pdf/watermark-pdf" },
@@ -599,6 +614,7 @@ function buildBaseTheme() {
               { text: "Redact PDF", link: "/tools/pdf/redact-pdf" },
               { text: "Sign PDF", link: "/tools/pdf/sign-pdf" },
               { text: "PDF to Text", link: "/tools/pdf/pdf-to-text" },
+              { text: "PDF to Markdown", link: "/tools/pdf/pdf-to-markdown" },
               { text: "PDF to Word", link: "/tools/pdf/pdf-to-word" },
               { text: "PDF Metadata", link: "/tools/pdf/pdf-metadata" },
               { text: "PDF OCR", link: "/tools/pdf/ocr-pdf" },
@@ -625,8 +641,13 @@ function buildBaseTheme() {
               { text: "JSON to XML", link: "/tools/files/json-xml" },
               { text: "Split CSV", link: "/tools/files/split-csv" },
               { text: "Merge CSVs", link: "/tools/files/merge-csvs" },
+              { text: "Merge Text Files", link: "/tools/files/merge-text" },
               { text: "Convert YAML / JSON", link: "/tools/files/yaml-json" },
               { text: "XML to CSV", link: "/tools/files/xml-to-csv" },
+              { text: "Convert Font", link: "/tools/files/convert-font" },
+              { text: "Convert Case", link: "/tools/files/convert-case" },
+              { text: "Proportion Calculator", link: "/tools/files/proportion-calculator" },
+              { text: "Base64 Encode / Decode", link: "/tools/files/base64" },
               { text: "Create ZIP", link: "/tools/files/create-zip" },
               { text: "Extract ZIP", link: "/tools/files/extract-zip" },
             ],

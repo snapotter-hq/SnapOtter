@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   insertedValues: undefined as Record<string, unknown> | undefined,
   insertRowCount: 1,
   updateCalls: [] as Array<{ table: unknown; values: unknown; where: unknown }>,
+  updateReturningRows: [] as unknown[],
   deleteCalls: [] as Array<{ table: unknown; where: unknown }>,
   requirePermission: vi.fn(
     () => () => Promise.resolve({ id: "admin-1", username: "admin-user", role: "admin" }),
@@ -64,7 +65,9 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
       set: (values: unknown) => ({
         where: (where: unknown) => {
           mocks.updateCalls.push({ table, values, where });
-          return Promise.resolve({ rowCount: 1 });
+          return Object.assign(Promise.resolve({ rowCount: 1 }), {
+            returning: () => Promise.resolve(mocks.updateReturningRows),
+          });
         },
       }),
     }),
@@ -82,7 +85,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
     closeDb: async () => {},
     schema: {
       roles: { id: "roles.id", name: "roles.name" },
-      users: { id: "users.id", role: "users.role" },
+      users: { id: "users.id", username: "users.username", role: "users.role" },
     },
   };
 });
@@ -119,6 +122,7 @@ describe("roles route logic", () => {
     mocks.insertedValues = undefined;
     mocks.insertRowCount = 1;
     mocks.updateCalls = [];
+    mocks.updateReturningRows = [];
     mocks.deleteCalls = [];
     mocks.requirePermission.mockImplementation(
       () => () => Promise.resolve({ id: "admin-1", username: "admin-user", role: "admin" }),
@@ -500,18 +504,48 @@ describe("roles route logic", () => {
         },
       ];
 
+      mocks.updateReturningRows = [
+        { id: "u-1", username: "alice" },
+        { id: "u-2", username: "bob" },
+      ];
+
       const reply = makeReply();
       await deleteHandler({ params: { id: "role-1" }, log: { info: vi.fn() } }, reply);
       expect(reply.statusCode).toBe(200);
-      expect(reply.payload).toEqual({ ok: true });
       expect(mocks.updateCalls).toHaveLength(1);
       expect(mocks.deleteCalls).toHaveLength(1);
+      // #4350: the demotion is reported to the caller and in the audit row.
+      // The users sit under reassignedUsers, never userId/targetUserId, so
+      // the audit row's actor and target stay the admin and the role.
+      const reassignedUsers = [
+        { id: "u-1", username: "alice" },
+        { id: "u-2", username: "bob" },
+      ];
+      expect(reply.payload).toEqual({ ok: true, reassignedUsers });
       expect(mocks.auditFn).toHaveBeenCalledWith("ROLE_DELETED", {
         adminId: "admin-1",
         username: "admin-user",
         roleId: "role-1",
         roleName: "reviewer",
+        reassignedUsers,
       });
+    });
+
+    it("reports an empty reassignedUsers list when the deleted role had no members (#4350)", async () => {
+      mocks.selectRows = [
+        {
+          id: "role-1",
+          name: "reviewer",
+          isBuiltin: false,
+          permissions: ["tools:use"],
+          toolPermissions: null,
+        },
+      ];
+
+      const reply = makeReply();
+      await deleteHandler({ params: { id: "role-1" }, log: { info: vi.fn() } }, reply);
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({ ok: true, reassignedUsers: [] });
     });
 
     it("excludes the synthetic anonymous user from GET /api/v1/roles userCount (#2473)", async () => {

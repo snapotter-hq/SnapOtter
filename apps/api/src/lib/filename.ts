@@ -18,6 +18,7 @@ const SAFE_EXTENSIONS = new Set([
   ".svgz",
   ".heic",
   ".heif",
+  ".hif",
   ".jxl",
   ".ico",
   ".jp2",

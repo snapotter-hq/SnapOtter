@@ -2113,13 +2113,6 @@
     "outputHash": "dc61d6f2773d",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "扱うのが PDF だけであれば、Stirling-PDF は優れており一見の価値があります。画像のリサイズ、動画の変換、音声の文字起こし、ファイルの一括処理も行うなら、複数のツールを並べて動かす代わりに、SnapOtter が 1 つの環境でそのすべてを扱えます。",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "1129611c8eb4",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "PDF 以外も 1 つのスタックで扱いたいなら、代わりになり得ます。SnapOtter の PDF 対応は幅広く、さらに画像、動画、音声、ファイルのツールを加えます。PDF 専用の構成なら、Stirling-PDF は堅実で焦点の絞られた選択肢です。",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "0363c3abdeee",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "どちらのプロジェクトもオープンソースでセルフホスト可能です。SnapOtter は AGPLv3 で、SSO、監査ログ、同様の管理機能向けにオプションの有料エンタープライズ層を加えています。",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "52a760040ac8",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "どちらも無料でオープンソースですか？",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "5d2853e06d27",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF と SnapOtter はどちらもセルフホストでオープンソースなので、いずれの場合もファイルは自社サーバー上にとどまります。違いは範囲です。Stirling-PDF は PDF に焦点を当て、SnapOtter は 5 つのファイル種別すべてにまたがります。",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "d880a5a6189e",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF は強力なセルフホスト型 PDF ツールキットです。SnapOtter も PDF をカバーし、さらに画像、動画、音声、ファイルのツールを 1 つのスタックにまとめます。どちらもオープンソースです。",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "5d8ca89fedc2",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "対応",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "cc3bf903e9e1",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "対応",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "0bcbbb80a1ac",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60 以上の PDF 操作",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "4fcef0c30799",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

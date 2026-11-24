@@ -1,19 +1,21 @@
 ---
-description: "Zmień nazwy wielu plików za pomocą szablonu wzorca i pobierz jako ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Zmień nazwy wielu obrazów za pomocą szablonu wzorca i pobierz jako ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: 05d89869a52f
 ---
 
 # Masowa zmiana nazw {#bulk-rename}
 
-Zmień nazwy wielu plików za pomocą szablonu wzorca z symbolami zastępczymi dla indeksu, uzupełnionego indeksu i oryginalnej nazwy pliku. Zwraca archiwum ZIP zawierające wszystkie pliki ze zmienionymi nazwami.
+Zmień nazwy wielu obrazów za pomocą szablonu wzorca z symbolami zastępczymi dla indeksu, uzupełnionego indeksu i oryginalnej nazwy pliku. Zwraca archiwum ZIP zawierające wszystkie obrazy ze zmienionymi nazwami.
 
 ## Punkt końcowy API {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Przyjmuje dane formularza multipart z wieloma plikami oraz polem JSON `settings`.
+Przyjmuje dane formularza multipart z wieloma plikami obrazów oraz polem JSON `settings`.
+
+Każdy przesłany plik musi być obrazem. Nagłówek każdego pliku jest sprawdzany przed rozpoczęciem tworzenia archiwum ZIP, a bajty są następnie pakowane bez zmian (bez ponownego kodowania). Jeśli jakiś plik nie jest rozpoznanym obrazem albo przekracza `MAX_MEGAPIXELS`, całe żądanie kończy się błędem `400` z komunikatem wskazującym ten plik, na przykład `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parametry {#parameters}
 

@@ -56,6 +56,7 @@ const SHIPPED_QSV_ONLY = `Encoders:
  A....D libvorbis            libvorbis (codec vorbis)
  V....D libtheora            libtheora Theora (codec theora)
  V....D libwebp_anim         libwebp WebP image (codec webp)
+ V....D libaom-av1           libaom AV1 (codec av1)
 `;
 
 /** Same shape, but from a build that really was compiled with NVENC. */
@@ -174,6 +175,7 @@ describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary
     "vorbis",
     "theora",
     "webp",
+    "av1-alpha",
   ];
   // One spawn for the whole block: this used to shell out once per target.
   const installed = parseEncoderNames(realEncoderOutput());

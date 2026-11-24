@@ -136,6 +136,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, or 400 from Smart Crop's face mode | The tool, or one step of a pipeline or batch, needs a bundle that is not installed. The body includes `feature` (the bundle ID) and `featureName`. | Install the bundle in Settings, then retry. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | An install or offline import was refused because the bundle's x86-64 libraries need AVX and this server's CPU doesn't have it. Nothing was downloaded or installed. The body includes `feature` (the bundle ID) and `reason` (`cpu-no-avx`). `GET /api/v1/features` reports the same bundle with `compatibility: "incompatible"` and `compatibilityReason: "cpu-no-avx"`. | Run SnapOtter on a CPU with AVX, or on arm64. Other bundles still install. |
+| `FEATURE_INSTALL_BUSY` | 409 | A cancel was refused because the installer is writing the shared AI environment, and stopping it there would break every installed AI tool. | Wait for the install to finish, then uninstall the bundle if you don't want it. |
 | `FEATURE_INCOMPATIBLE` | 501, or 400 when Fast OCR gets a language it can't read | The installed feature cannot do the requested quality or language. | Change the setting, or install a bundle that supports it. |
 | `ENGINE_UNAVAILABLE` | 503 | A required engine could not start, or an OCR runtime was removed after the request was validated. | Retry after an administrator repairs or reinstalls the feature. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium is not installed, so HTML to image cannot run. | Ask an administrator to install the browser. |
@@ -151,6 +152,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `NOT_ANIMATED` | 400 | Remove GIF Background received a still image. | Use Remove Background for still images. |
 | `TOO_MANY_FRAMES` | 400 | The animation has more frames than the server allows (`GIF_BG_MAX_FRAMES`). | Send a shorter animation, or ask an administrator to raise the limit. |
 | `TOO_MANY_PIXELS` | 400 | The animation's canvas times its frame count is over the server's limit: 268,402,689 pixels (16383 x 16383) for Remove GIF Background, or the GIF workload cap for other animated tools. | Send fewer frames or a smaller animation. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | An AI image tool got a multi-page TIFF or an animated GIF or WebP, and the output format would keep every frame. These tools run their model on one image at a time. | Split the file into separate images. Where the tool has an output format setting, a still format such as PNG processes the first frame only. |
 | `IMAGE_TOO_LARGE` | 400 | The image has more pixels than the decoder accepts. | Send a smaller image. |
 | `RESULT_TOO_LARGE` | 400 | The settings would produce an image larger than the encoder or pixel limit allows. | Use a smaller image or settings that make a smaller result. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice or pandoc couldn't open the document. It may be damaged, password-protected, or not the format its extension says. | Check the file opens in an office app, then send it again. |
@@ -158,6 +160,8 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `PDF_PASSWORD_PROTECTED` | 400 | The PDF is encrypted and this tool can't open it. | Unlock it with Unlock PDF first. |
 | `NO_AUDIO_TRACK` | 400 | The file has no audio stream for an audio tool to use. | Send a file that has audio. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg couldn't read the audio or video: it found no packets, no codec parameters, no `moov` atom, or data it can't parse. | Check the file plays in a media player, or re-export it, then retry. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode got input that isn't Base64. Whitespace is ignored and both the standard and URL-safe alphabets are accepted. | Check the text for stray characters or a cut-off end. |
+| `DECODED_DATA_NOT_TEXT` | 400 | The Base64 is valid but decodes to binary data, not UTF-8 text. | Decode it with a tool that saves a file instead of showing text. |
 | `PAGE_OUT_OF_RANGE` | 400 | The page range names a page the PDF doesn't have. | Check the page count and send a range inside it. |
 | `INVALID_PAGE_RANGE` | 400 | The page range isn't valid syntax. | Use page numbers like `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages was asked to remove every page. | Keep at least one page. |
@@ -168,6 +172,7 @@ Tools, batch runs, and pipelines that need an optional AI bundle use these codes
 | `NO_FACE_DETECTED` | 400 | Passport Photo found no face in the image. | Send a clear, front-facing photo with good lighting. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Compression, or a passport photo's size limit, can't get the file under the requested size, even after scaling it down. | Ask for a larger target size, or crop the image first. |
 | `TOO_MANY_PAGES` | 400 | OCR was asked for more pages than it processes in one job. | Select fewer pages with the page range. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR on a multi-page TIFF read more than 1,000,000 bytes of text across its pages, which is more than one result can store. | Split the TIFF into smaller files and run OCR on each. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata found the image's existing EXIF data damaged, so it can't rewrite it safely. | Strip the metadata with Remove Image Metadata first, then edit. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML or Markdown to PDF found a reference to an image, stylesheet, or font on the network, which the server doesn't fetch. | Embed the resource in the file (for example as a `data:` URI), then retry. |
 
@@ -214,10 +219,11 @@ These codes exist in the server source for logs, telemetry, or Fastify's own err
 | `SIEM_DECRYPTION_FAILED` | Reported to error tracking by SIEM forwarding. The SIEM auth header cannot be decrypted. |
 | `WEBHOOK_DECRYPTION_FAILED` | Reported to error tracking. The request that hit the same failure answers with `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Reported to error tracking when a staged upload cannot be removed. |
+| `RETENTION_DEADLINE_BACKFILLED` | Reported to error tracking by the storage TTL sweep when it fills in a finished job's missing team retention deadline. The job's files then follow the team's retention. |
 | `USERNAME_RACE_EXHAUSTED` | Raised when SSO auto-create loses the username race on every retry. The login page shows an error instead. |
 | `ERR_OUT_OF_RANGE` | Thrown by the object storage reader for an invalid byte range. |
 | `ETIMEDOUT` | Set on the timeout error for a GDPR export. The export fails, and it can be requested again. |
 | `FST_REQ_FILE_TOO_LARGE` | Fastify's code for an upload over the limit. Clients get a 413 with `PAYLOAD_TOO_LARGE`, or the route's own 413 message. |
 | `TARGET_SIZE_EXCEEDED` | Thrown when a target-size compression misses its target. The error has no status or code, so clients get a generic failure. |
 | `OCR_CACHE_PERMISSIONS` | Reported to error tracking as an operational fault when the AI data volume leaves the OCR runtime cache world-writable. The install job fails with a message that names the storage problem. |
-| `OCR_RUNTIME_UNREACHABLE` | Reported to error tracking as an operational fault when the server never reached huggingface.co to download the OCR runtime. The install job fails with a message about network access, `HTTPS_PROXY`, and offline import. |
+| `OCR_RUNTIME_UNREACHABLE` | Reported to error tracking as an operational fault when the server never reached huggingface.co to download the OCR runtime. The install job fails with a message about network access, `HTTPS_PROXY`, `HF_ENDPOINT`, and offline import. |

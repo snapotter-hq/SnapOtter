@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { getTestImagePath, test, waitForProcessing } from "./helpers";
+import AdmZip from "adm-zip";
+import { compressToSlider, getTestImagePath, test, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Cross-browser smoke tests -- critical flows validated across browsers.
@@ -95,40 +97,19 @@ test.describe("Cross-browser smoke tests", () => {
   }) => {
     const errors = collectConsoleErrors(page);
 
-    await page.goto("/image/compress");
-    await page.waitForLoadState("networkidle");
+    const slider = await compressToSlider(page);
+    const box = await slider.boundingBox();
+    if (!box) throw new Error("the slider has no bounding box");
 
-    // Upload and wait for processing to produce the before-after view
-    await uploadImage(page);
-    await waitForProcessing(page);
-    await page.waitForTimeout(1000);
-
-    // Locate the before-after slider container for drag interaction
-    const sliderContainer = page.locator("[class*='before-after'], [class*='BeforeAfter']").first();
-
-    // Even if the exact slider handle class differs, verify the container rendered
-    const containerVisible = await sliderContainer.isVisible({ timeout: 10000 }).catch(() => false);
-
-    if (containerVisible) {
-      // Drag the slider from center to the left quarter
-      const box = await sliderContainer.boundingBox();
-      if (box) {
-        const startX = box.x + box.width / 2;
-        const startY = box.y + box.height / 2;
-        const endX = box.x + box.width * 0.25;
-
-        await page.mouse.move(startX, startY);
-        await page.mouse.down();
-        await page.mouse.move(endX, startY, { steps: 10 });
-        await page.mouse.up();
-        await page.waitForTimeout(300);
-      }
-    }
-
-    // Verify no CSS layout breakage -- the container should still be visible
-    if (containerVisible) {
-      await expect(sliderContainer).toBeVisible();
-    }
+    // Drag the divider from the center to the left quarter.
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.25, y, { steps: 10 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
+      .toBeLessThan(35);
 
     expect(errors).toHaveLength(0);
   });
@@ -584,6 +565,47 @@ test.describe("Cross-browser smoke tests", () => {
     expect(pageContent).toBeTruthy();
 
     expect(errors).toHaveLength(0);
+  });
+
+  // #4505: WebKit keeps only the last of several <a download> clicks made in
+  // one task. Playwright's WebKit build saves all of them, so this can't show
+  // the drop itself; it checks that a multi-file selection now leaves as one
+  // ZIP holding every file, in every engine.
+  test("files page bulk download saves every ticked file in one ZIP", async ({
+    loggedInPage: page,
+  }) => {
+    const token = await page.evaluate(() => localStorage.getItem("snapotter-token"));
+    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const stem = `bulk-${test.info().project.name}-${Date.now()}`;
+    const names = [1, 2, 3].map((n) => `${stem}-${n}.png`);
+    const png = readFileSync(getTestImagePath());
+    for (const name of names) {
+      const res = await page.request.post("/api/v1/files/upload", {
+        headers,
+        multipart: { file: { name, mimeType: "image/png", buffer: png } },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+    }
+
+    await page.goto("/files");
+    await page.getByPlaceholder("Search files...").fill(stem);
+    for (const name of names) {
+      await page.getByRole("checkbox", { name: `Select File: ${name}` }).check();
+    }
+    await expect(page.getByText("3 selected")).toBeVisible();
+
+    const downloads: string[] = [];
+    page.on("download", (d) => downloads.push(d.suggestedFilename()));
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download", exact: true }).click();
+    const download = await downloadPromise;
+    await expect(page.getByRole("button", { name: "Download", exact: true })).toBeEnabled();
+
+    expect(download.suggestedFilename()).toBe("files.zip");
+    const zipPath = await download.path();
+    const entries = new AdmZip(readFileSync(zipPath)).getEntries().map((e) => e.entryName);
+    expect(entries.sort()).toEqual([...names].sort());
+    expect(downloads).toEqual(["files.zip"]);
   });
 
   // ---- Collage tool (no-dropzone mode) ----

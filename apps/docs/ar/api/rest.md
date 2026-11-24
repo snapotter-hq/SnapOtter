@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 146f4c35be04
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: f164d86ea413
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### إعدادات التحويل الجاهزة {#conversion-presets}
 
-يتضمن الكتالوج المشترك 83 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
+يتضمن الكتالوج المشترك 121 نقطة نهاية مخصصة لإعدادات التحويل الجاهزة مثل `jpg-to-png` و`mov-to-mp4` و`m4a-to-mp3` و`pdf-to-jpg` و`excel-to-csv`. الإعدادات الجاهزة هي مسارات أدوات من الدرجة الأولى:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 يقفل كل إعداد جاهز صيغة الإخراج ويفوّض إلى أداة أساسية مثل `convert` أو `convert-video` أو `extract-audio` أو `convert-audio` أو `image-to-pdf` أو `pdf-to-image` أو `svg-to-raster` أو `convert-spreadsheet`. راجع [إعدادات التحويل الجاهزة](/ar/tools/conversion-presets) للاطلاع على جدول المسارات الكامل والإعدادات الاختيارية.
+
+تعمل الإعدادات الجاهزة للضغط بالطريقة نفسها. تشغّل `compress-image-to-20kb` و`compress-image-to-50kb` و`compress-image-to-100kb` و`compress-image-to-200kb` و`compress-image-to-500kb` الأداة `compress`؛ وتشغّل `compress-pdf-to-100kb` و`compress-pdf-to-200kb` و`compress-pdf-to-500kb` و`compress-pdf-to-1mb` و`compress-pdf-to-2mb` الأداة `compress-pdf`. يثبّت كل واحد منها `mode` على `targetSize` و`targetSizeKb` على الحجم المذكور في اسمه.
 
 ### الأساسيات {#essentials}
 
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | معرّف الأداة | الاسم | نموذج الذكاء الاصطناعي | الإعدادات الرئيسية |
 |---------|------|---------|-------------|
 | `remove-background` | إزالة الخلفية | rembg (BiRefNet / U2-Net) | المرحلة 1: `model`، `edgeRefine` (0-3)، `decontaminate`. المرحلة 2 (`/api/v1/tools/image/remove-background/effects`) و`/batch` وخطوط المعالجة: `backgroundType` (transparent/color/gradient/blur، بالإضافة إلى image على `/effects`)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurEnabled`، `blurIntensity`، `shadowEnabled`، `shadowOpacity`، `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | إزالة خلفية GIF | rembg، إطاراً بإطار | `model`، `outputFormat` (webp/gif/apng)، `backgroundType` (transparent/color/gradient/blur/image)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurIntensity` (0-100)، `shadowEnabled`، `shadowOpacity` (0-100)، `edgeRefine` (0-3)، `decontaminate` |
 | `upscale` | تكبير الصورة | RealESRGAN | `scale` (2/4)، `model`، `faceEnhance`، `denoise`، `format`، `quality` |
 | `erase-object` | ممحاة الكائنات | LaMa (ONNX) | يُرسل القناع كجزء الملف الثاني (اسم الحقل `mask`)، `format`، `quality` |
 | `ocr` | OCR / استخراج النص | Tesseract (سريع)؛ RapidOCR + PP-OCR ONNX (متوازن/الأفضل) | `quality` (سريع/متوازن/الأفضل)، `language`، `enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | المخطط البياني | `scale` (linear/log) - يُرجع مخطط رسم بياني RGB + إحصائيات لكل قناة |
 | `lqip-placeholder` | عنصر نائب LQIP | `width` (4-64)، `blur`، `strategy` (blur/pixelate/solid)، `format` (webp/png/jpeg)، `quality` |
 | `barcode-generate` | مُولِّد الباركود | `text`، `type` (code128/ean13/upca/code39/itf14/datamatrix)، `scale` (1-8)، `includeText` (منطقي). نص JSON، دون رفع ملف. |
+| `aspect-ratio-calculator` | حاسبة نسبة العرض إلى الارتفاع | `width`، `height`، `newWidth`، `newHeight`، `round` (منطقي). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
 
 ### التخطيط والتركيب {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | حدود وإطار | `width`، `color`، `style` (solid/gradient/pattern)، `borderRadius`، `padding`، `shadow` |
 | `beautify` | تجميل لقطة الشاشة | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent)، `gradientStops`، `padding`، `borderRadius`، `shadowPreset`، `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...)، `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt)، `watermarkText`، `outputFormat` |
 | `circle-crop` | قص دائري | `zoom` (1-5)، `offsetX`، `offsetY`، `borderWidth`، `borderColor`، `background` (transparent/hex)، `outputSize` |
+| `rounded-crop` | اقتصاص مستدير | `shape` (rounded-square/squircle)، `cornerRadius` (0-50، نسبة مئوية من الضلع الأقصر)، `zoom` (1-5)، `offsetX`، `offsetY`، `borderWidth`، `borderColor`، `background` (transparent/hex)، `outputSize` |
 | `image-pad` | تبطين الصورة | `target` (16:9/9:16/1:1/4:3/3:4/custom)، `ratioW`، `ratioH`، `background` (color/transparent/blur)، `color` (hex)، `padding` (0-50%) |
 | `sprite-sheet` | ورقة العفاريت | `columns` (1-16)، `padding`، `background` (hex)، `format` (png/webp/jpeg)، `quality` - متعدد الملفات (2-64 صورة) |
 
@@ -267,7 +272,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | تحويل الفيديو | `format` (mp4/mov/webm/avi/mkv)، `quality` (high/balanced/small) |
 | `compress-video` | ضغط الفيديو | `quality` (light/balanced/strong)، `resolution` (original/1080p/720p/480p) |
-| `trim-video` | قص الفيديو | `startS`، `endS`، `precise` (منطقي، قص دقيق بالإطار) |
+| `trim-video` | قص الفيديو | `mode` (range/ends)، `startS`، `endS`، `cutStartS`، `cutEndS`، `precise` (منطقي، قص دقيق بالإطار) |
 | `mute-video` | كتم الفيديو | - |
 | `video-to-gif` | فيديو إلى GIF | `fps` (1-30)، `width`، `startS`، `durationS` (بحد أقصى 60 ثانية) |
 | `resize-video` | تغيير حجم الفيديو | `width`، `height`، `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | تثبيت الفيديو | `smoothing` (5-60، بالإطارات) |
 | `gif-to-video` | GIF إلى فيديو | `format` (mp4/webm/mov) |
 | `video-to-webp` | فيديو إلى WebP | `fps`، `width`، `quality`، `loop` (منطقي) |
+| `video-to-avif` | فيديو إلى AVIF | `fps` (1-30)، `width` (64-1280)، `startS`، `durationS` (بحد أقصى 60 ثانية)، `quality` (1-100)، `loop` (منطقي) |
 | `video-to-frames` | فيديو إلى إطارات | `mode` (all/nth/timestamps)، `n`، `timestamps`، `format` (png/jpg) |
 | `merge-videos` | دمج مقاطع الفيديو | - (متعدد الملفات، مُطبَّق على دقة الفيديو الأول) |
 | `replace-audio` | استبدال الصوت | - (فيديو + ملف صوتي، ملفان) |
 | `burn-subtitles` | حرق الترجمات | `fontSize` (8-72) - فيديو + ملف ترجمة |
 | `embed-subtitles` | تضمين الترجمات | `language` (رمز ISO 639-2/B) - فيديو + ملف ترجمة |
 | `extract-subtitles` | استخراج الترجمات | - (يُخرج SRT) |
+| `convert-subtitles` | تحويل الترجمات | `format` (srt/vtt/ass)، `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | صور إلى فيديو | `secondsPerImage` (0.5-10)، `resolution` (1080p/720p/square)، `fps` - متعدد الملفات |
 | `video-metadata` | تنظيف البيانات الوصفية للفيديو | - |
 | `auto-subtitles` | ترجمات تلقائية (ذكاء اصطناعي) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi)، `format` (srt/vtt) |
@@ -300,7 +307,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | معرّف الأداة | الاسم | الإعدادات الرئيسية |
 |---------|------|-------------|
 | `convert-audio` | تحويل الصوت | `format` (mp3/wav/ogg/flac/m4a)، `bitrateKbps` (32-320) |
-| `trim-audio` | قص الصوت | `startS`، `endS` |
+| `trim-audio` | قص الصوت | `mode` (range/ends)، `startS`، `endS`، `cutStartS`، `cutEndS` |
 | `volume-adjust` | ضبط مستوى الصوت | `gainDb` (-30 إلى 30) |
 | `normalize-audio` | تسوية الصوت | - (EBU R128، -16 LUFS) |
 | `fade-audio` | تلاشي الصوت | `fadeInS` (0-30)، `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | استخراج الصفحات | `range` (صيغة qpdf، مثال "1-5,8,10-z") |
 | `remove-pages` | إزالة الصفحات | `pages` (نطاق qpdf للإزالة) |
 | `organize-pdf` | تنظيم PDF | `order` (ترتيب صفحات qpdf، مثال "3,1,2,5-z") |
+| `multi-tool-pdf` | الأداة المتعددة لـ PDF | `items` (خطة الصفحات، `[{doc, page, rot}]`، حتى 1200 صفحة)، `pageCounts` - متعدد الملفات (حتى 20 ملف PDF) |
 | `protect-pdf` | حماية PDF | `userPassword`، `ownerPassword` (AES-256) |
 | `unlock-pdf` | إلغاء قفل PDF | `password` |
 | `repair-pdf` | إصلاح PDF | - |
@@ -335,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF بتدرج رمادي | - |
 | `pdfa-convert` | التحويل إلى PDF/A | - (PDF/A-2 للأرشفة) |
 | `crop-pdf` | قص PDF | `margin` (0-2000 نقطة) |
+| `resize-pdf-pages` | تغيير حجم صفحات PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | كتيّب PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | علامة مائية على PDF | `text`، `position`، `fontSize`، `opacity`، `rotation` |
@@ -344,7 +353,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | توقيع PDF | مسار multipart مخصص مع PDF `file`، وملفات التوقيع `sig0`، و`sig1`، ومصفوفة JSON `placements` |
 | `pdf-to-text` | PDF إلى نص | - |
 | `pdf-to-word` | PDF إلى Word | - |
-| `pdf-metadata` | البيانات الوصفية لـ PDF | `title`، `author`، `subject`، `keywords` |
+| `pdf-to-markdown` | PDF إلى Markdown | - (يُخرج ملف `.md`) |
+| `pdf-metadata` | البيانات الوصفية لـ PDF | `title`، `author`، `subject`، `keywords`، `stripAll` |
 | `convert-document` | تحويل مستند | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | تحويل عرض تقديمي | `format` (pptx/odp) |
 | `convert-spreadsheet` | تحويل جدول بيانات | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON إلى XML | `pretty` (منطقي) - ثنائي الاتجاه |
 | `split-csv` | تقسيم CSV | `rowsPerFile` (1-1000000)، `keepHeader` (منطقي) |
 | `merge-csvs` | دمج ملفات CSV | - (متعدد الملفات، أعمدة متطابقة) |
+| `merge-text` | دمج الملفات النصية | `separator` (blank-line/rule/filename-heading) - متعدد الملفات، 2-50 ملفًا |
 | `yaml-json` | YAML / JSON | - (ثنائي الاتجاه) |
 | `xml-to-csv` | XML إلى CSV | - (يعثر تلقائيًا على العناصر المتكررة) |
+| `convert-font` | تحويل خط | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | تحويل حالة الأحرف | `text`، `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab)، `locale` (وسم BCP 47). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
+| `proportion-calculator` | حاسبة التناسب | `a`، `b`، `c`، `mode` (direct/inverse). نص JSON، دون رفع ملف؛ يُعيد القيمة المفقودة. |
+| `base64` | ترميز / فك ترميز Base64 | `text`، `mode` (encode/decode)، `urlSafe` (منطقي). نص JSON، دون رفع ملف؛ يُعيد النص المحوَّل. |
 | `excel-to-csv` | Excel إلى CSV | إعداد تحويل جاهز مخصص مدعوم بـ `convert-spreadsheet` |
+| `otf-to-ttf` | OTF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff-to-ttf` | WOFF إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `woff2-to-ttf` | WOFF2 إلى TTF | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
+| `ttf-to-woff2` | TTF إلى WOFF2 | إعداد تحويل جاهز مخصص مدعوم بـ `convert-font` |
 | `create-zip` | إنشاء ZIP | - (متعدد الملفات، 2-50 ملفًا) |
 | `extract-zip` | استخراج ZIP | - (محمي من قنابل الضغط) |
 
@@ -396,6 +415,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `devicePreset` | سلسلة | `"desktop"` | `desktop`، `tablet`، `mobile`، `custom` |
 | `viewportWidth` | رقم | `1280` | عرض إطار عرض مخصص 320-3840 |
 | `viewportHeight` | رقم | `720` | ارتفاع إطار عرض مخصص 320-2160 |
+| `clientJobId` | string | (يُولَّد تلقائيًا) | معرّف مهمة من اختيارك، لتتمكن من فتح بث التقدم قبل وصول الرد |
 
 **مثال:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+يعمل الالتقاط كمهمة في قائمة الانتظار. إذا انتهى ضمن نافذة الانتظار المتزامن، فستحصل على النتيجة أعلاه مع `200`. أما الالتقاط الأبطأ فيرد بـ `202` مع `{"jobId":"...","async":true}`؛ تابعه كما هو موضح في [تتبع التقدم](#progress-tracking). حتى الإصدار 2.3.0 كانت نقطة النهاية هذه تنتظر دائمًا وترد بـ `200`، لذا يجب على السكربتات التي تتعامل مع `200` فقط أن تتعامل أيضًا مع `202`.
 
 ### المسارات الفرعية للأدوات {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | تنزيل الملف |
 | `GET` | `/api/v1/files/:id/thumbnail` | الحصول على صورة مصغرة JPEG بحجم 300 بكسل |
 | `DELETE` | `/api/v1/files` | حذف جماعي للملفات وسلاسل إصداراتها (النص: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | تنزيل عدة ملفات في ملف ZIP واحد (النص: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | جلب عناوين URL بعيدة إلى مساحة العمل للاستيراد المستند إلى URL |
 | `POST` | `/api/v1/preview` | إنشاء معاينة WebP متوافقة مع المتصفح (لصيغ HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | بث معاينة مخزَّنة مؤقتًا أو مُنشأة ومتوافقة مع المتصفح لملف PDF أو مستند Office أو فيديو أو صوت محفوظ |

@@ -495,6 +495,11 @@ const VideoToWebpSettings = lazy(() =>
     default: m.VideoToWebpSettings,
   })),
 );
+const VideoToAvifSettings = lazy(() =>
+  import("@/components/tools/video-to-avif-settings").then((m) => ({
+    default: m.VideoToAvifSettings,
+  })),
+);
 const VideoToFramesSettings = lazy(() =>
   import("@/components/tools/video-to-frames-settings").then((m) => ({
     default: m.VideoToFramesSettings,
@@ -523,6 +528,11 @@ const EmbedSubtitlesSettings = lazy(() =>
 const ExtractSubtitlesSettings = lazy(() =>
   import("@/components/tools/extract-subtitles-settings").then((m) => ({
     default: m.ExtractSubtitlesSettings,
+  })),
+);
+const ConvertSubtitlesSettings = lazy(() =>
+  import("@/components/tools/convert-subtitles-settings").then((m) => ({
+    default: m.ConvertSubtitlesSettings,
   })),
 );
 const ImagesToVideoSettings = lazy(() =>
@@ -720,6 +730,11 @@ const CropPdfSettings = lazy(() =>
     default: m.CropPdfSettings,
   })),
 );
+const ResizePdfPagesSettings = lazy(() =>
+  import("@/components/tools/resize-pdf-pages-settings").then((m) => ({
+    default: m.ResizePdfPagesSettings,
+  })),
+);
 const NupPdfSettings = lazy(() =>
   import("@/components/tools/nup-pdf-settings").then((m) => ({
     default: m.NupPdfSettings,
@@ -771,6 +786,11 @@ const SignPdfSettings = lazy(() =>
 const PdfToTextSettings = lazy(() =>
   import("@/components/tools/pdf-to-text-settings").then((m) => ({
     default: m.PdfToTextSettings,
+  })),
+);
+const PdfToMarkdownSettings = lazy(() =>
+  import("@/components/tools/pdf-to-markdown-settings").then((m) => ({
+    default: m.PdfToMarkdownSettings,
   })),
 );
 const PdfToWordSettings = lazy(() =>
@@ -843,14 +863,39 @@ const MergeCsvsSettings = lazy(() =>
     default: m.MergeCsvsSettings,
   })),
 );
+const MergeTextSettings = lazy(() =>
+  import("@/components/tools/merge-text-settings").then((m) => ({
+    default: m.MergeTextSettings,
+  })),
+);
 const YamlJsonSettings = lazy(() =>
   import("@/components/tools/yaml-json-settings").then((m) => ({
     default: m.YamlJsonSettings,
   })),
 );
+const ConvertFontSettings = lazy(() =>
+  import("@/components/tools/convert-font-settings").then((m) => ({
+    default: m.ConvertFontSettings,
+  })),
+);
 const XmlToCsvSettings = lazy(() =>
   import("@/components/tools/xml-to-csv-settings").then((m) => ({
     default: m.XmlToCsvSettings,
+  })),
+);
+const ConvertCaseSettings = lazy(() =>
+  import("@/components/tools/convert-case-settings").then((m) => ({
+    default: m.ConvertCaseSettings,
+  })),
+);
+const ProportionCalculatorSettings = lazy(() =>
+  import("@/components/tools/proportion-calculator-settings").then((m) => ({
+    default: m.ProportionCalculatorSettings,
+  })),
+);
+const Base64Settings = lazy(() =>
+  import("@/components/tools/base64-settings").then((m) => ({
+    default: m.Base64Settings,
   })),
 );
 const CreateZipSettings = lazy(() =>
@@ -865,6 +910,11 @@ const ExtractZipSettings = lazy(() =>
 );
 
 // Wave 5a: Image gap-fill tools
+const AspectRatioCalculatorSettings = lazy(() =>
+  import("@/components/tools/aspect-ratio-calculator-settings").then((m) => ({
+    default: m.AspectRatioCalculatorSettings,
+  })),
+);
 const BarcodeGenerateSettings = lazy(() =>
   import("@/components/tools/barcode-generate-settings").then((m) => ({
     default: m.BarcodeGenerateSettings,
@@ -1005,6 +1055,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["html-to-image", { Settings: HtmlToImageSettings, ResultsPanel: HtmlToImageResults }],
   ["barcode-read", { Settings: BarcodeReadSettings }],
   ["barcode-generate", { Settings: BarcodeGenerateSettings }],
+  ["aspect-ratio-calculator", { Settings: AspectRatioCalculatorSettings }],
   ["image-to-base64", { Settings: ImageToBase64Settings, ResultsPanel: ImageToBase64Results }],
 
   // Layout & Composition
@@ -1089,6 +1140,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["stabilize-video", { accept: VIDEO_INPUTS.join(","), Settings: StabilizeVideoSettings }],
   ["gif-to-video", { accept: ".gif", Settings: GifToVideoSettings }],
   ["video-to-webp", { accept: VIDEO_INPUTS.join(","), Settings: VideoToWebpSettings }],
+  ["video-to-avif", { accept: VIDEO_INPUTS.join(","), Settings: VideoToAvifSettings }],
   ["video-to-frames", { accept: VIDEO_INPUTS.join(","), Settings: VideoToFramesSettings }],
   ["merge-videos", { accept: VIDEO_INPUTS.join(","), Settings: MergeVideosSettings }],
   [
@@ -1113,6 +1165,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
     },
   ],
   ["extract-subtitles", { accept: VIDEO_INPUTS.join(","), Settings: ExtractSubtitlesSettings }],
+  ["convert-subtitles", { accept: SUBTITLE_INPUTS.join(","), Settings: ConvertSubtitlesSettings }],
   ["images-to-video", { accept: IMAGE_INPUTS.join(","), Settings: ImagesToVideoSettings }],
   ["video-metadata", { accept: VIDEO_INPUTS.join(","), Settings: VideoMetadataSettings }],
 
@@ -1173,6 +1226,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],
   ["repair-pdf", { accept: ".pdf", Settings: RepairPdfSettings }],
   ["crop-pdf", { accept: ".pdf", Settings: CropPdfSettings }],
+  ["resize-pdf-pages", { accept: ".pdf", Settings: ResizePdfPagesSettings }],
   ["nup-pdf", { accept: ".pdf", Settings: NupPdfSettings }],
   ["booklet-pdf", { accept: ".pdf", Settings: BookletPdfSettings }],
   ["watermark-pdf", { accept: ".pdf", Settings: WatermarkPdfSettings }],
@@ -1186,6 +1240,7 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["redact-pdf", { accept: ".pdf", Settings: RedactPdfSettings }],
   ["sign-pdf", { accept: ".pdf", Settings: SignPdfSettings }],
   ["pdf-to-text", { accept: ".pdf", Settings: PdfToTextSettings }],
+  ["pdf-to-markdown", { accept: ".pdf", Settings: PdfToMarkdownSettings }],
   ["pdf-to-word", { accept: ".pdf", Settings: PdfToWordSettings }],
   ["pdf-metadata", { accept: ".pdf", Settings: PdfMetadataSettings }],
   ["html-to-pdf", { accept: ".html,.htm", Settings: HtmlToPdfSettings }],
@@ -1198,8 +1253,13 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["json-xml", { accept: ".json,.xml", Settings: JsonXmlSettings }],
   ["split-csv", { accept: ".csv,.tsv", Settings: SplitCsvSettings }],
   ["merge-csvs", { accept: ".csv,.tsv", Settings: MergeCsvsSettings }],
+  ["merge-text", { accept: ".txt,.md,.markdown,.csv,.log", Settings: MergeTextSettings }],
   ["yaml-json", { accept: ".yaml,.yml,.json", Settings: YamlJsonSettings }],
   ["xml-to-csv", { accept: ".xml", Settings: XmlToCsvSettings }],
+  ["convert-font", { accept: ".ttf,.otf,.woff,.woff2", Settings: ConvertFontSettings }],
+  ["convert-case", { Settings: ConvertCaseSettings }],
+  ["proportion-calculator", { Settings: ProportionCalculatorSettings }],
+  ["base64", { Settings: Base64Settings }],
   ["create-zip", { Settings: CreateZipSettings }],
   ["extract-zip", { accept: ".zip", Settings: ExtractZipSettings }],
 ];

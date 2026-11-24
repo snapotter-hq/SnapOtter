@@ -1,8 +1,8 @@
 ---
-description: "Instale SnapOtter con Docker en un solo comando. Incluye la configuración con Docker Compose, la compilación desde el código fuente y una descripción completa de las funciones."
-i18n_source_hash: 2291f9ca0071
+description: "Instale SnapOtter con Docker en un solo comando, inicie sesión y abra su primera herramienta. Cubre la aceleración por GPU, las máquinas pequeñas, Docker Compose y la compilación desde el código fuente."
+i18n_source_hash: c2aae540add0
 i18n_provenance: machine
-i18n_output_hash: 98bafaa09848
+i18n_output_hash: c62a3f55c982
 i18n_hash_version: 2
 ---
 
@@ -14,17 +14,23 @@ Explore la interfaz completa en [demo.snapotter.com](https://demo.snapotter.com)
 
 ## Inicio rápido {#quick-start}
 
+Ejecute un solo comando:
+
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` definido, inicia su propio PostgreSQL y Redis en la interfaz loopback (modo integrado) y guarda todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o de alojarlo usted mismo en un homelab. Para producción, utilice el [stack canónico de Docker Compose](#docker-compose), que mantiene PostgreSQL y Redis en sus propios contenedores. El modo integrado se ejecuta como root (el valor predeterminado) y se desactiva automáticamente en cuanto define `DATABASE_URL`.
+Después abra [http://localhost:1349](http://localhost:1349) e inicie sesión con `admin` / `admin`. Se le pedirá que cambie su contraseña en el primer inicio de sesión.
 
-Los resultados de los trabajos no se guardan en el volumen de datos, así que desaparecen cuando se reemplaza el contenedor (al actualizar la imagen, por ejemplo) y sus enlaces de descarga dejan de funcionar. La sección Volúmenes de la guía de despliegue explica cómo conservarlos.
+Ahora abra una herramienta. Elija una en la barra lateral o vaya directamente a [Redimensionar](http://localhost:1349/image/resize), suelte una imagen y descargue el resultado.
 
-¿Va a instalarlo en una Raspberry Pi, un portátil antiguo o un VPS pequeño? Consulte [Configuraciones de bajos recursos](/es/guide/low-resource) para una guía ajustada y lo que cabe esperar de un hardware limitado.
+Esa es toda la instalación. Este único contenedor ejecuta todo lo que necesita: sin `DATABASE_URL` definido, inicia su propio PostgreSQL y Redis en la interfaz loopback (modo integrado) y guarda todos los datos en el volumen `SnapOtter-data`. Es la forma más rápida de probar SnapOtter o de alojarlo usted mismo en un homelab. El modo integrado se ejecuta como root (el valor predeterminado) y se desactiva automáticamente en cuanto define `DATABASE_URL`. Para producción, utilice el [stack de Docker Compose](#docker-compose), que mantiene PostgreSQL y Redis en sus propios contenedores.
 
-Abre [http://localhost:1349](http://localhost:1349) e inicia sesión con `admin` / `admin`. Se le pedirá que cambie su contraseña en el primer inicio de sesión.
+Los resultados de los trabajos no se guardan en el volumen de datos, así que desaparecen cuando se reemplaza el contenedor (al actualizar la imagen, por ejemplo) y sus enlaces de descarga dejan de funcionar. [Conservar la salida de los trabajos](/es/guide/deployment#keeping-job-output) en la guía de despliegue explica cómo conservarlos.
+
+::: tip Uso con 4 GB de RAM o menos
+En una Raspberry Pi, un portátil antiguo o un VPS pequeño, ejecute un trabajo a la vez y limite el grupo de hilos de imagen añadiendo `-e CONCURRENT_JOBS=1 -e MAX_WORKER_THREADS=2` al comando anterior, y omita los bundles de IA pesados. [Configuraciones de bajos recursos](/es/guide/low-resource#tuning-knobs) enumera los demás límites que conviene definir y lo que cabe esperar de un hardware limitado.
+:::
 
 ::: tip Analítica de producto anónima
 SnapOtter incluye analítica de producto anónima de forma predeterminada. Para desactivarla, abra **Settings → System → Privacy** y desactive **Anonymous Product Analytics**. Se detiene de inmediato para toda la instancia.
@@ -36,25 +42,51 @@ La supervisión de errores la proporciona [Sentry](https://sentry.io), que patro
 Para obtener detalles sobre lo que se recopila, consulte [Qué recopila SnapOtter](/es/guide/telemetry).
 :::
 
-::: tip Aceleración NVIDIA CUDA
-Añada `--gpus all` para la eliminación de fondo, la ampliación, la mejora de rostros y la restauración aceleradas con NVIDIA CUDA. El OCR sigue usando la CPU y funciona en la misma imagen con o sin acceso a la GPU:
+## Aceleración por GPU {#gpu-acceleration}
+
+Una GPU NVIDIA acelera mucho las herramientas de IA más pesadas: ampliación (unas 47 veces), mejora de rostros (unas 12 veces), transcripción y eliminación de fondo (unas 4 veces cada una). El OCR, la detección de rostros y la restauración de fotos siguen usando la CPU, así que una GPU no les ayuda. La misma imagen sirve para ambos casos; añada `--gpus all`:
 
 ```bash
 docker run -d --name SnapOtter -p 1349:1349 --gpus all -v SnapOtter-data:/data snapotter/snapotter:latest
 ```
 
-Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). Recurre a la CPU automáticamente cuando CUDA no está disponible. La aceleración con iGPU de Intel/AMD mediante VA-API, Quick Sync u OpenCL no es compatible actualmente con la inferencia de IA. Consulte [Etiquetas de Docker](/es/guide/docker-tags) para ver los benchmarks. Si las herramientas de IA se ejecutan en la CPU a pesar de `--gpus all`, consulte [Verificar la aceleración por GPU](/es/guide/deployment#verify-gpu-acceleration).
-:::
+Requiere el [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) en el host. Sin CUDA, SnapOtter recurre a la CPU automáticamente. La aceleración con iGPU de Intel/AMD mediante VA-API, Quick Sync u OpenCL no es compatible actualmente con la inferencia de IA.
 
-::: details También en GHCR
-```bash
-docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+- [Requisitos de hardware](/es/guide/deployment#full-ai-tools-on-nvidia-cuda) incluye todos los tiempos de GPU y CPU, y los [benchmarks de la imagen de Docker](/es/guide/docker-tags#benchmarks) los valores en caliente y en frío.
+- Si las herramientas de IA siguen ejecutándose en la CPU, consulte [Verificar la aceleración por GPU](/es/guide/deployment#verify-gpu-acceleration).
+- Para Compose, use el [inicio rápido de NVIDIA CUDA](/es/guide/deployment#quick-start-nvidia-cuda) de la guía de despliegue.
+
+## Otras formas de instalar {#other-ways-to-install}
+
+### Contenedor único con Compose {#single-container-compose}
+
+El mismo contenedor en modo integrado que en el inicio rápido, escrito como archivo Compose para que sea más fácil de seguir y de modificar. Guárdelo como `docker-compose.yml` y ejecute `docker compose up -d`:
+
+```yaml
+services:
+  snapotter:
+    image: snapotter/snapotter:latest
+    container_name: SnapOtter
+    ports:
+      - "1349:1349"
+    volumes:
+      - SnapOtter-data:/data
+      - SnapOtter-workspace:/tmp/workspace  # keeps job results across upgrades
+    environment:
+      - DEFAULT_USERNAME=admin
+      - DEFAULT_PASSWORD=admin  # you're asked to change it on first login
+    restart: unless-stopped
+    # mem_limit: 4g
+    # cpus: 2
+
+volumes:
+  SnapOtter-data:
+  SnapOtter-workspace:
 ```
 
-Ambos registros publican la misma imagen en cada versión.
-:::
+Igual que el comando `docker run`, esto sirve para probar SnapOtter y para instalaciones pequeñas. Todos los ajustes de [Configuración](/es/guide/configuration) van bajo `environment`.
 
-## Docker Compose {#docker-compose}
+### Docker Compose (producción) {#docker-compose}
 
 Utilice el archivo de producción que se mantiene y prueba con cada versión, en lugar de copiar un ejemplo abreviado de Compose de esta página:
 
@@ -74,13 +106,21 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d --no-build
 ```
 
-Abre [http://localhost:1349](http://localhost:1349) e inicia sesión con `admin` / `admin`.
+Abra [http://localhost:1349](http://localhost:1349) e inicie sesión con `admin` / `admin`.
 
 El [`docker/docker-compose.yml`](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docker-compose.yml) canónico incluye los cuatro volúmenes de runtime, comprobaciones de estado, límites de recursos, una configuración de Redis duradera, imágenes de base de datos y caché fijadas y el endurecimiento actual de los contenedores. Cambie la contraseña de administrador predeterminada inmediatamente después del primer inicio de sesión. Para un despliegue reproducible, fije la imagen de la aplicación SnapOtter a la etiqueta de versión o al digest que haya verificado, en lugar de seguir `latest`.
 
 Consulte [Configuración](/es/guide/configuration) para ver todas las variables de entorno y [Seguridad y endurecimiento](/es/guide/security) para obtener orientación sobre secretos, política de red y copias de seguridad.
 
-## Compilar desde el código fuente {#build-from-source}
+### GitHub Container Registry {#ghcr}
+
+Docker Hub y GHCR publican la misma imagen en cada versión. Para descargarla de GHCR, cambie el nombre de la imagen:
+
+```bash
+docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data ghcr.io/snapotter-hq/snapotter:latest
+```
+
+### Compilar desde el código fuente {#build-from-source}
 
 **Requisitos previos:** Node.js 22.22+, pnpm 9+, Docker (para Postgres + Redis), Python 3.11+ (para las funciones de IA), Git.
 
@@ -102,10 +142,10 @@ pnpm dev
 | Modalidad | Cantidad | Herramientas de ejemplo |
 |----------|-------|---------------|
 | **Imagen** | 112 | Redimensionar, Recortar, Comprimir, Convertir, Eliminar fondo, Ampliar, OCR, Marca de agua, Collage, Colorear, Herramientas de GIF, preajustes de formato |
-| **Vídeo** | 57 | Cortar, Recortar encuadre, Comprimir, Convertir, Unir, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, preajustes de formato |
-| **Audio** | 27 | Cortar, Unir, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, preajustes de formato |
-| **PDF / Documento** | 35 | Unir, Dividir, Comprimir, OCR, Marca de agua, Censurar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
-| **Archivos** | 23 | CSV a JSON, JSON a XML, Unir CSV, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
+| **Vídeo** | 63 | Cortar, Recortar encuadre, Comprimir, Convertir, Unir, Extraer audio, Subtítulos automáticos, Vídeo a GIF, Redimensionar, Estabilizar, preajustes de formato |
+| **Audio** | 57 | Cortar, Unir, Convertir, Normalizar, Reducción de ruido, Transcribir, Cambio de tono, Fundido, Creador de tonos de llamada, preajustes de formato |
+| **PDF / Documento** | 37 | Unir, Dividir, Comprimir, OCR, Marca de agua, Censurar, Word a PDF, Excel a PDF, Rotar, Proteger, Reparar |
+| **Archivos** | 25 | CSV a JSON, JSON a XML, Unir CSV, Dividir CSV, Crear ZIP, Extraer ZIP, Creador de gráficos, YAML/JSON |
 
 ### Pipelines {#pipelines}
 

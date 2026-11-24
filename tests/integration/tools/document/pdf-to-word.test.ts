@@ -83,6 +83,28 @@ function makeImageOnlyPdf(withTextPage = false): Buffer {
   return readFileSync(out);
 }
 
+/** Build a PDF whose text is drawn and visible but unreadable: Roboto as a
+ *  composite font with ToUnicode written as the name /Identity-H, so the glyph
+ *  ids come back as text (the "type0-identity-name" shape in pdf-to-text). */
+function makeUnreadableFontPdf(): Buffer {
+  const dir = mkdtempSync(join(tmpdir(), "pdf-word-glyphs-"));
+  const out = join(dir, "glyph-ids.pdf");
+  const font = join(process.cwd(), "apps", "api", "static", "fonts", "Roboto-Black.ttf");
+  const script = [
+    "import sys, fitz",
+    "font, out = sys.argv[-2:]",
+    "d = fitz.open(); p = d.new_page()",
+    "p.insert_text((72, 72), 'Invoice 2024 total due', fontname='rob', fontfile=font, fontsize=12)",
+    "for xref, _ext, ftype, *_ in p.get_fonts():",
+    "    if ftype == 'Type0':",
+    "        d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
+    "d.save(out); d.close()",
+  ].join("\n");
+  const res = spawnSync(pythonBin as string, ["-c", script, font, out], { encoding: "utf8" });
+  if (res.status !== 0) throw new Error(`could not build unreadable-font PDF: ${res.stderr}`);
+  return readFileSync(out);
+}
+
 async function downloadCompletedDocx(
   pdf: Buffer,
   filename: string,
@@ -124,6 +146,18 @@ describe.skipIf(!hasFitz)("pdf-to-word on a PDF with no text layer (requires PyM
     expect(error?.code).toBe("NO_TEXT_LAYER");
     expect(error?.message).toMatch(/text layer/i);
     expect(error?.message).toMatch(/OCR/);
+  }, 90_000);
+
+  it("does not call a PDF with a visible but unreadable text layer scanned (#4951)", async () => {
+    const res = await runTool(makeUnreadableFontPdf(), "glyph-ids.pdf");
+    expect(res.statusCode).toBe(202);
+    const row = await settledJobRow(JSON.parse(res.body).jobId);
+    expect(row.status).toBe("failed");
+    const error = row.error as { message?: string; code?: string } | null;
+    expect(error?.code).toBe("NO_TEXT_LAYER");
+    expect(error?.message).toMatch(/has a text layer/);
+    expect(error?.message).toMatch(/OCR/);
+    expect(error?.message).not.toMatch(/scanned|image-only|pictures/);
   }, 90_000);
 
   it("flags a batch where every file is scanned so the UI can offer OCR", async () => {

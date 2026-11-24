@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 80cc0a21a8e2
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 9d996ff7366d
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### कन्वर्ज़न प्रीसेट {#conversion-presets}
 
-साझा कैटलॉग में 83 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
+साझा कैटलॉग में 121 समर्पित कन्वर्ज़न प्रीसेट एंडपॉइंट शामिल हैं, जैसे `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, और `excel-to-csv`। प्रीसेट प्रथम-श्रेणी के टूल रूट हैं:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 प्रत्येक प्रीसेट आउटपुट फ़ॉर्मेट को लॉक करता है और किसी बेस टूल को सौंपता है, जैसे `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, या `convert-spreadsheet`। संपूर्ण रूट तालिका और वैकल्पिक सेटिंग्स के लिए [कन्वर्ज़न प्रीसेट](/hi/tools/conversion-presets) देखें।
+
+कम्प्रेशन प्रीसेट भी इसी तरह काम करते हैं। `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` और `compress-image-to-500kb` `compress` चलाते हैं; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` और `compress-pdf-to-2mb` `compress-pdf` चलाते हैं। हर प्रीसेट `mode` को `targetSize` पर और `targetSizeKb` को अपने नाम में दिए साइज़ पर लॉक कर देता है।
 
 ### आवश्यक चीज़ें {#essentials}
 
@@ -195,6 +197,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | टूल ID | नाम | AI मॉडल | मुख्य सेटिंग्स |
 |---------|------|---------|-------------|
 | `remove-background` | बैकग्राउंड हटाएँ | rembg (BiRefNet / U2-Net) | चरण 1: `model`, `edgeRefine` (0-3), `decontaminate`। चरण 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, और पाइपलाइन: `backgroundType` (transparent/color/gradient/blur, साथ ही `/effects` पर image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | GIF बैकग्राउंड हटाएँ | rembg, फ़्रेम दर फ़्रेम | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | इमेज अपस्केलिंग | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ऑब्जेक्ट इरेज़र | LaMa (ONNX) | मास्क दूसरे फ़ाइल भाग के रूप में भेजा जाता है (फ़ील्डनाम `mask`), `format`, `quality` |
 | `ocr` | OCR / टेक्स्ट एक्सट्रैक्शन | Tesseract (तेज़); RapidOCR + PP-OCR ONNX (संतुलित/सर्वोत्तम) | `quality` (तेज़/संतुलित/सर्वोत्तम), `language`, `enhance` |
@@ -238,6 +241,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `histogram` | हिस्टोग्राम | `scale` (linear/log) - RGB हिस्टोग्राम चार्ट + प्रति-चैनल आँकड़े लौटाता है |
 | `lqip-placeholder` | LQIP प्लेसहोल्डर | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | बारकोड जेनरेटर | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं। |
+| `aspect-ratio-calculator` | आस्पेक्ट रेशियो कैलकुलेटर | `width`, `height`, `newWidth`, `newHeight`, `round` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
 
 ### लेआउट और कंपोज़िशन {#layout-composition}
 
@@ -249,6 +253,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `border` | बॉर्डर और फ़्रेम | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | स्क्रीनशॉट सुंदर बनाएँ | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | सर्कल क्रॉप | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | गोल कोनों वाला क्रॉप | `shape` (rounded-square/squircle), `cornerRadius` (0-50, छोटी भुजा का प्रतिशत), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | इमेज पैड | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | स्प्राइट शीट | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - मल्टी-फ़ाइल (2-64 इमेज) |
 
@@ -267,7 +272,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `convert-video` | वीडियो कन्वर्ट करें | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | वीडियो कम्प्रेस करें | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | वीडियो ट्रिम करें | `startS`, `endS`, `precise` (bool, फ़्रेम-सटीक कट) |
+| `trim-video` | वीडियो ट्रिम करें | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, फ़्रेम-सटीक कट) |
 | `mute-video` | वीडियो म्यूट करें | - |
 | `video-to-gif` | वीडियो से GIF | `fps` (1-30), `width`, `startS`, `durationS` (अधिकतम 60s) |
 | `resize-video` | वीडियो रीसाइज़ करें | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `stabilize-video` | वीडियो स्थिर करें | `smoothing` (5-60, फ़्रेम में) |
 | `gif-to-video` | GIF से वीडियो | `format` (mp4/webm/mov) |
 | `video-to-webp` | वीडियो से WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | वीडियो से AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (अधिकतम 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | वीडियो से फ़्रेम | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | वीडियो मर्ज करें | - (मल्टी-फ़ाइल, पहले वीडियो के रिज़ॉल्यूशन पर नॉर्मलाइज़्ड) |
 | `replace-audio` | ऑडियो बदलें | - (वीडियो + ऑडियो फ़ाइल, दो फ़ाइलें) |
 | `burn-subtitles` | सबटाइटल बर्न करें | `fontSize` (8-72) - वीडियो + सबटाइटल फ़ाइल |
 | `embed-subtitles` | सबटाइटल एम्बेड करें | `language` (ISO 639-2/B कोड) - वीडियो + सबटाइटल फ़ाइल |
 | `extract-subtitles` | सबटाइटल निकालें | - (SRT आउटपुट करता है) |
+| `convert-subtitles` | सबटाइटल कन्वर्ट करें | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | इमेज से वीडियो | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - मल्टी-फ़ाइल |
 | `video-metadata` | वीडियो मेटाडेटा साफ़ करें | - |
 | `auto-subtitles` | ऑटो सबटाइटल (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | टूल ID | नाम | मुख्य सेटिंग्स |
 |---------|------|-------------|
 | `convert-audio` | ऑडियो कन्वर्ट करें | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | ऑडियो ट्रिम करें | `startS`, `endS` |
+| `trim-audio` | ऑडियो ट्रिम करें | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | वॉल्यूम समायोजित करें | `gainDb` (-30 से 30) |
 | `normalize-audio` | ऑडियो नॉर्मलाइज़ करें | - (EBU R128, -16 LUFS) |
 | `fade-audio` | ऑडियो फ़ेड करें | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `extract-pages` | पेज निकालें | `range` (qpdf सिंटैक्स, जैसे "1-5,8,10-z") |
 | `remove-pages` | पेज हटाएँ | `pages` (हटाने के लिए qpdf रेंज) |
 | `organize-pdf` | PDF व्यवस्थित करें | `order` (qpdf पेज क्रम, जैसे "3,1,2,5-z") |
+| `multi-tool-pdf` | PDF मल्टी-टूल | `items` (पेज प्लान, `[{doc, page, rot}]`, अधिकतम 1200 पेज), `pageCounts` - मल्टी-फ़ाइल (20 PDF तक) |
 | `protect-pdf` | PDF सुरक्षित करें | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | PDF अनलॉक करें | `password` |
 | `repair-pdf` | PDF रिपेयर करें | - |
@@ -335,6 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `grayscale-pdf` | PDF ग्रेस्केल | - |
 | `pdfa-convert` | PDF/A कन्वर्ट | - (आर्काइवल PDF/A-2) |
 | `crop-pdf` | PDF क्रॉप करें | `margin` (0-2000 पॉइंट) |
+| `resize-pdf-pages` | PDF पेज का आकार बदलें | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | बुकलेट PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF वॉटरमार्क करें | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `sign-pdf` | PDF साइन करें | PDF `file`, सिग्नेचर फ़ाइलें `sig0`, `sig1`, और `placements` JSON ऐरे के साथ कस्टम मल्टीपार्ट रूट |
 | `pdf-to-text` | PDF से टेक्स्ट | - |
 | `pdf-to-word` | PDF से Word | - |
-| `pdf-metadata` | PDF मेटाडेटा | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF से Markdown | - (`.md` फ़ाइल लौटाता है) |
+| `pdf-metadata` | PDF मेटाडेटा | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | डॉक्यूमेंट कन्वर्ट करें | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | प्रेज़ेंटेशन कन्वर्ट करें | `format` (pptx/odp) |
 | `convert-spreadsheet` | स्प्रेडशीट कन्वर्ट करें | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `json-xml` | JSON से XML | `pretty` (bool) - द्विदिशात्मक |
 | `split-csv` | CSV स्प्लिट करें | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV मर्ज करें | - (मल्टी-फ़ाइल, मेल खाते कॉलम) |
+| `merge-text` | टेक्स्ट फ़ाइलें मर्ज | `separator` (blank-line/rule/filename-heading) - मल्टी-फ़ाइल, 2-50 फ़ाइलें |
 | `yaml-json` | YAML / JSON | - (द्विदिशात्मक) |
 | `xml-to-csv` | XML से CSV | - (दोहराए जाने वाले तत्व स्वतः खोजता है) |
+| `convert-font` | फ़ॉन्ट कन्वर्ट | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | केस बदलें | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47 टैग)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
+| `proportion-calculator` | अनुपात कैलकुलेटर | `a`, `b`, `c`, `mode` (direct/inverse)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; छूटा हुआ मान लौटाता है। |
+| `base64` | Base64 एनकोड / डिकोड | `text`, `mode` (encode/decode), `urlSafe` (bool)। JSON बॉडी, कोई फ़ाइल अपलोड नहीं; बदला हुआ टेक्स्ट लौटाता है। |
 | `excel-to-csv` | Excel से CSV | `convert-spreadsheet` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `otf-to-ttf` | OTF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff-to-ttf` | WOFF से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `woff2-to-ttf` | WOFF2 से TTF | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
+| `ttf-to-woff2` | TTF से WOFF2 | `convert-font` द्वारा समर्थित समर्पित कन्वर्ज़न प्रीसेट |
 | `create-zip` | ZIP बनाएँ | - (मल्टी-फ़ाइल, 2-50 फ़ाइलें) |
 | `extract-zip` | ZIP निकालें | - (bomb-संरक्षित) |
 
@@ -396,6 +415,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | कस्टम व्यूपोर्ट चौड़ाई 320-3840 |
 | `viewportHeight` | number | `720` | कस्टम व्यूपोर्ट ऊँचाई 320-2160 |
+| `clientJobId` | string | (स्वतः बनाया गया) | आपकी अपनी जॉब आईडी, ताकि जवाब आने से पहले आप प्रोग्रेस स्ट्रीम खोल सकें |
 
 **उदाहरण:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+कैप्चर एक कतारबद्ध जॉब के रूप में चलता है। अगर यह सिंक्रोनस प्रतीक्षा अवधि के भीतर पूरा हो जाए, तो आपको ऊपर वाला परिणाम `200` के साथ मिलता है। धीमा कैप्चर `{"jobId":"...","async":true}` के साथ `202` लौटाता है; इसे [प्रोग्रेस ट्रैकिंग](#progress-tracking) में बताए अनुसार फ़ॉलो करें। 2.3.0 तक यह एंडपॉइंट हमेशा इंतज़ार करता था और `200` लौटाता था, इसलिए जो स्क्रिप्ट केवल `200` संभालती हैं, उन्हें `202` भी संभालना चाहिए।
 
 ### टूल सब-रूट {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ curl http://localhost:1349/api/v1/jobs/<jobId> \
 | `GET` | `/api/v1/files/:id/download` | फ़ाइल डाउनलोड करें |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG थंबनेल प्राप्त करें |
 | `DELETE` | `/api/v1/files` | फ़ाइलें और उनकी संस्करण श्रृंखलाएँ बल्क में हटाएँ (बॉडी: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | कई फ़ाइलें एक ZIP के रूप में download करें (बॉडी: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | URL-आधारित आयात के लिए रिमोट URL को वर्कस्पेस में लाएँ |
 | `POST` | `/api/v1/preview` | एक ब्राउज़र-संगत WebP प्रीव्यू जेनरेट करें (HEIC/HEIF/RAW फ़ॉर्मेट के लिए) |
 | `GET` | `/api/v1/files/:id/preview` | किसी सहेजी गई PDF, ऑफ़िस डॉक्यूमेंट, वीडियो, या ऑडियो फ़ाइल के लिए कैश किया गया या जेनरेट किया गया ब्राउज़र-संगत प्रीव्यू स्ट्रीम करें |

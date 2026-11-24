@@ -3,7 +3,7 @@ import { ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
-import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
+import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -106,12 +106,15 @@ export function registerImagePad(app: FastifyInstance) {
       async (inputBuffer, settings, filename) => {
         // A transparent background forces a container with alpha. PNG is that
         // container for a still, but it cannot hold frames, so an animation goes
-        // to WebP instead of being flattened (#1083). No quality for the forced
-        // PNG: Sharp reads it as palette quantisation, which dithers the padded
-        // image (#710).
+        // to WebP instead of being flattened (#1083), and a multi-page TIFF stays
+        // TIFF, which holds alpha too (#4877). No quality for the forced PNG:
+        // Sharp reads it as palette quantisation, which dithers the padded image
+        // (#710).
+        const resolved = await resolveOutputFormat(inputBuffer, filename);
         const outputFormat =
-          settings.background !== "transparent"
-            ? await resolveOutputFormat(inputBuffer, filename)
+          settings.background !== "transparent" ||
+          (await isMultiPageTiff(inputBuffer, resolved.format))
+            ? resolved
             : (await isAnimated(inputBuffer))
               ? outputFormatFor("webp", 95)
               : outputFormatFor("png");
@@ -119,7 +122,7 @@ export function registerImagePad(app: FastifyInstance) {
         // The blur background composites the original over a blurred canvas, and
         // a composite lands on the first frame only, so animation is handled a
         // frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           const meta = await sharp(source).metadata();
           const w = meta.width ?? 1;
           const h = meta.height ?? 1;
@@ -174,16 +177,13 @@ export function registerImagePad(app: FastifyInstance) {
               .toBuffer();
           }
 
-          return await sharp(buf)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          return await sharp(buf).toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;
         try {
           buffer =
-            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-            (await core(inputBuffer));
+            (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }

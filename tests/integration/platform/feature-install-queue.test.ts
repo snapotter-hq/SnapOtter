@@ -1270,6 +1270,33 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(detail?.error).toMatch(/mem_limit/);
   });
 
+  it("maps a SIGKILL from the OOM killer to the out-of-memory explanation (#4884)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+    const child = hoisted.spawnCalls[0];
+
+    // pip's progress on stdout must not replace the memory hint.
+    child.stdout.emit("data", Buffer.from("Collecting torch\n"));
+    child.emit("close", null, "SIGKILL");
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toMatch(/insufficient memory/i);
+    expect(detail?.error).toMatch(/mem_limit/);
+  });
+
+  it("names the signal when the installer is stopped by one (#4884)", async () => {
+    await postInstall("transcription");
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+
+    hoisted.spawnCalls[0].emit("close", null, "SIGTERM");
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    const detail = await getFeatureDetail("transcription");
+    expect(detail?.error).toBe("Install was stopped by signal SIGTERM");
+  });
+
   it("filters progress-bar noise out of the reported failure lines", async () => {
     await postInstall("transcription");
     await waitFor(() => hoisted.spawnCalls.length === 1);
@@ -1473,6 +1500,8 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
         action: "install_failed",
         error_kind: "timeout",
       });
+      const detail = await getFeatureDetail("transcription");
+      expect(detail?.error).not.toMatch(/insufficient memory/i);
     } finally {
       vi.unstubAllGlobals();
       env.INSTALL_STALL_MS = originalStall;
@@ -1604,5 +1633,174 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  describe("cancel (#4763)", () => {
+    async function postCancel(bundleId: string) {
+      return app.inject({
+        method: "POST",
+        url: `/api/v1/admin/features/${bundleId}/install/cancel`,
+        headers: auth(),
+      });
+    }
+
+    async function jobStatus(jobId: string): Promise<string | undefined> {
+      const { db, schema } = await import("../../../apps/api/src/db/index.js");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await db
+        .select({ status: schema.jobs.status })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      return row?.status;
+    }
+
+    it("stops a running install mid-download, settles the job as canceled, and starts the next", async () => {
+      const r1 = await postInstall("transcription");
+      const { jobId } = JSON.parse(r1.body) as { jobId: string };
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+      emitInstallerLine(child, { progress: 40, stage: "Downloading... 1.0 GB" });
+      const r2 = await postInstall("face-detection");
+      expect(JSON.parse(r2.body).queued).toBe(true);
+
+      const res = await postCancel("transcription");
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({ canceled: true, jobId });
+      expect(child.kill).toHaveBeenCalledWith("SIGINT");
+
+      // The installer cleans up and exits non-zero on SIGINT.
+      child.emit("close", 1, null);
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("canceled"));
+      const detail = await getFeatureDetail("transcription");
+      expect(detail?.status).toBe("not_installed");
+      expect(detail?.error ?? null).toBeNull();
+      expect(hoisted.reportErrorMock).not.toHaveBeenCalled();
+
+      await waitFor(() => hoisted.spawnCalls.length === 2);
+      expect(hoisted.spawnCalls[1].bundleId).toBe("face-detection");
+      hoisted.spawnCalls[1].emit("close", 0);
+      await waitFor(() => queue.getActiveBundleId() === null);
+    });
+
+    it("refuses to stop an installer that holds the venv writer lock", async () => {
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await waitFor(() => child.stdin.writes.length === 1);
+
+      const res = await postCancel("transcription");
+      expect(res.statusCode).toBe(409);
+      expect(JSON.parse(res.body).code).toBe("FEATURE_INSTALL_BUSY");
+      expect(child.kill).not.toHaveBeenCalled();
+
+      // Once the installer hands the lock back, the cancel goes through.
+      emitInstallerLine(child, { venvLock: "release" });
+      expect((await postCancel("transcription")).statusCode).toBe(200);
+      expect(child.kill).toHaveBeenCalledWith("SIGINT");
+      child.emit("close", 1, null);
+      await waitFor(() => queue.getActiveBundleId() === null);
+    });
+
+    it("never grants the venv lock to an installer canceled while it waited for it", async () => {
+      hoisted.acquireVenvLockMock.mockImplementationOnce(realVenvLock.acquireVenvLock);
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+
+      const runningJob = realVenvLock.tryAcquireVenvRead();
+      expect(runningJob).not.toBeNull();
+      emitInstallerLine(child, { venvLock: "acquire" });
+      await tick();
+
+      expect((await postCancel("transcription")).statusCode).toBe(200);
+      runningJob?.();
+      await tick();
+      expect(child.stdin.writes).toEqual([]);
+      const nextJob = realVenvLock.tryAcquireVenvRead();
+      expect(nextJob).not.toBeNull();
+      nextJob?.();
+
+      child.emit("close", 1, null);
+      await waitFor(() => queue.getActiveBundleId() === null);
+    });
+
+    it("drops a queued install so it never starts", async () => {
+      await postInstall("transcription");
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const r2 = await postInstall("face-detection");
+      const { jobId } = JSON.parse(r2.body) as { jobId: string };
+
+      const res = await postCancel("face-detection");
+      expect(res.statusCode).toBe(200);
+      expect(await jobStatus(jobId)).toBe("canceled");
+      expect(queue.getQueuedBundleIds()).toEqual([]);
+
+      // The close handler pumps synchronously, so a surviving entry would
+      // already have spawned here.
+      hoisted.spawnCalls[0].emit("close", 0);
+      await waitFor(() => queue.getActiveBundleId() === null);
+      expect(hoisted.spawnCalls).toHaveLength(1);
+    });
+
+    it("cancels through the generic jobs cancel by the install job id", async () => {
+      const { requestCancel } = await import("../../../apps/api/src/jobs/cancel.js");
+      const res = await postInstall("transcription");
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      const child = hoisted.spawnCalls[0];
+
+      expect(await requestCancel(jobId)).toBe(true);
+      expect(child.kill).toHaveBeenCalledWith("SIGINT");
+      child.emit("close", 1, null);
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("canceled"));
+      expect(await requestCancel(jobId)).toBe(false);
+    });
+
+    it("keeps an install that finished as the signal landed", async () => {
+      const res = await postInstall("transcription");
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+
+      expect((await postCancel("transcription")).statusCode).toBe(200);
+      hoisted.spawnCalls[0].emit("close", 0, null);
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("completed"));
+    });
+
+    it("answers 409 when the bundle is not installing and 404 for an unknown bundle", async () => {
+      const idle = await postCancel("transcription");
+      expect(idle.statusCode).toBe(409);
+      expect(JSON.parse(idle.body).error).toMatch(/not installing/);
+      expect((await postCancel("definitely-not-a-bundle")).statusCode).toBe(404);
+    });
+
+    it("refuses to cancel an Accurate OCR install that has started", async () => {
+      let finishDownload: (() => void) | undefined;
+      hoisted.downloadVerifiedRuntimeReleaseMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishDownload = () =>
+              resolve({
+                artifact: { target: "linux-amd64-cpu-py312" },
+                canonicalIndex: Buffer.from("index"),
+                archiveFile: "ocr.tar.gz",
+                archiveSha256: "a".repeat(64),
+                archiveSize: 1,
+                archiveExpandedSize: 1,
+                indexPath: "/tmp/index.json",
+                archivePath: "/tmp/archive.tar.gz",
+              });
+          }),
+      );
+      await postInstall("ocr");
+      await waitFor(() => finishDownload !== undefined);
+
+      const res = await postCancel("ocr");
+      expect(res.statusCode).toBe(409);
+      expect(JSON.parse(res.body).error).toMatch(/Accurate OCR/);
+
+      finishDownload?.();
+      await waitFor(() => queue.getActiveBundleId() === null);
+    });
   });
 });

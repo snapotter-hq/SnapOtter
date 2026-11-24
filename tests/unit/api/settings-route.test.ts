@@ -830,6 +830,7 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
       };
     });
     vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      analyticsConsentPending: () => false,
       refreshAnalyticsGate: refreshAnalyticsGateSpy,
       publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
     }));
@@ -1283,6 +1284,7 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
       isEnterpriseFeatureEnabled: async () => true,
     }));
     vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      analyticsConsentPending: () => false,
       refreshAnalyticsGate: refreshAnalyticsGateSpy,
       publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
     }));
@@ -1384,6 +1386,7 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
       isEnterpriseFeatureEnabled: async () => true,
     }));
     vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      analyticsConsentPending: () => false,
       refreshAnalyticsGate: refreshAnalyticsGateSpy,
       publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
     }));

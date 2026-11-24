@@ -472,7 +472,7 @@ Er is een aanvullend analyse-endpoint beschikbaar op `POST /api/v1/tools/image/i
 **Toolroute:** `content-aware-resize`  
 **Engine:** Go `caire`-binary (geen Python: geen GPU-voordeel)
 
-Wijzigt op intelligente wijze het formaat van afbeeldingen door naden met lage energie te verwijderen, met behoud van belangrijke inhoud.
+Wijzigt op intelligente wijze het formaat van afbeeldingen door naden met lage energie te verwijderen of in te voegen, met behoud van belangrijke inhoud. Elke zijde kan groeien tot maximaal het dubbele van de oorspronkelijke grootte.
 
 | Parameter | Type | Standaard | Beschrijving |
 |-----------|------|---------|-------------|

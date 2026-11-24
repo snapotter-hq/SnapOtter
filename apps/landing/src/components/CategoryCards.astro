@@ -78,6 +78,9 @@ const cards = MODALITIES.map((m) => {
     {cards.map((c) => (
       <a
         href={localizeHref(locale, `/tools/${c.section}/`)}
+        data-cta="category-card"
+        data-cta-location="hero"
+        data-cta-detail={c.section}
         class="group flex flex-col rounded-2xl p-4 text-start no-underline shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
         style={`background-color: ${c.color}; color: ${c.id === "image" ? "#1A1814" : "#FFFFFF"}`}
       >

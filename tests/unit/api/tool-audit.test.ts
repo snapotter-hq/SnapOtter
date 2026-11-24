@@ -447,6 +447,20 @@ describe("tool-audit helpers (#3973)", () => {
         await emitInlineRequestAuditIfNeeded(req as never, 200, "{}");
       }
 
+      // Passport Photo's analyze sends a tool_used step (#4886) but is not a
+      // run, so the audit log still counts only generate.
+      const analyzeReq = makeRequest();
+      enterToolRequestAuditContext(analyzeReq as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: analyzeReq.ip,
+        requestId: analyzeReq.id,
+        toolId: "passport-photo",
+        subRoute: "analyze",
+        startTime: Date.now(),
+      });
+      await emitInlineRequestAuditIfNeeded(analyzeReq as never, 200, "{}");
+
       const unauthReq = makeRequest();
       enterToolRequestAuditContext(unauthReq as never, {
         userId: null,

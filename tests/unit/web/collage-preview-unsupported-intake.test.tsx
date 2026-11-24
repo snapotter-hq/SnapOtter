@@ -168,6 +168,8 @@ describe("CollagePreview rejects non-image files (#2863)", () => {
     fireEvent.click(addButton);
     expect(inputs).toHaveLength(1);
     const pickerInput = inputs[0];
+    // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+    expect(pickerInput.isConnected).toBe(true);
 
     const abortSpy = vi.fn();
     const run = beginCollageRun(abortSpy);
@@ -258,6 +260,8 @@ describe("CollagePreview rejects non-image files (#2863)", () => {
     );
     expect(inputs).toHaveLength(1);
     const pickerInput = inputs[0];
+    // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+    expect(pickerInput.isConnected).toBe(true);
 
     const abortSpy = vi.fn();
     const run = beginCollageRun(abortSpy);

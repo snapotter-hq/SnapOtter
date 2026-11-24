@@ -1,10 +1,12 @@
+import { cpuFitDimensions, cpuFitRefuses } from "@snapotter/shared";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
-import { useFileStore } from "@/stores/file-store";
+import { useFeaturesStore } from "@/stores/features-store";
+import { type FileEntry, useFileStore } from "@/stores/file-store";
 
 const QUICK_SCALES = [2, 3, 4, 6, 8];
 const MODEL_OPTIONS = [
@@ -211,9 +213,84 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
   );
 }
 
+/**
+ * Says when a CPU-only server reduced the input before upscaling it (#4820),
+ * so a result smaller than expected isn't a mystery.
+ */
+export function UpscaleCpuResizeNote({ resizedTo }: { resizedTo: unknown }) {
+  const { t } = useTranslation();
+  const size = resizedTo as { width?: unknown; height?: unknown } | null | undefined;
+  if (typeof size?.width !== "number" || typeof size?.height !== "number") return null;
+  return (
+    <p className="text-xs text-foreground" data-testid="upscale-cpu-resized-note">
+      {format(t.toolSettings.upscale.cpuResizedNote, { width: size.width, height: size.height })}
+    </p>
+  );
+}
+
+interface UpscaleCpuFitHintProps {
+  width: number | null;
+  height: number | null;
+  scale: number;
+  model: string | undefined;
+  /** The server's CPU ceiling; null when a GPU may run it or the server didn't say. */
+  maxCpuMp: number | null;
+}
+
+/**
+ * Warns before the run that a CPU-only server will reduce this image first
+ * (#5036), using the server's own fit so 6x and 8x match too. Silent when the
+ * image fits, when a GPU may run it, or when the server will refuse instead
+ * (its error explains that). The server stays the source of truth: right
+ * after boot it can still be guessing about the GPU.
+ */
+export function UpscaleCpuFitHint({
+  width,
+  height,
+  scale,
+  model,
+  maxCpuMp,
+}: UpscaleCpuFitHintProps) {
+  const { t } = useTranslation();
+  if (maxCpuMp == null || !width || !height) return null;
+  const fit = cpuFitDimensions(width, height, scale, model, maxCpuMp);
+  if (!fit || cpuFitRefuses(width, height, scale, fit)) return null;
+  return (
+    <p className="text-xs text-foreground" data-testid="upscale-cpu-fit-hint">
+      {format(t.toolSettings.upscale.cpuFitHint, { width: fit.width, height: fit.height })}
+    </p>
+  );
+}
+
+/**
+ * The selected image's pixel size. Server-preview formats (HEIC, RAW) carry
+ * the original size on the entry because their blobUrl is a capped preview;
+ * plain formats are probed from the blobUrl, which is the file itself.
+ */
+function useEntryDimensions(entry: FileEntry | undefined) {
+  const blobUrl = entry?.blobUrl ?? null;
+  const [probed, setProbed] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    setProbed(null);
+    if (!blobUrl) return;
+    const img = new Image();
+    img.onload = () => setProbed({ width: img.naturalWidth, height: img.naturalHeight });
+    img.src = blobUrl;
+    return () => {
+      img.onload = null;
+    };
+  }, [blobUrl]);
+  if (entry?.originalWidth != null && entry?.originalHeight != null) {
+    return { width: entry.originalWidth, height: entry.originalHeight };
+  }
+  return probed;
+}
+
 export function UpscaleSettings() {
   const { t } = useTranslation();
-  const { files } = useFileStore();
+  const { files, currentEntry } = useFileStore();
+  const upscaleCpuMaxMp = useFeaturesStore((s) => s.upscaleCpuMaxMp);
+  const dimensions = useEntryDimensions(currentEntry);
   const {
     processFiles,
     processAllFiles,
@@ -223,6 +300,7 @@ export function UpscaleSettings() {
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   } = useToolProcessor("upscale");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
@@ -241,6 +319,14 @@ export function UpscaleSettings() {
     <div className="space-y-4">
       <UpscaleControls onChange={setSettings} />
 
+      <UpscaleCpuFitHint
+        width={dimensions?.width ?? null}
+        height={dimensions?.height ?? null}
+        scale={(settings.scale as number) ?? 2}
+        model={settings.model as string | undefined}
+        maxCpuMp={upscaleCpuMaxMp}
+      />
+
       {/* Error */}
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
@@ -254,6 +340,11 @@ export function UpscaleSettings() {
             {format(t.toolSettings.upscale.upscaledKb, { size: (processedSize / 1024).toFixed(1) })}
           </p>
         </div>
+      )}
+
+      {/* Single-file only, like the download link; resultPayload outlives a file swap, downloadUrl does not */}
+      {!hasMultiple && downloadUrl && (
+        <UpscaleCpuResizeNote resizedTo={resultPayload?.inputResizedTo} />
       )}
 
       {/* Process buttons / progress */}

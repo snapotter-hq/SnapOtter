@@ -1,7 +1,7 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: 955525a9893e
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: c8d7e73291c7
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Presets de conversão {#conversion-presets}
 
-O catálogo compartilhado inclui 83 endpoints dedicados a presets de conversão, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. Os presets são rotas de ferramentas de primeira classe:
+O catálogo compartilhado inclui 121 endpoints dedicados a presets de conversão, como `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. Os presets são rotas de ferramentas de primeira classe:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Cada preset trava o formato de saída e delega a uma ferramenta base como `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` ou `convert-spreadsheet`. Consulte [Presets de conversão](/pt-BR/tools/conversion-presets) para a tabela completa de rotas e as configurações opcionais.
+
+Os presets de compressão funcionam da mesma forma. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` e `compress-image-to-500kb` executam `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` e `compress-pdf-to-2mb` executam `compress-pdf`. Cada um trava `mode` em `targetSize` e `targetSizeKb` no tamanho indicado no nome.
 
 ### Essenciais {#essentials}
 
@@ -195,6 +197,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | ID da ferramenta | Nome | Modelo de IA | Principais configurações |
 |---------|------|---------|-------------|
 | `remove-background` | Remover Fundo | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` e pipelines: `backgroundType` (transparent/color/gradient/blur, além de image em `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Remover Fundo de GIF | rembg, quadro a quadro | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Ampliação de Imagem | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Apagador de Objetos | LaMa (ONNX) | Máscara enviada como segunda parte de arquivo (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Extração de texto | Tesseract (rápido); RapidOCR + PP-OCR ONNX (equilibrado/melhor) | `quality` (rápido/equilibrado/melhor), `language`, `enhance` |
@@ -238,6 +241,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `histogram` | Histograma | `scale` (linear/log) - retorna o gráfico de histograma RGB + estatísticas por canal |
 | `lqip-placeholder` | Placeholder LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Gerador de Código de Barras | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Corpo JSON, sem upload de arquivo. |
+| `aspect-ratio-calculator` | Calculadora de proporção | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Corpo JSON, sem upload de arquivo; retorna o valor que falta. |
 
 ### Layout e Composição {#layout-composition}
 
@@ -249,6 +253,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `border` | Borda e Moldura | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Embelezar Captura de Tela | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Recorte Circular | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Recorte Arredondado | `shape` (rounded-square/squircle), `cornerRadius` (0-50, porcentagem do lado menor), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Preencher Imagem | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - múltiplos arquivos (2-64 imagens) |
 
@@ -267,7 +272,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 |---------|------|-------------|
 | `convert-video` | Converter Vídeo | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Comprimir Vídeo | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Cortar Vídeo | `startS`, `endS`, `precise` (bool, corte com precisão de quadro) |
+| `trim-video` | Cortar Vídeo | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, corte com precisão de quadro) |
 | `mute-video` | Silenciar Vídeo | - |
 | `video-to-gif` | Vídeo para GIF | `fps` (1-30), `width`, `startS`, `durationS` (máx. 60s) |
 | `resize-video` | Redimensionar Vídeo | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `stabilize-video` | Estabilizar Vídeo | `smoothing` (5-60, em quadros) |
 | `gif-to-video` | GIF para Vídeo | `format` (mp4/webm/mov) |
 | `video-to-webp` | Vídeo para WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Vídeo para AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (máx. 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Vídeo para Quadros | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Mesclar Vídeos | - (múltiplos arquivos, normalizados para a resolução do primeiro vídeo) |
 | `replace-audio` | Substituir Áudio | - (vídeo + arquivo de áudio, dois arquivos) |
 | `burn-subtitles` | Gravar Legendas | `fontSize` (8-72) - vídeo + arquivo de legenda |
 | `embed-subtitles` | Incorporar Legendas | `language` (código ISO 639-2/B) - vídeo + arquivo de legenda |
 | `extract-subtitles` | Extrair Legendas | - (gera SRT) |
+| `convert-subtitles` | Converter Legendas | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Imagens para Vídeo | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - múltiplos arquivos |
 | `video-metadata` | Limpar Metadados de Vídeo | - |
 | `auto-subtitles` | Legendas Automáticas (IA) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | ID da ferramenta | Nome | Principais configurações |
 |---------|------|-------------|
 | `convert-audio` | Converter Áudio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Cortar Áudio | `startS`, `endS` |
+| `trim-audio` | Cortar Áudio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Ajustar Volume | `gainDb` (-30 a 30) |
 | `normalize-audio` | Normalizar Áudio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fade de Áudio | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `extract-pages` | Extrair Páginas | `range` (sintaxe qpdf, ex. "1-5,8,10-z") |
 | `remove-pages` | Remover Páginas | `pages` (intervalo qpdf a remover) |
 | `organize-pdf` | Organizar PDF | `order` (ordem de páginas qpdf, ex. "3,1,2,5-z") |
+| `multi-tool-pdf` | Ferramenta multifuncional de PDF | `items` (plano de páginas, `[{doc, page, rot}]`, até 1200 páginas), `pageCounts` - múltiplos arquivos (até 20 PDFs) |
 | `protect-pdf` | Proteger PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Desbloquear PDF | `password` |
 | `repair-pdf` | Reparar PDF | - |
@@ -335,6 +343,7 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `grayscale-pdf` | PDF em Tons de Cinza | - |
 | `pdfa-convert` | Converter para PDF/A | - (PDF/A-2 para arquivamento) |
 | `crop-pdf` | Recortar PDF | `margin` (0-2000 pontos) |
+| `resize-pdf-pages` | Redimensionar páginas PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | PDF em Livreto | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Marca-d'água em PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `sign-pdf` | Assinar PDF | Rota multipart personalizada com o PDF `file`, arquivos de assinatura `sig0`, `sig1` e o array JSON `placements` |
 | `pdf-to-text` | PDF para Texto | - |
 | `pdf-to-word` | PDF para Word | - |
-| `pdf-metadata` | Metadados de PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF para Markdown | - (gera um arquivo `.md`) |
+| `pdf-metadata` | Metadados de PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Converter Documento | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Converter Apresentação | `format` (pptx/odp) |
 | `convert-spreadsheet` | Converter Planilha | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ Todas as ferramentas de IA rodam no seu hardware: CPU por padrão ou NVIDIA CUDA
 | `json-xml` | JSON para XML | `pretty` (bool) - bidirecional |
 | `split-csv` | Dividir CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Mesclar CSVs | - (múltiplos arquivos, colunas correspondentes) |
+| `merge-text` | Mesclar arquivos de texto | `separator` (blank-line/rule/filename-heading) - múltiplos arquivos, 2-50 arquivos |
 | `yaml-json` | YAML / JSON | - (bidirecional) |
 | `xml-to-csv` | XML para CSV | - (encontra automaticamente elementos repetidos) |
+| `convert-font` | Converter Fonte | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Converter maiúsculas e minúsculas | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Corpo JSON, sem upload de arquivo; retorna o texto convertido. |
+| `proportion-calculator` | Calculadora de proporção | `a`, `b`, `c`, `mode` (direct/inverse). Corpo JSON, sem upload de arquivo; retorna o valor que falta. |
+| `base64` | Codificar / decodificar Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corpo JSON, sem upload de arquivo; retorna o texto convertido. |
 | `excel-to-csv` | Excel para CSV | preset de conversão dedicado, baseado em `convert-spreadsheet` |
+| `otf-to-ttf` | OTF para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `woff-to-ttf` | WOFF para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `woff2-to-ttf` | WOFF2 para TTF | preset de conversão dedicado, baseado em `convert-font` |
+| `ttf-to-woff2` | TTF para WOFF2 | preset de conversão dedicado, baseado em `convert-font` |
 | `create-zip` | Criar ZIP | - (múltiplos arquivos, 2-50 arquivos) |
 | `extract-zip` | Extrair ZIP | - (protegido contra bomb) |
 
@@ -396,6 +415,7 @@ Captura uma página web como imagem. Diferente de outras ferramentas, este endpo
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Largura personalizada da viewport 320-3840 |
 | `viewportHeight` | number | `720` | Altura personalizada da viewport 320-2160 |
+| `clientJobId` | string | (gerado) | Seu próprio ID de job, para abrir o stream de progresso antes de a resposta chegar |
 
 **Exemplo:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+A captura é executada como um job na fila. Se terminar dentro da janela de espera síncrona, você recebe o resultado acima com `200`. Uma captura mais lenta responde `202` com `{"jobId":"...","async":true}`; acompanhe-a como descrito em [Acompanhamento de progresso](#progress-tracking). Até a versão 2.3.0 este endpoint sempre esperava e respondia `200`, então scripts que tratam apenas `200` também devem tratar `202`.
 
 ### Sub-rotas de ferramentas {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ Armazenamento persistente de arquivos com histórico de versões.
 | `GET` | `/api/v1/files/:id/download` | Baixa o arquivo |
 | `GET` | `/api/v1/files/:id/thumbnail` | Obtém a miniatura JPEG de 300px |
 | `DELETE` | `/api/v1/files` | Exclui arquivos em massa e suas cadeias de versões (corpo: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Baixa vários arquivos em um único ZIP (corpo: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Busca URLs remotas para o workspace para importações baseadas em URL |
 | `POST` | `/api/v1/preview` | Gera uma prévia WebP compatível com navegador (para formatos HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Transmite uma prévia em cache ou gerada, compatível com navegador, para um PDF, documento office, vídeo ou arquivo de áudio salvo |

@@ -1,8 +1,8 @@
 ---
 description: "إعادة تحجيم بنحت الشقوق تضيف أو تزيل بكسلات على طول المسارات الأقل أهمية للحفاظ على المحتوى الأساسي والوجوه."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 98ba7932c1cf
+i18n_output_hash: fce766a119f9
 ---
 
 # Content-Aware Resize {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 98ba7932c1cf
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**المعالجة:** متزامنة (تُعيد النتيجة مباشرة)
+**المعالجة:** غير متزامنة (تُرجع 202، استعلم عن `/api/v1/jobs/{jobId}/progress` لمعرفة الحالة عبر SSE)
 
 **حزمة النموذج:** لا حاجة إليها للتشغيل الأساسي. تستخدم حماية الوجوه حزمة `face-detection` (200-300 ميغابايت) إذا كانت مفعّلة.
 
@@ -39,24 +39,40 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Response (200 OK) {#response-200-ok}
+## الاستجابة {#response}
+
+### الاستجابة الأولية (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### النتيجة النهائية (عبر SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notes {#notes}
 
-- يُعيد هذا المسار المخصص حاليًا استجابة 200 متزامنة.
 - يستخدم مكتبة نحت الشقوق `caire` لإعادة التحجيم المدركة للمحتوى.
-- يقلّل الأبعاد فقط (يزيل الشقوق). لا يمكنه توسيع الصورة إلى ما وراء حجمها الأصلي.
+- يصغّر الأبعاد بإزالة الشقوق أو يكبّرها بإدراجها. يمكن أن يزيد كل جانب حتى ضعف حجمه الأصلي كحد أقصى.
 - يستخدم خيار `protectFaces` اكتشاف الوجوه بالذكاء الاصطناعي لتحديد مناطق الوجه كذات طاقة عالية، مما يمنع مرور الشقوق عبر الوجوه.
 - يتحكّم `blurRadius` في التنعيم قبل حساب خريطة الطاقة. القيم الأعلى تجعل خريطة الطاقة أكثر تجانسًا، مما قد يساعد مع الصور المشوّشة.
 - يؤثّر `sobelThreshold` في مدى حدّة اكتشاف الحواف. القيم الأقل تحافظ على مزيد من الحواف الخفيفة.

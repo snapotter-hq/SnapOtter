@@ -1,6 +1,5 @@
 ###############################################################################
-# Test infrastructure - run with:
-#   docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit
+# Test infrastructure - run with `pnpm test:docker` (scripts/test-docker.sh)
 ###############################################################################
 name: snapotter-test
 services:
@@ -54,6 +53,26 @@ services:
         # runner fails closed before the suite starts. Host CI runs them too.
         "--exclude",
         "**/tests/unit/scripts/node-test-suites.test.ts",
+        # More repo-audit specs (#4921): the first four list tracked files or
+        # resolve the git dir, the last two read *.md files the dockerignore
+        # prunes. tests/unit/infra/docker-test-excludes.test.ts keeps the git
+        # and testcontainer cases on this list.
+        "--exclude",
+        "**/tests/unit/docs/no-em-dashes.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/tracked-file-size.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/vitest-collection-scope.test.ts",
+        "--exclude",
+        "**/tests/unit/agent-hooks/hooks.test.mjs",
+        "--exclude",
+        "**/tests/unit/docs/aio-workspace-docs.test.ts",
+        "--exclude",
+        "**/tests/unit/infra/release-version-policy.test.ts",
+        # Starts its own Redis testcontainer, and there is no Docker socket in
+        # this container. Host CI runs it.
+        "--exclude",
+        "**/tests/integration/platform/worker-error-backoff.test.ts",
       ]
     environment:
       - NODE_ENV=test
@@ -82,11 +101,13 @@ services:
       # One vitest fork bounds peak memory on a 7GB CI runner; the 90-minute
       # job budget absorbs the slower serial run.
       - VITEST_MAX_FORKS=1
-      # Dockerfile.test bakes PyMuPDF into /app/.venv. This turns a suite that
-      # can't find it into a failure, not a lane of silently skipped fitz
-      # tests (#1610). Setting PYTHON_VENV_PATH here would point the suite
-      # away from that venv.
+      # Dockerfile.test bakes PyMuPDF, pikepdf and pdf2docx into /app/.venv.
+      # These turn a suite that can't find one into a failure, not a lane of
+      # silently skipped tests (#1610, #1612). Setting PYTHON_VENV_PATH here
+      # would point the suite away from that venv.
       - REQUIRE_PYTHON_FITZ=1
+      - REQUIRE_PYTHON_PIKEPDF=1
+      - REQUIRE_PYTHON_PDF2DOCX=1
     # No tmpfs: the tools write multi-megapixel encodes and video transcodes to
     # WORKSPACE_PATH and /tmp, and a RAM-backed mount made that scratch count
     # against the 7GB runner alongside the app, Postgres, and Redis, which

@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 9ef22f278d64
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 8945c7c5ea1a
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preset Konversi {#conversion-presets}
 
-Katalog bersama menyertakan 83 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
+Katalog bersama menyertakan 121 endpoint preset konversi khusus seperti `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg`, dan `excel-to-csv`. Preset adalah rute tool kelas satu:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Setiap preset mengunci format keluaran dan mendelegasikan ke tool dasar seperti `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster`, atau `convert-spreadsheet`. Lihat [Preset Konversi](/id/tools/conversion-presets) untuk tabel rute lengkap dan pengaturan opsional.
+
+Preset kompresi bekerja dengan cara yang sama. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` dan `compress-image-to-500kb` menjalankan `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` dan `compress-pdf-to-2mb` menjalankan `compress-pdf`. Masing-masing mengunci `mode` ke `targetSize` dan `targetSizeKb` ke ukuran yang tertera pada namanya.
 
 ### Esensial {#essentials}
 
@@ -195,6 +197,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | ID Tool | Nama | Model AI | Pengaturan utama |
 |---------|------|---------|-------------|
 | `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, dan pipeline: `backgroundType` (transparent/color/gradient/blur, ditambah image pada `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Hapus Latar Belakang GIF | rembg, frame demi frame | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask dikirim sebagai bagian file kedua (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstraksi Teks | Tesseract (cepat); RapidOCR + PP-OCR ONNX (seimbang/terbaik) | `quality` (cepat/seimbang/terbaik), `language`, `enhance` |
@@ -238,6 +241,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `histogram` | Histogram | `scale` (linear/log) - mengembalikan grafik histogram RGB + statistik per kanal |
 | `lqip-placeholder` | LQIP Placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcode Generator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Body JSON, tanpa unggah file. |
+| `aspect-ratio-calculator` | Kalkulator rasio aspek | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
 
 ### Tata Letak & Komposisi {#layout-composition}
 
@@ -249,6 +253,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `border` | Border & Frame | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Beautify Screenshot | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Circle Crop | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Potong Membulat | `shape` (rounded-square/squircle), `cornerRadius` (0-50, persen dari sisi terpendek), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Image Pad | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite Sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 gambar) |
 
@@ -267,7 +272,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 |---------|------|-------------|
 | `convert-video` | Convert Video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Compress Video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Trim Video | `startS`, `endS`, `precise` (bool, potongan akurat per frame) |
+| `trim-video` | Trim Video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, potongan akurat per frame) |
 | `mute-video` | Mute Video | - |
 | `video-to-gif` | Video to GIF | `fps` (1-30), `width`, `startS`, `durationS` (maks 60d) |
 | `resize-video` | Resize Video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `stabilize-video` | Stabilize Video | `smoothing` (5-60, dalam frame) |
 | `gif-to-video` | GIF to Video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video to WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video ke AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (maks 60d), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video to Frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Merge Videos | - (multi-file, dinormalisasi ke resolusi video pertama) |
 | `replace-audio` | Replace Audio | - (file video + audio, dua file) |
 | `burn-subtitles` | Burn Subtitles | `fontSize` (8-72) - file video + subtitle |
 | `embed-subtitles` | Embed Subtitles | `language` (kode ISO 639-2/B) - file video + subtitle |
 | `extract-subtitles` | Extract Subtitles | - (menghasilkan SRT) |
+| `convert-subtitles` | Konversi Subtitle | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Images to Video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-file |
 | `video-metadata` | Clean Video Metadata | - |
 | `auto-subtitles` | Auto Subtitles (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | ID Tool | Nama | Pengaturan utama |
 |---------|------|-------------|
 | `convert-audio` | Convert Audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Trim Audio | `startS`, `endS` |
+| `trim-audio` | Trim Audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Volume Adjust | `gainDb` (-30 hingga 30) |
 | `normalize-audio` | Normalize Audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Fade Audio | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `extract-pages` | Extract Pages | `range` (sintaks qpdf, mis. "1-5,8,10-z") |
 | `remove-pages` | Remove Pages | `pages` (rentang qpdf yang akan dihapus) |
 | `organize-pdf` | Organize PDF | `order` (urutan halaman qpdf, mis. "3,1,2,5-z") |
+| `multi-tool-pdf` | Alat Serbaguna PDF | `items` (rencana halaman, `[{doc, page, rot}]`, hingga 1200 halaman), `pageCounts` - multi-file (hingga 20 PDF) |
 | `protect-pdf` | Protect PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Unlock PDF | `password` |
 | `repair-pdf` | Repair PDF | - |
@@ -335,6 +343,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `grayscale-pdf` | Grayscale PDF | - |
 | `pdfa-convert` | PDF/A Convert | - (PDF/A-2 arsip) |
 | `crop-pdf` | Crop PDF | `margin` (0-2000 poin) |
+| `resize-pdf-pages` | Ubah Ukuran Halaman PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Watermark PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `sign-pdf` | Sign PDF | Rute multipart kustom dengan PDF `file`, file tanda tangan `sig0`, `sig1`, dan array JSON `placements` |
 | `pdf-to-text` | PDF to Text | - |
 | `pdf-to-word` | PDF to Word | - |
-| `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF ke Markdown | - (mengembalikan file `.md`) |
+| `pdf-metadata` | PDF Metadata | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Convert Document | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Convert Presentation | `format` (pptx/odp) |
 | `convert-spreadsheet` | Convert Spreadsheet | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 | `json-xml` | JSON to XML | `pretty` (bool) - dua arah |
 | `split-csv` | Split CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Merge CSVs | - (multi-file, kolom yang cocok) |
+| `merge-text` | Gabung File Teks | `separator` (blank-line/rule/filename-heading) - multi-file, 2-50 file |
 | `yaml-json` | YAML / JSON | - (dua arah) |
 | `xml-to-csv` | XML to CSV | - (menemukan elemen berulang secara otomatis) |
+| `convert-font` | Konversi Font | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Ubah Huruf Besar/Kecil | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
+| `proportion-calculator` | Kalkulator Perbandingan | `a`, `b`, `c`, `mode` (direct/inverse). Body JSON, tanpa unggah file; mengembalikan nilai yang hilang. |
+| `base64` | Encode / Decode Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Body JSON, tanpa unggah file; mengembalikan teks hasil konversi. |
 | `excel-to-csv` | Excel to CSV | preset konversi khusus yang didukung oleh `convert-spreadsheet` |
+| `otf-to-ttf` | OTF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff-to-ttf` | WOFF to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `woff2-to-ttf` | WOFF2 to TTF | preset konversi khusus yang didukung oleh `convert-font` |
+| `ttf-to-woff2` | TTF to WOFF2 | preset konversi khusus yang didukung oleh `convert-font` |
 | `create-zip` | Create ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Extract ZIP | - (terlindungi dari bomb) |
 
@@ -396,6 +415,7 @@ Tangkap halaman web sebagai gambar. Tidak seperti tool lain, endpoint ini meneri
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Lebar viewport kustom 320-3840 |
 | `viewportHeight` | number | `720` | Tinggi viewport kustom 320-2160 |
+| `clientJobId` | string | (dibuat otomatis) | ID job milik Anda, agar Anda bisa membuka stream progres sebelum jawaban tiba |
 
 **Contoh:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+Penangkapan berjalan sebagai job dalam antrean. Jika selesai dalam jendela tunggu sinkron, Anda menerima hasil di atas dengan `200`. Penangkapan yang lebih lambat menjawab `202` dengan `{"jobId":"...","async":true}`; ikuti seperti dijelaskan di [Pelacakan Progres](#progress-tracking). Hingga versi 2.3.0 endpoint ini selalu menunggu dan menjawab `200`, jadi skrip yang hanya menangani `200` juga perlu menangani `202`.
 
 ### Sub-Rute Tool {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ Penyimpanan file persisten dengan riwayat versi.
 | `GET` | `/api/v1/files/:id/download` | Unduh file |
 | `GET` | `/api/v1/files/:id/thumbnail` | Dapatkan thumbnail JPEG 300px |
 | `DELETE` | `/api/v1/files` | Hapus massal file dan rantai versinya (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Unduh beberapa file sebagai satu ZIP (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Ambil URL jarak jauh ke dalam ruang kerja untuk impor berbasis URL |
 | `POST` | `/api/v1/preview` | Hasilkan pratinjau WebP yang kompatibel dengan peramban (untuk format HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Alirkan pratinjau yang di-cache atau dihasilkan yang kompatibel dengan peramban untuk file PDF, dokumen office, video, atau audio tersimpan |

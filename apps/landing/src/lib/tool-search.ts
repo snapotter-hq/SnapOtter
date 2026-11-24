@@ -1,4 +1,5 @@
 import { isJoinableFormat, normalizeSearchQuery } from "@snapotter/shared/search/format-aliases.js";
+import { filterRelevantTools } from "@snapotter/shared/search/relevance.js";
 
 export type ModalityFilter =
   | "all"
@@ -119,6 +120,7 @@ const KNOWN_CONVERSION_FORMAT_TOKENS = new Set([
   "gif",
   "heic",
   "heif",
+  "hif",
   "html",
   "image",
   "jpeg",
@@ -172,7 +174,7 @@ const BROAD_CONVERSION_FORMAT_TOKENS = new Set([
 const NOOP_FORMAT_ALIAS_GROUPS = [
   ["jpg", "jpeg", "jpe"],
   ["tif", "tiff"],
-  ["heic", "heif"],
+  ["heic", "heif", "hif"],
 ] as const;
 const NOOP_FORMAT_ALIAS_CANONICAL_BY_TOKEN = new Map<string, string>(
   NOOP_FORMAT_ALIAS_GROUPS.flatMap(([canonical, ...aliases]) =>
@@ -1034,6 +1036,32 @@ export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchRes
   };
 }
 
+/**
+ * A score above the threshold can come from one shared word ("text" in "curve
+ * text"), so every query word, or an alias of it, must also appear in the tool
+ * (#4899). Conversion queries skip this: scoreTool already zeroes any tool that
+ * can't convert in the asked direction. Generic converters name most of their
+ * formats only in acceptedInputs, so those count as words too ("orf to gif"
+ * keeps convert). Pass only scored candidates, since the filter drops typo
+ * matches whenever any input matches exactly.
+ */
+function relevantResults(rawQuery: string, candidates: ToolSearchResult[]): ToolSearchResult[] {
+  const query = buildQuery(rawQuery);
+  if (query.hasConversionIntent && query.conversionTargetTokens.length > 0) return candidates;
+  const byTool = new Map(
+    candidates.map((result) => [
+      {
+        ...result.item,
+        keywords: [...(result.item.keywords ?? []), ...result.item.acceptedInputs],
+      },
+      result,
+    ]),
+  );
+  return filterRelevantTools(rawQuery, [...byTool.keys()], TASK_ALIAS_GROUPS).flatMap(
+    (tool) => byTool.get(tool) ?? [],
+  );
+}
+
 export function searchTools(
   items: ToolSearchItem[],
   {
@@ -1061,11 +1089,12 @@ export function searchTools(
     };
   }
 
-  const sorted = [...scored].sort(compareResults);
+  const candidates = [...scored]
+    .sort(compareResults)
+    .filter((result) => result.score >= RELATED_SCORE_THRESHOLD);
+  const sorted = relevantResults(query, candidates);
   const resultMatches = sorted.filter((result) => result.score >= RESULT_SCORE_THRESHOLD);
-  const relatedMatches = sorted.filter(
-    (result) => result.score >= RELATED_SCORE_THRESHOLD && result.score < RESULT_SCORE_THRESHOLD,
-  );
+  const relatedMatches = sorted.filter((result) => result.score < RESULT_SCORE_THRESHOLD);
 
   return {
     results: resultMatches.slice(0, boundedLimit),

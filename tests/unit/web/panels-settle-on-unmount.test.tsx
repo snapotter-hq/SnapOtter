@@ -11,6 +11,7 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { AspectRatioCalculatorSettings } from "@/components/tools/aspect-ratio-calculator-settings";
 import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
 import { BeautifySettings } from "@/components/tools/beautify-settings";
 import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
@@ -580,6 +581,16 @@ interface FetchFileStorePanelCase {
 }
 
 const fetchFileStorePanels: FetchFileStorePanelCase[] = [
+  {
+    name: "aspect-ratio-calculator",
+    Panel: AspectRatioCalculatorSettings,
+    submitId: "aspect-ratio-calculator-submit",
+    needsSecondaryFile: false,
+    goodResponse: () =>
+      new Response(JSON.stringify({ ratio: "16:9", newWidth: null, newHeight: null }), {
+        status: 200,
+      }),
+  },
   {
     name: "barcode-generate",
     Panel: BarcodeGenerateSettings,
@@ -1661,7 +1672,9 @@ describe("own-store tool handlers abort and ignore late completions on store res
       usePassportPhotoStore.getState().reset();
     });
 
-    expect(fetchSignals[1]?.aborted).toBe(true);
+    // A generate stopped before its answer stays open so a late 202 can be
+    // canceled by clientJobId (#5115); the run still settles at once.
+    expect(fetchSignals[1]?.aborted).toBe(false);
     expect(usePassportPhotoStore.getState().generating).toBe(false);
 
     await act(async () => {
@@ -1721,7 +1734,9 @@ describe("own-store tool handlers abort and ignore late completions on store res
 
     useHtmlToImageStore.getState().reset();
 
-    expect(fetchSignals[0]?.aborted).toBe(true);
+    // A capture stopped before its answer stays open so a late 202 can be
+    // canceled by clientJobId (#5115); the run still settles at once.
+    expect(fetchSignals[0]?.aborted).toBe(false);
     expect(useHtmlToImageStore.getState().capturing).toBe(false);
 
     resolveCapture(

@@ -1,8 +1,8 @@
 ---
 description: "Schemat bazy danych PostgreSQL, tabele, migracje i procedury tworzenia kopii zapasowych dla SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: e30652f35103
+i18n_output_hash: 3fa4ef288199
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Aktywne sesje logowania. Każdy wiersz łączy token sesji z użytkownikiem.
 
 | Kolumna | Typ | Uwagi |
 |---|---|---|
-| `id` | varchar | Klucz główny (token sesji) |
+| `id` | varchar | Klucz główny (skrót SHA-256 tokenu sesji) |
 | `userId` | uuid | Klucz obcy do `users.id` |
 | `expiresAt` | timestamp | Czas wygaśnięcia |
 | `createdAt` | timestamp | Czas utworzenia |
@@ -189,6 +189,16 @@ W RDS, Supabase, Cloud SQL lub w dowolnym klastrze prowadzonym samodzielnie podz
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Następnie jako superużytkownik albo rola, która wykonała to `CREATE ROLE`, pozwól roli właściciela nią zarządzać:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Od Postgres 16 `CREATEROLE` pozwala roli zmieniać tylko role, które sama utworzyła albo na których ma `ADMIN OPTION`. SnapOtter zmienia hasło roli roboczej tylko wtedy, gdy przestaje ono pasować do `DATABASE_URL` (na przykład po rotacji), a bez tego uprawnienia taki start się nie powiedzie. `INHERIT FALSE, SET FALSE` przekazuje wyłącznie zarządzanie. Samo `WITH ADMIN OPTION` dałoby `snapotter` także uprawnienia roli roboczej. Postgres 15 i starsze nie potrzebują tego uprawnienia i odrzucają tę składnię, więc tam je pomiń.
+
+Gdy SnapOtter ustawia hasło, zapisuje weryfikator SCRAM-SHA-256, nawet jeśli `password_encryption` w klastrze ma wartość `md5`. Postgres akceptuje to przez wiersz `md5` w `pg_hba.conf`, ale pooler połączeń, który sam sprawdza skróty md5, nie zaloguje się jako rola robocza.
 
 Następnie należy przekazać SnapOtter oba ciągi połączenia, wskazujące ten sam host, port i bazę danych:
 

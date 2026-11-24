@@ -1,8 +1,8 @@
 ---
 description: "Skema database PostgreSQL, tabel, migrasi, dan prosedur backup untuk SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 23e987ca5c08
+i18n_output_hash: a0f4441b2aba
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Sesi login yang aktif. Setiap baris mengaitkan token sesi dengan seorang penggun
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | varchar | Primary key (token sesi) |
+| `id` | varchar | Kunci utama (hash SHA-256 dari token sesi) |
 | `userId` | uuid | Foreign key ke `users.id` |
 | `expiresAt` | timestamp | Waktu kedaluwarsa |
 | `createdAt` | timestamp | Waktu pembuatan |
@@ -189,6 +189,16 @@ Di RDS, Supabase, Cloud SQL, atau cluster apa pun yang Anda jalankan sendiri, pe
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Lalu, sebagai superuser atau peran yang menjalankan `CREATE ROLE` tersebut, izinkan peran pemilik mengelolanya:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Mulai Postgres 16, `CREATEROLE` hanya mengizinkan sebuah peran mengubah peran yang dibuatnya sendiri atau yang padanya ia memegang `ADMIN OPTION`. SnapOtter hanya mengubah kata sandi peran runtime ketika kata sandi itu tidak lagi cocok dengan `DATABASE_URL` (misalnya setelah rotasi), dan tanpa grant ini boot tersebut gagal. `INHERIT FALSE, SET FALSE` hanya menyerahkan pengelolaan, tidak lebih. `WITH ADMIN OPTION` biasa juga akan memberi `snapotter` hak istimewa peran runtime. Postgres 15 dan sebelumnya tidak memerlukan grant ini dan menolak sintaks tersebut, jadi lewati di sana.
+
+Saat SnapOtter menetapkan kata sandi, ia menyimpan verifier SCRAM-SHA-256, meskipun `password_encryption` klaster bernilai `md5`. Postgres menerimanya melalui baris `md5` di `pg_hba.conf`, tetapi connection pooler yang memeriksa hash md5 sendiri tidak dapat masuk sebagai peran runtime.
 
 Lalu berikan kedua connection string kepada SnapOtter, menunjuk ke host, port, dan database yang sama:
 

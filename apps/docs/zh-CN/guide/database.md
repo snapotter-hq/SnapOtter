@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的 PostgreSQL 数据库架构、表、迁移和备份流程。"
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 72b25076da96
+i18n_output_hash: 1e5732e25445
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter 使用 PostgreSQL 17 和 [Drizzle ORM](https://orm.drizzle.team/)（pg
 
 | 列 | 类型 | 备注 |
 |---|---|---|
-| `id` | varchar | 主键（会话令牌） |
+| `id` | varchar | 主键（会话令牌的 SHA-256 哈希） |
 | `userId` | uuid | 指向 `users.id` 的外键 |
 | `expiresAt` | timestamp | 过期时间 |
 | `createdAt` | timestamp | 创建时间 |
@@ -189,6 +189,16 @@ npx drizzle-kit migrate    # apply pending migrations
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+然后，以超级用户或执行了该 `CREATE ROLE` 的角色身份，让所有者角色管理它：
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+从 Postgres 16 起，`CREATEROLE` 只允许一个角色修改它自己创建的角色，或它持有 `ADMIN OPTION` 的角色。SnapOtter 只在运行时角色的密码与 `DATABASE_URL` 不再一致时（例如轮换之后）才修改它，没有这项授权，那次启动就会失败。`INHERIT FALSE, SET FALSE` 只移交管理权，别的都不给。单纯的 `WITH ADMIN OPTION` 还会让 `snapotter` 获得运行时角色的权限。Postgres 15 及更早版本不需要这项授权，也不接受这种语法，在那些版本上跳过即可。
+
+SnapOtter 设置密码时，即使集群的 `password_encryption` 是 `md5`，也会存储 SCRAM-SHA-256 验证器。Postgres 可以通过 `pg_hba.conf` 中的 `md5` 行接受它，但自行校验 md5 哈希的连接池无法以运行时角色登录。
 
 然后把两个连接字符串都交给 SnapOtter，指向相同的主机、端口和数据库：
 

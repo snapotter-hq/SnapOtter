@@ -6,6 +6,7 @@ import { logger } from "../../lib/logger.js";
 import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerAspectPad } from "./aspect-pad.js";
+import { registerAspectRatioCalculator } from "./aspect-ratio-calculator.js";
 import { registerAudioChannels } from "./audio-channels.js";
 import { registerAudioMetadata } from "./audio-metadata.js";
 import { registerAudioSpeed } from "./audio-speed.js";
@@ -13,6 +14,7 @@ import { registerAutoSubtitles } from "./auto-subtitles.js";
 import { registerBackgroundReplace } from "./background-replace.js";
 import { registerBarcodeGenerate } from "./barcode-generate.js";
 import { registerBarcodeRead } from "./barcode-read.js";
+import { registerBase64 } from "./base64.js";
 import { registerBeautify } from "./beautify.js";
 import { registerBlurBackground } from "./blur-background.js";
 import { registerBlurFaces } from "./blur-faces.js";
@@ -37,9 +39,12 @@ import { registerContentAwareResize } from "./content-aware-resize.js";
 import { registerConversionPresets } from "./conversion-presets.js";
 import { registerConvert } from "./convert.js";
 import { registerConvertAudio } from "./convert-audio.js";
+import { registerConvertCase } from "./convert-case.js";
 import { registerConvertDocument } from "./convert-document.js";
+import { registerConvertFont } from "./convert-font.js";
 import { registerConvertPresentation } from "./convert-presentation.js";
 import { registerConvertSpreadsheet } from "./convert-spreadsheet.js";
+import { registerConvertSubtitles } from "./convert-subtitles.js";
 import { registerConvertVideo } from "./convert-video.js";
 import { registerCreateZip } from "./create-zip.js";
 import { registerCrop } from "./crop.js";
@@ -85,6 +90,7 @@ import { registerMemeGenerator } from "./meme-generator.js";
 import { registerMergeAudio } from "./merge-audio.js";
 import { registerMergeCsvs } from "./merge-csvs.js";
 import { registerMergePdf } from "./merge-pdf.js";
+import { registerMergeText } from "./merge-text.js";
 import { registerMergeVideos } from "./merge-videos.js";
 import { registerMultiToolPdf } from "./multi-tool-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
@@ -100,6 +106,7 @@ import { registerPassportPhoto } from "./passport-photo.js";
 import { registerPdfMetadata } from "./pdf-metadata.js";
 import { registerPdfPageNumbers } from "./pdf-page-numbers.js";
 import { registerPdfToImage } from "./pdf-to-image.js";
+import { registerPdfToMarkdown } from "./pdf-to-markdown.js";
 import { registerPdfToText } from "./pdf-to-text.js";
 import { registerPdfToWord } from "./pdf-to-word.js";
 import { registerPdfaConvert } from "./pdfa-convert.js";
@@ -107,6 +114,7 @@ import { registerPitchShift } from "./pitch-shift.js";
 import { registerPixelate } from "./pixelate.js";
 import { registerPopularTools } from "./popular.js";
 import { registerPowerpointToPdf } from "./powerpoint-to-pdf.js";
+import { registerProportionCalculator } from "./proportion-calculator.js";
 import { registerProtectPdf } from "./protect-pdf.js";
 import { registerQrGenerate } from "./qr-generate.js";
 import { registerRedEyeRemoval } from "./red-eye-removal.js";
@@ -118,6 +126,7 @@ import { registerRepairPdf } from "./repair-pdf.js";
 import { registerReplaceAudio } from "./replace-audio.js";
 import { registerReplaceColor } from "./replace-color.js";
 import { registerResize } from "./resize.js";
+import { registerResizePdfPages } from "./resize-pdf-pages.js";
 import { registerResizeVideo } from "./resize-video.js";
 import { registerRestorePhoto } from "./restore-photo.js";
 import { registerReverseAudio } from "./reverse-audio.js";
@@ -153,6 +162,7 @@ import { registerVideoColor } from "./video-color.js";
 import { registerVideoLoudnorm } from "./video-loudnorm.js";
 import { registerVideoMetadata } from "./video-metadata.js";
 import { registerVideoSpeed } from "./video-speed.js";
+import { registerVideoToAvif } from "./video-to-avif.js";
 import { registerVideoToFrames } from "./video-to-frames.js";
 import { registerVideoToGif } from "./video-to-gif.js";
 import { registerVideoToWebp } from "./video-to-webp.js";
@@ -254,6 +264,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "qr-generate", register: registerQrGenerate },
     { id: "html-to-image", register: registerHtmlToImage },
     { id: "barcode-generate", register: registerBarcodeGenerate },
+    { id: "aspect-ratio-calculator", register: registerAspectRatioCalculator },
     { id: "barcode-read", register: registerBarcodeRead },
     { id: "image-to-base64", register: registerImageToBase64 },
 
@@ -296,6 +307,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "burn-subtitles", register: registerBurnSubtitles },
     { id: "change-fps", register: registerChangeFps },
     { id: "compress-video", register: registerCompressVideo },
+    { id: "convert-subtitles", register: registerConvertSubtitles },
     { id: "convert-video", register: registerConvertVideo },
     { id: "crop-video", register: registerCropVideo },
     { id: "embed-subtitles", register: registerEmbedSubtitles },
@@ -317,6 +329,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "video-to-frames", register: registerVideoToFrames },
     { id: "video-to-gif", register: registerVideoToGif },
     { id: "video-to-webp", register: registerVideoToWebp },
+    { id: "video-to-avif", register: registerVideoToAvif },
     { id: "watermark-video", register: registerWatermarkVideo },
 
     // Audio
@@ -360,6 +373,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "grayscale-pdf", register: registerGrayscalePdf },
     { id: "pdfa-convert", register: registerPdfaConvert },
     { id: "crop-pdf", register: registerCropPdf },
+    { id: "resize-pdf-pages", register: registerResizePdfPages },
     { id: "nup-pdf", register: registerNupPdf },
     { id: "booklet-pdf", register: registerBookletPdf },
     { id: "watermark-pdf", register: registerWatermarkPdf },
@@ -367,6 +381,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "flatten-pdf", register: registerFlattenPdf },
     { id: "redact-pdf", register: registerRedactPdf },
     { id: "pdf-to-text", register: registerPdfToText },
+    { id: "pdf-to-markdown", register: registerPdfToMarkdown },
     { id: "pdf-to-word", register: registerPdfToWord },
     { id: "pdf-metadata", register: registerPdfMetadata },
     { id: "powerpoint-to-pdf", register: registerPowerpointToPdf },
@@ -378,15 +393,20 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
 
     // Data Files
     { id: "chart-maker", register: registerChartMaker },
+    { id: "convert-font", register: registerConvertFont },
     { id: "create-zip", register: registerCreateZip },
     { id: "csv-excel", register: registerCsvExcel },
     { id: "csv-json", register: registerCsvJson },
     { id: "extract-zip", register: registerExtractZip },
     { id: "json-xml", register: registerJsonXml },
     { id: "merge-csvs", register: registerMergeCsvs },
+    { id: "merge-text", register: registerMergeText },
     { id: "split-csv", register: registerSplitCsv },
     { id: "xml-to-csv", register: registerXmlToCsv },
     { id: "yaml-json", register: registerYamlJson },
+    { id: "convert-case", register: registerConvertCase },
+    { id: "proportion-calculator", register: registerProportionCalculator },
+    { id: "base64", register: registerBase64 },
 
     // AI Tools
     { id: "background-replace", register: registerBackgroundReplace },

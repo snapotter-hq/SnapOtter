@@ -1,13 +1,14 @@
 ---
 description: "由 SnapOtter 工具目录生成的专用转换预设端点。"
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: 79839a307027
+i18n_output_hash: 22dc8d508c2e
+i18n_hash_version: 2
 ---
 
 # Conversion Presets {#conversion-presets}
 
-除了基础转换器工具外，SnapOtter 还提供 83 个专用的转换预设端点。每个预设锁定输出格式并委托给其基础处理流程，因此其行为、校验和输出约定与下面列出的基础工具一致。
+除了基础转换器工具外，SnapOtter 还提供 121 个专用的转换预设端点。每个预设锁定输出格式并委托给其基础处理流程，因此其行为、校验和输出约定与下面列出的基础工具一致。
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -93,6 +94,10 @@ i18n_output_hash: 79839a307027
 | `mp4-to-wav` | MP4 转 WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV 转 WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 转 OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT 转 VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT 转 SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS 转 SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT 转 ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Audio Presets {#audio-presets}
 
@@ -108,6 +113,36 @@ i18n_output_hash: 79839a307027
 | `wav-to-mp3` | WAV 转 MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | none |
 | `mp3-to-wav` | MP3 转 WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | none |
 | `flac-to-mp3` | FLAC 转 MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | none |
+| `mp3-to-flac` | MP3 转 FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | none |
+| `mp3-to-ogg` | MP3 转 OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | none |
+| `mp3-to-m4a` | MP3 转 M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | none |
+| `wav-to-flac` | WAV 转 FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | none |
+| `wav-to-ogg` | WAV 转 OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | none |
+| `wav-to-m4a` | WAV 转 M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | none |
+| `flac-to-wav` | FLAC 转 WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | none |
+| `flac-to-ogg` | FLAC 转 OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | none |
+| `flac-to-m4a` | FLAC 转 M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | none |
+| `ogg-to-flac` | OGG 转 FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | none |
+| `ogg-to-m4a` | OGG 转 M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | none |
+| `m4a-to-flac` | M4A 转 FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | none |
+| `m4a-to-ogg` | M4A 转 OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | none |
+| `aac-to-ogg` | AAC 转 OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | none |
+| `aac-to-m4a` | AAC 转 M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | none |
+| `opus-to-mp3` | Opus 转 MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | none |
+| `opus-to-wav` | Opus 转 WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | none |
+| `opus-to-flac` | Opus 转 FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | none |
+| `opus-to-ogg` | Opus 转 OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | none |
+| `opus-to-m4a` | Opus 转 M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | none |
+| `wma-to-mp3` | WMA 转 MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | none |
+| `wma-to-wav` | WMA 转 WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | none |
+| `wma-to-flac` | WMA 转 FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | none |
+| `wma-to-ogg` | WMA 转 OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | none |
+| `wma-to-m4a` | WMA 转 M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | none |
+| `aiff-to-mp3` | AIFF 转 MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | none |
+| `aiff-to-wav` | AIFF 转 WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | none |
+| `aiff-to-flac` | AIFF 转 FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | none |
+| `aiff-to-ogg` | AIFF 转 OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | none |
+| `aiff-to-m4a` | AIFF 转 M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | none |
 
 ## PDF Presets {#pdf-presets}
 
@@ -122,6 +157,10 @@ i18n_output_hash: 79839a307027
 | Preset ID | Converts | Route | Base tool | Accepted inputs | Optional settings |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel 转 CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`、`.xls` | none |
+| `otf-to-ttf` | OTF 转 TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF 转 TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 转 TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF 转 WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`、`.otf` | none |
 
 ## Notes {#notes}
 

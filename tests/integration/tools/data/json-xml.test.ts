@@ -79,6 +79,20 @@ describe("json-xml (pure JS, no skipIf)", () => {
     expect(ada).toBeDefined();
   }, 30_000);
 
+  it("renames JSON keys that aren't valid XML names (#4859)", async () => {
+    const json = Buffer.from(
+      JSON.stringify({ a: { "@_on": true, "first name": 1, "2024": 2, list: [[1, 2]] } }),
+    );
+    const res = await runTool("keys.json", json, { pretty: false });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    // JavaScript orders integer-like keys first, so "2024" leads.
+    expect(dl.payload).toBe(
+      '<a on="true"><_2024 key="2024">2</_2024><first_name key="first name">1</first_name>' +
+        "<list><item>1</item><item>2</item></list></a>",
+    );
+  }, 30_000);
+
   // Sentry NODE-A8: the XML builder and parser cap nesting at 100 levels and
   // throw a plain Error that used to read as our bug (#4378).
   function nestedJson(depth: number): Buffer {
@@ -125,4 +139,20 @@ describe("json-xml (pure JS, no skipIf)", () => {
     },
     30_000,
   );
+
+  // #4379: fast-xml-parser is lenient, so an unclosed root used to come back
+  // as a 200 with whatever it had read so far.
+  it("rejects XML with an unclosed root instead of returning partial JSON", async () => {
+    const res = await runTool(
+      "malformed.xml",
+      Buffer.from("<people><person><name>Ada</name></person>"),
+      {
+        pretty: true,
+      },
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(
+      "XML parse failed: Unclosed tag 'people'. (line 1, column 1)",
+    );
+  }, 30_000);
 });

@@ -742,6 +742,8 @@ function pickProjectFile(content: string, name = "bad.snapotter") {
   const fileInputs = createdFileInputs.filter((input) => input.type === "file");
   const input = fileInputs[fileInputs.length - 1];
   expect(input).toBeDefined();
+  // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+  expect(input.isConnected).toBe(true);
   const file = new File([content], name, { type: "application/json" });
   Object.defineProperty(input, "files", {
     value: [file],

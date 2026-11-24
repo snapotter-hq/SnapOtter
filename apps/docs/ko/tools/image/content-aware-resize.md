@@ -1,8 +1,8 @@
 ---
 description: "낮은 중요도 경로를 따라 픽셀을 추가하거나 제거하여 핵심 콘텐츠와 얼굴을 보존하는 심 카빙(seam-carving) 크기 조정입니다."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 5caaed80e2b8
+i18n_output_hash: 14aa91503ed2
 ---
 
 # 콘텐츠 인식 크기 조정 {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 5caaed80e2b8
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**처리 방식:** 동기(결과를 직접 반환)
+**처리 방식:** 비동기(202를 반환하며, SSE를 통해 `/api/v1/jobs/{jobId}/progress`에서 상태를 폴링)
 
 **모델 번들:** 기본 작동에는 필요하지 않습니다. 얼굴 보호가 활성화된 경우 `face-detection` 번들(200~300 MB)을 사용합니다.
 
@@ -39,24 +39,40 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## 응답 (200 OK) {#response-200-ok}
+## 응답 {#response}
+
+### 초기 응답 (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### 최종 결과 (SSE를 통해) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## 참고 사항 {#notes}
 
-- 이 사용자 지정 라우트는 현재 동기 200 응답을 반환합니다.
 - 콘텐츠 인식 크기 조정에 `caire` 심 카빙 라이브러리를 사용합니다.
-- 치수를 줄이기만 합니다(심 제거). 이미지를 원래 크기 이상으로 확장할 수 없습니다.
+- 심을 제거해 축소하거나 심을 삽입해 확대합니다. 각 변은 원래 크기의 최대 2배까지 늘어날 수 있습니다.
 - `protectFaces` 옵션은 AI 얼굴 감지를 사용하여 얼굴 영역을 고에너지로 표시하여 심이 얼굴을 통과하지 못하게 합니다.
 - `blurRadius`은(는) 에너지 맵 계산 전에 스무딩을 제어합니다. 값이 높을수록 에너지 맵이 더 균일해져 노이즈가 있는 이미지에 도움이 될 수 있습니다.
 - `sobelThreshold`은(는) 에지가 얼마나 공격적으로 감지되는지에 영향을 미칩니다. 값이 낮을수록 더 미묘한 에지를 보존합니다.

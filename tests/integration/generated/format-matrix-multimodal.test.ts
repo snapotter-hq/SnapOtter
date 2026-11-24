@@ -2,11 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { apiToolPath, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
+  isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import {
   buildGeneratedFixtureIndex,
@@ -17,7 +20,7 @@ import {
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -48,8 +51,11 @@ const ALL_FIXTURES = [...FIXTURES_BY_EXT.values()].flat();
 
 /** Tools that do NOT use the standard factory POST endpoint. */
 const CUSTOM_ROUTE_TOOLS = new Set([
+  "base64",
   "barcode-generate",
   "chart-maker",
+  "convert-case",
+  "proportion-calculator",
   "qr-generate",
   "passport-photo",
   "html-to-image",
@@ -61,6 +67,7 @@ const MULTI_INPUT_TOOLS = new Set([
   "merge-videos",
   "merge-audio",
   "merge-csvs",
+  "merge-text",
   "replace-audio",
   "burn-subtitles",
   "embed-subtitles",
@@ -162,7 +169,21 @@ describe("multi-modality tool x format matrix", () => {
       continue;
     }
 
-    describe.skipIf(isAiTool && !REQUIRE_AI_FEATURES)(toolId, () => {
+    const aiGate = isAiTool
+      ? requiredAiGate(toolId, {
+          requireAiFeatures: REQUIRE_AI_FEATURES,
+          firstMissingBundle: getFirstMissingBundleForTool,
+          dataDir: process.env.DATA_DIR,
+        })
+      : undefined;
+    if (aiGate?.kind === "fail") {
+      it(`${toolId} -- required AI bundle installed`, () => {
+        throw new Error(aiGate.reason);
+      });
+      continue;
+    }
+
+    describe.skipIf(aiGate?.kind === "skip")(toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {
         expectedAttempts: effectiveFixtures.length,
       });
@@ -326,8 +347,20 @@ describe("multi-modality tool x format matrix", () => {
               );
               accounting.accept();
             } catch (error) {
-              if (!isEngineUnavailableFailure(error)) throw error;
-              accounting.skip("missing-host-binary", `engine unavailable for ${fixture.filename}`);
+              if (isEngineUnavailableFailure(error)) {
+                accounting.skip(
+                  "missing-host-binary",
+                  `engine unavailable for ${fixture.filename}`,
+                );
+                return;
+              }
+              // A long tool refuses a bad file by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(payload.jobId as string), ALLOWED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
             }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();

@@ -2,7 +2,7 @@
  * Cooperative job cancellation via Redis pub/sub.
  *
  * - Workers call registerCancelable(jobId) on start and unregister on finish.
- * - requestCancel(jobId) handles seven states:
+ * - requestCancel(jobId) handles eight states:
  *   1. Batch parent (plain or pipeline-batch): flag the batch canceled and
  *      publish every runnable child id on the cancel channel; batch-finalize
  *      commits terminal state (#767, #771).
@@ -16,7 +16,9 @@
  *   5. Waiting/delayed: remove from queue, mark DB row canceled.
  *   6. Active (in a worker): publish the jobId on the cancel channel;
  *      the worker's AbortSignal fires and it cleans up.
- *   7. Terminal or absent: no-op, returns false.
+ *   7. AI feature bundle install: not a queue job, so it goes to the install
+ *      queue in the API process that runs it (#4763).
+ *   8. Terminal or absent: no-op, returns false.
  * - startCancelListener() subscribes to the cancel channel and fires
  *   registered AbortControllers.
  */
@@ -151,6 +153,7 @@ export async function stopCancelListener(): Promise<void> {
 
 /** Cancel metadata the routes stamp into jobs.settings at enqueue time. */
 interface CancelRowSettings {
+  featureInstall?: string;
   flowChildCount?: number;
   stepCount?: number;
   clientJobId?: string;
@@ -199,6 +202,13 @@ export async function requestCancel(jobId: string): Promise<boolean> {
     })
     .from(schema.jobs)
     .where(eq(schema.jobs.id, jobId));
+  if (row && (row.settings as CancelRowSettings | null)?.featureInstall) {
+    if (isTerminal(row.status)) return false;
+    // Imported on demand: the install queue lives in the API process with the
+    // feature routes, and worker-only processes never need them loaded.
+    const { cancelFeatureInstall } = await import("../routes/features.js");
+    return (await cancelFeatureInstall(jobId)).canceled;
+  }
   // A batch started with a clientJobId runs under a server id; the client
   // cancels by its own id, which lands on the alias row.
   const aliasTarget = row ? batchAliasTarget(row) : null;

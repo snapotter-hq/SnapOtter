@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: 8025b13e01d6
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: a12d1c342b33
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Preset di conversione {#conversion-presets}
 
-Il catalogo condiviso include 83 endpoint dedicati ai preset di conversione, come `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. I preset sono route degli strumenti di prima classe:
+Il catalogo condiviso include 121 endpoint dedicati ai preset di conversione, come `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` e `excel-to-csv`. I preset sono route degli strumenti di prima classe:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Ogni preset blocca il formato di output e delega a uno strumento di base come `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` o `convert-spreadsheet`. Vedi [Preset di conversione](/it/tools/conversion-presets) per la tabella completa delle route e le impostazioni facoltative.
+
+I preset di compressione funzionano allo stesso modo. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` e `compress-image-to-500kb` eseguono `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` e `compress-pdf-to-2mb` eseguono `compress-pdf`. Ognuno blocca `mode` su `targetSize` e `targetSizeKb` sulla dimensione indicata nel nome.
 
 ### Elementi essenziali {#essentials}
 
@@ -195,6 +197,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | ID strumento | Nome | Modello AI | Impostazioni principali |
 |---------|------|---------|-------------|
 | `remove-background` | Rimuovi sfondo | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` e pipeline: `backgroundType` (transparent/color/gradient/blur, più image su `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | Rimuovi sfondo GIF | rembg, fotogramma per fotogramma | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Upscaling immagini | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Gomma per oggetti | LaMa (ONNX) | Maschera inviata come secondo file part (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Estrazione testo | Tesseract (veloce); RapidOCR + PP-OCR ONNX (bilanciato/migliore) | `quality` (veloce/bilanciato/migliore), `language`, `enhance` |
@@ -238,6 +241,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `histogram` | Istogramma | `scale` (linear/log) - restituisce il grafico dell'istogramma RGB + statistiche per canale |
 | `lqip-placeholder` | Segnaposto LQIP | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Generatore di codici a barre | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). Corpo JSON, nessun caricamento di file. |
+| `aspect-ratio-calculator` | Calcolatore proporzioni | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). Corpo JSON, nessun caricamento di file; restituisce il valore mancante. |
 
 ### Layout e composizione {#layout-composition}
 
@@ -249,6 +253,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `border` | Bordo e cornice | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Abbellisci screenshot | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Ritaglio circolare | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Ritaglio Arrotondato | `shape` (rounded-square/squircle), `cornerRadius` (0-50, percentuale del lato più corto), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Spaziatura immagine | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Foglio sprite | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - multi-file (2-64 immagini) |
 
@@ -267,7 +272,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 |---------|------|-------------|
 | `convert-video` | Converti video | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Comprimi video | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Taglia video | `startS`, `endS`, `precise` (bool, taglio preciso al frame) |
+| `trim-video` | Taglia video | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, taglio preciso al frame) |
 | `mute-video` | Silenzia video | - |
 | `video-to-gif` | Video in GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Ridimensiona video | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `stabilize-video` | Stabilizza video | `smoothing` (5-60, in frame) |
 | `gif-to-video` | GIF in video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video in WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video in AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video in frame | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Unisci video | - (multi-file, normalizzato alla risoluzione del primo video) |
 | `replace-audio` | Sostituisci audio | - (file video + audio, due file) |
 | `burn-subtitles` | Incorpora sottotitoli | `fontSize` (8-72) - file video + sottotitoli |
 | `embed-subtitles` | Integra sottotitoli | `language` (codice ISO 639-2/B) - file video + sottotitoli |
 | `extract-subtitles` | Estrai sottotitoli | - (produce SRT) |
+| `convert-subtitles` | Converti Sottotitoli | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Immagini in video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - multi-file |
 | `video-metadata` | Pulisci metadati video | - |
 | `auto-subtitles` | Sottotitoli automatici (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | ID strumento | Nome | Impostazioni principali |
 |---------|------|-------------|
 | `convert-audio` | Converti audio | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Taglia audio | `startS`, `endS` |
+| `trim-audio` | Taglia audio | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Regola volume | `gainDb` (-30 a 30) |
 | `normalize-audio` | Normalizza audio | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Dissolvenza audio | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `extract-pages` | Estrai pagine | `range` (sintassi qpdf, es. "1-5,8,10-z") |
 | `remove-pages` | Rimuovi pagine | `pages` (intervallo qpdf da rimuovere) |
 | `organize-pdf` | Organizza PDF | `order` (ordine delle pagine qpdf, es. "3,1,2,5-z") |
+| `multi-tool-pdf` | Strumento multifunzione PDF | `items` (piano delle pagine, `[{doc, page, rot}]`, fino a 1200 pagine), `pageCounts` - multi-file (fino a 20 PDF) |
 | `protect-pdf` | Proteggi PDF | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | Sblocca PDF | `password` |
 | `repair-pdf` | Ripara PDF | - |
@@ -335,6 +343,7 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `grayscale-pdf` | PDF in scala di grigi | - |
 | `pdfa-convert` | Converti in PDF/A | - (PDF/A-2 di archiviazione) |
 | `crop-pdf` | Ritaglia PDF | `margin` (0-2000 punti) |
+| `resize-pdf-pages` | Ridimensiona pagine PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | PDF opuscolo | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | Filigrana PDF | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `sign-pdf` | Firma PDF | Route multipart personalizzata con PDF `file`, file di firma `sig0`, `sig1` e array JSON `placements` |
 | `pdf-to-text` | PDF in testo | - |
 | `pdf-to-word` | PDF in Word | - |
-| `pdf-metadata` | Metadati PDF | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF in Markdown | - (produce un file `.md`) |
+| `pdf-metadata` | Metadati PDF | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Converti documento | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Converti presentazione | `format` (pptx/odp) |
 | `convert-spreadsheet` | Converti foglio di calcolo | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ Tutti gli strumenti AI vengono eseguiti sul tuo hardware: CPU per impostazione p
 | `json-xml` | JSON in XML | `pretty` (bool) - bidirezionale |
 | `split-csv` | Dividi CSV | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | Unisci CSV | - (multi-file, colonne corrispondenti) |
+| `merge-text` | Unisci file di testo | `separator` (blank-line/rule/filename-heading) - multi-file, 2-50 file |
 | `yaml-json` | YAML / JSON | - (bidirezionale) |
 | `xml-to-csv` | XML in CSV | - (individua automaticamente gli elementi ripetuti) |
+| `convert-font` | Converti Font | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Cambia maiuscole/minuscole | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (tag BCP 47). Corpo JSON, nessun caricamento di file; restituisce il testo convertito. |
+| `proportion-calculator` | Calcolatore di proporzioni | `a`, `b`, `c`, `mode` (direct/inverse). Corpo JSON, nessun caricamento di file; restituisce il valore mancante. |
+| `base64` | Codifica / decodifica Base64 | `text`, `mode` (encode/decode), `urlSafe` (bool). Corpo JSON, nessun caricamento di file; restituisce il testo convertito. |
 | `excel-to-csv` | Excel in CSV | preset di conversione dedicato supportato da `convert-spreadsheet` |
+| `otf-to-ttf` | OTF in TTF | preset di conversione dedicato supportato da `convert-font` |
+| `woff-to-ttf` | WOFF in TTF | preset di conversione dedicato supportato da `convert-font` |
+| `woff2-to-ttf` | WOFF2 in TTF | preset di conversione dedicato supportato da `convert-font` |
+| `ttf-to-woff2` | TTF in WOFF2 | preset di conversione dedicato supportato da `convert-font` |
 | `create-zip` | Crea ZIP | - (multi-file, 2-50 file) |
 | `extract-zip` | Estrai ZIP | - (protetto da zip bomb) |
 
@@ -396,6 +415,7 @@ Cattura una pagina web come immagine. A differenza degli altri strumenti, questo
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Larghezza personalizzata del viewport 320-3840 |
 | `viewportHeight` | number | `720` | Altezza personalizzata del viewport 320-2160 |
+| `clientJobId` | string | (generato) | Il tuo ID del job, per aprire lo stream di avanzamento prima che arrivi la risposta |
 
 **Esempio:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+La cattura viene eseguita come job in coda. Se termina entro la finestra di attesa sincrona, ricevi il risultato sopra con `200`. Una cattura più lenta risponde `202` con `{"jobId":"...","async":true}`; seguila come descritto in [Monitoraggio dell'avanzamento](#progress-tracking). Fino alla versione 2.3.0 questo endpoint attendeva sempre e rispondeva `200`, quindi gli script che gestiscono solo `200` dovrebbero gestire anche `202`.
 
 ### Sotto-route degli strumenti {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ Archiviazione persistente dei file con cronologia delle versioni.
 | `GET` | `/api/v1/files/:id/download` | Scarica il file |
 | `GET` | `/api/v1/files/:id/thumbnail` | Ottiene una miniatura JPEG da 300px |
 | `DELETE` | `/api/v1/files` | Elimina in blocco i file e le loro catene di versioni (corpo: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Scarica più file in un unico ZIP (corpo: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Recupera URL remoti nello spazio di lavoro per importazioni basate su URL |
 | `POST` | `/api/v1/preview` | Genera un'anteprima WebP compatibile con il browser (per i formati HEIC/HEIF/RAW) |
 | `GET` | `/api/v1/files/:id/preview` | Trasmette in streaming un'anteprima compatibile con il browser, memorizzata nella cache o generata, per un file PDF, documento office, video o audio salvato |

@@ -28,6 +28,8 @@ import contextlib, importlib.util, io, json, os, sys, tempfile, types
 
 PYTHON_DIR = sys.argv[1]
 SCRIPTS = json.loads(sys.argv[2])
+# doc_markdown imports a helper from doc_text, as it does under the dispatcher.
+sys.path.insert(0, PYTHON_DIR)
 
 pymupdf = types.ModuleType("pymupdf")
 def _fail_redirect(**k):
@@ -61,6 +63,7 @@ with tempfile.TemporaryDirectory() as scratch:
 
     PAYLOADS = {
         "doc_flatten.py": {"path": dummy_in, "out": dummy_out},
+        "doc_markdown.py": {"path": dummy_in, "out": dummy_out},
         "doc_redact.py": {"path": dummy_in, "out": dummy_out, "terms": ["x"], "caseSensitive": False},
         "doc_scrub_meta.py": {"path": dummy_in, "out": dummy_out},
         "doc_sign.py": {"input": dummy_in, "output": dummy_out, "signatures": [dummy_in], "placements": [{"sig": 0, "page": 0, "x": 0, "y": 0, "w": 0.1, "h": 0.1}]},
@@ -96,6 +99,8 @@ import contextlib, importlib.machinery, importlib.util, io, json, os, sys, tempf
 
 PYTHON_DIR = sys.argv[1]
 SCRIPTS = json.loads(sys.argv[2])
+# doc_markdown imports a helper from doc_text, as it does under the dispatcher.
+sys.path.insert(0, PYTHON_DIR)
 
 pymupdf = types.ModuleType("pymupdf")
 pymupdf._stream = None
@@ -142,6 +147,7 @@ with tempfile.TemporaryDirectory() as scratch:
 
     PAYLOADS = {
         "doc_flatten.py": {"path": dummy_in, "out": dummy_out},
+        "doc_markdown.py": {"path": dummy_in, "out": dummy_out},
         "doc_redact.py": {"path": dummy_in, "out": dummy_out, "terms": ["x"], "caseSensitive": False},
         "doc_scrub_meta.py": {"path": dummy_in, "out": dummy_out},
         "doc_sign.py": {"input": dummy_in, "output": dummy_out, "signatures": [dummy_in], "placements": [{"sig": 0, "page": 0, "x": 0, "y": 0, "w": 0.1, "h": 0.1}]},

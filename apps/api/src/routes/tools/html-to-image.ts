@@ -2,10 +2,28 @@ import { randomUUID } from "node:crypto";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { captureHtml, capturePage, isBrowserAvailable } from "../../lib/browser-service.js";
+import { insertToolJobAlias } from "../../jobs/enqueue.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
+import {
+  type CaptureOptions,
+  captureHtml,
+  capturePage,
+  isBrowserAvailable,
+} from "../../lib/browser-service.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { putObject } from "../../lib/object-storage.js";
+import { resolveToolPool } from "../../lib/pool.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
+import { discardUnenqueuedUploads, settleUnenqueuedAlias } from "../../lib/upload-cleanup.js";
+import { InputValidationError } from "../../modality/contract.js";
+import { requireToolAccess } from "../../permissions.js";
+import {
+  enqueueAndAwaitToolJob,
+  registerDirectJobProcessFn,
+  type ToolProcessV2,
+} from "../tool-factory.js";
+
+const TOOL_ID = "html-to-image";
 
 const DEVICE_PRESETS = {
   desktop: { width: 1280, height: 720, isMobile: false },
@@ -13,16 +31,20 @@ const DEVICE_PRESETS = {
   mobile: { width: 375, height: 812, isMobile: true },
 } as const;
 
-const settingsSchema = z
-  .object({
-    url: z.string().url().optional(),
+const captureSettingsSchema = z.object({
+  url: z.string().url().optional(),
+  format: z.enum(["jpg", "png", "webp"]).default("png"),
+  quality: z.number().min(1).max(100).default(90),
+  fullPage: z.boolean().default(false),
+  devicePreset: z.enum(["desktop", "tablet", "mobile", "custom"]).default("desktop"),
+  viewportWidth: z.number().min(320).max(3840).default(1280),
+  viewportHeight: z.number().min(320).max(2160).default(720),
+});
+
+const settingsSchema = captureSettingsSchema
+  .extend({
     html: z.string().min(1).max(5_000_000).optional(),
-    format: z.enum(["jpg", "png", "webp"]).default("png"),
-    quality: z.number().min(1).max(100).default(90),
-    fullPage: z.boolean().default(false),
-    devicePreset: z.enum(["desktop", "tablet", "mobile", "custom"]).default("desktop"),
-    viewportWidth: z.number().min(320).max(3840).default(1280),
-    viewportHeight: z.number().min(320).max(2160).default(720),
+    clientJobId: z.string().optional(),
   })
   .refine((data) => data.url || data.html, {
     message: "Either url or html must be provided",
@@ -33,7 +55,86 @@ const settingsSchema = z
     path: ["url"],
   });
 
+/** What the job carries: the HTML itself travels as the job's input object. */
+export type CaptureSettings = z.infer<typeof captureSettingsSchema>;
+
+const CONTENT_TYPES = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
+const BROWSER_CRASHED = "BROWSER_CRASHED";
+
+/**
+ * Render the queued source. A URL capture reads `settings.url`; an HTML capture
+ * reads the input object, which holds the HTML the request sent. Failures keep
+ * the statuses the inline route answered: 504 for a page that never loaded, 503
+ * for a browser that is down, 422 for any other capture failure. The 504 carries
+ * PAGE_LOAD_TIMEOUT so the worker fails it once: a retry would hold the slot for
+ * another full page-load timeout on a page that already timed out.
+ */
+export const processHtmlToImage: ToolProcessV2 = async ({
+  inputs,
+  settings: raw,
+  signal,
+  report,
+}) => {
+  const settings = captureSettingsSchema.parse(raw);
+  const preset =
+    settings.devicePreset !== "custom"
+      ? DEVICE_PRESETS[settings.devicePreset]
+      : { width: settings.viewportWidth, height: settings.viewportHeight, isMobile: false };
+  const captureOpts: CaptureOptions = {
+    format: settings.format,
+    quality: settings.quality,
+    fullPage: settings.fullPage,
+    viewportWidth: preset.width,
+    viewportHeight: preset.height,
+    isMobile: preset.isMobile,
+    signal,
+  };
+
+  report(10, "Loading page");
+  let buffer: Buffer;
+  try {
+    buffer = settings.url
+      ? await capturePage(settings.url, captureOpts)
+      : await captureHtml(inputs[0].buffer.toString("utf8"), captureOpts);
+  } catch (err) {
+    // A cancel or the job deadline closed the page. The worker settles both
+    // from the signal, and a 422 here would hide the timeout as a bad capture.
+    if (signal.aborted) throw err;
+    if (hasServerErrorStatus(err)) throw err;
+    const message = err instanceof Error ? err.message : "Unknown error";
+    if (message.includes("Timeout") || message.includes("timeout")) {
+      throw new InputValidationError(
+        "Page took too long to load",
+        504,
+        stripInternalPaths(message),
+        "PAGE_LOAD_TIMEOUT",
+      );
+    }
+    if (message.includes("permanently disabled") || message.includes("temporarily unavailable")) {
+      throw new InputValidationError(
+        "Screenshot service is temporarily unavailable",
+        503,
+        undefined,
+        BROWSER_CRASHED,
+      );
+    }
+    throw new InputValidationError("Screenshot capture failed", 422, stripInternalPaths(message));
+  }
+  report(90, "Saving");
+
+  return {
+    buffer,
+    filename: `screenshot.${settings.format}`,
+    contentType: CONTENT_TYPES[settings.format],
+    // Nothing was uploaded, so there is no original to measure. The worker
+    // would otherwise report the size of the queued HTML or URL.
+    resultPayload: { originalSize: 0 },
+  };
+};
+
 export function registerHtmlToImage(app: FastifyInstance) {
+  registerDirectJobProcessFn(TOOL_ID, processHtmlToImage);
+
   app.post(
     "/api/v1/tools/image/html-to-image",
     {
@@ -42,6 +143,9 @@ export function registerHtmlToImage(app: FastifyInstance) {
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const authUser = await requireToolAccess(request, reply, TOOL_ID);
+      if (!authUser) return reply;
+
       const parsed = settingsSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
@@ -50,7 +154,13 @@ export function registerHtmlToImage(app: FastifyInstance) {
         });
       }
 
-      const settings = parsed.data;
+      const { html, clientJobId: clientJobIdRaw, ...settings } = parsed.data;
+
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw ?? null);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      const clientJobId = clientJobIdField ?? null;
 
       if (!isBrowserAvailable()) {
         return reply.status(503).send({
@@ -72,72 +182,51 @@ export function registerHtmlToImage(app: FastifyInstance) {
         }
       }
 
-      const preset =
-        settings.devicePreset !== "custom"
-          ? DEVICE_PRESETS[settings.devicePreset]
-          : {
-              width: settings.viewportWidth,
-              height: settings.viewportHeight,
-              isMobile: false,
-            };
-
+      const jobId = randomUUID();
+      const pool = resolveToolPool(TOOL_ID);
+      const enqueueState = { enqueued: false };
+      let aliasStamped = false;
       try {
-        const captureOpts = {
-          format: settings.format,
-          quality: settings.quality,
-          fullPage: settings.fullPage,
-          viewportWidth: preset.width,
-          viewportHeight: preset.height,
-          isMobile: preset.isMobile,
-        };
-
-        // Zod refine guarantees either url or html is present
-        const buffer = settings.html
-          ? await captureHtml(settings.html, captureOpts)
-          : await capturePage(settings.url ?? "", captureOpts);
-
-        const jobId = randomUUID();
-        const ext = settings.format;
-        const filename = `screenshot.${ext}`;
-        await putObject(`outputs/${jobId}/${filename}`, buffer);
-
-        return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${filename}`,
-          originalSize: 0,
-          processedSize: buffer.length,
-        });
-      } catch (err) {
-        if (hasServerErrorStatus(err)) throw err;
-        const message = err instanceof Error ? err.message : "Unknown error";
-
-        if (message.includes("Timeout") || message.includes("timeout")) {
-          request.log?.warn({ err, toolId: "html-to-image" }, "Screenshot capture timed out");
-          return reply.status(504).send({
-            error: "Page took too long to load",
-            details: stripInternalPaths(message),
-          });
+        // Stamp the client-facing alias before the upload so a cancel landing
+        // before the enqueue has a durable pointer to resolve (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool })) !== false;
         }
 
-        if (
-          message.includes("permanently disabled") ||
-          message.includes("temporarily unavailable")
-        ) {
-          request.log?.error(
-            { err, toolId: "html-to-image" },
-            "Screenshot browser service unavailable",
-          );
-          return reply.status(503).send({
-            error: "Screenshot service is temporarily unavailable",
-            code: "BROWSER_CRASHED",
-          });
-        }
+        // The worker needs an input object, and up to 5 MB of HTML has no
+        // business in the job's settings or its database row. A URL capture
+        // queues the URL itself so the job still has one.
+        const source = html ?? settings.url ?? "";
+        const filename = html ? "page.html" : "page.url";
+        const inputRef = `uploads/${jobId}/${filename}`;
+        await putObject(inputRef, Buffer.from(source, "utf8"));
 
-        request.log?.warn({ err, toolId: "html-to-image" }, "Screenshot capture failed");
-        return reply.status(422).send({
-          error: "Screenshot capture failed",
-          details: stripInternalPaths(message),
+        return await enqueueAndAwaitToolJob(request, reply, {
+          jobData: {
+            jobId,
+            toolId: TOOL_ID,
+            userId: authUser.id,
+            username: authUser.username,
+            requestIp: request.ip,
+            requestId: request.id,
+            pool,
+            inputRefs: [inputRef],
+            filename,
+            settings,
+            clientJobId: clientJobId ?? undefined,
+            kind: "tool",
+            analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+          },
+          inputFileCount: 0,
+          totalInputSize: 0,
+          state: enqueueState,
         });
+      } finally {
+        if (!enqueueState.enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+        }
       }
     },
   );

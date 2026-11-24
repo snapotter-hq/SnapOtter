@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getRequiredBundlesForTool, TOOL_OPTIONAL_BUNDLE_MAP } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
@@ -35,6 +36,19 @@ describe("generated QA harness contract", () => {
     expect(text).toContain("featureUnavailableDisposition");
   });
 
+  // #4443: under REQUIRE_AI_FEATURES=1 a bundle missing from DATA_DIR must
+  // fail the tool by name, not skip it or hide behind per-request 501s.
+  it.each([
+    "format-matrix-generated.shared.ts",
+    "format-matrix-multimodal.test.ts",
+    "settings-matrix.test.ts",
+  ])("%s gates AI tools on installed bundles through requiredAiGate", (filename) => {
+    const text = source(filename);
+    expect(text).toContain("requiredAiGate(toolId");
+    expect(text).toContain("firstMissingBundle: getFirstMissingBundleForTool");
+    expect(text).not.toMatch(/&& !REQUIRE_AI_FEATURES\)/);
+  });
+
   it("multimodal matrix consumes the shared image-inclusive fixture index", () => {
     const text = source("format-matrix-multimodal.test.ts");
     expect(text).toContain("generatedFixtureDirectories");
@@ -54,6 +68,18 @@ describe("generated QA harness contract", () => {
     );
   });
 
+  // A long tool's refusal of a bad file arrives as a failed job, not a 4xx
+  // response. Each 202 branch has to read the recorded status off the job row,
+  // or the refusal reads as a crash and accounting stops balancing (#5038).
+  it.each([
+    "format-matrix-generated.shared.ts",
+    "format-matrix-multimodal.test.ts",
+    "settings-matrix.test.ts",
+  ])("%s counts a recorded client-fault job failure as a rejection", (filename) => {
+    const text = source(filename);
+    expect(text).toContain("isRecordedRejection(await settledJobRow(");
+  });
+
   it("fuzz executes the exact requested run count instead of interrupting successfully", () => {
     const text = source("fuzz-settings.test.ts");
     expect(text).not.toContain("interruptAfterTimeLimit");
@@ -64,6 +90,25 @@ describe("generated QA harness contract", () => {
     const text = source("settings-pairwise.test.ts");
     expect(text).not.toContain("MAX_CASES_PER_TOOL");
     expect(text).not.toMatch(/\.slice\(0,/);
+  });
+
+  // The set skips a tool outright by default, so a tool listed without a
+  // feature bundle silently loses all its settings coverage (#4987).
+  it("settings matrix AI-gates only tools that have a feature bundle", () => {
+    const set = source("settings-matrix.test.ts").match(
+      /const AI_GATED_TOOLS = new Set\(\[([^\]]*)\]\)/,
+    );
+    expect(set, "AI_GATED_TOOLS literal not found").not.toBeNull();
+    const ids = [...(set?.[1] ?? "").matchAll(/"([^"]+)"/g)].map(([, id]) => id);
+    expect(ids.length).toBeGreaterThan(0);
+    const knownUnbundled = new Set(["beautify", "image-enhancement"]); // #5181
+    const unbundled = ids.filter(
+      (id) =>
+        !knownUnbundled.has(id) &&
+        getRequiredBundlesForTool(id).length === 0 &&
+        !TOOL_OPTIONAL_BUNDLE_MAP[id],
+    );
+    expect(unbundled).toEqual([]);
   });
 
   it("settings capability gates preserve every collected variation", () => {
@@ -110,9 +155,10 @@ describe("generated QA harness contract", () => {
 
   it("the nightly extended lane does not require AI features it never installs", () => {
     // Strict required-AI mode (absence of a bundle is a failure) is only valid
-    // on a host with bundles installed, which is the release-QA fleet. The
+    // on a host with bundles installed: the ubuntu_gpu AI matrix step in the
+    // release preflight (.claude/scripts/fix-issue/ai-matrix.sh, #4443). The
     // extended-matrix lane has no bundle-install step, so requiring them there
-    // 501s every installed-contract case on a bundle-less runner.
+    // fails every AI tool on a bundle-less runner.
     const workflow = readFileSync(join(process.cwd(), ".github/workflows/nightly.yml"), "utf8");
     const extendedLane = workflow.slice(
       workflow.indexOf("  extended-matrix:"),

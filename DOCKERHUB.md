@@ -103,11 +103,11 @@ The same image runs on CPU or NVIDIA CUDA. Intel/AMD iGPU acceleration through V
 ## Features
 
 - **200+ tools across 5 modalities**
-  - **Image (112):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats.
-  - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn or extract subtitles, and more.
-  - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge or split, waveform, and more.
-  - **Documents / PDF (35):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, multi-tool page editor, OCR, and more.
-  - **Files (23):** CSV, JSON, XML, and YAML conversion, CSV merge or split, chart maker, ZIP create or extract.
+  - **Image (113):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, and more. Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats.
+  - **Video (63):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn, extract or convert subtitles, and more.
+  - **Audio (57):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge or split, waveform, and more.
+  - **Documents / PDF (37):** merge, split, compress, convert (Word, Excel, PowerPoint, EPUB), protect or unlock, redact, watermark, page numbers, multi-tool page editor, OCR, and more.
+  - **Files (32):** CSV, JSON, XML, and YAML conversion, CSV merge or split, chart maker, font conversion, text case conversion, proportion calculator, ZIP create or extract, Base64 text encode or decode.
 - **Image editor:** layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser, processes on your hardware.
 - **Local AI:** remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required. Built-in Fast OCR adds about 25 MiB to the official image; the optional accuracy pack installs on demand.
 - **OIDC / SSO:** log in with Google, GitHub, Okta, or any OpenID Connect provider.
@@ -130,6 +130,7 @@ Common environment variables (set on the `snapotter` service). Use `0` for unlim
 | `DEFAULT_PASSWORD` | `admin` | Initial admin password. Change this for any non-local deployment. |
 | `MAX_UPLOAD_SIZE_MB` | `0` | Max upload size in MB. `0` is unlimited. |
 | `MAX_BATCH_SIZE` | `0` | Max files per batch. `0` is unlimited. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` | Cap in GB on stored uploads and results. `0` is unlimited. |
 | `CONCURRENT_JOBS` | `0` | Worker concurrency. `0` auto-detects from CPU. |
 | `PROCESSING_TIMEOUT_S` | `0` | Per-job timeout in seconds. `0` is unlimited. |
 | `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per client. `0` disables the limit. |

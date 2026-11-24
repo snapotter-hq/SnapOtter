@@ -9,6 +9,8 @@ import { PdfToWordSettings } from "@/components/tools/pdf-to-word-settings";
 import { useFileStore } from "@/stores/file-store";
 
 const SCANNED_MESSAGE = "This PDF has no extractable text layer.";
+const UNREADABLE_MESSAGE =
+  "This PDF has a text layer, but its fonts don't map to readable characters.";
 
 function pdf(name: string): File {
   return new File(["%PDF-1.4"], name, { type: "application/pdf" });
@@ -47,6 +49,16 @@ afterEach(() => {
 });
 
 describe("pdf-to-word OCR handoff (#4838)", () => {
+  it("shows a hint that doesn't call an unreadable-font PDF scanned (#4951)", () => {
+    useFileStore.getState().setFiles([pdf("glyph-ids.pdf")]);
+    useFileStore.getState().setError(UNREADABLE_MESSAGE, NO_TEXT_LAYER_CODE);
+    renderPanel();
+
+    const hint = en.toolSettings["pdf-to-word"].scannedHint;
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    expect(hint).not.toMatch(/scan/i);
+  });
+
   it("offers OCR when the server says the PDF has no text layer", () => {
     useFileStore.getState().setFiles([pdf("scan.pdf")]);
     useFileStore.getState().setError(SCANNED_MESSAGE, NO_TEXT_LAYER_CODE);

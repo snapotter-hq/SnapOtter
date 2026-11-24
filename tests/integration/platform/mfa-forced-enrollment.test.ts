@@ -27,6 +27,7 @@ const { buildTestApp, createUserAndLogin } = await import("../test-server.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 
+import { hashSessionToken } from "../../../apps/api/src/lib/session-token.js";
 import type { TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -538,7 +539,7 @@ describe("POST /api/auth/mfa/enroll-complete maxSessionsPerUser enforcement (#25
     // createUnenrolledUser already created 1 session via createUserAndLogin; seed an older one so count = 2.
     const t0 = randomUUID();
     await db.insert(schema.sessions).values({
-      id: t0,
+      id: hashSessionToken(t0),
       userId,
       createdAt: new Date(Date.now() - 60_000),
       expiresAt: new Date(Date.now() + 3_600_000),
@@ -549,7 +550,7 @@ describe("POST /api/auth/mfa/enroll-complete maxSessionsPerUser enforcement (#25
       .where(eq(schema.sessions.userId, userId))
       .orderBy(asc(schema.sessions.createdAt));
     expect(sessionsBefore).toHaveLength(2);
-    expect(sessionsBefore[0].id).toBe(t0);
+    expect(sessionsBefore[0].id).toBe(hashSessionToken(t0));
 
     await setMfaPolicy("required");
     await db
@@ -636,6 +637,6 @@ describe("POST /api/auth/mfa/enroll-complete maxSessionsPerUser enforcement (#25
       .from(schema.sessions)
       .where(eq(schema.sessions.userId, userId))
       .orderBy(asc(schema.sessions.createdAt));
-    expect(remaining.map((r) => r.id)).toEqual([sessionsBefore[1].id, newToken]);
+    expect(remaining.map((r) => r.id)).toEqual([sessionsBefore[1].id, hashSessionToken(newToken)]);
   });
 });

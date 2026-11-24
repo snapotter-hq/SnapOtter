@@ -175,7 +175,7 @@ pnpm test:e2e:docs           # VitePress docs
 pnpm test:e2e:analytics      # Local analytics flows (starts local dev servers)
 pnpm test:e2e:noauth         # No-auth server (AUTH_ENABLED=false)
 pnpm test:e2e:external       # Complete browser suite against a running external server
-pnpm test:docker             # Compose-backed tests (starts the test infrastructure)
+pnpm test:docker             # Unit + integration suite inside the Compose test image
 
 # Editor and demo e2e (no root alias)
 pnpm playwright test --config playwright.editor.config.ts
@@ -196,7 +196,8 @@ BASE_URL=http://127.0.0.1:1349 pnpm test:e2e:external
 
 This command neither starts Docker nor proves that the target is containerized.
 An unavailable target fails the Playwright run. Use `pnpm test:e2e:analytics` for
-local analytics flows, or `pnpm test:docker` to launch the Compose test infrastructure.
+local analytics flows, or `pnpm test:docker` to run the unit and integration suite
+in the Compose test image.
 
 ### Environment Requirements
 
@@ -210,6 +211,12 @@ Each Vitest fork gets its own Postgres DB clone + workspace + library-file folde
 isolated `BULLMQ_PREFIX` via `tests/setup/per-fork-env.ts` (testcontainers for Postgres), so an exported
 `DATA_DIR` is ignored. The exception is `REQUIRE_AI_FEATURES=1`, which keeps your `DATA_DIR` so the
 installed-AI contracts can find the bundles installed there. 30s test timeouts.
+
+Ordinary runs skip AI tools in the generated matrices (`settings-matrix`, `format-matrix-generated-*`,
+`format-matrix-multimodal`), because a fresh per-fork `DATA_DIR` never has bundles. With
+`REQUIRE_AI_FEATURES=1` they run, and a tool whose bundle is missing from `DATA_DIR` fails by name
+before any request. No CI lane installs bundles, so that strict run happens in the release preflight on
+the `ubuntu_gpu` fleet host, against a persistent `DATA_DIR` with every bundle installed (#4443).
 
 ### E2E Projects
 

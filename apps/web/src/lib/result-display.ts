@@ -85,8 +85,8 @@ export function shouldShowConversionCard(state: {
 
 // What <video> plays without help; the media player shows these directly.
 const BROWSER_VIDEO_EXTS = new Set(["mp4", "webm", "ogg", "ogv", "m4v", "mov"]);
-// A GIF input (gif-to-video) or an image result (video-to-gif, video-to-webp).
-const IMAGE_EXTS = new Set(["gif", "webp", "png", "jpg", "jpeg", "apng"]);
+// A GIF input (gif-to-video) or an image result (video-to-gif, video-to-webp, video-to-avif).
+const IMAGE_EXTS = new Set(["gif", "webp", "avif", "png", "jpg", "jpeg", "apng"]);
 
 export type VideoAreaView = "player" | "image" | "server-preview" | "no-preview";
 

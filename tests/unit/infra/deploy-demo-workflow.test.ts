@@ -54,7 +54,7 @@ function expectBefore(workflow: string, earlier: string, later: string) {
   expect(earlierIndex, `${earlier} should run before ${later}`).toBeLessThan(laterIndex);
 }
 
-const EXPECTED_PATHS = [
+const EXPECTED_PUSH_PATHS = [
   "apps/demo/**",
   "apps/web/**",
   "packages/shared/**",
@@ -70,6 +70,19 @@ const EXPECTED_PATHS = [
   "scripts/check-live-egress.mjs",
   "tests/e2e-demo/**",
   "tests/playwright-run.ts",
+  "tests/unit/infra/demo-theme.test.ts",
+  "tests/unit/infra/demo-mock-api.test.ts",
+  "tests/unit/infra/deploy-demo-workflow.test.ts",
+  ".github/workflows/deploy-demo.yml",
+];
+
+// Web and shared changes reach the demo through the post-merge push run; PRs
+// only start this job for demo-specific files so it stops holding runner slots
+// on most fix PRs (#5061).
+const EXPECTED_PULL_REQUEST_PATHS = [
+  "apps/demo/**",
+  "playwright.demo.config.ts",
+  "tests/e2e-demo/**",
   "tests/unit/infra/demo-theme.test.ts",
   "tests/unit/infra/demo-mock-api.test.ts",
   "tests/unit/infra/deploy-demo-workflow.test.ts",
@@ -114,12 +127,11 @@ describe("demo deployment workflow", () => {
     expect(steps.filter((step) => /playwright install\b/.test(step.run ?? ""))).toEqual([]);
   });
 
-  it("rebuilds when the demo shell, real app UI, shared code, or build inputs change", () => {
+  it("rebuilds on main when the demo shell, real app UI, shared code, or build inputs change", () => {
     const parsed = parseWorkflow();
 
     expect(parsed.on?.push?.branches).toEqual(["main"]);
-    expect(parsed.on?.push?.paths).toEqual(EXPECTED_PATHS);
-    expect(parsed.on?.pull_request?.paths).toEqual(EXPECTED_PATHS);
+    expect(parsed.on?.push?.paths).toEqual(EXPECTED_PUSH_PATHS);
     expect(parsed.on).toHaveProperty("workflow_dispatch");
     expect(parsed.concurrency).toEqual({
       // biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub Actions expression
@@ -127,6 +139,15 @@ describe("demo deployment workflow", () => {
       "cancel-in-progress": true,
     });
     expect(parsed.env?.TESTCONTAINERS_RYUK_DISABLED).toBe("true");
+  });
+
+  it("runs on pull requests only for demo-specific files (#5061)", () => {
+    const parsed = parseWorkflow();
+    const prPaths = parsed.on?.pull_request?.paths;
+
+    expect(prPaths).toEqual(EXPECTED_PULL_REQUEST_PATHS);
+    expect(prPaths).not.toContain("apps/web/**");
+    expect(prPaths).not.toContain("packages/shared/**");
   });
 
   it("runs build and smoke gates on pull requests while keeping deploy steps main-only (#1128)", () => {

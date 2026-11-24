@@ -38,7 +38,7 @@ export function SideBySideComparison({
       aria-label={t.a11y.comparisonScroller}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs to be focusable for keyboard users on Safari
       tabIndex={0}
-      className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto max-h-full overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      className="flex flex-col items-center gap-3 w-full max-h-full overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
     >
       {/* Side-by-side images */}
       <div className="flex flex-col-reverse sm:flex-row gap-4 w-full">

@@ -1,7 +1,7 @@
 import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { runMediaTool } from "../../lib/media-tool.js";
+import { runMediaTool, wavPcmCodec } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 // libmp3lame clamps the bitrate silently above these: MPEG-2.5 (8 kHz) tops out
@@ -72,11 +72,11 @@ export function registerConvertAudio(app: FastifyInstance) {
       const base = ctx.inputs[0].filename.replace(/\.[^.]+$/, "");
       const outName = `${base}.${settings.format}`;
 
-      const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
+      const { outPath } = await runMediaTool(ctx, outName, (inPath, out, { audio }) => {
         const rate = settings.sampleRate ? ["-ar", String(settings.sampleRate)] : [];
         switch (settings.format) {
           case "wav":
-            return ["-i", inPath, "-vn", "-c:a", "pcm_s16le", ...rate, out];
+            return ["-i", inPath, "-vn", "-c:a", wavPcmCodec([audio]), ...rate, out];
           case "ogg": {
             // libvorbis ABR (-b:a) fails with "encoder setup failed" when the bitrate is
             // too high for the source sample rate (e.g. 8 kHz). Use quality VBR (-q:a),

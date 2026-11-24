@@ -169,10 +169,16 @@ describe("ensureDefaultSettings analytics default", () => {
     expect(store.rows.get("analyticsEnabled")).toBe("true");
   });
 
-  it("seeds nothing by default, because absent already means on", async () => {
-    env.SNAPOTTER_ANALYTICS_DEFAULT = "on";
+  it("seeds nothing when unset, so a fresh install asks its admin (#4910)", async () => {
+    env.SNAPOTTER_ANALYTICS_DEFAULT = undefined;
     await ensureDefaultSettings();
     expect(store.rows.has("analyticsEnabled")).toBe(false);
+  });
+
+  it("seeds analyticsEnabled=true when SNAPOTTER_ANALYTICS_DEFAULT is on, answering the prompt in advance", async () => {
+    env.SNAPOTTER_ANALYTICS_DEFAULT = "on";
+    await ensureDefaultSettings();
+    expect(store.rows.get("analyticsEnabled")).toBe("true");
   });
 
   it("runs at boot before analytics starts, so an instance seeded off never sends instance_started", () => {
@@ -182,7 +188,7 @@ describe("ensureDefaultSettings analytics default", () => {
       "await ensureDefaultSettings();",
       "await initAnalytics();",
       "await primeAnalyticsGate();",
-      "await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED",
+      "await trackInstanceStarted();",
     ].map((step) => source.indexOf(step));
     expect(steps.every((at) => at > -1)).toBe(true);
     expect([...steps].sort((a, b) => a - b)).toEqual(steps);

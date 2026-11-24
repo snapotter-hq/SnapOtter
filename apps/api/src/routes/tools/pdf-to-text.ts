@@ -1,10 +1,9 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pdfTextPy } from "@snapotter/doc-engine";
-import { NO_TEXT_LAYER_CODE } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { InputValidationError } from "../../modality/contract.js";
+import { noTextLayerError } from "../../lib/no-text-layer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
@@ -30,21 +29,28 @@ export function registerPdfToText(app: FastifyInstance) {
       // (#589). The code lets the web app offer OCR as a button instead of a
       // dead end (#1164); OCR stays the user's call because it needs an AI
       // bundle and runs for minutes.
-      if (!result.hasText) {
-        throw new InputValidationError(
-          "This PDF has no extractable text layer. It looks scanned or image-only, so use the PDF OCR tool to read its text.",
-          422,
-          undefined,
-          NO_TEXT_LAYER_CODE,
-        );
-      }
+      if (!result.hasText) throw noTextLayerError(result);
       ctx.report(90, "Done");
 
       return {
         scratchPath: outPath,
         filename: `${base}.txt`,
         contentType: "text/plain",
-        resultPayload: { chars: result.chars },
+        // The .txt keeps every page as extracted, unreadable ones included:
+        // dropping text on a heuristic is worse than showing it. Say how many
+        // pages it was so the junk isn't silent (#954), including pages where
+        // only some of the text is junk (#4947).
+        resultPayload: {
+          chars: result.chars,
+          ...(result.unreadablePages && result.pages
+            ? { unreadablePages: { count: result.unreadablePages, total: result.pages } }
+            : {}),
+          ...(result.partlyUnreadablePages && result.pages
+            ? {
+                partlyUnreadablePages: { count: result.partlyUnreadablePages, total: result.pages },
+              }
+            : {}),
+        },
       };
     },
   });

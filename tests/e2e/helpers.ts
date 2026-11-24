@@ -327,6 +327,66 @@ export async function openSettings(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// compressToSlider(): run compress on the test image and return the
+// before/after slider, failing if it never mounts (#1896)
+// ---------------------------------------------------------------------------
+export async function compressToSlider(page: Page): Promise<Locator> {
+  await page.goto("/image/compress");
+  await uploadTestImage(page);
+  // Below the 768px breakpoint the settings live in a bottom sheet that the
+  // "Process" peek bar opens, and the open sheet covers the preview.
+  const isMobile = (page.viewportSize()?.width ?? 1280) < 768;
+  if (isMobile) await page.getByRole("button", { name: "Process", exact: true }).click();
+  // The default Target Size mode starts empty with the button disabled.
+  // Quality mode has a default, so pick it.
+  await page.getByRole("button", { name: "Quality", exact: true }).click();
+  await page.getByTestId("compress-submit").click();
+  const slider = page.getByRole("slider", { name: "Before/after comparison slider" });
+  await expect(slider).toBeVisible({ timeout: 15_000 });
+  if (isMobile) {
+    await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+  }
+  await expect(slider).toHaveAttribute("aria-valuenow", "50");
+  return slider;
+}
+
+// ---------------------------------------------------------------------------
+// touchDragCropHandle(): drag the crop selection's bottom-right handle up and
+// left by a fraction of the selection, as touch input
+// ---------------------------------------------------------------------------
+// Playwright's touchscreen can only tap, and a tap never moves a crop handle.
+// So this dispatches the pointer events a finger drag produces, with
+// pointerType "touch", which is the input react-image-crop listens to.
+export async function touchDragCropHandle(page: Page, fraction: number): Promise<void> {
+  const handle = page.locator(".ReactCrop__drag-handle.ord-se");
+  await expect(handle).toBeAttached();
+  await handle.evaluate((el, f) => {
+    const selection = el.closest(".ReactCrop__crop-selection");
+    if (!selection) throw new Error("crop handle is outside the crop selection");
+    const sel = selection.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const init = (clientX: number, clientY: number): PointerEventInit => ({
+      pointerId: 1,
+      pointerType: "touch",
+      isPrimary: true,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX,
+      clientY,
+    });
+    const endX = x - sel.width * f;
+    const endY = y - sel.height * f;
+    el.dispatchEvent(new PointerEvent("pointerdown", init(x, y)));
+    el.ownerDocument.dispatchEvent(new PointerEvent("pointermove", init(endX, endY)));
+    el.ownerDocument.dispatchEvent(new PointerEvent("pointerup", init(endX, endY)));
+  }, fraction);
+}
+
+// ---------------------------------------------------------------------------
 // maskAppVersion(): screenshot options that hide the app version (#1862)
 // ---------------------------------------------------------------------------
 // The version renders in the Settings General and About tabs. It changes with

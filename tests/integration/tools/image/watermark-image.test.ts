@@ -379,6 +379,33 @@ describe("watermark-image", () => {
     expect(json.processedSize).toBeGreaterThan(0);
   });
 
+  it("keeps the watermark at least 1 px wide on a 1x1 base at the default scale (#4856)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: SMALL_PNG },
+      { name: "watermark", filename: "wm.jpg", contentType: "image/jpeg", content: JPG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/watermark-image",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { downloadUrl } = JSON.parse(res.body);
+    const dl = await app.inject({
+      method: "GET",
+      url: downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const sharp = (await import("sharp")).default;
+    const meta = await sharp(dl.rawPayload).metadata();
+    expect(meta.width).toBe(1);
+    expect(meta.height).toBe(1);
+  });
+
   // ── HEIC watermark image ─────────────────────────────────────────
 
   it("processes HEIC watermark image", { timeout: 120_000 }, async () => {

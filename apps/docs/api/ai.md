@@ -75,6 +75,10 @@ Tools with cross-bundle dependencies:
 
 A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
 
+### Downloading through a mirror {#downloading-through-a-mirror}
+
+Bundle archives and the accurate OCR runtime download from huggingface.co. Where that host is blocked or slow, set `HF_ENDPOINT` on the app container to a Hugging Face mirror, for example `HF_ENDPOINT=https://hf-mirror.com`. Every bundle download and the OCR runtime use it, including the fallback downloader and the manual-download link in an install error. Use an `https` URL without credentials; the OCR runtime install refuses anything else. Integrity doesn't depend on the mirror: each bundle archive is checked against its SHA-256 and the OCR runtime index is signed, so a mirror that serves altered files fails the install. The exception is `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: the runtime downloads that fill in a missing model weight use `HF_ENDPOINT` too, and those weights aren't checksum-verified, so only combine the two with a mirror you trust. If the server reaches the internet through a proxy instead, see [Outbound proxy and private CA](/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Installing every bundle at once {#installing-every-bundle-at-once}
 
 Settings, AI Features has an **Install All** button that queues every bundle the host can run. It skips anything already installed, skips bundles reported incompatible with the host, and retries a failed bundle once before moving on. For a normal instance that button is the whole answer, and nothing below is needed.
@@ -318,6 +322,9 @@ Accepts a JSON body with the Phase 1 results plus generation settings:
 | `landmarks` | object | (required) | Landmarks from Phase 1 |
 | `imageWidth` | number | (required) | Image width from Phase 1 |
 | `imageHeight` | number | (required) | Image height from Phase 1 |
+| `clientJobId` | string | (generated) | Your own job id for the progress stream |
+
+Generate runs as a queued job: `200` with the result inside the synchronous wait window, `202` with a job id after it. See [Passport Photo](/tools/image/passport-photo#phase-2-generate) for the details.
 
 ## Object Erasing (Inpainting) {#object-erasing-inpainting}
 
@@ -463,7 +470,7 @@ An additional analysis endpoint is available at `POST /api/v1/tools/image/image-
 **Tool route:** `content-aware-resize`
 **Engine:** Go `caire` binary (not Python - no GPU benefit)
 
-Intelligently resizes images by removing low-energy seams, preserving important content.
+Intelligently resizes images by removing or inserting low-energy seams, preserving important content. Each side can grow to at most 2x its original size.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

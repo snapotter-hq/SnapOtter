@@ -46,7 +46,7 @@ jobs:
     # Same condition as the `fleet` output below, inlined because a job can't
     # read its own outputs; otherwise every fleet job would still wait in the
     # hosted queue behind this 10-second job (#4965).
-    runs-on: ${{ (vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'))) && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' && ((vars.FLEET_PR_SHARE || 'even') == 'all' || ((vars.FLEET_PR_SHARE || 'even') == 'even' && (endsWith(format('{0}', github.event.pull_request.number), '0') || endsWith(format('{0}', github.event.pull_request.number), '2') || endsWith(format('{0}', github.event.pull_request.number), '4') || endsWith(format('{0}', github.event.pull_request.number), '6') || endsWith(format('{0}', github.event.pull_request.number), '8'))))))) && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     outputs:
       code: ${{ steps.filter.outputs.code }}
       landing: ${{ steps.filter.outputs.landing }}
@@ -56,11 +56,15 @@ jobs:
       # runners (#4965). This repo is public: only a push to main or a PR from
       # a branch of this repo qualifies, never a fork. Dependabot PRs stay
       # hosted because they install dependency versions nobody has reviewed.
+      # Three runners can't drain dozens of PR runs at once, so the repo
+      # variable FLEET_PR_SHARE splits same-repo PRs: even (default) sends
+      # even-numbered PRs to the fleet and odd ones to hosted runners, all
+      # sends every one, none sends none. Pushes to main always use the fleet.
       # Setting the repo variable FLEET_RUNNERS=off sends every job back to
       # hosted runners without a PR (the host is down, say). The runners also
       # refuse any other job in a host-side job-started hook, since a fork PR
       # can edit this file.
-      fleet: ${{ vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')) }}
+      fleet: ${{ vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' && ((vars.FLEET_PR_SHARE || 'even') == 'all' || ((vars.FLEET_PR_SHARE || 'even') == 'even' && (endsWith(format('{0}', github.event.pull_request.number), '0') || endsWith(format('{0}', github.event.pull_request.number), '2') || endsWith(format('{0}', github.event.pull_request.number), '4') || endsWith(format('{0}', github.event.pull_request.number), '6') || endsWith(format('{0}', github.event.pull_request.number), '8')))))) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: filter
@@ -214,7 +218,9 @@ jobs:
     # Keeps the required "Unit Tests" context stable across shard counts, the
     # same way test-integration-result does for Integration.
     name: Unit Tests
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, test-unit]
     if: always()
@@ -319,7 +325,9 @@ jobs:
     # unexpanded name "Integration (${{ matrix.shard }}/6)") never leaves
     # required shard contexts stuck as expected.
     name: Integration
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, test-integration]
     if: always()
@@ -671,7 +679,9 @@ jobs:
     # Keep always(), not !cancelled(): a job skipped by its own if: reports as
     # success, so a cancelled run would pass this check.
     name: AI Sidecar (rembg)
-    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
+    # Needs-only gate: on a fleet-routed run it goes to the small
+    # snapotter-gate runner, so it never queues behind heavy fleet jobs.
+    runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-gate"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: [changes, ai-sidecar-rembg]
     if: always()

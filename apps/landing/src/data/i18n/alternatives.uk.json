@@ -2113,13 +2113,6 @@
     "outputHash": "2e40c073bd14",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "Якщо ви працюєте лише з PDF, Stirling-PDF чудовий і вартий уваги. Якщо ви також змінюєте розмір зображень, конвертуєте відео, транскрибуєте аудіо чи обробляєте файли пакетно, SnapOtter впорається з усім цим в одному розгортанні замість запуску кількох інструментів поруч.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "ebd03bc5fa4e",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "Може бути, якщо вам потрібен один стек не лише для PDF. Охоплення PDF у SnapOtter широке, і він додає інструменти для зображень, відео, аудіо та файлів. Для конфігурації лише під PDF Stirling-PDF це надійний вузькоспеціалізований вибір.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "a520ada845a8",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "Обидва проєкти мають відкритий код і придатні для самостійного хостингу. SnapOtter поширюється за AGPLv3 і додає необовʼязковий платний корпоративний рівень для SSO, журналів аудиту та подібних засобів контролю.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "dd60fe49b118",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "Чи обидва безкоштовні та з відкритим кодом?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "430877d117bb",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF і SnapOtter обидва мають самостійний хостинг і відкритий код, тож файли в обох випадках залишаються на вашому сервері. Різниця в охопленні: Stirling-PDF зосереджений на PDF, тоді як SnapOtter охоплює всі пʼять типів файлів.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "3aeebd47c4fa",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF це потужний набір інструментів для PDF із самостійним хостингом. SnapOtter теж охоплює PDF, а ще додає інструменти для зображень, відео, аудіо та файлів в одному стеку. Обидва з відкритим кодом.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "7798449efa8c",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "Так",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "97ef44dfb0fd",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "Так",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "cc830340862d",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60+ операцій з PDF",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "8ec63aa42dbc",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

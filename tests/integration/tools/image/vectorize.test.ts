@@ -2,12 +2,13 @@
  * Integration tests for the vectorize tool.
  *
  * Converts raster images to SVG via potrace (black-and-white) or
- * @neplex/vectorizer (color). Custom route with settings for colorMode,
- * threshold, path mode, and more.
+ * @neplex/vectorizer (color). Factory route (queued through BullMQ, #4337)
+ * with settings for colorMode, threshold, path mode, and more.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { waitForDownloadedJobArtifact } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -31,6 +32,21 @@ beforeAll(async () => {
 afterAll(async () => {
   await testApp.cleanup();
 });
+
+// A big trace can outlast the sync window and come back 202, so follow the
+// job to its SVG instead of insisting on 200.
+async function expectSvgOutput(res: { statusCode: number; body: string }): Promise<void> {
+  expect([200, 202], res.body).toContain(res.statusCode);
+  const json = JSON.parse(res.body);
+  if (res.statusCode === 200) {
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\.svg$/);
+    return;
+  }
+  const artifact = await waitForDownloadedJobArtifact(app, adminToken, "vectorize", json.jobId);
+  expect(artifact.buffer.length).toBeGreaterThan(0);
+  expect(artifact.filename).toMatch(/\.svg$/);
+}
 
 describe("vectorize", () => {
   it("vectorizes a PNG with default settings (bw mode)", async () => {
@@ -209,7 +225,7 @@ describe("vectorize", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toContain("No image file");
+    expect(json.error).toBe("No file provided");
   });
 
   it("rejects invalid settings JSON", async () => {
@@ -502,7 +518,7 @@ describe("vectorize", () => {
 
   // ── Large file handling ───────────────────────────────────────
 
-  it("vectorizes a large stress image in bw mode", async () => {
+  it("vectorizes a large stress image in bw mode", { timeout: 180_000 }, async () => {
     const LARGE = readFixture(fixtures.image.stressLarge);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "large.jpg", contentType: "image/jpeg", content: LARGE },
@@ -516,9 +532,7 @@ describe("vectorize", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.processedSize).toBeGreaterThan(0);
+    await expectSvgOutput(res);
   });
 
   // ── Empty file handling ───────────────────────────────────────
@@ -1072,10 +1086,7 @@ describe("vectorize", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    expect(json.processedSize).toBeGreaterThan(0);
-    expect(json.downloadUrl).toMatch(/\.svg$/);
+    await expectSvgOutput(res);
   });
 
   // ── Invert with color mode (ignored but no error) ─────────────

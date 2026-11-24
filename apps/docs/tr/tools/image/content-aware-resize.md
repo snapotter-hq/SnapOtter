@@ -1,8 +1,8 @@
 ---
 description: "Önemli içeriği ve yüzleri korumak için düşük önem taşıyan yollar boyunca piksel ekleyen veya kaldıran dikiş oyma yeniden boyutlandırma."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: e9a902a6bd97
+i18n_output_hash: 8af6a2ee0fd9
 ---
 
 # İçerik Duyarlı Yeniden Boyutlandırma {#content-aware-resize}
@@ -13,7 +13,7 @@ En az görsel öneme sahip yollar boyunca pikselleri akıllıca kaldıran veya e
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**İşleme:** Eşzamanlı (sonucu doğrudan döndürür)
+**İşleme:** Eşzamansız (202 döndürür, durum için SSE aracılığıyla `/api/v1/jobs/{jobId}/progress` sorgulayın)
 
 **Model paketi:** Temel işlem için gerekmez. Yüz koruması, etkinleştirilirse `face-detection` paketini (200-300 MB) kullanır.
 
@@ -39,24 +39,40 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Yanıt (200 OK) {#response-200-ok}
+## Yanıt {#response}
+
+### İlk Yanıt (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Nihai Sonuç (SSE aracılığıyla) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Notlar {#notes}
 
-- Bu özel rota şu anda eşzamanlı bir 200 yanıtı döndürür.
 - İçerik duyarlı yeniden boyutlandırma için `caire` dikiş oyma kitaplığını kullanır.
-- Yalnızca boyutları küçültür (dikişleri kaldırır). Bir görüntüyü orijinal boyutunun ötesine genişletemez.
+- Dikişleri kaldırarak küçültür veya dikiş ekleyerek büyütür. Her kenar, orijinal boyutunun en fazla 2 katına kadar büyüyebilir.
 - `protectFaces` seçeneği, yüz bölgelerini yüksek enerjili olarak işaretlemek için AI yüz algılamasını kullanır ve dikişlerin yüzlerden geçmesini önler.
 - `blurRadius`, enerji haritası hesaplamasından önce düzeltmeyi denetler. Daha yüksek değerler enerji haritasını daha eşit hale getirir, bu da gürültülü görüntülere yardımcı olabilir.
 - `sobelThreshold`, kenarların ne kadar agresif algılandığını etkiler. Daha düşük değerler daha ince kenarları korur.

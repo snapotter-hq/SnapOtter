@@ -16,10 +16,11 @@ All configuration is done through environment variables. Every variable has a se
 | `HOST` | `0.0.0.0` | IP address the server listens on. On a bridge network (the default for `docker run` and Compose) keep `0.0.0.0` (or `::`), or published ports stop working. On a native install or a container on the host network, `127.0.0.1` keeps the API off the network; put a reverse proxy in front for remote access. [Embedded mode](#embedded-mode) works only with `0.0.0.0`, `::` or `127.0.0.1`, because its startup check calls `127.0.0.1`. With any other address, `::1` included, the container never counts as started, and a later crash stops it instead of restarting the server. Anything that isn't an IP address, `localhost` included, stops the server at startup. |
 | `BASE_PATH` | (empty) | Public deployment path, e.g. `/snapotter`. Empty or `/` serves at the domain root. Applied at runtime; no image rebuild required. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maximum requests per minute per IP to the API key management endpoints (list, create, revoke). Keys in use for tool calls are not affected. There's no unlimited value: `0` refuses every request to those endpoints. |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. The default believes only a private-network peer, so a reverse proxy on a Docker network or a LAN is trusted and a public client's forged header is not. Set `true` only when a proxy you control sits in front on a public address. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Set `off` to start a new instance with "Anonymous Product Analytics" switched off, so it sends nothing from its first boot. It only fills in the setting while nobody has chosen one. Once the setting is saved, by an admin or by this variable, changing the variable does nothing; an admin can still turn analytics on under Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | (unset) | Answers the first-run analytics question in advance, so nobody is asked. Unset, a new instance asks its administrator and sends nothing until answered. `off` starts it with "Anonymous Product Analytics" switched off; `on` starts it switched on. It only fills in the setting while nobody has chosen one. Once the setting is saved, by an admin or by this variable, changing the variable does nothing; an admin can still change it under Settings > System > Privacy. |
 
 ### Authentication {#authentication}
 
@@ -33,17 +34,21 @@ The two booleans below accept only `true` and `false`. Anything else, `1` or `ye
 | `MAX_USERS` | `0` (unlimited) | Maximum number of registered user accounts. Set to 0 for unlimited. |
 | `SESSION_DURATION_HOURS` | `168` | Login session lifetime in hours (default is 7 days). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Set to `true` to skip the forced password-change prompt on first login. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Maximum login requests per minute per IP. Further attempts get a `429` until the minute is up. Repeated failures for one username usually hit `LOGIN_THROTTLE_MAX_FAILURES` first. An admin can override it under Settings > System. There's no unlimited value: `0` refuses every login. A source build starts at 10. |
+| `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Failed password logins one username may have inside `LOGIN_THROTTLE_WINDOW_S` before further attempts for it get a `429`, whatever IP they come from. They are let through again as the oldest failures age out of the window. Set to 0 to turn the throttle off. |
+| `LOGIN_THROTTLE_WINDOW_S` | `900` | Length of that window, in seconds. Must be at least 1; the server refuses to start on 0. |
 
 ### Storage {#storage}
 
 | Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` or `s3`. S3 and MinIO need a license with the s3_storage feature plus the `S3_*` variables below. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string, and the connection every request is served on. On 2.3.0 and later, set `DATABASE_MIGRATION_URL` too and this becomes the least-privilege runtime role, holding DML on the app's tables and nothing else. The Compose stack points it at its `postgres` service; leave it unset (together with `REDIS_URL`) to get embedded mode. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL connection string, and the connection every request is served on. On 2.3.0 and later, set `DATABASE_MIGRATION_URL` too and this becomes the least-privilege runtime role, holding DML on the app's tables and nothing else. The Compose stack points it at its `postgres` service; leave it unset (together with `REDIS_URL`) to get embedded mode. To connect over a unix socket, name the socket directory in `host`, as in `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, and mount that directory into the container. |
 | `DATABASE_MIGRATION_URL` | (empty) | Privileged connection, used only during boot to run migrations and grant the runtime role, then closed before the first request. Leave it empty and SnapOtter runs single-role, with `DATABASE_URL` doing both jobs. See [Least-privilege roles](/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection string (used for BullMQ job queues). Compose points this at its `redis` service. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection string (used for BullMQ job queues). Compose points this at its `redis` service. For a unix socket, use `unix:///run/redis/redis.sock?db=5` (add `&password=...` if Redis needs one) and mount the socket into the container. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory for temporary files during processing. Cleaned up automatically. The image sets `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory for persistent user files (uploaded images, saved results). The image sets `/data/files`. |
+| `MAX_STORAGE_PER_USER_MB` | `5000` | Cap in megabytes on what each user keeps in the Files library. A save that would pass it is refused with the amount used and the limit. A quota set on the user overrides it. Set to 0 for unlimited. |
 
 ### S3 object storage {#s3-object-storage}
 
@@ -82,7 +87,7 @@ Run the image with no `DATABASE_URL` and no `REDIS_URL` and it starts its own Po
 
 Upgrading from 1.x: put your old `snapotter.db` at `/data/snapotter.db` in the volume and embedded mode imports it into the embedded PostgreSQL on first boot. The import runs once; later boots skip it.
 
-Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image ships with analytics on; build with `--build-arg SNAPOTTER_ANALYTICS=off`, set `SNAPOTTER_ANALYTICS_DEFAULT=off` before the first boot, or use the in-app admin opt-out, to disable it.
+Telemetry note: embedded mode inherits the image's analytics default like any other configuration. The published image can send analytics, but a new instance asks its administrator first and sends nothing until answered. To disable it, answer no, build with `--build-arg SNAPOTTER_ANALYTICS=off`, set `SNAPOTTER_ANALYTICS_DEFAULT=off` before the first boot, or use the in-app admin opt-out.
 
 ### Processing limits {#processing-limits}
 
@@ -91,19 +96,33 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Maximum file size per upload in megabytes. Set to 0 for unlimited. The published image ships `0`; a source build starts at 100. |
 | `MAX_BATCH_SIZE` | `0` (unlimited) | Maximum number of files in a single batch request. Set to 0 for unlimited. The published image ships `0`; a source build starts at 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Number of batch jobs that run in parallel. Set to 0 to auto-detect based on available CPU cores. |
-| `MAX_MEGAPIXELS` | `0` (unlimited) | Maximum image resolution allowed in megapixels. Set to 0 for unlimited. |
+| `MAX_MEGAPIXELS` | `0` (no app limit) | Maximum image resolution allowed in megapixels. Set to 0 to remove SnapOtter's own limit. The image decoder still refuses anything above about 268 MP (16383 x 16383 pixels), so a value above 268 has no extra effect. |
+| `MAX_CPU_UPSCALE_MP` | `4` | Largest input, in megapixels, that AI upscaling takes on a host without a GPU. The upscaled output is also capped at 16 times this value (64 MP by default), so a high scale factor lowers the input limit further. A bigger image is reduced to fit before upscaling; if that would leave the result no bigger than the original, the request is refused instead. Lanczos skips the input limit but not the output cap. Set to 0 for no limit, which needs a lot of RAM: RealESRGAN always builds a 4x buffer internally. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` (unlimited) | Cap in GB on the combined size of uploads and stored results in the workspace. Once it's passed, uploads and tool requests get a 503 until files expire after `FILE_MAX_AGE_HOURS`. Set to 0 for unlimited; local storage still refuses writes with a 503 once the disk has less than 0.5 GB free. The published image ships `0`; a source build starts at 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maximum worker threads for image processing. Set to 0 to auto-detect based on available CPU cores. |
 | `PROCESSING_TIMEOUT_S` | `0` (no limit) | Timeout for each call into the Python sidecar that runs the AI tools, in seconds. Set to 0 for no limit. It does not cap image, PDF, or media jobs; `JOB_TIMEOUT_FAST_S` and `JOB_TIMEOUT_LONG_S` do that. |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Seconds the Python AI sidecar and the accurate OCR runtime sit idle before they exit and free their memory (about 1.3 GB and 0.7 GB once warm). Both start again on the next request, so the first AI call after an idle exit pays the library start-up cost, a few seconds. Set to 0 to keep them running. The default matches `AI_SESSION_IDLE_TIMEOUT`, so loaded models are not dropped earlier than that setting says. If you raise `AI_SESSION_IDLE_TIMEOUT`, raise this to match. |
+| `AI_SESSION_IDLE_TIMEOUT` | `0` (auto) | Seconds a loaded AI model stays cached in the sidecar after its last use. Auto is 600. Read by the Python sidecar, which also drops every cached model when it exits after `AI_SIDECAR_IDLE_TIMEOUT`. |
+| `AI_SESSION_CACHE_BYTES` | `0` (auto) | Memory budget for cached AI models, in bytes. Auto is 40% of GPU memory, and no caching at all on a CPU-only host. Set it on a CPU host to cache models in RAM; set it to 1 to turn caching off on a GPU host. Read by the Python sidecar. |
+| `MAX_AI_JOBS_PER_USER` | `5` | Single-file AI jobs one user may have queued or running at once. More get a `429` until one finishes. The AI pool runs one job at a time, so this keeps one user from holding it. Batch and pipeline AI runs don't count. Set to 0 for unlimited. |
 | `JOB_TIMEOUT_FAST_S` | `120` | Deadline for one job on the fast pools (image and document tools), in seconds. A job that runs longer fails with a timeout error. Set to 0 for no limit. |
 | `JOB_TIMEOUT_LONG_S` | `7200` | Deadline for one job on the long pools (AI and media tools, plus any tool marked as long-running), in seconds. Set to 0 for no limit. Balanced and Best PDF OCR extend their own deadline by page count (2 and 5 minutes a page), up to 6 hours, so a large PDF doesn't need this raised. |
 | `SYNC_WAIT_MS` | `8000` | How long a tool request waits for its job before the API stops waiting and returns `202` with a job id to follow over SSE, in milliseconds. It does not stop the job. Set to 0 to wait for the job however long it takes. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximum number of steps in a pipeline. Set to 0 for no limit. |
+| `MAX_PIPELINE_STEP_PIXELS` | `67108864` | Largest output a pipeline step may ask for, as width times height in pixels (the default is 8192 x 8192). A step whose settings ask for more is rejected before the pipeline runs. Set to 0 for no limit. |
 | `MAX_CANVAS_PIXELS` | `0` (no limit) | Maximum canvas size in pixels for output images. Set to 0 for no limit. |
 | `MAX_SVG_SIZE_MB` | `50` | Largest SVG accepted before sanitizing, in megabytes. `0` behaves differently here than in the rows around it. It removes the pre-parse size cap entirely rather than raising it, so leave this one set. |
 | `MAX_PDF_PAGES` | `0` (unlimited) | Maximum number of PDF pages for PDF-to-image conversion. Set to 0 for unlimited. |
+| `MAX_VIDEO_DURATION_S` | `0` (unlimited) | Longest video the video tools accept, in seconds. Longer files are rejected before processing, with the duration and the limit in the error. Set to 0 for unlimited. |
+| `MAX_AUDIO_DURATION_S` | `0` (unlimited) | Same, for the audio tools. |
+| `MAX_VIDEO_BITRATE_KBPS` | `0` (unlimited) | Highest overall bitrate the video tools accept, in kilobits per second. Set to 0 for unlimited. |
+| `PREVIEW_TIMEOUT_S` | `300` | Time limit for encoding one in-browser preview clip of a video or audio file, in seconds. Document previews use `LIBREOFFICE_TIMEOUT_S` instead. Set to 0 for no limit. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Time limit for one LibreOffice conversion (Word, Excel and PowerPoint to PDF, the document converters, and document previews), in seconds. `0` doesn't mean unlimited here; it falls back to 120. |
+| `GIF_BG_MAX_FRAMES` | `150` | Most frames Remove GIF Background accepts in one animation. Longer animations get a `400` that names the frame count. Set to 0 for no frame limit; a separate pixel budget still applies. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (off) | Address-space cap, in megabytes, for each ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc and pdfcpu process the media and document engines start. The decoders that read uploaded images (ImageMagick, exiftool and their ffmpeg fallback) aren't capped. One that passes it is killed instead of pushing the whole container into the out-of-memory killer. It caps virtual memory, not resident memory, so leave headroom. The AI sidecar is never capped. Set to 0 to turn it off and rely on the container memory limit. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Largest `settings` field a tool request may carry, in kilobytes, counted in UTF-8 bytes. Requests over the limit get a `400`. Set to 0 for no limit. Real tool settings are far smaller than 64 KB, so raise this only if a client sends unusually large settings. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Largest subtitle file (`.srt`, `.vtt`, `.ass`) Burn Subtitles and Embed Subtitles accept, in megabytes. Larger files get a `400` that names the file size and the limit. Set to 0 for no limit. A feature-length subtitle file is usually well under 1 MB. |
+| `MAX_METADATA_TAG_LENGTH` | `10000` | Longest value Edit Metadata writes into a single tag (artist, description, keywords and so on), in characters. Longer values get a `400` that names the tag and the limit. Set to 0 for no limit. Raise it if you store long captions or descriptions. A tag value also has to fit inside `MAX_SETTINGS_PAYLOAD_KB` and the operating system's per-argument limit (128 KB on Linux). |
 
 ### Engines {#engines}
 
@@ -132,6 +151,14 @@ The published Compose files pass all of them through from `.env`, so setting the
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | How long unsaved processing results (raw uploads and tool outputs) are kept before automatic deletion. Files you explicitly save to the Files library are not affected and persist until you delete them. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup job runs. |
+| `JOBS_RETENTION_DAYS` | `30` | Days a finished job record (completed, failed or canceled) is kept before the retention sweep, which runs every 6 hours, deletes it. An admin can override it under Settings > System. Users and teams on legal hold keep theirs. Set to 0 to keep them forever. |
+| `AUDIT_RETENTION_DAYS` | `0` (forever) | Days audit log entries are kept. Same override and legal hold rules. Nothing is deleted while tamper-resistant audit logging is on. Set to 0 to keep them forever. |
+
+### Enterprise license {#enterprise-license}
+
+| Variable | Default | Description |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (empty) | License key that unlocks the enterprise features, such as SAML, SCIM and S3 storage. Read at startup, so restart after changing it. An invalid or expired key logs a warning and the server runs without them. In the container you can mount it instead, via `SNAPOTTER_LICENSE_KEY_FILE` (see [Docker secrets](/guide/security#docker-secrets)). |
 
 ### Appearance {#appearance}
 

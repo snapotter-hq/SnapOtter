@@ -2639,6 +2639,1142 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "mp3-to-flac": {
+    searchTitle: "MP3 to FLAC Converter Online Free",
+    longDescription:
+      "Convert MP3 audio to FLAC. You are starting from MP3, which is the safe default: every player built in the last 25 years reads it. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. FLAC is lossless, but it cannot rebuild what MP3 already threw away. You get a larger file containing exactly what the MP3 held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a MP3 into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your MP3 files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will MP3 to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about MP3 I should know?",
+        a: "MP3 cannot mark a gapless album boundary reliably, so expect a short silence between tracks unless the player understands the gapless tags.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "mp3-to-ogg": {
+    searchTitle: "MP3 to OGG Converter Online Free",
+    longDescription:
+      "Convert MP3 audio to Ogg Vorbis. You are starting from MP3, which is the safe default: every player built in the last 25 years reads it. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a MP3 into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your MP3 files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will MP3 to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about MP3 I should know?",
+        a: "MP3 cannot mark a gapless album boundary reliably, so expect a short silence between tracks unless the player understands the gapless tags.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "mp3-to-m4a": {
+    searchTitle: "MP3 to M4A Converter Online Free",
+    longDescription:
+      "Convert MP3 audio to M4A. You are starting from MP3, which is the safe default: every player built in the last 25 years reads it. M4A is AAC audio in an MP4 container, which some older players refuse to open. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a MP3 into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your MP3 files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will MP3 to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about MP3 I should know?",
+        a: "MP3 cannot mark a gapless album boundary reliably, so expect a short silence between tracks unless the player understands the gapless tags.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wav-to-flac": {
+    searchTitle: "WAV to FLAC Converter Online Free",
+    longDescription:
+      "Convert WAV audio to FLAC. You are starting from WAV, which is uncompressed PCM: perfect fidelity at roughly 10MB per minute. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WAV into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your WAV files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WAV to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WAV I should know?",
+        a: "WAV has no standard tag block, so artist and title fields most likely do not exist in the source to carry over.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wav-to-ogg": {
+    searchTitle: "WAV to OGG Converter Online Free",
+    longDescription:
+      "Convert WAV audio to Ogg Vorbis. You are starting from WAV, which is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. WAV is lossless and OGG is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WAV into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your WAV files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WAV to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WAV I should know?",
+        a: "WAV has no standard tag block, so artist and title fields most likely do not exist in the source to carry over.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wav-to-m4a": {
+    searchTitle: "WAV to M4A Converter Online Free",
+    longDescription:
+      "Convert WAV audio to M4A. You are starting from WAV, which is uncompressed PCM: perfect fidelity at roughly 10MB per minute. M4A is AAC audio in an MP4 container, which some older players refuse to open. WAV is lossless and M4A is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WAV into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your WAV files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WAV to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WAV I should know?",
+        a: "WAV has no standard tag block, so artist and title fields most likely do not exist in the source to carry over.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "flac-to-wav": {
+    searchTitle: "FLAC to WAV Converter Online Free",
+    longDescription:
+      "Convert FLAC audio to WAV. You are starting from FLAC, which is lossless compression, so bit-perfect audio at about half the size of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a FLAC into WAV for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names WAV specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever WAV supports them",
+      "Batch conversion across a whole library",
+      "Your FLAC files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will FLAC to WAV lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. WAV carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about FLAC I should know?",
+        a: "FLAC keeps the full dynamic range. If the destination is a phone or a car stereo, consider normalising while you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "flac-to-ogg": {
+    searchTitle: "FLAC to OGG Converter Online Free",
+    longDescription:
+      "Convert FLAC audio to Ogg Vorbis. You are starting from FLAC, which is lossless compression, so bit-perfect audio at about half the size of WAV. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. FLAC is lossless and OGG is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a FLAC into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your FLAC files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will FLAC to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about FLAC I should know?",
+        a: "FLAC keeps the full dynamic range. If the destination is a phone or a car stereo, consider normalising while you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "flac-to-m4a": {
+    searchTitle: "FLAC to M4A Converter Online Free",
+    longDescription:
+      "Convert FLAC audio to M4A. You are starting from FLAC, which is lossless compression, so bit-perfect audio at about half the size of WAV. M4A is AAC audio in an MP4 container, which some older players refuse to open. FLAC is lossless and M4A is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a FLAC into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your FLAC files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will FLAC to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about FLAC I should know?",
+        a: "FLAC keeps the full dynamic range. If the destination is a phone or a car stereo, consider normalising while you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "ogg-to-flac": {
+    searchTitle: "OGG to FLAC Converter Online Free",
+    longDescription:
+      "Convert Ogg Vorbis audio to FLAC. You are starting from Ogg Vorbis, which is royalty-free and strong at low bitrates, but thin on hardware support. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. FLAC is lossless, but it cannot rebuild what OGG already threw away. You get a larger file containing exactly what the OGG held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a OGG into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your OGG files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will OGG to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about OGG I should know?",
+        a: "Ogg's bitrate is variable by design, so a nominal 128kbps Vorbis file is not directly comparable to a constant 128kbps MP3, and usually sounds better.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "ogg-to-m4a": {
+    searchTitle: "OGG to M4A Converter Online Free",
+    longDescription:
+      "Convert Ogg Vorbis audio to M4A. You are starting from Ogg Vorbis, which is royalty-free and strong at low bitrates, but thin on hardware support. M4A is AAC audio in an MP4 container, which some older players refuse to open. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a OGG into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your OGG files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will OGG to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about OGG I should know?",
+        a: "Ogg's bitrate is variable by design, so a nominal 128kbps Vorbis file is not directly comparable to a constant 128kbps MP3, and usually sounds better.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "m4a-to-flac": {
+    searchTitle: "M4A to FLAC Converter Online Free",
+    longDescription:
+      "Convert M4A audio to FLAC. You are starting from M4A, which is AAC audio in an MP4 container, which some older players refuse to open. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. FLAC is lossless, but it cannot rebuild what M4A already threw away. You get a larger file containing exactly what the M4A held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a M4A into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your M4A files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will M4A to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about M4A I should know?",
+        a: "M4A and MP4 are the same container with a different extension. If a player rejects the .m4a, renaming it to .mp4 occasionally works without converting anything.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "m4a-to-ogg": {
+    searchTitle: "M4A to OGG Converter Online Free",
+    longDescription:
+      "Convert M4A audio to Ogg Vorbis. You are starting from M4A, which is AAC audio in an MP4 container, which some older players refuse to open. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a M4A into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your M4A files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will M4A to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about M4A I should know?",
+        a: "M4A and MP4 are the same container with a different extension. If a player rejects the .m4a, renaming it to .mp4 occasionally works without converting anything.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aac-to-ogg": {
+    searchTitle: "AAC to OGG Converter Online Free",
+    longDescription:
+      "Convert AAC audio to Ogg Vorbis. You are starting from AAC, which is cleaner than MP3 at the same bitrate, and standard across Apple devices. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AAC into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your AAC files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AAC to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AAC I should know?",
+        a: "A raw .aac stream has no container and no dependable duration header, which is why some players scrub through it badly. Converting fixes that even when the codec stays the same.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aac-to-m4a": {
+    searchTitle: "AAC to M4A Converter Online Free",
+    longDescription:
+      "Convert AAC audio to M4A. You are starting from AAC, which is cleaner than MP3 at the same bitrate, and standard across Apple devices. M4A is AAC audio in an MP4 container, which some older players refuse to open. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AAC into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your AAC files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AAC to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AAC I should know?",
+        a: "A raw .aac stream has no container and no dependable duration header, which is why some players scrub through it badly. Converting fixes that even when the codec stays the same.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "opus-to-mp3": {
+    searchTitle: "Opus to MP3 Converter Online Free",
+    longDescription:
+      "Convert Opus audio to MP3. You are starting from Opus, which is the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video. MP3 is the safe default: every player built in the last 25 years reads it. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Get a Opus file playing on a car stereo, an old phone, or anything stubborn",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names MP3 specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever MP3 supports them",
+      "Batch conversion across a whole library",
+      "Your Opus files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will Opus to MP3 lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. MP3 carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about Opus I should know?",
+        a: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "opus-to-wav": {
+    searchTitle: "Opus to WAV Converter Online Free",
+    longDescription:
+      "Convert Opus audio to WAV. You are starting from Opus, which is the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. WAV is lossless, but it cannot rebuild what Opus already threw away. You get a larger file containing exactly what the Opus held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a Opus into WAV for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names WAV specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever WAV supports them",
+      "Batch conversion across a whole library",
+      "Your Opus files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will Opus to WAV lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. WAV carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about Opus I should know?",
+        a: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "opus-to-flac": {
+    searchTitle: "Opus to FLAC Converter Online Free",
+    longDescription:
+      "Convert Opus audio to FLAC. You are starting from Opus, which is the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. FLAC is lossless, but it cannot rebuild what Opus already threw away. You get a larger file containing exactly what the Opus held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a Opus into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your Opus files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will Opus to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about Opus I should know?",
+        a: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "opus-to-ogg": {
+    searchTitle: "Opus to OGG Converter Online Free",
+    longDescription:
+      "Convert Opus audio to Ogg Vorbis. You are starting from Opus, which is the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a Opus into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your Opus files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will Opus to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about Opus I should know?",
+        a: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "opus-to-m4a": {
+    searchTitle: "Opus to M4A Converter Online Free",
+    longDescription:
+      "Convert Opus audio to M4A. You are starting from Opus, which is the most efficient lossy codec in common use, behind WhatsApp voice notes, Discord, and most WebM video. M4A is AAC audio in an MP4 container, which some older players refuse to open. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a Opus into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your Opus files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will Opus to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about Opus I should know?",
+        a: "Most .opus files are voice notes or audio ripped from WebM video. Desktop players and car stereos often refuse them, which is usually why people convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wma-to-mp3": {
+    searchTitle: "WMA to MP3 Converter Online Free",
+    longDescription:
+      "Convert Windows Media Audio audio to MP3. You are starting from Windows Media Audio, which is Microsoft's legacy codec, which Apple devices and many players will not open. MP3 is the safe default: every player built in the last 25 years reads it. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Get a WMA file playing on a car stereo, an old phone, or anything stubborn",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names MP3 specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever MP3 supports them",
+      "Batch conversion across a whole library",
+      "Your WMA files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WMA to MP3 lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. MP3 carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WMA I should know?",
+        a: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wma-to-wav": {
+    searchTitle: "WMA to WAV Converter Online Free",
+    longDescription:
+      "Convert Windows Media Audio audio to WAV. You are starting from Windows Media Audio, which is Microsoft's legacy codec, which Apple devices and many players will not open. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. WAV is lossless, but it cannot rebuild what WMA already threw away. You get a larger file containing exactly what the WMA held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WMA into WAV for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names WAV specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever WAV supports them",
+      "Batch conversion across a whole library",
+      "Your WMA files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WMA to WAV lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. WAV carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WMA I should know?",
+        a: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wma-to-flac": {
+    searchTitle: "WMA to FLAC Converter Online Free",
+    longDescription:
+      "Convert Windows Media Audio audio to FLAC. You are starting from Windows Media Audio, which is Microsoft's legacy codec, which Apple devices and many players will not open. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. FLAC is lossless, but it cannot rebuild what WMA already threw away. You get a larger file containing exactly what the WMA held, which helps before editing and achieves nothing as an archive upgrade. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WMA into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your WMA files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WMA to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WMA I should know?",
+        a: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wma-to-ogg": {
+    searchTitle: "WMA to OGG Converter Online Free",
+    longDescription:
+      "Convert Windows Media Audio audio to Ogg Vorbis. You are starting from Windows Media Audio, which is Microsoft's legacy codec, which Apple devices and many players will not open. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WMA into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your WMA files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WMA to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WMA I should know?",
+        a: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "wma-to-m4a": {
+    searchTitle: "WMA to M4A Converter Online Free",
+    longDescription:
+      "Convert Windows Media Audio audio to M4A. You are starting from Windows Media Audio, which is Microsoft's legacy codec, which Apple devices and many players will not open. M4A is AAC audio in an MP4 container, which some older players refuse to open. Both formats are lossy, so this is a second compression pass over audio that was already compressed. Fine for listening, wrong for archiving. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a WMA into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your WMA files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WMA to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about WMA I should know?",
+        a: "WMA files ripped by old versions of Windows Media Player can carry DRM. Protected tracks will not decode, and no converter can get around that.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aiff-to-mp3": {
+    searchTitle: "AIFF to MP3 Converter Online Free",
+    longDescription:
+      "Convert AIFF audio to MP3. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. MP3 is the safe default: every player built in the last 25 years reads it. AIFF is lossless and MP3 is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Get a AIFF file playing on a car stereo, an old phone, or anything stubborn",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names MP3 specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever MP3 supports them",
+      "Batch conversion across a whole library",
+      "Your AIFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AIFF to MP3 lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. MP3 carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AIFF I should know?",
+        a: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aiff-to-wav": {
+    searchTitle: "AIFF to WAV Converter Online Free",
+    longDescription:
+      "Convert AIFF audio to WAV. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. WAV is uncompressed PCM: perfect fidelity at roughly 10MB per minute. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AIFF into WAV for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names WAV specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever WAV supports them",
+      "Batch conversion across a whole library",
+      "Your AIFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AIFF to WAV lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. WAV carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AIFF I should know?",
+        a: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aiff-to-flac": {
+    searchTitle: "AIFF to FLAC Converter Online Free",
+    longDescription:
+      "Convert AIFF audio to FLAC. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. FLAC is lossless compression, so bit-perfect audio at about half the size of WAV. Both formats are lossless, so every sample comes through untouched and only the container and the file size change. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AIFF into FLAC for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names FLAC specifically",
+    ],
+    features: [
+      "Lossless encode, with no quality call to make",
+      "Tags, artwork, and track metadata carried across wherever FLAC supports them",
+      "Batch conversion across a whole library",
+      "Your AIFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AIFF to FLAC lose quality?",
+        a: "Nothing is lost on this hop. Whether that is useful depends on the source: from a lossy original you get a faithful copy of already-reduced audio, not a restored one.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. FLAC carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AIFF I should know?",
+        a: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aiff-to-ogg": {
+    searchTitle: "AIFF to OGG Converter Online Free",
+    longDescription:
+      "Convert AIFF audio to Ogg Vorbis. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. Ogg Vorbis is royalty-free and strong at low bitrates, but thin on hardware support. AIFF is lossless and OGG is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AIFF into OGG for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names OGG specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever OGG supports them",
+      "Batch conversion across a whole library",
+      "Your AIFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AIFF to OGG lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. OGG carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AIFF I should know?",
+        a: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "aiff-to-m4a": {
+    searchTitle: "AIFF to M4A Converter Online Free",
+    longDescription:
+      "Convert AIFF audio to M4A. You are starting from AIFF, which is Apple's uncompressed PCM format, the Mac counterpart of WAV. M4A is AAC audio in an MP4 container, which some older players refuse to open. AIFF is lossless and M4A is lossy, so this discards audio data in exchange for a much smaller file. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Move a AIFF into M4A for editing or archiving",
+      "Standardise a mixed music or voice library on a single format",
+      "Meet an upload requirement that names M4A specifically",
+    ],
+    features: [
+      "Bitrate and sample rate control",
+      "Tags, artwork, and track metadata carried across wherever M4A supports them",
+      "Batch conversion across a whole library",
+      "Your AIFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will AIFF to M4A lose quality?",
+        a: "Some, unavoidably. Pick a bitrate you are happy to live with, because the discarded detail is gone for good and re-encoding upward later recovers nothing.",
+      },
+      {
+        q: "Are tags and cover art kept?",
+        a: "Yes, wherever the target has somewhere to put them. M4A carries the common fields; anything exotic in the source may not survive.",
+      },
+      {
+        q: "Anything peculiar about AIFF I should know?",
+        a: "AIFF holds the same uncompressed PCM audio as WAV in Apple's wrapper, so expect roughly 10MB per minute at CD quality before you convert.",
+      },
+      {
+        q: "Can I convert a whole folder at once?",
+        a: "Yes. Batch conversion applies the same settings to every file and returns them together.",
+      },
+    ],
+  },
+  "srt-to-vtt": {
+    searchTitle: "SRT to VTT Subtitle Converter Online Free",
+    longDescription:
+      "Convert SubRip (SRT) subtitles to WebVTT, the format HTML5 video players and streaming sites expect. Cue timing and dialogue carry over unchanged. WebVTT keeps italics, bold and underline, so anything fancier in the source is dropped. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Add the subtitles to an HTML5 video player or a streaming upload",
+      "Hand a VTT file to a video platform or editor that rejects SRT",
+      "Fix the encoding of an old SRT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 VTT, decoding legacy Windows-1252 SRT files automatically",
+      "Your SRT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting SRT to VTT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic SRT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "vtt-to-srt": {
+    searchTitle: "VTT to SRT Subtitle Converter Online Free",
+    longDescription:
+      "Convert WebVTT subtitles to SubRip (SRT), the format TVs, media players, and most video editors expect. Cue timing and dialogue carry over unchanged. SubRip (SRT) keeps basic tags such as italics and bold, so anything fancier in the source is dropped. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Play the subtitles on a TV or media player, or drop them into a video editor",
+      "Hand an SRT file to a video platform or editor that rejects VTT",
+      "Fix the encoding of an old VTT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 SRT, decoding legacy Windows-1252 VTT files automatically",
+      "Your VTT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting VTT to SRT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic VTT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "ass-to-srt": {
+    searchTitle: "ASS to SRT Subtitle Converter Online Free",
+    longDescription:
+      "Convert Advanced SubStation Alpha (ASS) subtitles to SubRip (SRT), the format TVs, media players, and most video editors expect. Cue timing and dialogue carry over unchanged. On-screen positioning, fonts and karaoke effects are dropped, since SRT can't hold them; italics and bold survive. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Play the subtitles on a TV or media player, or drop them into a video editor",
+      "Hand an SRT file to a video platform or editor that rejects ASS",
+      "Fix the encoding of an old ASS file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 SRT, decoding legacy Windows-1252 ASS files automatically",
+      "Your ASS files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting ASS to SRT change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic ASS files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
+  "srt-to-ass": {
+    searchTitle: "SRT to ASS Subtitle Converter Online Free",
+    longDescription:
+      "Convert SubRip (SRT) subtitles to Advanced SubStation Alpha (ASS), the format Aegisub and styled-subtitle players such as mpv and VLC expect. Cue timing and dialogue carry over unchanged. The cues get a default ASS style, ready for you to restyle in Aegisub or another editor. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Restyle the subtitles in Aegisub, or play them styled in mpv or VLC",
+      "Hand an ASS file to a video platform or editor that rejects SRT",
+      "Fix the encoding of an old SRT file while converting it",
+    ],
+    features: [
+      "Keeps every cue's start and end time",
+      "Writes UTF-8 ASS, decoding legacy Windows-1252 SRT files automatically",
+      "Your SRT files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Does converting SRT to ASS change the timing?",
+        a: "No. Each cue keeps its start and end time; only the file syntax changes.",
+      },
+      {
+        q: "What if accented or non-Latin characters come out garbled?",
+        a: "This converter reads valid UTF-8 as is and anything else as Windows-1252. For Cyrillic, Chinese, Japanese, Korean or Arabic SRT files in a legacy encoding, use Convert Subtitles and pick the encoding there.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any feature-length subtitle. An admin can raise it with the MAX_SUBTITLE_SIZE_MB setting.",
+      },
+    ],
+  },
   "excel-to-csv": {
     searchTitle: "Excel to CSV Converter Online Free",
     longDescription:
@@ -2666,6 +3802,126 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       {
         q: "Will accented or non-Latin characters survive?",
         a: "Yes, the output is UTF-8. If a downstream tool mangles them it is reading the file as something else, which is normally fixable by choosing the encoding at import.",
+      },
+    ],
+  },
+  "otf-to-ttf": {
+    searchTitle: "OTF to TTF Converter Online Free",
+    longDescription:
+      "Convert OTF fonts to TTF. OTF is OpenType with CFF outlines, the cubic-curve flavour most type foundries ship. TTF is TrueType, the desktop format every operating system and design app installs. OTF stores cubic curves and TTF stores quadratic ones, so every glyph is redrawn. Each curve stays within one font unit of the original, which is invisible at any size you would set text. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as OTF on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your OTF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will OTF to TTF change how the font looks?",
+        a: "Not visibly. The curves are approximated within one font unit, which is a fraction of a pixel at normal text sizes. Hinting is not carried over, so very small sizes on older Windows rendering may look slightly softer.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "woff-to-ttf": {
+    searchTitle: "WOFF to TTF Converter Online Free",
+    longDescription:
+      "Convert WOFF fonts to TTF. WOFF is a compressed web wrapper around a TTF or OTF. TTF is TrueType, the desktop format every operating system and design app installs. Unwrapping WOFF gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as WOFF on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your WOFF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WOFF to TTF change how the font looks?",
+        a: "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "woff2-to-ttf": {
+    searchTitle: "WOFF2 to TTF Converter Online Free",
+    longDescription:
+      "Convert WOFF2 fonts to TTF. WOFF2 is the Brotli-compressed web wrapper every current browser loads, and the smallest of the four. TTF is TrueType, the desktop format every operating system and design app installs. Unwrapping WOFF2 gives back the font inside. If that font has CFF outlines, they are redrawn as TrueType curves within one font unit of the original. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Install a font that only came as WOFF2 on a desktop or in a design app",
+      "Get a font into software that only accepts TrueType",
+      "Inspect or edit a webfont in a desktop font editor",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your WOFF2 files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will WOFF2 to TTF change how the font looks?",
+        a: "Only if the font inside uses CFF outlines, and then only by up to one font unit per curve. A TrueType font inside comes out unchanged.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Variable CFF2 fonts can't become TTF, and the tool says so instead of returning a broken file. A variable font that already has TrueType outlines keeps its axes.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
+      },
+    ],
+  },
+  "ttf-to-woff2": {
+    searchTitle: "TTF to WOFF2 Converter Online Free",
+    longDescription:
+      "Convert TTF fonts to WOFF2. TTF is TrueType, the desktop format every operating system and design app installs. WOFF2 is the Brotli-compressed web wrapper every current browser loads, and the smallest of the four. WOFF2 only wraps the font, so the outlines, kerning, and OpenType features come through untouched. TrueType and OpenType sources both work. Runs on your own SnapOtter instance. Files never reach a third party.",
+    useCases: [
+      "Self-host a webfont with an @font-face rule instead of loading it from a font CDN",
+      "Cut a site's font payload by serving WOFF2 in place of a raw TTF",
+      "Ship a brand font with a web app without bloating the first page load",
+    ],
+    features: [
+      "Kerning, ligatures, and other OpenType layout tables carried across",
+      "Embedding permissions (the OS/2 fsType bits) left exactly as the foundry set them",
+      "Batch conversion across a whole font family",
+      "Your TTF files are processed on your own server and never uploaded anywhere",
+    ],
+    faqs: [
+      {
+        q: "Will TTF to WOFF2 change how the font looks?",
+        a: "No. WOFF2 is a compressed container, so the glyphs inside are the same ones you uploaded.",
+      },
+      {
+        q: "Does this work with variable fonts?",
+        a: "Yes. A variable font keeps its axes when it is wrapped as WOFF2.",
+      },
+      {
+        q: "Does converting change the font's licence?",
+        a: "No. The licence is whatever the foundry granted you, whatever the file format. Check it before you self-host a font on the web.",
       },
     ],
   },
@@ -5659,6 +6915,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "video-to-avif": {
+    searchTitle: "Convert Video to Animated AVIF",
+    longDescription:
+      "Turn a video clip into an animated AVIF image, the royalty-free AV1-based format that usually comes out smaller than a GIF or animated WebP at the same visual quality. Pick the start point, clip length, frame rate, width, and quality, and SnapOtter encodes it on your own server.",
+    useCases: [
+      "Replace heavy GIF animations on a website with smaller AVIF files",
+      "Turn a short screen recording into a looping animation for product docs",
+      "Create animated hero images or product previews that load fast on mobile",
+      "Cut a highlight from a longer video into a compact animation for a blog post",
+    ],
+    features: [
+      "Royalty-free AV1 compression with a 1 to 100 quality setting",
+      "Choose the start time and clip length, up to 60 seconds per animation",
+      "Configurable frame rate up to 30 fps and width from 64 to 1280 pixels",
+      "Loop forever or play once",
+      "Runs entirely on your self-hosted instance with no data leaving your network",
+    ],
+    faqs: [
+      {
+        q: "Why use AVIF instead of GIF or WebP?",
+        a: "Animated AVIF uses AV1 compression, so it is usually smaller than an animated WebP and far smaller than a GIF at the same visual quality. It supports full color instead of GIF's 256-color palette, and the format is royalty-free. Conversion runs locally on your server.",
+      },
+      {
+        q: "Where does animated AVIF play?",
+        a: "Current versions of Chrome, Firefox, Safari, and Edge play animated AVIF. Some desktop image viewers and older apps show only the first frame, so keep a GIF or MP4 fallback for those. SnapOtter processes everything on your own infrastructure.",
+      },
+      {
+        q: "Why is conversion slower than GIF or WebP?",
+        a: "AV1 encoding takes more CPU work than older formats, which is why each animation is capped at 60 seconds. Shorter clips, a lower frame rate, or a smaller width finish faster. The audio track is dropped, since AVIF images carry no sound.",
+      },
+    ],
+  },
   "video-to-frames": {
     searchTitle: "Extract Video Frames as Images",
     longDescription:
@@ -5822,7 +7110,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
   "extract-subtitles": {
     searchTitle: "Extract Subtitles From Video File",
     longDescription:
-      "Pull the embedded subtitle track out of a video container and save it as a standalone SRT file. Useful for repurposing captions, translating them, or archiving text separately from video. SnapOtter extracts the subtitles on your own server.",
+      "Pull the embedded subtitle track out of a video container and save it as a standalone SRT, WebVTT or ASS file. Useful for repurposing captions, translating them, or archiving text separately from video. SnapOtter extracts the subtitles on your own server.",
     useCases: [
       "Extract captions from a training video to create a text transcript",
       "Pull subtitle files from videos for translation into other languages",
@@ -5830,7 +7118,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       "Extract closed captions from broadcast recordings for compliance documentation",
     ],
     features: [
-      "Extracts embedded subtitle streams as standalone SRT files",
+      "Extracts embedded subtitle streams as standalone SRT, WebVTT or ASS files",
       "Supports extraction from MP4, MKV, MOV, and WebM containers",
       "Detects and lists all available subtitle tracks in a file",
       "Preserves original timing and formatting from the source stream",
@@ -5847,7 +7135,39 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "What format is the output?",
-        a: "Subtitles are extracted as SRT files, the most widely supported subtitle format. SRT is plain text with timestamps, making it easy to edit or translate. All extraction happens locally on your infrastructure.",
+        a: "SRT by default, the most widely supported subtitle format. You can pick WebVTT for web players or ASS for styled-subtitle editors instead. All extraction happens locally on your infrastructure.",
+      },
+    ],
+  },
+  "convert-subtitles": {
+    searchTitle: "Convert Subtitles: SRT to VTT, ASS to SRT",
+    longDescription:
+      "Convert a subtitle file between SRT, WebVTT and ASS. Timing and dialogue carry over, so an .ass from a fansub release becomes an .srt your TV plays, and an .srt becomes the .vtt a web video player expects. ASS positioning and effects are dropped, since SRT and WebVTT can't hold them; basic formatting such as italics survives. Older SRT files saved in Windows-1252, GB18030 or another legacy encoding come out as clean UTF-8. Conversion runs on your own SnapOtter server.",
+    useCases: [
+      "Turn an SRT into WebVTT for an HTML5 video player",
+      "Convert ASS subtitles to SRT for a TV or media player that only reads SRT",
+      "Fix garbled accents in an old Windows-1252 SRT by re-saving it as UTF-8",
+      "Prepare a plain SRT before embedding or burning it into a video",
+    ],
+    features: [
+      "Converts in any direction between SRT, WebVTT and ASS",
+      "Keeps cue timing and dialogue text",
+      "Reads UTF-8 and legacy encodings such as Windows-1252, Windows-1251, GB18030, Big5 and Shift_JIS",
+      "Always writes UTF-8 output",
+      "Batch converts several subtitle files at once",
+    ],
+    faqs: [
+      {
+        q: "What happens to ASS styling when I convert to SRT?",
+        a: "Timing, dialogue and basic formatting carry over. SRT keeps italics, bold, colour and font size as tags, and WebVTT keeps italics, bold and underline. On-screen positioning, karaoke and other ASS effects are dropped.",
+      },
+      {
+        q: "My converted subtitles show strange characters. What do I do?",
+        a: "The source file probably isn't UTF-8. Auto-detect reads anything that isn't valid UTF-8 as Windows-1252. For Chinese, Cyrillic, Japanese, Korean or Arabic subtitles, pick the file's encoding in the settings and convert again.",
+      },
+      {
+        q: "Is there a size limit?",
+        a: "Subtitle files are capped at 1 MB by default, which fits any normal feature-length subtitle. An admin can change the cap with the MAX_SUBTITLE_SIZE_MB setting.",
       },
     ],
   },
@@ -7246,6 +8566,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
 
+  "resize-pdf-pages": {
+    searchTitle: "Resize PDF Pages to 4x6, A4 or Letter Free",
+    longDescription:
+      "Change the page size of every page in a PDF. Pick A4, US Letter, A5, A6, a 4x6 in or 100x150 mm shipping label, or a custom size. Content is scaled to fit and centered without rasterizing, so text and barcodes stay sharp. SnapOtter runs on your own server, so documents stay on your network.",
+    useCases: [
+      "Turning a full-page carrier label into a 4x6 in page for a thermal label printer",
+      "Converting a US Letter document to A4 before printing in Europe",
+      "Shrinking pages to A5 or A6 for handouts and small booklets",
+      "Resizing every page in a batch of PDFs inside an automated pipeline",
+    ],
+    features: [
+      "Preset sizes including 4x6 in and 100x150 mm label stock",
+      "Custom page sizes in inches or millimetres",
+      "Scales to fit and centers, never stretches the content",
+      "Keeps vector text and barcodes sharp instead of rasterizing",
+      "Self-hosted processing keeps document content on your network",
+    ],
+    faqs: [
+      {
+        q: "Will a shipping label barcode still scan after resizing?",
+        a: "Yes. Pages are scaled as vectors, not turned into images, so barcodes keep crisp edges at any size. Processing runs on your own server.",
+      },
+      {
+        q: "What happens when the new size has a different shape?",
+        a: "The page is scaled to fit inside the new size and centered. The leftover space stays blank, so nothing is stretched or cut off.",
+      },
+      {
+        q: "Does it crop to the label on a Letter or A4 sheet?",
+        a: "No. Resizing keeps the whole page, so a label printed on a quarter of the sheet stays a quarter of the new page.",
+      },
+    ],
+  },
   "nup-pdf": {
     searchTitle: "N-up PDF Multiple Pages Per Sheet",
     longDescription:
@@ -7499,6 +8851,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       {
         q: "Can I extract text from password-protected PDFs?",
         a: "The PDF must be accessible for text extraction. Processing happens locally on your SnapOtter server so your document content is never sent to any external service.",
+      },
+    ],
+  },
+  "pdf-to-markdown": {
+    searchTitle: "Convert PDF to Markdown Free",
+    longDescription:
+      "Convert a PDF into a Markdown file with headings, lists, links and ruled tables kept where the PDF has them. Headings are worked out from font size, so the output reads like a document rather than a wall of text. Images are left out. It runs on your self-hosted SnapOtter instance, so the document never leaves your server.",
+    useCases: [
+      "Moving PDF manuals and handbooks into a wiki or docs site",
+      "Feeding reports to an LLM or RAG pipeline as clean Markdown",
+      "Turning a PDF spec into an editable file you can keep in Git",
+      "Pulling tables out of a PDF report into Markdown you can edit",
+    ],
+    features: [
+      "Infers heading levels from font size across the whole document",
+      "Keeps bulleted and numbered lists",
+      "Keeps bold, italic and web links inline",
+      "Turns tables drawn with ruling lines into Markdown tables",
+      "Refuses scanned PDFs with no text layer and points you to OCR",
+    ],
+    faqs: [
+      {
+        q: "Does this work with scanned PDFs?",
+        a: "No. A scanned PDF has no text layer, so there is nothing to convert. The tool tells you so instead of handing back an empty file, and you can run the PDF OCR tool on it instead.",
+      },
+      {
+        q: "How well are tables converted?",
+        a: "Tables drawn with ruling lines usually come out as proper Markdown tables. Tables laid out with spacing alone often come through as plain lines of text, so check them in the output.",
+      },
+      {
+        q: "What happens to images in the PDF?",
+        a: "They're dropped. The output is a single Markdown file with the text, headings, lists, links and tables.",
       },
     ],
   },
@@ -7979,6 +9363,42 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       {
         q: "Is there a limit on how many files I can merge?",
         a: "You can merge multiple files in a single operation. All merging happens locally on your self-hosted infrastructure so your data never leaves your network.",
+      },
+    ],
+  },
+  "merge-text": {
+    searchTitle: "Merge Text and Markdown Files Into One",
+    longDescription:
+      "Join 2 to 50 text, Markdown, CSV or log files into a single file, in the order you arrange them. Put a blank line, a horizontal rule, or each file's name as a heading between them. When every file is Markdown the result is Markdown too, and a file that isn't UTF-8 text is rejected by name instead of turning into garbled characters. Runs on your own SnapOtter instance, so your notes and logs never reach a third party.",
+    useCases: [
+      "Stitching chapter or section drafts written as separate Markdown files into one manuscript",
+      "Combining a folder of meeting notes into a single document to search or share",
+      "Combining several .log files into one before searching through them",
+      "Assembling README fragments or changelog entries into one page",
+    ],
+    features: [
+      "Joins files in the order shown, with drag-to-reorder before you merge",
+      "Choice of separator: blank line, horizontal rule, or a filename heading for each file",
+      "Keeps the shared extension, so Markdown inputs come back as merged.md",
+      "Rejects binary and non-UTF-8 files with the offending filename in the error",
+      "Matches Windows line endings when every input uses them",
+    ],
+    faqs: [
+      {
+        q: "Can I control the order of the files?",
+        a: "Yes. Files are joined top to bottom in the order they appear in the file list, and you can drag them into a different order before merging.",
+      },
+      {
+        q: "What does the filename heading separator look like?",
+        a: 'When every file is Markdown, each section starts with a level one heading such as "# notes.md". Otherwise each section gets a "==> notes.txt <==" marker line instead, the same style tail uses for multiple files.',
+      },
+      {
+        q: "Can I merge CSV files with it?",
+        a: "You can, but the result comes back as plain text because each file's header row is repeated. To combine CSV tables into one valid table, use Merge CSVs instead.",
+      },
+      {
+        q: "Does it support email files?",
+        a: "Not yet. .eml files aren't accepted, because flattening MIME email into readable text needs its own handling. Supported inputs are .txt, .md, .markdown, .csv and .log.",
       },
     ],
   },

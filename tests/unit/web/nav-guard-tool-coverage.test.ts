@@ -21,7 +21,7 @@ import { OWN_STORE_TOOL_IDS, WARN_ONLY_TOOL_IDS } from "@/hooks/use-work-in-flig
  * is the real mapping the app uses. The "<toolId>-settings.tsx" filename
  * convention would be cheaper to follow but it is only a convention: crop,
  * adjust-colors and erase-object are already registered through wrappers, and
- * the 83 conversion presets all share one component.
+ * the conversion presets all share one component.
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +38,8 @@ const EXEMPT: Record<string, string> = {
     "holds typed config, not a result; the image regenerates client-side the moment the page is open",
   "barcode-generate":
     "holds typed config, not a result; the image regenerates client-side the moment the page is open",
+  "aspect-ratio-calculator":
+    "produces no file: the answer is two numbers that come back from the typed dimensions in one click",
   "watermark-image":
     "hand-rolls its fetch but puts the result in the file store (setProcessedUrl), which the guard already reads",
   compose:
@@ -55,6 +57,11 @@ const EXEMPT: Record<string, string> = {
   info: "produces no file: it reads metadata out of the input, and re-reads it on demand",
   "color-palette":
     "produces no file: it reads colors out of the input, and re-reads them on demand",
+  "convert-case":
+    "produces no file: it turns pasted text into text that is shown and copied in place",
+  "proportion-calculator":
+    "produces no file: it turns three typed numbers into one that is shown and copied in place",
+  base64: "produces no file: it turns pasted text into text that is shown and copied in place",
   ocr: "writes the extracted text onto the file-store entry (updateEntryById), which the guard already reads, and claims it when copied, downloaded, or auto-saved (#1111)",
   favicon:
     "writes the generated zip onto the file-store entry (updateEntryById), which the guard already reads (#1111)",

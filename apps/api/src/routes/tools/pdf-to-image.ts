@@ -154,20 +154,78 @@ async function convertWithSharp(
 }
 
 // ── Render a single page ─────────────────────────────────────────
+
+/**
+ * sharp's default limitInputPixels (16383 x 16383). convertWithSharp decodes
+ * every render with that default, so a page rendered past it can never become
+ * an output; refusing up front skips a render that would only exhaust mupdf's
+ * heap first (#4424).
+ */
+export const MAX_RENDER_PIXELS = 16383 * 16383;
+
+/**
+ * mupdf's own refusals of a pixmap it cannot allocate: its WASM heap running
+ * out (`malloc (N bytes) failed`) or its size guards. Both mean the page is too
+ * big at this DPI, not that the document is broken.
+ */
+const MUPDF_ALLOCATION_FAILURE = /^(?:malloc \(\d+ bytes\) failed|Overly (?:large|wide) image)$/;
+
+/**
+ * A page that would render too large at the requested DPI. Raised from
+ * renderPage, possibly after earlier pages were written, so the single-file
+ * route clears its outputs before answering 400.
+ */
+class PdfRenderTooLargeError extends Error {
+  readonly code = "RESULT_TOO_LARGE";
+}
+
+/** Pixel size mupdf gives a page's pixmap at `dpi`, using its own rect rounding. */
+export function renderPixelSize(
+  bounds: readonly number[],
+  dpi: number,
+): { width: number; height: number } {
+  const scale = dpi / 72;
+  const [x0, y0, x1, y1] = bounds.map((v) => v * scale);
+  return {
+    width: Math.ceil(x1 - 0.001) - Math.floor(x0 + 0.001),
+    height: Math.ceil(y1 - 0.001) - Math.floor(y0 + 0.001),
+  };
+}
+
+function formatMegapixels(pixels: number): string {
+  return (pixels / 1_000_000).toFixed(0);
+}
+
 function renderPage(doc: mupdf.Document, pageIndex: number, dpi: number): Uint8Array {
   const page = doc.loadPage(pageIndex);
   try {
+    const { width, height } = renderPixelSize(page.getBounds(), dpi);
+    if (width * height > MAX_RENDER_PIXELS) {
+      throw new PdfRenderTooLargeError(
+        `Page ${pageIndex + 1} at ${dpi} DPI would render ${width} x ${height} px (${formatMegapixels(width * height)} MP), which exceeds the ${formatMegapixels(MAX_RENDER_PIXELS)} MP limit. Lower the DPI and try again.`,
+      );
+    }
     const scale = dpi / 72;
-    const pixmap = page.toPixmap(
-      mupdf.Matrix.scale(scale, scale),
-      mupdf.ColorSpace.DeviceRGB,
-      false,
-      true,
-    );
     try {
-      return pixmap.asPNG();
-    } finally {
-      pixmap.destroy();
+      const pixmap = page.toPixmap(
+        mupdf.Matrix.scale(scale, scale),
+        mupdf.ColorSpace.DeviceRGB,
+        false,
+        true,
+      );
+      try {
+        return pixmap.asPNG();
+      } finally {
+        pixmap.destroy();
+      }
+    } catch (err) {
+      if (err instanceof Error && MUPDF_ALLOCATION_FAILURE.test(err.message)) {
+        throw new PdfRenderTooLargeError(
+          `Page ${pageIndex + 1} is too large to render at ${dpi} DPI (${width} x ${height} px). Lower the DPI and try again.`,
+          { cause: err },
+        );
+      }
+      throw err;
     }
   } finally {
     page.destroy();
@@ -687,7 +745,7 @@ export function registerPdfToImageRoute(
           );
 
           const tooLarge = imageSizeLimitError(err);
-          if (err instanceof PdfInputError) {
+          if (err instanceof PdfInputError || err instanceof PdfRenderTooLargeError) {
             errors.push({ filename: file.filename, error: err.message });
           } else if (tooLarge) {
             errors.push({ filename: file.filename, error: tooLarge.message });
@@ -986,6 +1044,9 @@ export function registerPdfToImageRoute(
         });
       }
       if (hasServerErrorStatus(err)) throw err;
+      if (err instanceof PdfRenderTooLargeError) {
+        return reply.status(400).send({ error: err.message, code: err.code });
+      }
       const tooLarge = imageSizeLimitError(err);
       if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");

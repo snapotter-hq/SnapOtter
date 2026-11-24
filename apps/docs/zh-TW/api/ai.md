@@ -472,7 +472,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 **工具路由：** `content-aware-resize`  
 **引擎：** Go `caire` 二進位檔（非 Python，GPU 無法加速）
 
-透過移除低能量接縫來智慧調整影像大小，保留重要內容。
+透過移除或插入低能量接縫來智慧調整影像大小，保留重要內容。每一邊最多可放大到原始尺寸的 2 倍。
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|

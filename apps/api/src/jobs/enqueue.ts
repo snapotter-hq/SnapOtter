@@ -347,8 +347,8 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   }
 
   // Fire-and-forget: compute deleteAfter from team retention override. A
-  // failure leaves delete_after NULL, so the job's files follow the global
-  // FILE_MAX_AGE_HOURS TTL instead of the team's retention (#1522).
+  // failure leaves delete_after NULL until the storage TTL sweep backfills it
+  // for a team with a retention override (#1522, #4938).
   if (data.userId) {
     void computeDeleteAfter(data.jobId, data.userId).catch((err: unknown) => {
       logger.warn(
@@ -403,9 +403,9 @@ export async function waitForJob(
 
 /**
  * Compute and set `deleteAfter` on a job row based on the owning user's
- * team retention setting. Only applies when the enterprise
- * `team_retention_overrides` feature is enabled. Fire-and-forget; failures
- * never block job creation.
+ * team retention override. Jobs whose team has none keep the global TTL.
+ * Only applies when the enterprise `team_retention_overrides` feature is
+ * enabled. Fire-and-forget; failures never block job creation.
  */
 async function computeDeleteAfter(jobId: string, userId: string): Promise<void> {
   const isTeamRetentionEnabled = await isEnterpriseFeatureEnabled(
@@ -429,10 +429,10 @@ async function computeDeleteAfter(jobId: string, userId: string): Promise<void> 
     .where(eq(schema.teams.id, userRow[0].team))
     .limit(1);
 
-  const retentionHours =
-    teamRow.length && teamRow[0].retentionHours !== null
-      ? teamRow[0].retentionHours
-      : env.FILE_MAX_AGE_HOURS;
+  // No override: leave delete_after NULL so the global sweep applies the live
+  // tempFileMaxAgeHours setting, where FILE_MAX_AGE_HOURS=0 means never (#5100).
+  const retentionHours = teamRow[0]?.retentionHours;
+  if (retentionHours == null) return;
 
   const deleteAfter = new Date(Date.now() + retentionHours * 60 * 60 * 1000);
   await db.update(schema.jobs).set({ deleteAfter }).where(eq(schema.jobs.id, jobId));

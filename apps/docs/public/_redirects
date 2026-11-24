@@ -65,6 +65,8 @@
 /tools/convert-audio.html /tools/audio/convert-audio 301
 /tools/convert-document /tools/files/convert-document 301
 /tools/convert-document.html /tools/files/convert-document 301
+/tools/convert-font /tools/files/convert-font 301
+/tools/convert-font.html /tools/files/convert-font 301
 /tools/convert-presentation /tools/files/convert-presentation 301
 /tools/convert-presentation.html /tools/files/convert-presentation 301
 /tools/convert-spreadsheet /tools/files/convert-spreadsheet 301
@@ -190,6 +192,8 @@
 /tools/pdf-to-image.html /tools/pdf/pdf-to-image 301
 /tools/pdf-to-text /tools/pdf/pdf-to-text 301
 /tools/pdf-to-text.html /tools/pdf/pdf-to-text 301
+/tools/pdf-to-markdown /tools/pdf/pdf-to-markdown 301
+/tools/pdf-to-markdown.html /tools/pdf/pdf-to-markdown 301
 /tools/pdf-to-word /tools/pdf/pdf-to-word 301
 /tools/pdf-to-word.html /tools/pdf/pdf-to-word 301
 /tools/pdfa-convert /tools/pdf/pdfa-convert 301
@@ -288,6 +292,8 @@
 /tools/video-metadata.html /tools/video/video-metadata 301
 /tools/video-speed /tools/video/video-speed 301
 /tools/video-speed.html /tools/video/video-speed 301
+/tools/video-to-avif /tools/video/video-to-avif 301
+/tools/video-to-avif.html /tools/video/video-to-avif 301
 /tools/video-to-frames /tools/video/video-to-frames 301
 /tools/video-to-frames.html /tools/video/video-to-frames 301
 /tools/video-to-gif /tools/video/video-to-gif 301

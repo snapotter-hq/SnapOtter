@@ -306,21 +306,25 @@ export function getFirstMissingBundleForTool(toolId: string): string | null {
 
 // ── Install status mutations ────────────────────────────────────────────
 
+// Both edit a copy because readInstalled() returns the cache itself: editing it
+// in place would leave the cache holding a change whose write then failed.
 export function markInstalled(bundleId: string, version: string, models: string[]): void {
   const data = readInstalled();
-  data.bundles[bundleId] = {
+  const bundles = { ...data.bundles };
+  bundles[bundleId] = {
     version,
     installedAt: new Date().toISOString(),
     models,
   };
-  writeInstalled(data);
+  writeInstalled({ ...data, bundles });
   invalidateCache();
 }
 
 export function markUninstalled(bundleId: string): void {
   const data = readInstalled();
-  delete data.bundles[bundleId];
-  writeInstalled(data);
+  const bundles = { ...data.bundles };
+  delete bundles[bundleId];
+  writeInstalled({ ...data, bundles });
   invalidateCache();
 }
 
@@ -1167,12 +1171,30 @@ function recoverInterruptedInstallsWithResult(): InterruptedInstallRecoveryResul
         // Native installs and dev checkouts have no base venv to restore from.
         // Retrying cannot change that, and a retained breadcrumb re-runs this
         // every few seconds forever while holding back the rest of startup
-        // recovery, so surface the risk once and let the operator repair or
-        // reinstall the affected environment themselves.
+        // recovery, so surface the risk once. Dropping the interrupted bundle
+        // from the ledger turns its Install button into the repair instead of
+        // reporting it installed against a venv that may be half-written. Only
+        // a failed ledger write keeps the breadcrumb, like a failed unlink.
+        const suspectBundleId = readVenvWritingBundleId();
+        const subject = suspectBundleId ? `An install of "${suspectBundleId}"` : "An install";
+        const advice = suspectBundleId
+          ? `Reinstall "${suspectBundleId}" in Settings > AI Features.`
+          : "Reinstall the affected bundle.";
         logger.warn(
-          `[feature-status] An install was interrupted mid venv-write and there is no base venv at ${BAKED_BASE_VENV} to restore from; the AI venv at ${sharedVenvPath()} may be inconsistent. Reinstall the affected bundle.`,
+          `[feature-status] ${subject} was interrupted mid venv-write and there is no base venv at ${BAKED_BASE_VENV} to restore from; the AI venv at ${sharedVenvPath()} may be inconsistent. ${advice}`,
         );
-        consumeMarker = true;
+        try {
+          if (suspectBundleId && suspectBundleId in readInstalled().bundles) {
+            markUninstalled(suspectBundleId);
+          }
+          consumeMarker = true;
+        } catch (err) {
+          recoveryIncomplete = true;
+          logger.error(
+            { err, bundleId: suspectBundleId },
+            "[feature-status] Could not drop the interrupted bundle from installed.json; retaining venv.writing for retry",
+          );
+        }
       }
       if (consumeMarker) {
         try {
@@ -2282,6 +2304,22 @@ function markVenvWriting(bundleId: string): void {
     JSON.stringify({ bundleId, startedAt: new Date().toISOString() }),
     "utf-8",
   );
+}
+
+/**
+ * The bundle a dead install recorded in venv.writing, or null. The writer died
+ * mid-install, so the file may be empty or truncated; this runs on the boot
+ * path and must never throw.
+ */
+function readVenvWritingBundleId(): string | null {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(VENV_WRITING_MARKER, "utf-8"));
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const bundleId = (parsed as { bundleId?: unknown }).bundleId;
+    return typeof bundleId === "string" && bundleId.length > 0 ? bundleId : null;
+  } catch {
+    return null;
+  }
 }
 
 function clearVenvWriting(): void {

@@ -1,13 +1,14 @@
 ---
 description: "Speciale conversiepreset-endpoints gegenereerd uit de SnapOtter-toolcatalogus."
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: cc9f15364d1f
+i18n_output_hash: 85cb45491181
+i18n_hash_version: 2
 ---
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter biedt naast de basisconvertertools 83 speciale conversiepreset-endpoints. Elke preset vergrendelt het uitvoerformaat en delegeert naar de bijbehorende basisverwerkingspijplijn, zodat het gedrag, de validatie en het uitvoercontract overeenkomen met de hieronder vermelde basistool.
+SnapOtter biedt naast de basisconvertertools 121 speciale conversiepreset-endpoints. Elke preset vergrendelt het uitvoerformaat en delegeert naar de bijbehorende basisverwerkingspijplijn, zodat het gedrag, de validatie en het uitvoercontract overeenkomen met de hieronder vermelde basistool.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -93,6 +94,10 @@ Stuur `multipart/form-data` met een `file`-deel en een optionele `settings` JSON
 | `mp4-to-wav` | MP4 naar WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | geen |
 | `mov-to-wav` | MOV naar WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | geen |
 | `mp4-to-ogg` | MP4 naar OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | geen |
+| `srt-to-vtt` | SRT naar VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | geen |
+| `vtt-to-srt` | VTT naar SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | geen |
+| `ass-to-srt` | ASS naar SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | geen |
+| `srt-to-ass` | SRT naar ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | geen |
 
 ## Audio Presets {#audio-presets}
 
@@ -108,6 +113,36 @@ Stuur `multipart/form-data` met een `file`-deel en een optionele `settings` JSON
 | `wav-to-mp3` | WAV naar MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | geen |
 | `mp3-to-wav` | MP3 naar WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | geen |
 | `flac-to-mp3` | FLAC naar MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | geen |
+| `mp3-to-flac` | MP3 naar FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | geen |
+| `mp3-to-ogg` | MP3 naar OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | geen |
+| `mp3-to-m4a` | MP3 naar M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | geen |
+| `wav-to-flac` | WAV naar FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | geen |
+| `wav-to-ogg` | WAV naar OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | geen |
+| `wav-to-m4a` | WAV naar M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | geen |
+| `flac-to-wav` | FLAC naar WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | geen |
+| `flac-to-ogg` | FLAC naar OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | geen |
+| `flac-to-m4a` | FLAC naar M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | geen |
+| `ogg-to-flac` | OGG naar FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | geen |
+| `ogg-to-m4a` | OGG naar M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | geen |
+| `m4a-to-flac` | M4A naar FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | geen |
+| `m4a-to-ogg` | M4A naar OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | geen |
+| `aac-to-ogg` | AAC naar OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | geen |
+| `aac-to-m4a` | AAC naar M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | geen |
+| `opus-to-mp3` | Opus naar MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | geen |
+| `opus-to-wav` | Opus naar WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | geen |
+| `opus-to-flac` | Opus naar FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | geen |
+| `opus-to-ogg` | Opus naar OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | geen |
+| `opus-to-m4a` | Opus naar M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | geen |
+| `wma-to-mp3` | WMA naar MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | geen |
+| `wma-to-wav` | WMA naar WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | geen |
+| `wma-to-flac` | WMA naar FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | geen |
+| `wma-to-ogg` | WMA naar OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | geen |
+| `wma-to-m4a` | WMA naar M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | geen |
+| `aiff-to-mp3` | AIFF naar MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | geen |
+| `aiff-to-wav` | AIFF naar WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | geen |
+| `aiff-to-flac` | AIFF naar FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | geen |
+| `aiff-to-ogg` | AIFF naar OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | geen |
+| `aiff-to-m4a` | AIFF naar M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | geen |
 
 ## PDF Presets {#pdf-presets}
 
@@ -122,6 +157,10 @@ Stuur `multipart/form-data` met een `file`-deel en een optionele `settings` JSON
 | Preset-ID | Converteert | Route | Basistool | Geaccepteerde invoer | Optionele instellingen |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel naar CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | geen |
+| `otf-to-ttf` | OTF naar TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | geen |
+| `woff-to-ttf` | WOFF naar TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | geen |
+| `woff2-to-ttf` | WOFF2 naar TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | geen |
+| `ttf-to-woff2` | TTF naar WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | geen |
 
 ## Notes {#notes}
 

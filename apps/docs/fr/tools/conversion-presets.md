@@ -1,13 +1,14 @@
 ---
 description: "Points de terminaison de préréglages de conversion dédiés, générés à partir du catalogue d'outils SnapOtter."
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: a1b69a78341d
+i18n_output_hash: ac2b95782edc
+i18n_hash_version: 2
 ---
 
 # Préréglages de conversion {#conversion-presets}
 
-SnapOtter expose 83 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
+SnapOtter expose 121 points de terminaison de préréglages de conversion dédiés en plus des outils de conversion de base. Chaque préréglage verrouille le format de sortie et délègue à son pipeline de traitement de base, de sorte que le comportement, la validation et le contrat de sortie correspondent à l'outil de base indiqué ci-dessous.
 
 ## Modèle de point de terminaison de l'API {#api-endpoint-pattern}
 
@@ -93,6 +94,10 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | `mp4-to-wav` | MP4 vers WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | none |
 | `mov-to-wav` | MOV vers WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | none |
 | `mp4-to-ogg` | MP4 vers OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | none |
+| `srt-to-vtt` | SRT vers VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | none |
+| `vtt-to-srt` | VTT vers SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | none |
+| `ass-to-srt` | ASS vers SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | none |
+| `srt-to-ass` | SRT vers ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | none |
 
 ## Préréglages audio {#audio-presets}
 
@@ -108,6 +113,36 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | `wav-to-mp3` | WAV vers MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | none |
 | `mp3-to-wav` | MP3 vers WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | none |
 | `flac-to-mp3` | FLAC vers MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | none |
+| `mp3-to-flac` | MP3 vers FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | none |
+| `mp3-to-ogg` | MP3 vers OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | none |
+| `mp3-to-m4a` | MP3 vers M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | none |
+| `wav-to-flac` | WAV vers FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | none |
+| `wav-to-ogg` | WAV vers OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | none |
+| `wav-to-m4a` | WAV vers M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | none |
+| `flac-to-wav` | FLAC vers WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | none |
+| `flac-to-ogg` | FLAC vers OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | none |
+| `flac-to-m4a` | FLAC vers M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | none |
+| `ogg-to-flac` | OGG vers FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | none |
+| `ogg-to-m4a` | OGG vers M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | none |
+| `m4a-to-flac` | M4A vers FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | none |
+| `m4a-to-ogg` | M4A vers OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | none |
+| `aac-to-ogg` | AAC vers OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | none |
+| `aac-to-m4a` | AAC vers M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | none |
+| `opus-to-mp3` | Opus vers MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | none |
+| `opus-to-wav` | Opus vers WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | none |
+| `opus-to-flac` | Opus vers FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | none |
+| `opus-to-ogg` | Opus vers OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | none |
+| `opus-to-m4a` | Opus vers M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | none |
+| `wma-to-mp3` | WMA vers MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | none |
+| `wma-to-wav` | WMA vers WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | none |
+| `wma-to-flac` | WMA vers FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | none |
+| `wma-to-ogg` | WMA vers OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | none |
+| `wma-to-m4a` | WMA vers M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | none |
+| `aiff-to-mp3` | AIFF vers MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | none |
+| `aiff-to-wav` | AIFF vers WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | none |
+| `aiff-to-flac` | AIFF vers FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | none |
+| `aiff-to-ogg` | AIFF vers OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | none |
+| `aiff-to-m4a` | AIFF vers M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | none |
 
 ## Préréglages PDF {#pdf-presets}
 
@@ -122,6 +157,10 @@ Envoyez `multipart/form-data` avec une partie `file` et une chaîne JSON `settin
 | ID du préréglage | Convertit | Route | Outil de base | Entrées acceptées | Réglages facultatifs |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel vers CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | none |
+| `otf-to-ttf` | OTF vers TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | none |
+| `woff-to-ttf` | WOFF vers TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | none |
+| `woff2-to-ttf` | WOFF2 vers TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | none |
+| `ttf-to-woff2` | TTF vers WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | none |
 
 ## Remarques {#notes}
 

@@ -44,7 +44,9 @@ test.describe("State bleed between tools", () => {
     await expect(blobImages).toHaveCount(0);
 
     // Step 6: No before/after comparison slider should be visible
-    await expect(page.locator("[class*='before-after'], [class*='BeforeAfter']")).not.toBeVisible();
+    await expect(
+      page.getByRole("slider", { name: "Before/after comparison slider" }),
+    ).not.toBeVisible();
   });
 
   // ── Reverse direction: rotate -> resize ──────────────────────────────

@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: ed9a62f2b460
-i18n_source_hash: e1ea853b4dd1
+i18n_output_hash: 22829087a148
+i18n_source_hash: 73d17e904bb2
 i18n_provenance: human
 ---
 
@@ -149,11 +149,13 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 ### Conversiepresets {#conversion-presets}
 
-De gedeelde catalogus bevat 83 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
+De gedeelde catalogus bevat 121 speciale conversiepreset-endpoints zoals `jpg-to-png`, `mov-to-mp4`, `m4a-to-mp3`, `pdf-to-jpg` en `excel-to-csv`. Presets zijn eersteklas tool-routes:
 
 `POST /api/v1/tools/<section>/<presetId>`
 
 Elke preset vergrendelt het uitvoerformaat en delegeert naar een basistool zoals `convert`, `convert-video`, `extract-audio`, `convert-audio`, `image-to-pdf`, `pdf-to-image`, `svg-to-raster` of `convert-spreadsheet`. Zie [Conversiepresets](/nl/tools/conversion-presets) voor de volledige routetabel en optionele instellingen.
+
+Compressiepresets werken op dezelfde manier. `compress-image-to-20kb`, `compress-image-to-50kb`, `compress-image-to-100kb`, `compress-image-to-200kb` en `compress-image-to-500kb` draaien `compress`; `compress-pdf-to-100kb`, `compress-pdf-to-200kb`, `compress-pdf-to-500kb`, `compress-pdf-to-1mb` en `compress-pdf-to-2mb` draaien `compress-pdf`. Elk vergrendelt `mode` op `targetSize` en `targetSizeKb` op de grootte uit de naam.
 
 ### Essentials {#essentials}
 
@@ -195,6 +197,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | Tool-ID | Naam | AI-model | Belangrijkste instellingen |
 |---------|------|---------|-------------|
 | `remove-background` | Achtergrond verwijderen | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` en pipelines: `backgroundType` (transparent/color/gradient/blur, plus image op `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
+| `remove-gif-background` | GIF-achtergrond verwijderen | rembg, frame voor frame | `model`, `outputFormat` (webp/gif/apng), `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurIntensity` (0-100), `shadowEnabled`, `shadowOpacity` (0-100), `edgeRefine` (0-3), `decontaminate` |
 | `upscale` | Afbeelding upscalen | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objectgum | LaMa (ONNX) | Masker verzonden als tweede bestandsdeel (veldnaam `mask`), `format`, `quality` |
 | `ocr` | OCR / Tekstextractie | Tesseract (snel); RapidOCR + PP-OCR ONNX (gebalanceerd/beste) | `quality` (snel/gebalanceerd/beste), `language`, `enhance` |
@@ -238,6 +241,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `histogram` | Histogram | `scale` (linear/log) - retourneert een RGB-histogramgrafiek + statistieken per kanaal |
 | `lqip-placeholder` | LQIP-placeholder | `width` (4-64), `blur`, `strategy` (blur/pixelate/solid), `format` (webp/png/jpeg), `quality` |
 | `barcode-generate` | Barcodegenerator | `text`, `type` (code128/ean13/upca/code39/itf14/datamatrix), `scale` (1-8), `includeText` (bool). JSON-body, geen bestandsupload. |
+| `aspect-ratio-calculator` | Beeldverhouding-calculator | `width`, `height`, `newWidth`, `newHeight`, `round` (bool). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
 
 ### Layout & compositie {#layout-composition}
 
@@ -249,6 +253,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `border` | Rand & kader | `width`, `color`, `style` (solid/gradient/pattern), `borderRadius`, `padding`, `shadow` |
 | `beautify` | Screenshot verfraaien | `backgroundType` (solid/linear-gradient/radial-gradient/image/transparent), `gradientStops`, `padding`, `borderRadius`, `shadowPreset`, `frame` (none/macos-light/macos-dark/windows-light/windows-dark/browser-light/browser-dark/iphone/macbook/ipad/...), `socialPreset` (none/twitter/linkedin/instagram-square/instagram-story/facebook/producthunt), `watermarkText`, `outputFormat` |
 | `circle-crop` | Cirkelvormig bijsnijden | `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
+| `rounded-crop` | Afgerond bijsnijden | `shape` (rounded-square/squircle), `cornerRadius` (0-50, procent van de kortste zijde), `zoom` (1-5), `offsetX`, `offsetY`, `borderWidth`, `borderColor`, `background` (transparent/hex), `outputSize` |
 | `image-pad` | Afbeelding opvullen | `target` (16:9/9:16/1:1/4:3/3:4/custom), `ratioW`, `ratioH`, `background` (color/transparent/blur), `color` (hex), `padding` (0-50%) |
 | `sprite-sheet` | Sprite sheet | `columns` (1-16), `padding`, `background` (hex), `format` (png/webp/jpeg), `quality` - meerdere bestanden (2-64 afbeeldingen) |
 
@@ -267,7 +272,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 |---------|------|-------------|
 | `convert-video` | Video converteren | `format` (mp4/mov/webm/avi/mkv), `quality` (high/balanced/small) |
 | `compress-video` | Video comprimeren | `quality` (light/balanced/strong), `resolution` (original/1080p/720p/480p) |
-| `trim-video` | Video inkorten | `startS`, `endS`, `precise` (bool, frame-nauwkeurige knip) |
+| `trim-video` | Video inkorten | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS`, `precise` (bool, frame-nauwkeurige knip) |
 | `mute-video` | Video dempen | - |
 | `video-to-gif` | Video naar GIF | `fps` (1-30), `width`, `startS`, `durationS` (max 60s) |
 | `resize-video` | Videoformaat wijzigen | `width`, `height`, `preset` (custom/2160p/1440p/1080p/720p/480p/360p) |
@@ -284,12 +289,14 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `stabilize-video` | Video stabiliseren | `smoothing` (5-60, in frames) |
 | `gif-to-video` | GIF naar video | `format` (mp4/webm/mov) |
 | `video-to-webp` | Video naar WebP | `fps`, `width`, `quality`, `loop` (bool) |
+| `video-to-avif` | Video naar AVIF | `fps` (1-30), `width` (64-1280), `startS`, `durationS` (max 60s), `quality` (1-100), `loop` (bool) |
 | `video-to-frames` | Video naar frames | `mode` (all/nth/timestamps), `n`, `timestamps`, `format` (png/jpg) |
 | `merge-videos` | Video's samenvoegen | - (meerdere bestanden, genormaliseerd naar de resolutie van de eerste video) |
 | `replace-audio` | Audio vervangen | - (video- + audiobestand, twee bestanden) |
 | `burn-subtitles` | Ondertitels inbranden | `fontSize` (8-72) - video- + ondertitelbestand |
 | `embed-subtitles` | Ondertitels insluiten | `language` (ISO 639-2/B-code) - video- + ondertitelbestand |
 | `extract-subtitles` | Ondertitels extraheren | - (levert SRT) |
+| `convert-subtitles` | Ondertitels converteren | `format` (srt/vtt/ass), `encoding` (auto/utf-8/windows-1252/windows-1250/windows-1251/windows-1256/iso-8859-2/gb18030/big5/shift_jis/euc-kr) |
 | `images-to-video` | Afbeeldingen naar video | `secondsPerImage` (0.5-10), `resolution` (1080p/720p/square), `fps` - meerdere bestanden |
 | `video-metadata` | Videometadata opschonen | - |
 | `auto-subtitles` | Automatische ondertitels (AI) | `language` (auto/en/de/fr/es/zh/ja/ko/id/th/vi), `format` (srt/vtt) |
@@ -300,7 +307,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | Tool-ID | Naam | Belangrijkste instellingen |
 |---------|------|-------------|
 | `convert-audio` | Audio converteren | `format` (mp3/wav/ogg/flac/m4a), `bitrateKbps` (32-320) |
-| `trim-audio` | Audio inkorten | `startS`, `endS` |
+| `trim-audio` | Audio inkorten | `mode` (range/ends), `startS`, `endS`, `cutStartS`, `cutEndS` |
 | `volume-adjust` | Volume aanpassen | `gainDb` (-30 tot 30) |
 | `normalize-audio` | Audio normaliseren | - (EBU R128, -16 LUFS) |
 | `fade-audio` | Audio faden | `fadeInS` (0-30), `fadeOutS` (0-30) |
@@ -328,6 +335,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `extract-pages` | Pagina's extraheren | `range` (qpdf-syntaxis, bijv. \"1-5,8,10-z\") |
 | `remove-pages` | Pagina's verwijderen | `pages` (te verwijderen qpdf-bereik) |
 | `organize-pdf` | PDF ordenen | `order` (qpdf-paginavolgorde, bijv. \"3,1,2,5-z\") |
+| `multi-tool-pdf` | PDF-multitool | `items` (paginaplan, `[{doc, page, rot}]`, tot 1200 pagina's), `pageCounts` - meerdere bestanden (tot 20 PDF's) |
 | `protect-pdf` | PDF beveiligen | `userPassword`, `ownerPassword` (AES-256) |
 | `unlock-pdf` | PDF ontgrendelen | `password` |
 | `repair-pdf` | PDF repareren | - |
@@ -335,6 +343,7 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `grayscale-pdf` | PDF grijswaarden | - |
 | `pdfa-convert` | PDF/A-conversie | - (archief-PDF/A-2) |
 | `crop-pdf` | PDF bijsnijden | `margin` (0-2000 punten) |
+| `resize-pdf-pages` | PDF-paginaformaat wijzigen | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up-PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Boekje-PDF | `perSheet` (2/4/6/8) |
 | `watermark-pdf` | PDF van watermerk voorzien | `text`, `position`, `fontSize`, `opacity`, `rotation` |
@@ -344,7 +353,8 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `sign-pdf` | PDF ondertekenen | Aangepaste multipart-route met PDF `file`, handtekeningbestanden `sig0`, `sig1` en `placements` JSON-array |
 | `pdf-to-text` | PDF naar tekst | - |
 | `pdf-to-word` | PDF naar Word | - |
-| `pdf-metadata` | PDF-metadata | `title`, `author`, `subject`, `keywords` |
+| `pdf-to-markdown` | PDF naar Markdown | - (levert een `.md`-bestand) |
+| `pdf-metadata` | PDF-metadata | `title`, `author`, `subject`, `keywords`, `stripAll` |
 | `convert-document` | Document converteren | `format` (docx/odt/rtf/txt) |
 | `convert-presentation` | Presentatie converteren | `format` (pptx/odp) |
 | `convert-spreadsheet` | Spreadsheet converteren | `format` (xlsx/ods/csv) |
@@ -373,9 +383,18 @@ Alle AI-tools draaien op je eigen hardware: standaard op CPU, of op NVIDIA CUDA 
 | `json-xml` | JSON naar XML | `pretty` (bool) - bidirectioneel |
 | `split-csv` | CSV splitsen | `rowsPerFile` (1-1000000), `keepHeader` (bool) |
 | `merge-csvs` | CSV's samenvoegen | - (meerdere bestanden, overeenkomende kolommen) |
+| `merge-text` | Tekstbestanden samenvoegen | `separator` (blank-line/rule/filename-heading) - meerdere bestanden, 2-50 bestanden |
 | `yaml-json` | YAML / JSON | - (bidirectioneel) |
 | `xml-to-csv` | XML naar CSV | - (vindt automatisch herhalende elementen) |
+| `convert-font` | Lettertype converteren | `format` (ttf, otf, woff, woff2) |
+| `convert-case` | Hoofdletters wijzigen | `text`, `mode` (upper/lower/sentence/title/capitalized/inverse/alternating/camel/pascal/snake/kebab), `locale` (BCP 47-tag). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
+| `proportion-calculator` | Verhoudingscalculator | `a`, `b`, `c`, `mode` (direct/inverse). JSON-body, geen bestandsupload; levert de ontbrekende waarde. |
+| `base64` | Base64 coderen / decoderen | `text`, `mode` (encode/decode), `urlSafe` (bool). JSON-body, geen bestandsupload; levert de geconverteerde tekst. |
 | `excel-to-csv` | Excel naar CSV | speciale conversiepreset ondersteund door `convert-spreadsheet` |
+| `otf-to-ttf` | OTF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff-to-ttf` | WOFF naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `woff2-to-ttf` | WOFF2 naar TTF | speciale conversiepreset ondersteund door `convert-font` |
+| `ttf-to-woff2` | TTF naar WOFF2 | speciale conversiepreset ondersteund door `convert-font` |
 | `create-zip` | ZIP maken | - (meerdere bestanden, 2-50 bestanden) |
 | `extract-zip` | ZIP uitpakken | - (beschermd tegen zip-bommen) |
 
@@ -396,6 +415,7 @@ Leg een webpagina vast als afbeelding. Anders dan andere tools accepteert dit en
 | `devicePreset` | string | `"desktop"` | `desktop`, `tablet`, `mobile`, `custom` |
 | `viewportWidth` | number | `1280` | Aangepaste viewport-breedte 320-3840 |
 | `viewportHeight` | number | `720` | Aangepaste viewport-hoogte 320-2160 |
+| `clientJobId` | string | (gegenereerd) | Uw eigen job-ID, zodat u de voortgangsstream kunt openen voordat het antwoord binnenkomt |
 
 **Voorbeeld:**
 
@@ -416,6 +436,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
   "processedSize": 54321
 }
 ```
+
+De opname draait als job in de wachtrij. Is die klaar binnen het synchrone wachtvenster, dan krijgt u het resultaat hierboven met `200`. Een tragere opname antwoordt `202` met `{"jobId":"...","async":true}`; volg die zoals beschreven in [Voortgang volgen](#progress-tracking). Tot en met 2.3.0 wachtte dit endpoint altijd en antwoordde het `200`, dus scripts die alleen `200` afhandelen, moeten ook `202` afhandelen.
 
 ### Tool-subroutes {#tool-sub-routes}
 
@@ -538,6 +560,7 @@ Persistente bestandsopslag met versiegeschiedenis.
 | `GET` | `/api/v1/files/:id/download` | Bestand downloaden |
 | `GET` | `/api/v1/files/:id/thumbnail` | 300px JPEG-thumbnail ophalen |
 | `DELETE` | `/api/v1/files` | Bestanden en hun versieketens in bulk verwijderen (body: `{ ids: [...] }`) |
+| `POST` | `/api/v1/files/download` | Meerdere bestanden als één ZIP downloaden (body: `{ ids: [...] }`) |
 | `POST` | `/api/v1/fetch-urls` | Externe URL's ophalen in de werkruimte voor URL-gebaseerde imports |
 | `POST` | `/api/v1/preview` | Een browsercompatibele WebP-preview genereren (voor HEIC/HEIF/RAW-formaten) |
 | `GET` | `/api/v1/files/:id/preview` | Een gecachte of gegenereerde browsercompatibele preview streamen voor een opgeslagen PDF, Office-document, video of audiobestand |

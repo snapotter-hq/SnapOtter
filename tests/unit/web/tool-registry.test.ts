@@ -376,7 +376,15 @@ describe("toolRegistry", () => {
   });
 
   it("tools with no-dropzone display mode have a ResultsPanel", () => {
-    const selfContainedTools = new Set(["meme-generator", "barcode-generate", "chart-maker"]);
+    const selfContainedTools = new Set([
+      "meme-generator",
+      "barcode-generate",
+      "chart-maker",
+      "convert-case",
+      "proportion-calculator",
+      "aspect-ratio-calculator",
+      "base64",
+    ]);
     for (const [toolId, entry] of toolRegistry) {
       if (entry.displayMode === "no-dropzone" && !selfContainedTools.has(toolId)) {
         expect(entry.ResultsPanel, `missing ResultsPanel for ${toolId}`).toBeDefined();

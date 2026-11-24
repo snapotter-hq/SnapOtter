@@ -2,7 +2,7 @@
 
 Contributor reference for every analytics event SnapOtter can emit, what each carries, and where it fires. For the user-facing summary and opt-out steps, see the published [telemetry guide](apps/docs/guide/telemetry.md). For the privacy stance, see the in-app privacy policy.
 
-Product analytics is on by default and set instance-wide by an admin under Settings > System > Privacy. Nothing is sent when it is off.
+Product analytics is set instance-wide by an admin under Settings > System > Privacy. A new instance asks on first run and sends nothing until answered; an instance upgraded from a release before that prompt keeps the setting it had (#4910). Nothing is sent when it is off.
 
 ## Source of truth
 
@@ -37,9 +37,9 @@ Emitted from `apps/api` through `trackEvent()`; properties are filtered by `anal
 | `instance_started` | Once per boot | `arch`, `os_platform`, `deploy_mode`, `gpu_present`, `app_version` |
 | `auth_login` | A login succeeds | `method` (`password` or `oidc`) |
 | `auth_login_failed` | A login attempt fails | `method` (`password` or `oidc`) |
-| `tool_used` | A tool job finishes (once per job: an attempt that will be retried sends nothing) | `tool_id`, `status`, `duration_ms`, `category`, `is_ai_tool`, `is_batch`, `input_format`, `output_format`, `bytes_in`, `bytes_out`, `execution_hint`, `error_code`, `error_kind` |
+| `tool_used` | A tool job finishes (once per job: an attempt that will be retried sends nothing) | `tool_id`, `status`, `duration_ms`, `category`, `is_ai_tool`, `is_batch`, `input_format`, `output_format`, `bytes_in`, `bytes_out`, `execution_hint`, `error_code`, `error_kind`, `step` (only on Passport Photo's analyze, a stage of a run rather than a run, so run counts filter on `step` not being set) |
 | `pipeline_executed` | A pipeline run finishes | `step_count`, `tool_ids`, `is_batch`, `file_count`, `duration_ms`, `status` |
-| `ai_bundle_action` | An AI bundle is installed, uninstalled, reset, or imported | `bundle_id`, `action`, `duration_ms` |
+| `ai_bundle_action` | An AI bundle install starts, succeeds, or fails, or a bundle is uninstalled, reset, or imported | `bundle_id`, `action` (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), `duration_ms` (0 for `install_started`), `error_kind` (only on `install_failed`, from the closed `AI_INSTALL_ERROR_KINDS` list: `oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`; the raw installer message never leaves the server) |
 
 ### Feedback events
 
@@ -74,6 +74,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `pipeline_step_added` | A step is added to a pipeline | `tool_id` |
 | `pipeline_saved` | A pipeline is saved | `step_count` |
 | `pipeline_template_selected` | A pipeline template is picked | `template_id` |
+| `starter_job_clicked` | A tool in the first-run "Getting Started" block on the home page is opened | `tool_id` |
 | `sponsor_clicked` | The sponsor link is clicked | none |
 | `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
 | `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |

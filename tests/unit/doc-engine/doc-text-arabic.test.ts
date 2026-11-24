@@ -867,8 +867,13 @@ describe("doc_text.main wiring", () => {
     expect(main).toMatch(/normalize_presentation_forms\(page\.get_text\(\)\)/);
   });
 
-  it("decides hasText with the readability test", () => {
-    expect(main).toMatch(/has_text = any\(has_readable_text\(part\) for part in judged\)/);
+  it("decides hasText and the page counts with the readability test (#954)", () => {
+    expect(main).toMatch(/tally = tally_pages\(parts, judged, glyph_id_pages\)/);
+    expect(source).toMatch(/if has_readable_text\(verdict_text\):/);
+  });
+
+  it("tells the tally which pages had glyph-id fonts left out of their verdict (#4947)", () => {
+    expect(main).toMatch(/glyph_id_pages\.append\(readable is not None\)/);
   });
 
   it("judges unmapped composite-font pages on MuPDF's own U+FFFD, not glyph ids (#955)", () => {

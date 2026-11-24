@@ -130,6 +130,7 @@ describe("buildOutputName", () => {
     ["frame.fit", "image/fits", "frame_edit-metadata.fit"],
     ["frame.fts", "image/fits", "frame_edit-metadata.fts"],
     ["figure.epsf", "application/postscript", "figure_edit-metadata.epsf"],
+    ["DSC00001.HIF", "image/heif", "DSC00001_edit-metadata.HIF"],
   ])(
     "preserves alternate extension on %s when it already maps to %s (#3206)",
     (filename, contentType, expected) => {

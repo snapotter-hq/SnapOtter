@@ -189,6 +189,10 @@ describe("sanitizeFilename", () => {
     expect(sanitizeFilename(".png.backup.png")).toBe(".png.backup.png");
   });
 
+  it("treats Sony's .hif as a safe extension (#4825)", () => {
+    expect(sanitizeFilename("DSC00001.HIF.php")).toBe("DSC00001.HIF");
+  });
+
   it("still drops an unsafe tail after the last repeat", () => {
     expect(sanitizeFilename("my.png.photo.png.php")).toBe("my.png.photo.png");
     expect(sanitizeFilename(".png.php")).toBe(".png");

@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-databaseschema, tabellen, migraties en back-upprocedures voor SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: f85602dbff85
+i18n_output_hash: cd2c66c1ee7e
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Actieve loginsessies. Elke rij koppelt een sessietoken aan een gebruiker.
 
 | Kolom | Type | Opmerkingen |
 |---|---|---|
-| `id` | varchar | Primaire sleutel (sessietoken) |
+| `id` | varchar | Primaire sleutel (SHA-256-hash van het sessietoken) |
 | `userId` | uuid | Foreign key naar `users.id` |
 | `expiresAt` | timestamp | Vervaltijd |
 | `createdAt` | timestamp | Aanmaaktijd |
@@ -189,6 +189,16 @@ Op RDS, Supabase, Cloud SQL of een cluster dat u zelf beheert, is de scheiding o
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Geef de eigenaarsrol daarna, als superuser of als de rol die die `CREATE ROLE` uitvoerde, het recht om hem te beheren:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Vanaf Postgres 16 mag een rol met `CREATEROLE` alleen rollen wijzigen die hij zelf heeft aangemaakt of waarop hij `ADMIN OPTION` heeft. SnapOtter wijzigt het wachtwoord van de runtime-rol alleen als het niet meer overeenkomt met `DATABASE_URL` (bijvoorbeeld na een rotatie), en zonder deze grant mislukt die start. `INHERIT FALSE, SET FALSE` draagt alleen het beheer over. Een kale `WITH ADMIN OPTION` zou `snapotter` ook de rechten van de runtime-rol geven. Postgres 15 en ouder hebben de grant niet nodig en weigeren die syntaxis, dus sla hem daar over.
+
+Als SnapOtter het wachtwoord instelt, slaat het een SCRAM-SHA-256-verifier op, ook als `password_encryption` van het cluster op `md5` staat. Postgres accepteert dat via een `md5`-regel in `pg_hba.conf`, maar een connection pooler die md5-hashes zelf controleert, kan niet als de runtime-rol inloggen.
 
 Geef SnapOtter vervolgens beide verbindingsreeksen, gericht op dezelfde host, poort en database:
 

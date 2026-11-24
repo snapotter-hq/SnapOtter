@@ -26,22 +26,24 @@ export function registerAudioChannels(app: FastifyInstance) {
 
       const [inPath] = await stageMediaInputs(ctx);
       const info = await probeMedia(inPath);
-      const ch = info.streams.find((s) => s.type === "audio")?.channels ?? 0;
+      const audio = info.streams.find((s) => s.type === "audio");
+      const ch = audio?.channels ?? 0;
 
       if ((settings.mode === "stereo-to-mono" || settings.mode === "swap") && ch < 2) {
         throw new InputValidationError("This mode needs a stereo input", 422);
       }
 
       const outPath = join(ctx.scratchDir, "media", outName);
+      const { encodeArgs } = audioOutputFor(origExt, audio);
       let args: string[];
 
       if (settings.mode === "stereo-to-mono") {
-        args = ["-i", inPath, "-ac", "1", ...out.encodeArgs, outPath];
+        args = ["-i", inPath, "-ac", "1", ...encodeArgs, outPath];
       } else if (settings.mode === "mono-to-stereo") {
-        args = ["-i", inPath, "-ac", "2", ...out.encodeArgs, outPath];
+        args = ["-i", inPath, "-ac", "2", ...encodeArgs, outPath];
       } else {
         // swap
-        args = ["-i", inPath, "-af", "pan=stereo|c0=c1|c1=c0", ...out.encodeArgs, outPath];
+        args = ["-i", inPath, "-af", "pan=stereo|c0=c1|c1=c0", ...encodeArgs, outPath];
       }
 
       await runFfmpegWithProgress(ctx, args, info.durationS);

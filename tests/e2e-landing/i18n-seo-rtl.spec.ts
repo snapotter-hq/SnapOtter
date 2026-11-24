@@ -59,6 +59,11 @@ test.describe("landing hreflang, RTL, and banner", () => {
     await page.goto("/de/faq");
     const banner = page.locator("[data-mt-banner]");
     await expect(banner).toBeVisible();
+    // The notice and its link are separate strings, so the notice shows once (#933).
+    const notice = await banner.locator("span").innerText();
+    const bannerText = await banner.innerText();
+    expect(bannerText.split(notice.trim())).toHaveLength(2);
+    await expect(banner.locator("a")).not.toContainText(notice.trim());
     await banner.locator("[data-mt-dismiss]").click();
     await expect(banner).toBeHidden();
     const stored = await page.evaluate(() => localStorage.getItem("snapotter:mt-banner"));

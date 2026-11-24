@@ -1,4 +1,4 @@
-import { AI_INSTALL_ERROR_KINDS } from "@snapotter/shared";
+import { AI_BUNDLE_ACTIONS, AI_INSTALL_ERROR_KINDS } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { sanitizeEventProperties } from "../../../apps/api/src/lib/analytics-allowlist.js";
 
@@ -108,6 +108,20 @@ describe("auth_login_failed reason (#4216)", () => {
   });
 });
 
+describe("tool_used step (#4886)", () => {
+  it("keeps a step from the closed set", () => {
+    expect(
+      sanitizeEventProperties("tool_used", { tool_id: "passport-photo", step: "analyze" }),
+    ).toEqual({ tool_id: "passport-photo", step: "analyze" });
+  });
+
+  it("drops a step outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("tool_used", { tool_id: "passport-photo", step: "Jane Doe.heic" }),
+    ).toEqual({ tool_id: "passport-photo" });
+  });
+});
+
 describe("ai_bundle_action install failure (#4821)", () => {
   it.each(AI_INSTALL_ERROR_KINDS)("keeps the closed-set error_kind %s", (kind) => {
     expect(
@@ -127,6 +141,31 @@ describe("ai_bundle_action install failure (#4821)", () => {
         bundle_id: "ocr",
         error_kind: "Permission denied: /data/ai/cache",
       }),
+    ).toEqual({ bundle_id: "ocr" });
+  });
+});
+
+describe("ai_bundle_action action (#4994)", () => {
+  it("lists every action the API emits", () => {
+    expect([...AI_BUNDLE_ACTIONS].sort()).toEqual([
+      "imported",
+      "install_failed",
+      "install_started",
+      "installed",
+      "reset_environment",
+      "uninstalled",
+    ]);
+  });
+
+  it.each(AI_BUNDLE_ACTIONS)("keeps the closed-set action %s", (action) => {
+    expect(
+      sanitizeEventProperties("ai_bundle_action", { bundle_id: "ocr", action, duration_ms: 0 }),
+    ).toEqual({ bundle_id: "ocr", action, duration_ms: 0 });
+  });
+
+  it("drops an action outside the closed set", () => {
+    expect(
+      sanitizeEventProperties("ai_bundle_action", { bundle_id: "ocr", action: "/data/ai/venv" }),
     ).toEqual({ bundle_id: "ocr" });
   });
 });

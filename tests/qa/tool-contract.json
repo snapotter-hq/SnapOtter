@@ -16,6 +16,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -164,6 +165,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -302,6 +304,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -397,6 +400,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -516,6 +520,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -631,6 +636,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -788,6 +794,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -901,6 +908,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1039,6 +1047,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1105,6 +1114,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1172,6 +1182,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1238,6 +1249,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1529,6 +1541,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1839,6 +1852,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -1935,6 +1949,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2027,6 +2042,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2297,6 +2313,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2386,6 +2403,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2452,6 +2470,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2638,6 +2657,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2744,6 +2764,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -2996,6 +3017,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3106,6 +3128,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3235,6 +3258,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3336,6 +3360,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3448,6 +3473,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3504,6 +3530,10 @@
         "values": [0, 50, 100, null]
       },
       {
+        "key": "format",
+        "values": ["original", "png", "jpeg", "jpg", "webp", "avif", "jxl", null]
+      },
+      {
         "key": "quality",
         "values": [1, 50.5, 100, null]
       }
@@ -3540,6 +3570,16 @@
         "why": "wrong type"
       },
       {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
         "key": "quality",
         "value": 0,
         "why": "below declared min"
@@ -3573,6 +3613,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3734,6 +3775,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3820,6 +3862,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -3982,6 +4025,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4220,6 +4264,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4330,6 +4375,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4396,6 +4442,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4462,6 +4509,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4601,6 +4649,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4667,6 +4716,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4720,7 +4770,23 @@
       },
       {
         "key": "position",
-        "values": ["top", "center", "bottom", null]
+        "values": ["top", "center", "bottom", "custom", null]
+      },
+      {
+        "key": "x",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "y",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "wrap",
+        "values": [true, false, null]
+      },
+      {
+        "key": "maxWidth",
+        "values": [10, 55, 100, null]
       },
       {
         "key": "backgroundBox",
@@ -4758,6 +4824,56 @@
         "why": "wrong type"
       },
       {
+        "key": "x",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "x",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "x",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "y",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "y",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "y",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "wrap",
+        "value": "yes-please",
+        "why": "wrong type"
+      },
+      {
+        "key": "maxWidth",
+        "value": 9,
+        "why": "below declared min"
+      },
+      {
+        "key": "maxWidth",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "maxWidth",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
         "key": "backgroundBox",
         "value": "yes-please",
         "why": "wrong type"
@@ -4786,6 +4902,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4852,6 +4969,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -4999,6 +5117,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5065,6 +5184,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5131,6 +5251,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5197,6 +5318,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5263,6 +5385,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5329,6 +5452,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5395,6 +5519,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5461,6 +5586,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5527,6 +5653,74 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
+      ".svg",
+      ".svgz",
+      ".ico",
+      ".jxl",
+      ".jp2",
+      ".psd",
+      ".tga",
+      ".exr",
+      ".hdr",
+      ".dng",
+      ".cr2",
+      ".cr3",
+      ".nef",
+      ".nrw",
+      ".arw",
+      ".orf",
+      ".rw2",
+      ".raf",
+      ".pef",
+      ".3fr",
+      ".iiq",
+      ".srw",
+      ".x3f",
+      ".rwl",
+      ".gpr",
+      ".fff",
+      ".mrw",
+      ".mef",
+      ".kdc",
+      ".dcr",
+      ".erf",
+      ".ptx",
+      ".ppm",
+      ".pgm",
+      ".pbm",
+      ".qoi",
+      ".dds",
+      ".fits",
+      ".dpx",
+      ".apng",
+      ".cur",
+      ".eps"
+    ],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aspect-ratio-calculator",
+    "name": "Aspect Ratio Calculator",
+    "modality": "image",
+    "section": "image",
+    "acceptedInputs": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".gif",
+      ".bmp",
+      ".tiff",
+      ".tif",
+      ".avif",
+      ".heic",
+      ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5593,6 +5787,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5659,6 +5854,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5725,6 +5921,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -5892,6 +6089,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -6102,6 +6300,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -6430,6 +6629,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -6593,6 +6793,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -6789,6 +6990,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -6876,6 +7078,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7029,6 +7232,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7116,6 +7320,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7359,6 +7564,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7441,6 +7647,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7579,6 +7786,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7731,6 +7939,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -7931,6 +8140,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -8421,12 +8631,24 @@
     "registered": true,
     "axes": [
       {
+        "key": "mode",
+        "values": ["range", "ends", null]
+      },
+      {
         "key": "startS",
         "values": [0, 50, 100, null]
       },
       {
         "key": "endS",
-        "values": [0.000001, 50.000001, 100.000001]
+        "values": [0.000001, 50.000001, 100.000001, null]
+      },
+      {
+        "key": "cutStartS",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "cutEndS",
+        "values": [0, 50, 100, null]
       },
       {
         "key": "precise",
@@ -8434,6 +8656,16 @@
       }
     ],
     "invalidProbes": [
+      {
+        "key": "mode",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "mode",
+        "value": 12345,
+        "why": "wrong type"
+      },
       {
         "key": "startS",
         "value": -1,
@@ -8451,6 +8683,26 @@
       },
       {
         "key": "endS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "cutStartS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "cutStartS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "cutEndS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "cutEndS",
         "value": "not-a-number",
         "why": "wrong type"
       },
@@ -9436,6 +9688,136 @@
     ]
   },
   {
+    "id": "video-to-avif",
+    "name": "Video to AVIF",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [
+      ".mp4",
+      ".mov",
+      ".webm",
+      ".mkv",
+      ".avi",
+      ".m4v",
+      ".mts",
+      ".m2ts",
+      ".3gp",
+      ".flv",
+      ".wmv",
+      ".mpg",
+      ".mpeg",
+      ".ts",
+      ".ogv"
+    ],
+    "executionHint": "long",
+    "outputModality": "image",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "fps",
+        "values": [1, 16, 30, null]
+      },
+      {
+        "key": "width",
+        "values": [64, 672, 1280, null]
+      },
+      {
+        "key": "startS",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "durationS",
+        "values": [1, 30.5, 60, null]
+      },
+      {
+        "key": "quality",
+        "values": [1, 51, 100, null]
+      },
+      {
+        "key": "loop",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "fps",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "fps",
+        "value": 31,
+        "why": "above declared max"
+      },
+      {
+        "key": "fps",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "width",
+        "value": 63,
+        "why": "below declared min"
+      },
+      {
+        "key": "width",
+        "value": 1281,
+        "why": "above declared max"
+      },
+      {
+        "key": "width",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "startS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "startS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "durationS",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "durationS",
+        "value": 61,
+        "why": "above declared max"
+      },
+      {
+        "key": "durationS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "quality",
+        "value": 0,
+        "why": "below declared min"
+      },
+      {
+        "key": "quality",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "quality",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "loop",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "video-to-frames",
     "name": "Video to Frames",
     "modality": "video",
@@ -9696,8 +10078,81 @@
     "outputModality": "file",
     "isAI": false,
     "registered": true,
-    "axes": [],
-    "invalidProbes": []
+    "axes": [
+      {
+        "key": "format",
+        "values": ["srt", "vtt", "ass", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
+    "id": "convert-subtitles",
+    "name": "Convert Subtitles",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt", ".vtt", ".ass"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [
+      {
+        "key": "format",
+        "values": ["srt", "vtt", "ass", null]
+      },
+      {
+        "key": "encoding",
+        "values": [
+          "auto",
+          "utf-8",
+          "windows-1252",
+          "windows-1250",
+          "windows-1251",
+          "windows-1256",
+          "iso-8859-2",
+          "gb18030",
+          "big5",
+          "shift_jis",
+          "euc-kr",
+          null
+        ]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "encoding",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "encoding",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
   },
   {
     "id": "images-to-video",
@@ -9716,6 +10171,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -9776,6 +10232,18 @@
       {
         "key": "fps",
         "values": [10, 35, 60, null]
+      },
+      {
+        "key": "outputFormat",
+        "values": ["mp4", "gif", "webp", null]
+      },
+      {
+        "key": "frameDelayMs",
+        "values": [20, 5010, 10000, null]
+      },
+      {
+        "key": "loop",
+        "values": [0, 50, 100, null]
       }
     ],
     "invalidProbes": [
@@ -9816,6 +10284,46 @@
       },
       {
         "key": "fps",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "outputFormat",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "outputFormat",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": 19,
+        "why": "below declared min"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": 10001,
+        "why": "above declared max"
+      },
+      {
+        "key": "frameDelayMs",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "loop",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "loop",
+        "value": 101,
+        "why": "above declared max"
+      },
+      {
+        "key": "loop",
         "value": "not-a-number",
         "why": "wrong type"
       }
@@ -9955,15 +10463,37 @@
     "registered": true,
     "axes": [
       {
+        "key": "mode",
+        "values": ["range", "ends", null]
+      },
+      {
         "key": "startS",
         "values": [0, 50, 100, null]
       },
       {
         "key": "endS",
-        "values": [0.000001, 50.000001, 100.000001]
+        "values": [0.000001, 50.000001, 100.000001, null]
+      },
+      {
+        "key": "cutStartS",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "cutEndS",
+        "values": [0, 50, 100, null]
       }
     ],
     "invalidProbes": [
+      {
+        "key": "mode",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "mode",
+        "value": 12345,
+        "why": "wrong type"
+      },
       {
         "key": "startS",
         "value": -1,
@@ -9981,6 +10511,26 @@
       },
       {
         "key": "endS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "cutStartS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "cutStartS",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "cutEndS",
+        "value": -1,
+        "why": "below declared min"
+      },
+      {
+        "key": "cutEndS",
         "value": "not-a-number",
         "why": "wrong type"
       }
@@ -11161,6 +11711,75 @@
     ]
   },
   {
+    "id": "resize-pdf-pages",
+    "name": "Resize PDF Pages",
+    "modality": "document",
+    "section": "pdf",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "pageSize",
+        "values": ["4x6in", "100x150mm", "a4", "a5", "a6", "letter", "legal", "custom", null]
+      },
+      {
+        "key": "width",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "height",
+        "values": [0, 50, 100, null]
+      },
+      {
+        "key": "unit",
+        "values": ["in", "mm", null]
+      },
+      {
+        "key": "keepOrientation",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "pageSize",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "pageSize",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "width",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "height",
+        "value": "not-a-number",
+        "why": "wrong type"
+      },
+      {
+        "key": "unit",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "unit",
+        "value": 12345,
+        "why": "wrong type"
+      },
+      {
+        "key": "keepOrientation",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "nup-pdf",
     "name": "Pages Per Sheet (N-up)",
     "modality": "document",
@@ -11429,6 +12048,19 @@
     "invalidProbes": []
   },
   {
+    "id": "pdf-to-markdown",
+    "name": "PDF to Markdown",
+    "modality": "document",
+    "section": "pdf",
+    "acceptedInputs": [".pdf"],
+    "executionHint": "long",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "pdf-to-word",
     "name": "PDF to Word",
     "modality": "document",
@@ -11449,8 +12081,19 @@
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
-    "axes": [],
-    "invalidProbes": []
+    "axes": [
+      {
+        "key": "stripAll",
+        "values": [true, false, null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "stripAll",
+        "value": "yes-please",
+        "why": "wrong type"
+      }
+    ]
   },
   {
     "id": "powerpoint-to-pdf",
@@ -11749,6 +12392,35 @@
     "invalidProbes": []
   },
   {
+    "id": "merge-text",
+    "name": "Merge Text Files",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".txt", ".md", ".markdown", ".csv", ".log"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "maxInputs": 50,
+    "axes": [
+      {
+        "key": "separator",
+        "values": ["blank-line", "rule", "filename-heading", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "separator",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "separator",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
     "id": "yaml-json",
     "name": "Convert YAML / JSON",
     "modality": "file",
@@ -11769,6 +12441,70 @@
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "convert-font",
+    "name": "Convert Font",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".ttf", ".otf", ".woff", ".woff2"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [
+      {
+        "key": "format",
+        "values": ["ttf", "otf", "woff", "woff2", null]
+      }
+    ],
+    "invalidProbes": [
+      {
+        "key": "format",
+        "value": "__snapotter_qa_not_a_member__",
+        "why": "enum outsider"
+      },
+      {
+        "key": "format",
+        "value": 12345,
+        "why": "wrong type"
+      }
+    ]
+  },
+  {
+    "id": "convert-case",
+    "name": "Convert Case",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "proportion-calculator",
+    "name": "Proportion Calculator",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "base64",
+    "name": "Base64 Encode / Decode",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": false,
     "axes": [],
     "invalidProbes": []
   },
@@ -12099,7 +12835,7 @@
     "name": "HEIC to JPG",
     "modality": "image",
     "section": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "acceptedInputs": [".heic", ".heif", ".hif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -12132,7 +12868,7 @@
     "name": "HEIC to PNG",
     "modality": "image",
     "section": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "acceptedInputs": [".heic", ".heif", ".hif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -12165,7 +12901,7 @@
     "name": "HEIC to AVIF",
     "modality": "image",
     "section": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "acceptedInputs": [".heic", ".heif", ".hif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -12803,7 +13539,7 @@
     "name": "HEIC to PDF",
     "modality": "image",
     "section": "image",
-    "acceptedInputs": [".heic", ".heif"],
+    "acceptedInputs": [".heic", ".heif", ".hif"],
     "executionHint": "fast",
     "outputModality": "document",
     "isAI": false,
@@ -13579,12 +14315,476 @@
     "invalidProbes": []
   },
   {
+    "id": "mp3-to-flac",
+    "name": "MP3 to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "mp3-to-ogg",
+    "name": "MP3 to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "mp3-to-m4a",
+    "name": "MP3 to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".mp3"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wav-to-flac",
+    "name": "WAV to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wav-to-ogg",
+    "name": "WAV to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wav-to-m4a",
+    "name": "WAV to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wav"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "flac-to-wav",
+    "name": "FLAC to WAV",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "flac-to-ogg",
+    "name": "FLAC to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "flac-to-m4a",
+    "name": "FLAC to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".flac"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ogg-to-flac",
+    "name": "OGG to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ogg-to-m4a",
+    "name": "OGG to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".ogg"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "m4a-to-flac",
+    "name": "M4A to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "m4a-to-ogg",
+    "name": "M4A to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".m4a"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aac-to-ogg",
+    "name": "AAC to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aac-to-m4a",
+    "name": "AAC to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aac"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "opus-to-mp3",
+    "name": "Opus to MP3",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "opus-to-wav",
+    "name": "Opus to WAV",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "opus-to-flac",
+    "name": "Opus to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "opus-to-ogg",
+    "name": "Opus to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "opus-to-m4a",
+    "name": "Opus to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".opus"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wma-to-mp3",
+    "name": "WMA to MP3",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wma-to-wav",
+    "name": "WMA to WAV",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wma-to-flac",
+    "name": "WMA to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wma-to-ogg",
+    "name": "WMA to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "wma-to-m4a",
+    "name": "WMA to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".wma"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aiff-to-mp3",
+    "name": "AIFF to MP3",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aiff-to-wav",
+    "name": "AIFF to WAV",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aiff-to-flac",
+    "name": "AIFF to FLAC",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aiff-to-ogg",
+    "name": "AIFF to OGG",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "aiff-to-m4a",
+    "name": "AIFF to M4A",
+    "modality": "audio",
+    "section": "audio",
+    "acceptedInputs": [".aiff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "srt-to-vtt",
+    "name": "SRT to VTT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "vtt-to-srt",
+    "name": "VTT to SRT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".vtt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ass-to-srt",
+    "name": "ASS to SRT",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".ass"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "srt-to-ass",
+    "name": "SRT to ASS",
+    "modality": "video",
+    "section": "video",
+    "acceptedInputs": [".srt"],
+    "executionHint": "fast",
+    "outputModality": "file",
+    "isAI": false,
+    "registered": true,
+    "inputKinds": ["subtitle"],
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
     "id": "excel-to-csv",
     "name": "Excel to CSV",
     "modality": "document",
     "section": "files",
     "acceptedInputs": [".xlsx", ".xls"],
     "executionHint": "long",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "otf-to-ttf",
+    "name": "OTF to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".otf"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "woff-to-ttf",
+    "name": "WOFF to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".woff"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "woff2-to-ttf",
+    "name": "WOFF2 to TTF",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".woff2"],
+    "executionHint": "fast",
+    "isAI": false,
+    "registered": true,
+    "axes": [],
+    "invalidProbes": []
+  },
+  {
+    "id": "ttf-to-woff2",
+    "name": "TTF to WOFF2",
+    "modality": "file",
+    "section": "files",
+    "acceptedInputs": [".ttf", ".otf"],
+    "executionHint": "fast",
     "isAI": false,
     "registered": true,
     "axes": [],
@@ -13607,6 +14807,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -13673,6 +14874,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -13739,6 +14941,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -13805,6 +15008,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",
@@ -13871,6 +15075,7 @@
       ".avif",
       ".heic",
       ".heif",
+      ".hif",
       ".svg",
       ".svgz",
       ".ico",

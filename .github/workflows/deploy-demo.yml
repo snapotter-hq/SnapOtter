@@ -23,23 +23,13 @@ on:
       - "tests/unit/infra/demo-mock-api.test.ts"
       - "tests/unit/infra/deploy-demo-workflow.test.ts"
       - ".github/workflows/deploy-demo.yml"
+  # Demo-only on PRs: web and shared changes reach the demo through the push
+  # run on main, so most fix PRs don't hold a runner slot here (#5061).
   pull_request:
     paths:
       - "apps/demo/**"
-      - "apps/web/**"
-      - "packages/shared/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - "tsconfig.base.json"
-      - ".github/actions/setup/**"
-      - ".github/actions/playwright-install/**"
-      - "docker/feature-manifest.json"
       - "playwright.demo.config.ts"
-      - "scripts/check-live-egress.mjs"
       - "tests/e2e-demo/**"
-      - "tests/playwright-run.ts"
       - "tests/unit/infra/demo-theme.test.ts"
       - "tests/unit/infra/demo-mock-api.test.ts"
       - "tests/unit/infra/deploy-demo-workflow.test.ts"

@@ -28,7 +28,7 @@ export function registerNormalizeAudio(app: FastifyInstance) {
           inPath,
           "-af",
           `loudnorm=I=-16:TP=-1.5:LRA=11,aresample=${sr}`,
-          ...out.encodeArgs,
+          ...audioOutputFor(origExt, info.audio).encodeArgs,
           outPath,
         ];
       });

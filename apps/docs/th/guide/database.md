@@ -1,8 +1,8 @@
 ---
 description: "สคีมาฐานข้อมูล PostgreSQL ตาราง การย้ายข้อมูล และขั้นตอนการสำรองข้อมูลของ SnapOtter"
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 11e48e0ca011
+i18n_output_hash: a8ab98bb3a4b
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ SnapOtter ใช้ PostgreSQL 17 ร่วมกับ [Drizzle ORM](https://or
 
 | คอลัมน์ | ชนิด | หมายเหตุ |
 |---|---|---|
-| `id` | varchar | คีย์หลัก (โทเคนเซสชัน) |
+| `id` | varchar | คีย์หลัก (แฮช SHA-256 ของโทเคนเซสชัน) |
 | `userId` | uuid | คีย์นอกที่อ้างอิง `users.id` |
 | `expiresAt` | timestamp | เวลาหมดอายุ |
 | `createdAt` | timestamp | เวลาที่สร้าง |
@@ -189,6 +189,16 @@ npx drizzle-kit migrate    # apply pending migrations
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+จากนั้น ในฐานะ superuser หรือบทบาทที่รัน `CREATE ROLE` นั้น ให้สิทธิ์บทบาทเจ้าของในการจัดการบทบาทนี้:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+ตั้งแต่ Postgres 16 เป็นต้นไป `CREATEROLE` อนุญาตให้บทบาทแก้ไขได้เฉพาะบทบาทที่ตัวเองสร้างหรือที่ตัวเองถือ `ADMIN OPTION` อยู่ SnapOtter จะเปลี่ยนรหัสผ่านของบทบาทรันไทม์ก็ต่อเมื่อรหัสผ่านนั้นไม่ตรงกับ `DATABASE_URL` แล้ว (เช่น หลังการหมุนรหัสผ่าน) และหากไม่มีสิทธิ์นี้ การบูตครั้งนั้นจะล้มเหลว `INHERIT FALSE, SET FALSE` มอบเฉพาะสิทธิ์การจัดการเท่านั้น ส่วน `WITH ADMIN OPTION` แบบธรรมดาจะให้ `snapotter` ได้สิทธิ์ของบทบาทรันไทม์ไปด้วย Postgres 15 และเก่ากว่าไม่ต้องใช้สิทธิ์นี้และไม่รับไวยากรณ์ดังกล่าว จึงข้ามขั้นตอนนี้ได้
+
+เมื่อ SnapOtter ตั้งรหัสผ่าน จะเก็บ verifier แบบ SCRAM-SHA-256 แม้ว่า `password_encryption` ของคลัสเตอร์จะเป็น `md5` ก็ตาม Postgres ยอมรับผ่านบรรทัด `md5` ใน `pg_hba.conf` แต่ connection pooler ที่ตรวจแฮช md5 เองจะล็อกอินด้วยบทบาทรันไทม์ไม่ได้
 
 จากนั้นส่งสตริงการเชื่อมต่อทั้งสองให้ SnapOtter โดยชี้ไปที่โฮสต์ พอร์ต และฐานข้อมูลเดียวกัน
 

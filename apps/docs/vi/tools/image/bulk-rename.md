@@ -1,19 +1,21 @@
 ---
-description: "Đổi tên nhiều tệp bằng một mẫu khuôn dạng và tải xuống dưới dạng ZIP."
-i18n_source_hash: 2776dcc2f71c
+description: "Đổi tên nhiều ảnh bằng một mẫu khuôn dạng và tải xuống dưới dạng ZIP."
+i18n_source_hash: 160ace6b0d70
 i18n_provenance: human
 i18n_output_hash: a4147e32af58
 ---
 
 # Bulk Rename {#bulk-rename}
 
-Đổi tên nhiều tệp bằng một mẫu khuôn dạng với các trình giữ chỗ cho chỉ số, chỉ số được đệm và tên tệp gốc. Trả về một kho lưu trữ ZIP chứa tất cả tệp đã đổi tên.
+Đổi tên nhiều ảnh bằng một mẫu khuôn dạng với các trình giữ chỗ cho chỉ số, chỉ số được đệm và tên tệp gốc. Trả về một kho lưu trữ ZIP chứa tất cả ảnh đã đổi tên.
 
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/bulk-rename`
 
-Chấp nhận dữ liệu biểu mẫu multipart với nhiều tệp và một trường JSON `settings`.
+Chấp nhận dữ liệu biểu mẫu multipart với nhiều tệp ảnh và một trường JSON `settings`.
+
+Mọi tệp tải lên đều phải là ảnh. Phần đầu của từng tệp được kiểm tra trước khi ZIP bắt đầu, sau đó các byte được nén nguyên trạng (không mã hóa lại). Nếu có tệp không phải ảnh được nhận dạng, hoặc vượt quá `MAX_MEGAPIXELS`, toàn bộ yêu cầu sẽ thất bại với `400` và một lỗi nêu tên tệp đó, ví dụ `Invalid file "notes.txt": Unrecognized image format`.
 
 ## Parameters {#parameters}
 

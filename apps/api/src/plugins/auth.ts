@@ -40,6 +40,7 @@ import {
   readMaxSessionsPerUser,
   setSessionCookie,
 } from "../lib/session-cookie.js";
+import { createSessionToken, hashSessionToken } from "../lib/session-token.js";
 import {
   getSettingNumber,
   getSettingStrict,
@@ -405,10 +406,6 @@ export function requireAdmin(request: FastifyRequest, reply: FastifyReply): Auth
 export const AUTH_BODY_LIMIT_BYTES = 16 * 1024;
 
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
-
-export function createSessionToken(): string {
-  return randomUUID();
-}
 
 // ── Default team + admin creation ──────────────────────────────────
 
@@ -963,13 +960,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           return { status: "role_changed" as const };
         }
 
+        const sessionId = hashSessionToken(token);
         await tx.insert(schema.sessions).values({
-          id: token,
+          id: sessionId,
           userId: user.id,
           expiresAt,
         });
 
-        await evictExcessUserSessions(tx, user.id, maxSessions, token);
+        await evictExcessUserSessions(tx, user.id, maxSessions, sessionId);
 
         const [teamRow] = await tx
           .select()
@@ -1045,10 +1043,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       let idpLogout: "failed" | undefined;
 
       if (token) {
+        const sessionId = hashSessionToken(token);
         const [session] = await db
           .select()
           .from(schema.sessions)
-          .where(eq(schema.sessions.id, token));
+          .where(eq(schema.sessions.id, sessionId));
 
         if (session?.idToken && env.OIDC_ENABLED) {
           // A null endpoint means a local-only logout without a fault: the IdP
@@ -1116,7 +1115,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           }
         }
 
-        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
       }
 
       // Clear the session cookie
@@ -1159,11 +1158,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "No session token provided" });
     }
 
-    const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
+    const sessionId = hashSessionToken(token);
+    const [session] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionId));
 
     if (!session || session.expiresAt < new Date()) {
       if (session) {
-        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
       }
       return reply.status(401).send({ error: "Session expired or invalid" });
     }
@@ -1175,7 +1178,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (isDisabledRole(user.role)) {
-      await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+      await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
       return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
     }
 
@@ -1278,7 +1281,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           await tx
             .delete(schema.sessions)
             .where(
-              and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
+              and(
+                eq(schema.sessions.userId, authUser.id),
+                ne(schema.sessions.id, hashSessionToken(currentToken)),
+              ),
             );
         }
 
@@ -2177,11 +2183,16 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "Authentication required" });
     }
 
-    const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
+    // Sessions are looked up by digest; the API-key branch below needs the raw token.
+    const sessionId = hashSessionToken(token);
+    const [session] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionId));
 
     if (!session || session.expiresAt < new Date()) {
       if (session) {
-        await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+        await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
       }
 
       // Try API key authentication if token has si_ prefix
@@ -2266,7 +2277,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     }
 
     if (isDisabledRole(user.role)) {
-      await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+      await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
       if (isPublic) return;
       return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
     }
@@ -2279,7 +2290,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     );
     if (idleTimeoutMinutes > 0) {
       const redis = sharedRedis();
-      const idleKey = `session:idle:${token}`;
+      const idleKey = `session:idle:${sessionId}`;
       const lastSeen = await redis.get(idleKey);
 
       if (!lastSeen) {
@@ -2287,7 +2298,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
         if (session.lastActivity) {
           const elapsed = Date.now() - session.lastActivity.getTime();
           if (elapsed > idleTimeoutMinutes * 60 * 1000) {
-            await db.delete(schema.sessions).where(eq(schema.sessions.id, token));
+            await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
             if (isPublic) return;
             return reply
               .status(401)
@@ -2298,7 +2309,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
         await db
           .update(schema.sessions)
           .set({ lastActivity: new Date() })
-          .where(eq(schema.sessions.id, token));
+          .where(eq(schema.sessions.id, sessionId));
       }
 
       // Refresh Redis key with TTL = idle timeout

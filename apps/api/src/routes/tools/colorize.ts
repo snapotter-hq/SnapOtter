@@ -21,6 +21,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -65,6 +66,8 @@ registerAiJobHandler(
     (s) => s?.model ?? "auto",
     async (input, data, ctx) => {
       const settings = settingsSchema.parse(data.settings);
+      const outputFormat = await resolveOutputFormat(input, data.filename);
+      await assertSingleFrameFor(input, outputFormat.format);
 
       let result: Awaited<ReturnType<typeof colorize>>;
       try {
@@ -78,7 +81,6 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(input, err);
       }
 
-      const outputFormat = await resolveOutputFormat(input, data.filename);
       let outputBuffer = result.buffer;
       if (outputFormat.format !== "png") {
         outputBuffer = await sharp(result.buffer)
@@ -284,6 +286,10 @@ export function registerColorize(app: FastifyInstance) {
       (s) => (s as { model?: string })?.model ?? "auto",
       async (inputBuffer, settings, filename, ctx) => {
         const orientedBuffer = await autoOrient(inputBuffer);
+        // Match the input's own format, the way the tool page does; a pipeline
+        // step that fed a JPEG used to get a PNG here (#2076).
+        const outputFormat = await resolveOutputFormat(orientedBuffer, filename);
+        await assertSingleFrameFor(orientedBuffer, outputFormat.format);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
@@ -304,9 +310,6 @@ export function registerColorize(app: FastifyInstance) {
             throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
 
-          // Match the input's own format, the way the tool page does; a pipeline
-          // step that fed a JPEG used to get a PNG here (#2076).
-          const outputFormat = await resolveOutputFormat(orientedBuffer, filename);
           let outputBuffer = result.buffer;
           if (outputFormat.format !== "png") {
             outputBuffer = await sharp(result.buffer)

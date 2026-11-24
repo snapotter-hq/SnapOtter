@@ -98,7 +98,7 @@ const GATED: Array<[string, string, typeof IMG]> = [
   ["hand-written: image-to-base64", "/api/v1/tools/image/image-to-base64", IMG],
   ["hand-written: info", "/api/v1/tools/image/info", IMG],
   ["hand-written: compare", "/api/v1/tools/image/compare", IMG],
-  ["hand-written: vectorize", "/api/v1/tools/image/vectorize", IMG],
+  ["factory: vectorize", "/api/v1/tools/image/vectorize", IMG],
   ["hand-written: strip-metadata inspect", "/api/v1/tools/image/strip-metadata/inspect", IMG],
   ["ai route: upscale", "/api/v1/tools/image/upscale", IMG],
   ["ai route: erase-object", "/api/v1/tools/image/erase-object", IMG],

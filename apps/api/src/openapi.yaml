@@ -3,7 +3,7 @@ info:
   title: SnapOtter API
   version: 2.0.0
   description: |
-    REST API for SnapOtter, self-hosted file-processing infrastructure with 200+ tools across image, video, audio, PDF, and documents.
+    REST API for SnapOtter, the open-source file toolkit with 200+ tools across image, video, audio, PDF, and documents.
 
     ## Authentication
 
@@ -421,32 +421,44 @@ paths:
                     - `square` (boolean, default false) - Crop to square aspect ratio
 
                     At least one of `width`, `height`, or `square` must be provided.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
-        "200":
-          description: Processed image
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/ToolResponse"
-                  - type: object
-                    properties:
-                      width:
-                        type: integer
-                      height:
-                        type: integer
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
               example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                downloadUrl: /api/v1/download/abc123/output.png
-                originalSize: 1
-                processedSize: 1
-                previewUrl: example
-                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
-                width: 1
-                height: 1
+                async: true
         "400":
           description: Invalid input
           content:
@@ -2137,7 +2149,11 @@ paths:
       description: |
         Phase 2 of passport photo generation. Uses the jobId and landmarks from
         the analyze phase to crop, resize, and tile the photo to the specified
-        country/document specification. Fast response (no AI re-run).
+        country/document specification (no AI re-run). The crop runs as a
+        queued job. One that finishes inside the sync window answers 200 with
+        the result; a slower one answers 202 with a job id, and the result
+        arrives on the job's progress stream at /api/v1/jobs/{jobId}/progress.
+        Releases up to 2.3.0 always held the request open and answered 200.
       security:
         - bearerAuth: []
       requestBody:
@@ -2208,6 +2224,11 @@ paths:
                 imageHeight:
                   type: integer
                   description: Original image height from analyze phase
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
               filename: photo.png
@@ -2237,6 +2258,10 @@ paths:
                     type: string
                   downloadUrl:
                     type: string
+                  originalSize:
+                    type: integer
+                  processedSize:
+                    type: integer
                   dimensions:
                     type: object
                     properties:
@@ -2279,6 +2304,34 @@ paths:
                   documentType: example
                   documentLabel: example
                 printDownloadUrl: example
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         "400":
           description: Invalid settings or unknown country code
           content:
@@ -2688,7 +2741,11 @@ paths:
                     - `text` (string 1-500, required) - Overlay text
                     - `fontSize` (number 8-200, default 48) - Font size in pixels
                     - `color` (hex string, default "#FFFFFF") - Text color
-                    - `position` (string, default "bottom") - One of: top, center, bottom
+                    - `position` (string, default "bottom") - One of: top, center, bottom, custom
+                    - `x` (number 0-100, default 50) - Horizontal centre of the text as a percentage of image width; used when position is custom
+                    - `y` (number 0-100, default 50) - Vertical centre of the text as a percentage of image height; used when position is custom
+                    - `wrap` (boolean, default true) - Wrap long text onto several lines
+                    - `maxWidth` (number 10-100, default 90) - Widest a wrapped line may get, as a percentage of image width
                     - `backgroundBox` (boolean, default false) - Show background box behind text
                     - `backgroundColor` (hex string, default "#000000") - Background box color
                     - `shadow` (boolean, default true) - Add text shadow
@@ -3054,7 +3111,12 @@ paths:
       operationId: vectorizeImage
       tags: [Image]
       summary: Image to SVG
-      description: Convert a raster image to SVG vector format using potrace (B&W) or VTracer (color).
+      description: |
+        Convert a raster image to SVG vector format using potrace (B&W) or VTracer (color).
+
+        Runs as a queued job. A trace that finishes inside the synchronous wait window
+        answers 200 with the result; a longer one (large or detailed color input) answers
+        202 with a job id. Follow its progress over SSE, then fetch the SVG.
       security:
         - bearerAuth: []
       requestBody:
@@ -3081,9 +3143,15 @@ paths:
                     - `pathMode` (string, default "spline") - One of: none, polygon, spline
                     - `cornerThreshold` (number 0-180, default 60) - Corner detection angle
                     - `invert` (boolean, default false) - Invert colors before tracing
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               file: photo.png
               settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
       responses:
         "200":
           description: Processed image (downloadUrl points to .svg file)
@@ -3098,6 +3166,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         "400":
           description: Invalid input
           content:
@@ -3112,6 +3208,12 @@ paths:
                 $ref: "#/components/schemas/UnauthorizedError"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/tools/image/svg-to-raster:
     post:
@@ -4419,24 +4521,35 @@ paths:
                   description: |
                     JSON string with options:
                     - `templateId` (string, required) - Template ID defining the grid layout
-                    - `cells` (array, optional) - Per-cell configuration overrides
+                    - `cells` (array, optional) - Per-cell configuration overrides. Set a cell's `imageIndex` to `-1` to leave it empty
                     - `gap` (number 0-500, default 8) - Gap between images in pixels
                     - `cornerRadius` (number 0-500, default 0) - Corner rounding radius
                     - `backgroundColor` (string, default "#FFFFFF") - Background fill color
                     - `aspectRatio` (string, default "free") - Aspect ratio constraint
                     - `outputFormat` (string, default "png") - One of: png, jpeg, webp, avif, jxl
                     - `quality` (number 1-100, default 90) - Output quality
+
+                    Without `cells`, send one image per template cell. Fewer images return 400 with code `INVALID_SETTINGS`. Images beyond the template's cell count are ignored and named in the response's `warnings`.
             example:
               file:
-                - photo.png
-              settings: '{}'
+                - photo-1.png
+                - photo-2.png
+              settings: '{"templateId":"2-h-equal"}'
       responses:
         "200":
           description: Processed image
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ToolResponse"
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                        description: Present when more images were uploaded than the template holds. Names the ignored files.
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -5684,7 +5797,7 @@ paths:
       operationId: captureWebpage
       tags: [Image]
       summary: Capture webpage as image
-      description: Capture a webpage as a high-quality screenshot image. Accepts a JSON body with a URL and capture options.
+      description: Capture a webpage as a high-quality screenshot image. Accepts a JSON body with a URL and capture options. The capture runs as a queued job. A capture that finishes inside the sync window answers 200 with the result; a slower one answers 202 with a job id, and the result arrives on the job's progress stream at /api/v1/jobs/{jobId}/progress. Releases up to 2.3.0 always held the request open and answered 200.
       security:
         - bearerAuth: []
       requestBody:
@@ -5725,6 +5838,11 @@ paths:
                   minimum: 320
                   maximum: 2160
                   default: 720
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
             example:
               url: https://example.com/
               format: png
@@ -5747,6 +5865,34 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         "400":
           description: Invalid URL or parameters
           content:
@@ -6722,6 +6868,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/files/download:
+    post:
+      operationId: bulkDownloadFiles
+      tags: [Files]
+      summary: Download several saved files as one ZIP
+      description: Streams one ZIP holding every requested file. Entries keep request order, duplicate IDs are dropped, and colliding names get _1, _2 suffixes. Without files:all, every ID must be one of your own files. If any ID is missing or not yours, the whole request fails with 404 rather than returning an archive with a file left out. A blob that disappears from storage after the first entry has been sent cuts the stream, so a client never receives a ZIP with a file quietly missing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                  description: Saved file IDs to include, in archive order
+            example:
+              ids:
+                - 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: ZIP archive of the requested files
+          headers:
+            Content-Disposition:
+              description: Always names the archive files.zip.
+              schema:
+                type: string
+                example: attachment; filename="files.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: (binary data)
+        "400":
+          description: The ids list is missing, empty, or holds a non-string value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "403":
+          description: The caller has neither files:own nor files:all
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForbiddenError"
+        "404":
+          description: An ID is missing or belongs to another user ("File not found"), or the first file's blob is gone from storage ("File not found in storage")
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit exceeded (60 requests a minute)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/v1/files/upload:
     post:
@@ -8558,6 +8775,13 @@ paths:
                               type: string
                         error:
                           type: [string, "null"]
+                  upscaleCpuMaxMp:
+                    type: [number, "null"]
+                    description: >-
+                      Largest input in megapixels this host upscales without a
+                      GPU before reducing it first (0 means no cap). Null when a
+                      GPU may run the upscale. Boot-time guess until the AI
+                      sidecar reports; the upscale result stays authoritative.
               example:
                 bundles:
                   - id: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
@@ -8583,6 +8807,7 @@ paths:
                       percent: 1
                       stage: example
                     error: example
+                upscaleCpuMaxMp: 4
         "401":
           description: Authentication required
           content:
@@ -9418,8 +9643,21 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                  reassignedUsers:
+                    type: array
+                    description: Users moved off the deleted role onto "user" (disabled members onto "disabled:user").
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        username:
+                          type: string
               example:
                 ok: true
+                reassignedUsers:
+                  - id: 8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e
+                    username: jane
         "400":
           description: Cannot delete built-in role
           content:
@@ -9641,7 +9879,7 @@ paths:
                     JSON string with options:
                     - `startS` (number >= 0, default 0) - Start time in seconds
                     - `endS` (number, required) - End time in seconds (must be after startS)
-                    - `precise` (boolean, default false) - Re-encode for frame-accurate cuts instead of keyframe seek
+                    - `precise` (boolean, default false) - Re-encode the whole range for exact start and end frames instead of copying from the next keyframe
             example:
               file: photo.png
               settings: '{}'
@@ -10643,6 +10881,95 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/video/video-to-avif:
+    post:
+      operationId: videoToAvif
+      tags: [Video]
+      summary: Video to AVIF
+      description: Convert a video clip into an animated AVIF image.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to process
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `fps` (integer 1-30, default 12) - Output frame rate
+                    - `width` (integer 64-1280, default 480) - Output width in pixels
+                    - `startS` (number >= 0, default 0) - Start time in seconds
+                    - `durationS` (number 0-60, default 5) - Duration in seconds
+                    - `quality` (integer 1-100, default 50) - AVIF quality
+                    - `loop` (boolean, default true) - Loop the animation
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: '{}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/tools/video/video-to-frames:
     post:
       operationId: videoToFrames
@@ -10992,7 +11319,7 @@ paths:
       operationId: extractSubtitles
       tags: [Video]
       summary: Extract Subtitles
-      description: Pull the subtitle track out of a video as an SRT file.
+      description: Pull the subtitle track out of a video as an SRT, WebVTT or ASS file.
       security:
         - bearerAuth: []
       requestBody:
@@ -11007,6 +11334,11 @@ paths:
                   type: string
                   format: binary
                   description: Video file with an embedded subtitle track
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
             example:
               file: photo.png
       responses:
@@ -11023,6 +11355,70 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+  /api/v1/tools/video/convert-subtitles:
+    post:
+      operationId: convertSubtitles
+      tags: [Video]
+      summary: Convert Subtitles
+      description: |
+        Convert a subtitle file between SRT, WebVTT and ASS. Converting from
+        ASS drops its positioning and effects. Input is capped by
+        MAX_SUBTITLE_SIZE_MB (1 MB by default).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Subtitle file (.srt, .vtt or .ass)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
+                    - `encoding` (string, default "auto") - Text encoding of the input. One of: auto, utf-8, windows-1252, windows-1250, windows-1251, windows-1256, iso-8859-2, gb18030, big5, shift_jis, euc-kr. "auto" reads valid UTF-8 as is and otherwise assumes Windows-1252
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: subtitles.ass
+              settings: '{"format":"srt"}'
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Converted subtitle file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/subtitles.srt
+                originalSize: 2048
+                processedSize: 1536
         "400":
           description: Invalid input
           content:
@@ -11064,9 +11460,12 @@ paths:
                   type: string
                   description: |
                     JSON string with options:
-                    - `secondsPerImage` (number 0.5-10, default 2) - Display duration per image in seconds
-                    - `resolution` (string, default "720p") - One of: 1080p, 720p, square
-                    - `fps` (integer 10-60, default 30) - Output frame rate
+                    - `outputFormat` (string, default "mp4") - One of: mp4, gif, webp
+                    - `secondsPerImage` (number 0.5-10, default 2) - MP4 only. Display duration per image in seconds
+                    - `resolution` (string, default "720p") - MP4 only. One of: 1080p, 720p, square
+                    - `fps` (integer 10-60, default 30) - MP4 only. Output frame rate
+                    - `frameDelayMs` (integer 20-10000, default 500) - GIF and WebP only. Time each image is shown, in milliseconds
+                    - `loop` (integer 0-100, default 0) - GIF and WebP only. Times the animation plays; 0 loops forever
             example:
               file:
                 - photo.png
@@ -13571,6 +13970,67 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/pdf/resize-pdf-pages:
+    post:
+      operationId: resizePdfPages
+      tags: [PDF]
+      summary: Resize PDF Pages
+      description: Resize every page to a preset or custom size, such as a 4x6 in shipping label. Content is scaled to fit and centered without rasterizing.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to resize
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `pageSize` (string, default "4x6in") - One of: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
+                    - `width` (number, default 4) - Custom page width, used when pageSize is custom
+                    - `height` (number, default 6) - Custom page height, used when pageSize is custom
+                    - `unit` (string, default "in") - Unit for the custom size: in or mm. Each custom side must be 0.5-200 in (12.7-5080 mm)
+                    - `keepOrientation` (boolean, default false) - Turn the target size to match each page's orientation instead of forcing width x height
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        "200":
+          description: Resized PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/pdf/nup-pdf:
     post:
       operationId: nupPdf
@@ -14800,6 +15260,26 @@ paths:
                       chars:
                         type: integer
                         description: Number of characters extracted
+                      unreadablePages:
+                        type: object
+                        description: Present only when some pages had characters that didn't read as text (fonts with no usable ToUnicode map). Those pages stay in the .txt as extracted.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pages whose text layer didn't read as text
+                          total:
+                            type: integer
+                            description: Pages in the PDF
+                      partlyUnreadablePages:
+                        type: object
+                        description: Present only when some pages read as text but also held text in a font with no usable ToUnicode map. Those lines stay in the .txt as extracted.
+                        properties:
+                          count:
+                            type: integer
+                            description: Pages that read as text but also held unreadable text
+                          total:
+                            type: integer
+                            description: Pages in the PDF
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -14808,6 +15288,98 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 chars: 1
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/v1/tools/pdf/pdf-to-markdown:
+    post:
+      operationId: pdfToMarkdown
+      tags: [PDF]
+      summary: PDF to Markdown
+      description: Convert a PDF to Markdown. Headings are inferred from font size, and lists, links and ruled tables are kept where the PDF has real structure; images are dropped. A scanned PDF with no text layer is refused with 422 and code NO_TEXT_LAYER, so run OCR on it instead.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to convert (.pdf)
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Markdown file
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ToolResponse"
+                  - type: object
+                    properties:
+                      chars:
+                        type: integer
+                        description: Number of characters in the Markdown output
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                chars: 1
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          headers:
+            Location:
+              description: Status URL for the job (same value as statusUrl).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e
+                  progressUrl:
+                    type: string
+                    example: /api/v1/jobs/3f9c2a1e/progress
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+              example:
+                statusUrl: /api/v1/jobs/3f9c2a1e
+                progressUrl: /api/v1/jobs/3f9c2a1e/progress
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                async: true
         "400":
           description: Invalid input
           content:
@@ -14923,6 +15495,7 @@ paths:
                     - `author` (string, optional, max 500) - Document author
                     - `subject` (string, optional, max 500) - Document subject
                     - `keywords` (string, optional, max 500) - Document keywords
+                    - `stripAll` (boolean, optional) - Remove the whole Info dictionary (dates, Creator, Producer, custom keys) and the XMP stream before writing the fields above. Stripping XMP breaks PDF/A conformance.
             example:
               file: photo.png
               settings: '{}'
@@ -14939,6 +15512,22 @@ paths:
                       metadata:
                         type: object
                         description: The resulting PDF metadata fields
+                      stripped:
+                        type: object
+                        description: Present when `stripAll` was set. What the strip removed.
+                        properties:
+                          removed:
+                            type: array
+                            items:
+                              type: string
+                            description: Info dictionary keys that were present
+                          xmpRemoved:
+                            type: boolean
+                            description: Whether an XMP metadata stream was removed
+                          pdfa:
+                            type: string
+                            nullable: true
+                            description: PDF/A level the input declared (for example 2B), null when none
               example:
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 downloadUrl: /api/v1/download/abc123/output.png
@@ -15422,6 +16011,67 @@ paths:
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
 
+  /api/v1/tools/files/merge-text:
+    post:
+      operationId: mergeText
+      tags: [Files]
+      summary: Merge Text Files
+      description: Combine multiple text or Markdown files into one, in the order they are uploaded. Each file must be UTF-8 text. The output keeps the shared extension when every input has the same one, otherwise it is plain text. CSV inputs always come back as .txt, because each file brings its own header row.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Two or more .txt, .md, .markdown, .csv or .log files to merge (2-50 files)
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `separator` (blank-line | rule | filename-heading, default blank-line) - What goes between files: a blank line, a `---` rule, or each file's name as a heading
+            example:
+              file:
+                - notes-1.md
+                - notes-2.md
+              settings: '{"separator":"filename-heading"}'
+      responses:
+        "200":
+          description: Merged text file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/merged.md
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/files/yaml-json:
     post:
       operationId: yamlJson
@@ -15511,6 +16161,284 @@ paths:
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         "400":
           description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/v1/tools/files/proportion-calculator:
+    post:
+      operationId: proportionCalculator
+      tags: [Files]
+      summary: Proportion Calculator
+      description: |
+        Solve the rule of three: given three values, find the fourth. Takes a
+        JSON body, not multipart, and answers with a number instead of a file.
+
+        `direct`: A is to B as C is to X, so X = B * C / A. `inverse`: A * B =
+        C * X, so X = A * B / C. The answer is rounded to 15 significant digits.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [a, b, c]
+              properties:
+                a:
+                  type: number
+                  description: First known value. Must not be 0 in direct mode.
+                b:
+                  type: number
+                  description: The value that goes with a
+                c:
+                  type: number
+                  description: Third known value. Must not be 0 in inverse mode.
+                mode:
+                  type: string
+                  enum: [direct, inverse]
+                  default: direct
+                  description: Direct or inverse proportion
+            example:
+              a: 3
+              b: 6
+              c: 10
+              mode: direct
+      responses:
+        "200":
+          description: The missing value
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, x]
+                properties:
+                  mode:
+                    type: string
+                    enum: [direct, inverse]
+                  x:
+                    type: number
+                    description: The value that goes with c
+              example:
+                mode: direct
+                x: 20
+        "400":
+          description: Invalid input, a zero divisor, or an answer out of range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/v1/tools/files/convert-font:
+    post:
+      operationId: convertFont
+      tags: [Files]
+      summary: Convert Font
+      description: Convert a font between TTF, OTF, WOFF and WOFF2. WOFF and WOFF2 keep the outlines unchanged. OTF to TTF redraws cubic curves as quadratic ones within 1 font unit; TTF to OTF keeps the shapes, rounding control points to whole font units. Embedding permissions (OS/2 fsType) are kept. Font collections (.ttc) are rejected.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: TTF, OTF, WOFF, or WOFF2 font to convert
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `format` (string, one of ttf, otf, woff, woff2, default ttf) - Output format
+            example:
+              file: photo.png
+              settings: '{}'
+      responses:
+        "200":
+          description: Converted font
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/v1/tools/files/convert-case:
+    post:
+      operationId: convertCase
+      tags: [Files]
+      summary: Convert Case
+      description: |
+        Change text to another case: UPPER, lower, Sentence, Title, Capitalized,
+        iNVERSE, aLtErNaTiNg, camelCase, PascalCase, snake_case or kebab-case. This
+        tool accepts a JSON body, not multipart, and answers with the converted
+        text instead of a file to download.
+
+        `title` keeps short English words lowercase unless they start or end the
+        line. `camel`, `pascal`, `snake` and `kebab` split on spaces, punctuation
+        and existing case changes, and convert each line on its own.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, mode]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Text to convert
+                mode:
+                  type: string
+                  enum: [upper, lower, sentence, title, capitalized, inverse, alternating, camel, pascal, snake, kebab]
+                  description: Target case
+                locale:
+                  type: string
+                  maxLength: 64
+                  description: BCP 47 language tag for language-specific casing, such as the Turkish dotted and dotless i. Without it, casing is language-independent.
+            example:
+              text: the lord of the rings
+              mode: title
+      responses:
+        "200":
+          description: Converted text
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, result]
+                properties:
+                  mode:
+                    type: string
+                    enum: [upper, lower, sentence, title, capitalized, inverse, alternating, camel, pascal, snake, kebab]
+                  result:
+                    type: string
+                    description: The converted text
+              example:
+                mode: title
+                result: The Lord of the Rings
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
+  /api/v1/tools/files/base64:
+    post:
+      operationId: base64Text
+      tags: [Files]
+      summary: Base64 Encode / Decode
+      description: |
+        Encode UTF-8 text to Base64, or decode Base64 back to UTF-8 text. This tool
+        accepts a JSON body, not multipart, and answers with the converted text
+        instead of a file to download.
+
+        Decoding ignores whitespace and line breaks, accepts input with or without
+        padding, and takes both the standard (`+`, `/`) and URL-safe (`-`, `_`)
+        alphabets. Input that is not Base64 fails with `ENCODED_TEXT_INVALID`;
+        Base64 that decodes to binary data rather than UTF-8 text fails with
+        `DECODED_DATA_NOT_TEXT`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, mode]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000000
+                  description: Text to encode, or Base64 to decode
+                mode:
+                  type: string
+                  enum: [encode, decode]
+                  description: Conversion direction
+                urlSafe:
+                  type: boolean
+                  default: false
+                  description: When encoding, use the URL-safe alphabet (`-` and `_`) without padding. Ignored when decoding.
+            example:
+              text: Hello, World!
+              mode: encode
+              urlSafe: false
+      responses:
+        "200":
+          description: Converted text
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, result]
+                properties:
+                  mode:
+                    type: string
+                    enum: [encode, decode]
+                  result:
+                    type: string
+                    description: The Base64 output when encoding, or the decoded text when decoding
+              example:
+                mode: encode
+                result: SGVsbG8sIFdvcmxkIQ==
+        "400":
+          description: Invalid input, input that is not Base64, or Base64 that does not decode to text
           content:
             application/json:
               schema:
@@ -15877,6 +16805,94 @@ paths:
                 processedSize: 1
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/image/aspect-ratio-calculator:
+    post:
+      operationId: calculateAspectRatio
+      tags: [Image]
+      summary: Aspect ratio calculator
+      description: Work out the width or height that keeps an aspect ratio, and the simplified ratio (1920x1080 is 16:9). Send newWidth or newHeight, not both; with neither, only the ratio comes back. This tool accepts a JSON body, not multipart.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [width, height]
+              properties:
+                width:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Original width
+                height:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: Original height
+                newWidth:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: New width to solve the height from
+                newHeight:
+                  type: number
+                  minimum: 0.0001
+                  maximum: 1000000
+                  description: New height to solve the width from
+                round:
+                  type: boolean
+                  default: true
+                  description: Round the solved dimension to whole pixels (minimum 1); otherwise keep two decimals
+            example:
+              width: 1920
+              height: 1080
+              newWidth: 1280
+              round: true
+      responses:
+        "200":
+          description: Solved dimensions and simplified ratio
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [width, height, ratio, ratioDecimal, newWidth, newHeight]
+                properties:
+                  width:
+                    type: number
+                  height:
+                    type: number
+                  ratio:
+                    type: string
+                    description: Simplified ratio, such as 16:9
+                  ratioDecimal:
+                    type: number
+                    description: Width divided by height, to four decimals
+                  newWidth:
+                    type: [number, "null"]
+                  newHeight:
+                    type: [number, "null"]
+              example:
+                width: 1920
+                height: 1080
+                ratio: "16:9"
+                ratioDecimal: 1.7778
+                newWidth: 1280
+                newHeight: 720
         "400":
           description: Invalid input
           content:
@@ -17510,7 +18526,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to JPG input file (.heic, .heif)"
+                  description: "HEIC to JPG input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -17581,7 +18597,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to PNG input file (.heic, .heif)"
+                  description: "HEIC to PNG input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -17652,7 +18668,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: "HEIC to AVIF input file (.heic, .heif)"
+                  description: "HEIC to AVIF input file (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -19411,7 +20427,7 @@ paths:
                   items:
                     type: string
                     format: binary
-                  description: "HEIC to PDF input files (.heic, .heif)"
+                  description: "HEIC to PDF input files (.heic, .heif, .hif)"
                 settings:
                   type: string
                   description: |
@@ -22166,6 +23182,290 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/v1/tools/video/srt-to-vtt:
+    post:
+      operationId: srtToVttTool
+      tags: [Video]
+      summary: "SRT to VTT"
+      description: |
+        Convert SRT to VTT
+        This is a dedicated conversion preset endpoint backed by `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SRT to VTT input file (.srt)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated SRT to VTT converter using the convert-subtitles pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/vtt-to-srt:
+    post:
+      operationId: vttToSrtTool
+      tags: [Video]
+      summary: "VTT to SRT"
+      description: |
+        Convert VTT to SRT
+        This is a dedicated conversion preset endpoint backed by `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "VTT to SRT input file (.vtt)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated VTT to SRT converter using the convert-subtitles pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/ass-to-srt:
+    post:
+      operationId: assToSrtTool
+      tags: [Video]
+      summary: "ASS to SRT"
+      description: |
+        Convert ASS to SRT
+        This is a dedicated conversion preset endpoint backed by `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "ASS to SRT input file (.ass)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated ASS to SRT converter using the convert-subtitles pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/video/srt-to-ass:
+    post:
+      operationId: srtToAssTool
+      tags: [Video]
+      summary: "SRT to ASS"
+      description: |
+        Convert SRT to ASS
+        This is a dedicated conversion preset endpoint backed by `convert-subtitles`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "SRT to ASS input file (.srt)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated SRT to ASS converter using the convert-subtitles pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/tools/audio/m4a-to-mp3:
     post:
       operationId: m4aToMp3Tool
@@ -22876,6 +24176,2136 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /api/v1/tools/audio/mp3-to-flac:
+    post:
+      operationId: mp3ToFlacTool
+      tags: [Audio]
+      summary: "MP3 to FLAC"
+      description: |
+        Convert MP3 to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP3 to FLAC input file (.mp3)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP3 to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/mp3-to-ogg:
+    post:
+      operationId: mp3ToOggTool
+      tags: [Audio]
+      summary: "MP3 to OGG"
+      description: |
+        Convert MP3 to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP3 to OGG input file (.mp3)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP3 to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/mp3-to-m4a:
+    post:
+      operationId: mp3ToM4aTool
+      tags: [Audio]
+      summary: "MP3 to M4A"
+      description: |
+        Convert MP3 to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "MP3 to M4A input file (.mp3)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated MP3 to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wav-to-flac:
+    post:
+      operationId: wavToFlacTool
+      tags: [Audio]
+      summary: "WAV to FLAC"
+      description: |
+        Convert WAV to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WAV to FLAC input file (.wav)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WAV to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wav-to-ogg:
+    post:
+      operationId: wavToOggTool
+      tags: [Audio]
+      summary: "WAV to OGG"
+      description: |
+        Convert WAV to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WAV to OGG input file (.wav)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WAV to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wav-to-m4a:
+    post:
+      operationId: wavToM4aTool
+      tags: [Audio]
+      summary: "WAV to M4A"
+      description: |
+        Convert WAV to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WAV to M4A input file (.wav)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WAV to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/flac-to-wav:
+    post:
+      operationId: flacToWavTool
+      tags: [Audio]
+      summary: "FLAC to WAV"
+      description: |
+        Convert FLAC to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "FLAC to WAV input file (.flac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated FLAC to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/flac-to-ogg:
+    post:
+      operationId: flacToOggTool
+      tags: [Audio]
+      summary: "FLAC to OGG"
+      description: |
+        Convert FLAC to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "FLAC to OGG input file (.flac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated FLAC to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/flac-to-m4a:
+    post:
+      operationId: flacToM4aTool
+      tags: [Audio]
+      summary: "FLAC to M4A"
+      description: |
+        Convert FLAC to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "FLAC to M4A input file (.flac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated FLAC to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/ogg-to-flac:
+    post:
+      operationId: oggToFlacTool
+      tags: [Audio]
+      summary: "OGG to FLAC"
+      description: |
+        Convert OGG to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OGG to FLAC input file (.ogg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OGG to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/ogg-to-m4a:
+    post:
+      operationId: oggToM4aTool
+      tags: [Audio]
+      summary: "OGG to M4A"
+      description: |
+        Convert OGG to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OGG to M4A input file (.ogg)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OGG to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/m4a-to-flac:
+    post:
+      operationId: m4aToFlacTool
+      tags: [Audio]
+      summary: "M4A to FLAC"
+      description: |
+        Convert M4A to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "M4A to FLAC input file (.m4a)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated M4A to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/m4a-to-ogg:
+    post:
+      operationId: m4aToOggTool
+      tags: [Audio]
+      summary: "M4A to OGG"
+      description: |
+        Convert M4A to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "M4A to OGG input file (.m4a)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated M4A to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aac-to-ogg:
+    post:
+      operationId: aacToOggTool
+      tags: [Audio]
+      summary: "AAC to OGG"
+      description: |
+        Convert AAC to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AAC to OGG input file (.aac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AAC to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aac-to-m4a:
+    post:
+      operationId: aacToM4aTool
+      tags: [Audio]
+      summary: "AAC to M4A"
+      description: |
+        Convert AAC to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AAC to M4A input file (.aac)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AAC to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/opus-to-mp3:
+    post:
+      operationId: opusToMp3Tool
+      tags: [Audio]
+      summary: "Opus to MP3"
+      description: |
+        Convert Opus to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Opus to MP3 input file (.opus)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Opus to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/opus-to-wav:
+    post:
+      operationId: opusToWavTool
+      tags: [Audio]
+      summary: "Opus to WAV"
+      description: |
+        Convert Opus to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Opus to WAV input file (.opus)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Opus to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/opus-to-flac:
+    post:
+      operationId: opusToFlacTool
+      tags: [Audio]
+      summary: "Opus to FLAC"
+      description: |
+        Convert Opus to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Opus to FLAC input file (.opus)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Opus to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/opus-to-ogg:
+    post:
+      operationId: opusToOggTool
+      tags: [Audio]
+      summary: "Opus to OGG"
+      description: |
+        Convert Opus to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Opus to OGG input file (.opus)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Opus to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/opus-to-m4a:
+    post:
+      operationId: opusToM4aTool
+      tags: [Audio]
+      summary: "Opus to M4A"
+      description: |
+        Convert Opus to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Opus to M4A input file (.opus)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated Opus to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wma-to-mp3:
+    post:
+      operationId: wmaToMp3Tool
+      tags: [Audio]
+      summary: "WMA to MP3"
+      description: |
+        Convert WMA to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WMA to MP3 input file (.wma)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WMA to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wma-to-wav:
+    post:
+      operationId: wmaToWavTool
+      tags: [Audio]
+      summary: "WMA to WAV"
+      description: |
+        Convert WMA to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WMA to WAV input file (.wma)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WMA to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wma-to-flac:
+    post:
+      operationId: wmaToFlacTool
+      tags: [Audio]
+      summary: "WMA to FLAC"
+      description: |
+        Convert WMA to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WMA to FLAC input file (.wma)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WMA to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wma-to-ogg:
+    post:
+      operationId: wmaToOggTool
+      tags: [Audio]
+      summary: "WMA to OGG"
+      description: |
+        Convert WMA to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WMA to OGG input file (.wma)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WMA to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/wma-to-m4a:
+    post:
+      operationId: wmaToM4aTool
+      tags: [Audio]
+      summary: "WMA to M4A"
+      description: |
+        Convert WMA to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WMA to M4A input file (.wma)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WMA to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aiff-to-mp3:
+    post:
+      operationId: aiffToMp3Tool
+      tags: [Audio]
+      summary: "AIFF to MP3"
+      description: |
+        Convert AIFF to MP3
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AIFF to MP3 input file (.aiff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AIFF to MP3 converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aiff-to-wav:
+    post:
+      operationId: aiffToWavTool
+      tags: [Audio]
+      summary: "AIFF to WAV"
+      description: |
+        Convert AIFF to WAV
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AIFF to WAV input file (.aiff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AIFF to WAV converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aiff-to-flac:
+    post:
+      operationId: aiffToFlacTool
+      tags: [Audio]
+      summary: "AIFF to FLAC"
+      description: |
+        Convert AIFF to FLAC
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AIFF to FLAC input file (.aiff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AIFF to FLAC converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aiff-to-ogg:
+    post:
+      operationId: aiffToOggTool
+      tags: [Audio]
+      summary: "AIFF to OGG"
+      description: |
+        Convert AIFF to OGG
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AIFF to OGG input file (.aiff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AIFF to OGG converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/audio/aiff-to-m4a:
+    post:
+      operationId: aiffToM4aTool
+      tags: [Audio]
+      summary: "AIFF to M4A"
+      description: |
+        Convert AIFF to M4A
+        This is a dedicated conversion preset endpoint backed by `convert-audio`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "AIFF to M4A input file (.aiff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated AIFF to M4A converter using the convert-audio pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /api/v1/tools/files/excel-to-csv:
     post:
       operationId: excelToCsvTool
@@ -22941,6 +26371,290 @@ paths:
                 progressUrl: /api/v1/jobs/3f9c2a1e/progress
                 jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
                 async: true
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/otf-to-ttf:
+    post:
+      operationId: otfToTtfTool
+      tags: [Files]
+      summary: "OTF to TTF"
+      description: |
+        Convert OTF to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "OTF to TTF input file (.otf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated OTF to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/woff-to-ttf:
+    post:
+      operationId: woffToTtfTool
+      tags: [Files]
+      summary: "WOFF to TTF"
+      description: |
+        Convert WOFF to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WOFF to TTF input file (.woff)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WOFF to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/woff2-to-ttf:
+    post:
+      operationId: woff2ToTtfTool
+      tags: [Files]
+      summary: "WOFF2 to TTF"
+      description: |
+        Convert WOFF2 to TTF
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "WOFF2 to TTF input file (.woff2)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated WOFF2 to TTF converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        "400":
+          description: Invalid input or settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/tools/files/ttf-to-woff2:
+    post:
+      operationId: ttfToWoff2Tool
+      tags: [Files]
+      summary: "TTF to WOFF2"
+      description: |
+        Convert TTF to WOFF2
+        This is a dedicated conversion preset endpoint backed by `convert-font`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "TTF to WOFF2 input file (.ttf, .otf)"
+                settings:
+                  type: string
+                  description: |
+                    Dedicated TTF to WOFF2 converter using the convert-font pipeline.
+                    The output format is locked by the endpoint.
+                clientJobId:
+                  type: string
+                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
+                  maxLength: 128
+                  description: Client-provided job ID for SSE progress tracking
+            example:
+              file: photo.png
+              settings: example
+              clientJobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+      responses:
+        "200":
+          description: Processed file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/output.png
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         "400":
           description: Invalid input or settings
           content:

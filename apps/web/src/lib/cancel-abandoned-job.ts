@@ -11,6 +11,14 @@ const MESSAGES = {
     missing: "Cancel for an abandoned Erase Object job found no job",
     failed: "Canceling an abandoned Erase Object job failed",
   },
+  "html-to-image": {
+    missing: "Cancel for an abandoned HTML to Image job found no job",
+    failed: "Canceling an abandoned HTML to Image job failed",
+  },
+  "passport-photo": {
+    missing: "Cancel for an abandoned Passport Photo job found no job",
+    failed: "Canceling an abandoned Passport Photo job failed",
+  },
   ocr: {
     missing: "Cancel for an abandoned OCR job found no job",
     failed: "Canceling an abandoned OCR job failed",

@@ -78,6 +78,26 @@ describe.skipIf(!ffmpegAvailable())("trim-audio (requires ffmpeg)", () => {
     // the duration, leaving well under 0.1s either way.
     const res = await runTool({ startS: 0.98, endS: 9 });
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/Trim window/);
+    expect(JSON.parse(res.body).error).toMatch(/Less than 0\.1 seconds of the audio/);
+  });
+
+  it("cuts time off both ends without an end time (#728)", async () => {
+    const res = await runTool({ mode: "ends", cutStartS: 0.2, cutEndS: 0.2 });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    expect(dl.statusCode).toBe(200);
+    const tmpDir = mkdtempSync(join(tmpdir(), "trim-ends-test-"));
+    const probeFile = join(tmpDir, "trimmed.mp3");
+    writeFileSync(probeFile, dl.rawPayload);
+    const info = await probeMedia(probeFile);
+    // tiny.mp3 is ~1.0-1.045s; stream copy can overshoot by a frame or two.
+    expect(info.durationS as number).toBeGreaterThan(0.4);
+    expect(info.durationS as number).toBeLessThan(0.9);
+  }, 60_000);
+
+  it("rejects an ends cut that leaves nothing (#728)", async () => {
+    const res = await runTool({ mode: "ends", cutStartS: 0.6, cutEndS: 0.6 });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/nothing of the audio is left/);
   });
 });

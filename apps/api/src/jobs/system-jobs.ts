@@ -9,13 +9,15 @@
  * The system pool also handles batch-finalize (routed by the worker before
  * calling runSystemJob); anything else is a bug.
  */
+import { SafeError } from "@snapotter/shared";
 import type { Job } from "bullmq";
-import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { reportError } from "../lib/error-report.js";
 import { getActiveAndQueuedInstalls } from "../lib/feature-install-queue.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
@@ -425,6 +427,86 @@ function listSweepErrors(errors: string[]): string {
   return `${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`;
 }
 
+/**
+ * Fill in a finished job's missing team retention deadline, so its files don't
+ * fall back to the global TTL (#4938). The usual cause is a failed
+ * fire-and-forget computeDeleteAfter in enqueue.ts (#1522), but a job from
+ * before the feature was licensed, before its team set an override, or by a
+ * user who has since moved to such a team is NULL too and gets filled the same
+ * way. The deadline matches what enqueue writes, counted from created_at
+ * rather than enqueue time, with the team's current retention_hours. Teams
+ * without an override are left to the global sweep. Returns the ids filled in.
+ * A filled row is no longer NULL, so each job is logged and reported once.
+ */
+async function backfillTeamRetentionDeadlines(): Promise<Set<string>> {
+  if (!(await isEnterpriseFeatureEnabled("team_retention_overrides", "cron"))) return new Set();
+
+  const rows = await db
+    .update(schema.jobs)
+    .set({
+      deleteAfter: sql`${schema.jobs.createdAt} + make_interval(hours => ${schema.teams.retentionHours})`,
+    })
+    .from(schema.users)
+    .innerJoin(schema.teams, eq(schema.teams.id, schema.users.team))
+    .where(
+      and(
+        eq(schema.jobs.userId, schema.users.id),
+        isNull(schema.jobs.deleteAfter),
+        isNotNull(schema.teams.retentionHours),
+        inArray(schema.jobs.status, [...FINISHED_STATUSES]),
+      ),
+    )
+    .returning({ id: schema.jobs.id, deleteAfter: schema.jobs.deleteAfter });
+
+  for (const row of rows) {
+    logger.warn(
+      { jobId: row.id, deleteAfter: row.deleteAfter },
+      "Storage TTL: backfilled a missing team retention deadline",
+    );
+    void reportError(
+      new SafeError("Filled in a missing team retention deadline", {
+        code: "RETENTION_DEADLINE_BACKFILLED",
+      }),
+      {
+        source: "cron",
+        subsystem: "retention",
+        jobId: row.id,
+        periodic: true,
+        job: SYSTEM_JOBS.storageTtl,
+      },
+    );
+  }
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Clear a job's deadline when no team override backs it, so its files follow
+ * the global tempFileMaxAgeHours setting (#5121). Before #5100, enqueue wrote
+ * a FILE_MAX_AGE_HOURS deadline for a team without an override or a team row
+ * that no longer exists. A team that later clears its override, or a user who
+ * moves to such a team, keeps the old deadline the same way. A cleared
+ * override can't be told apart from one never set, so both lose the deadline.
+ * Returns how many rows were cleared.
+ */
+async function clearUnbackedTeamRetentionDeadlines(): Promise<number> {
+  if (!(await isEnterpriseFeatureEnabled("team_retention_overrides", "cron"))) return 0;
+
+  const rows = await db
+    .update(schema.jobs)
+    .set({ deleteAfter: null })
+    .from(schema.users)
+    .leftJoin(schema.teams, eq(schema.teams.id, schema.users.team))
+    .where(
+      and(
+        eq(schema.jobs.userId, schema.users.id),
+        isNotNull(schema.jobs.deleteAfter),
+        isNull(schema.teams.retentionHours),
+      ),
+    )
+    .returning({ id: schema.jobs.id });
+  return rows.length;
+}
+
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
   const heldUserRows = await db
@@ -455,6 +537,26 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // but only for a finished job: one still queued or running needs its input
   // (#1412), and the next sweep after it finishes honors the deadline.
   let deleteAfterCleaned = 0;
+  // A backfilled deadline can already be in the past. Its job waits for the
+  // next sweep, so the logged and reported backfill comes before the delete.
+  let backfilled = new Set<string>();
+  try {
+    backfilled = await backfillTeamRetentionDeadlines();
+  } catch (err) {
+    logger.error({ err }, "Storage TTL: team retention deadline backfill failed");
+  }
+  // Before the deadline select, so a cleared job goes to the global sweep
+  // this pass instead of being deleted on its stale deadline.
+  try {
+    const cleared = await clearUnbackedTeamRetentionDeadlines();
+    if (cleared > 0) {
+      logger.info(
+        `Storage TTL: cleared ${cleared} team retention deadlines with no team override behind them`,
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, "Storage TTL: clearing team retention deadlines with no override failed");
+  }
   // A failed deadline deletion is a retention promise not kept, so it is
   // counted and logged like the global sweep's failures, never dropped (#1442).
   const deleteAfterErrors: string[] = [];
@@ -473,6 +575,7 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     for (const job of expiredJobs) {
       // Skip jobs belonging to users under legal hold
       if (job.userId && heldUserIds.has(job.userId)) continue;
+      if (backfilled.has(job.id)) continue;
       // deletePrefix already tolerates a missing dir, so anything thrown here
       // is a real fault. Each prefix is tried on its own, so a failed uploads/
       // delete doesn't also leave outputs/ behind.

@@ -67,6 +67,9 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   "video-to-webp": lazy(() =>
     import("./video-to-webp-settings").then((m) => ({ default: m.VideoToWebpControls })),
   ),
+  "video-to-avif": lazy(() =>
+    import("./video-to-avif-settings").then((m) => ({ default: m.VideoToAvifControls })),
+  ),
   "resize-video": lazy(() =>
     import("./resize-video-settings").then((m) => ({ default: m.ResizeVideoControls })),
   ),
@@ -139,6 +142,9 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
   ),
   "organize-pdf": lazy(() =>
     import("./organize-pdf-settings").then((m) => ({ default: m.OrganizePdfControls })),
+  ),
+  "resize-pdf-pages": lazy(() =>
+    import("./resize-pdf-pages-settings").then((m) => ({ default: m.ResizePdfPagesControls })),
   ),
   "nup-pdf": lazy(() => import("./nup-pdf-settings").then((m) => ({ default: m.NupPdfControls }))),
   "watermark-pdf": lazy(() =>

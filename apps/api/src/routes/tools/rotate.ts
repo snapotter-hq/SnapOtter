@@ -29,7 +29,7 @@ export function registerRotate(app: FastifyInstance) {
          * reverses the frame order on top of flipping each frame. Both are avoided
          * by running one frame at a time (#1083).
          */
-        const core = async (buffer: Buffer): Promise<Buffer> => {
+        const core = async (buffer: Buffer, format = outputFormat): Promise<Buffer> => {
           let image = sharp(buffer);
 
           // Apply rotation first
@@ -46,7 +46,7 @@ export function registerRotate(app: FastifyInstance) {
             });
           }
 
-          return await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+          return await image.toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         // Nothing to turn means nothing to decompose. Re-encoding the animation
@@ -67,8 +67,7 @@ export function registerRotate(app: FastifyInstance) {
               .toBuffer();
           } else {
             buffer =
-              (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-              (await core(inputBuffer));
+              (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
           }
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);

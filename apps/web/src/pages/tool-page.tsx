@@ -57,6 +57,7 @@ import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { showUnsupportedFileType } from "@/lib/intake-notice";
 import { withAnalytics } from "@/lib/lazy-analytics";
+import { openFileInput } from "@/lib/open-file-input";
 import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -66,7 +67,7 @@ import {
   MULTI_FILE_TOOLS,
   REORDERABLE_TOOLS,
 } from "@/lib/tool-display-modes";
-import { getToolName } from "@/lib/tool-i18n";
+import { getSectionName, getToolName } from "@/lib/tool-i18n";
 import { type ComparisonPreview, getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -438,7 +439,7 @@ function ToolPageContent({
     const section = toolSection(tool);
     const sectionInfo = SECTIONS.find((s) => s.id === section);
     return {
-      modality: sectionInfo?.name ?? section,
+      modality: getSectionName(t, section, sectionInfo?.name ?? section),
       modalityTab: section,
       toolName: getToolName(t, tool.id, tool.name),
     };
@@ -767,7 +768,7 @@ function ToolPageContent({
         showUnsupportedFileType(t.dropzone.unsupportedFileType);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [
     addFiles,
     toolAccept,
@@ -1527,6 +1528,7 @@ function ToolPageContent({
                 cssRotate: previewTransform.rotate,
                 cssFlipH: previewTransform.flipH,
                 cssFlipV: previewTransform.flipV,
+                gridOverlay: previewTransform.showGrid,
               }
             : {})}
           {...(isLivePreview && previewFilter ? { cssFilter: previewFilter } : {})}

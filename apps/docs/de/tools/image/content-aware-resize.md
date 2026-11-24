@@ -1,8 +1,8 @@
 ---
 description: "Seam-Carving-Skalierung, die Pixel entlang wenig wichtiger Pfade hinzufügt oder entfernt, um Schlüsselinhalte und Gesichter zu bewahren."
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: f93b84234ca9
+i18n_output_hash: 98f7aedd761d
 ---
 
 # Inhaltsbasierte Skalierung {#content-aware-resize}
@@ -13,7 +13,7 @@ Seam-Carving-Skalierung, die Pixel entlang der Pfade mit der geringsten visuelle
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**Verarbeitung:** Synchron (gibt das Ergebnis direkt zurück)
+**Verarbeitung:** Asynchron (gibt 202 zurück, Status über SSE per `/api/v1/jobs/{jobId}/progress` abfragen)
 
 **Modell-Bundle:** Für den Grundbetrieb keines erforderlich. Der Gesichtsschutz verwendet, sofern aktiviert, das Bundle `face-detection` (200-300 MB).
 
@@ -39,24 +39,40 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## Antwort (200 OK) {#response-200-ok}
+## Antwort {#response}
+
+### Erste Antwort (202 Accepted) {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### Endergebnis (über SSE) {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## Hinweise {#notes}
 
-- Diese benutzerdefinierte Route gibt derzeit eine synchrone 200-Antwort zurück.
 - Verwendet die Seam-Carving-Bibliothek `caire` für die inhaltsbasierte Skalierung.
-- Verkleinert nur die Abmessungen (entfernt Seams). Kann ein Bild nicht über seine ursprüngliche Größe hinaus vergrößern.
+- Verkleinert durch Entfernen von Seams oder vergrößert durch Einfügen von Seams. Jede Seite kann auf höchstens das Doppelte ihrer ursprünglichen Größe wachsen.
 - Die Option `protectFaces` nutzt die KI-Gesichtserkennung, um Gesichtsbereiche als hochenergetisch zu markieren und zu verhindern, dass Seams durch Gesichter verlaufen.
 - `blurRadius` steuert die Glättung vor der Berechnung der Energiekarte. Höhere Werte machen die Energiekarte gleichmäßiger, was bei verrauschten Bildern helfen kann.
 - `sobelThreshold` beeinflusst, wie aggressiv Kanten erkannt werden. Niedrigere Werte bewahren feinere Kanten.

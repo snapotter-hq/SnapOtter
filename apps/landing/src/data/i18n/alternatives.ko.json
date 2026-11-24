@@ -2113,13 +2113,6 @@
     "outputHash": "6dd41a6f2530",
     "stale": false
   },
-  "alt:stirling-pdf:breadth": {
-    "text": "PDF만 다룬다면 Stirling-PDF는 훌륭하고 살펴볼 만합니다. 이미지 크기 조정, 비디오 변환, 오디오 전사, 파일 일괄 처리도 한다면, SnapOtter는 여러 도구를 나란히 돌리는 대신 이 모두를 하나의 배포 환경에서 처리합니다.",
-    "_sourceHash": "313d117f9889",
-    "provenance": "machine",
-    "outputHash": "95b43fd8de77",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.0.a": {
     "text": "PDF를 넘어서는 하나의 스택을 원한다면 그럴 수 있습니다. SnapOtter의 PDF 지원 범위는 넓고, 여기에 이미지, 비디오, 오디오, 파일 도구를 더합니다. PDF만 다루는 구성이라면 Stirling-PDF가 탄탄하고 집중된 선택입니다.",
     "_sourceHash": "fe786c82b18a",
@@ -2134,13 +2127,6 @@
     "outputHash": "d0d1a451207b",
     "stale": false
   },
-  "alt:stirling-pdf:faqs.1.a": {
-    "text": "두 프로젝트 모두 오픈소스이며 셀프호스팅이 가능합니다. SnapOtter는 AGPLv3이며 SSO, 감사 로깅 등 통제 기능을 위한 선택형 유료 엔터프라이즈 등급을 추가로 제공합니다.",
-    "_sourceHash": "022e718ebced",
-    "provenance": "machine",
-    "outputHash": "db14b7026062",
-    "stale": false
-  },
   "alt:stirling-pdf:faqs.1.q": {
     "text": "둘 다 무료이자 오픈소스인가요?",
     "_sourceHash": "4d9f144a07a6",
@@ -2153,20 +2139,6 @@
     "_sourceHash": "7d2d27eb6d3c",
     "provenance": "machine",
     "outputHash": "7d2d27eb6d3c",
-    "stale": false
-  },
-  "alt:stirling-pdf:intro": {
-    "text": "Stirling-PDF와 SnapOtter는 둘 다 셀프호스팅이자 오픈소스라, 어느 쪽이든 파일은 내 서버에 머뭅니다. 차이는 범위입니다. Stirling-PDF는 PDF에 집중하는 반면, SnapOtter는 다섯 가지 파일 유형 전부를 아우릅니다.",
-    "_sourceHash": "20f16d6ce2b4",
-    "provenance": "machine",
-    "outputHash": "7521835c7411",
-    "stale": false
-  },
-  "alt:stirling-pdf:metaDescription": {
-    "text": "Stirling-PDF는 강력한 셀프호스팅형 PDF 도구 모음입니다. SnapOtter도 PDF를 다루면서, 이미지, 비디오, 오디오, 파일 도구를 하나의 스택에 담습니다. 둘 다 오픈소스입니다.",
-    "_sourceHash": "5a1e0e3abb93",
-    "provenance": "machine",
-    "outputHash": "848844883d50",
     "stale": false
   },
   "alt:stirling-pdf:pageTitle": {
@@ -2191,13 +2163,6 @@
     "stale": false
   },
   "alt:stirling-pdf:rows.0.snapotter": {
-    "text": "예",
-    "_sourceHash": "85a39ab345d6",
-    "provenance": "machine",
-    "outputHash": "2eb73fba696e",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.1.competitor": {
     "text": "예",
     "_sourceHash": "85a39ab345d6",
     "provenance": "machine",
@@ -2237,13 +2202,6 @@
     "_sourceHash": "147342dd6456",
     "provenance": "machine",
     "outputHash": "81dbc9a7d4bc",
-    "stale": false
-  },
-  "alt:stirling-pdf:rows.3.competitor": {
-    "text": "60개 이상의 PDF 작업",
-    "_sourceHash": "4d80b4dd60af",
-    "provenance": "machine",
-    "outputHash": "84ee5d3b0a34",
     "stale": false
   },
   "alt:stirling-pdf:rows.3.feature": {

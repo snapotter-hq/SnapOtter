@@ -1,5 +1,6 @@
 import { runDocsScript } from "@snapotter/ai";
 import {
+  type FontFormat,
   isSafeMessageError,
   SafeError,
   type SignPlacement,
@@ -198,22 +199,44 @@ export async function pdfRedactPy(
   return { found: parsed.found };
 }
 
+/**
+ * What doc_text reports. The page counts split the pages with no readable text
+ * into ones that came back blank (a scan) and ones whose text failed the
+ * readability test (fonts with no usable ToUnicode map), so the caller can say
+ * which (#954). partlyUnreadablePages counts pages that did read but also hold
+ * text in a font that didn't (#4947). An older sidecar sends no counts, and a
+ * #954-era one sends all but the last.
+ */
+export interface PdfTextResult {
+  chars: number;
+  hasText: boolean;
+  pages?: number;
+  emptyPages?: number;
+  unreadablePages?: number;
+  partlyUnreadablePages?: number;
+}
+
 /** Extract plain text from a PDF (PyMuPDF get_text). */
 export async function pdfTextPy(
   inPath: string,
   outTxtPath: string,
   opts?: DocsScriptOptions,
-): Promise<{ chars: number; hasText: boolean }> {
+): Promise<PdfTextResult> {
   const runOpts = buildDocsRunOpts(opts);
   const stdout = await runDocsScript(
     "doc_text",
     { path: inPath, out: outTxtPath },
     ...(runOpts ? [runOpts] : []),
   ).catch(withDamageClassification);
-  const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
-    "doc_text",
-    stdout,
-  );
+  const parsed = parseDocsJson<{
+    chars?: number;
+    hasText?: boolean;
+    pages?: unknown;
+    emptyPages?: unknown;
+    unreadablePages?: unknown;
+    partlyUnreadablePages?: unknown;
+    error?: string;
+  }>("doc_text", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_text failed: ${formatDocsError(parsed.error, stdout)}`);
   }
@@ -222,7 +245,43 @@ export async function pdfTextPy(
   }
   // Fall back to a chars>0 heuristic if an older sidecar omits hasText.
   const hasText = parsed.hasText ?? parsed.chars > 0;
-  return { chars: parsed.chars, hasText };
+  const { pages, emptyPages, unreadablePages, partlyUnreadablePages } = parsed;
+  if (
+    typeof pages !== "number" ||
+    typeof emptyPages !== "number" ||
+    typeof unreadablePages !== "number"
+  ) {
+    return { chars: parsed.chars, hasText };
+  }
+  return {
+    chars: parsed.chars,
+    hasText,
+    pages,
+    emptyPages,
+    unreadablePages,
+    ...(typeof partlyUnreadablePages === "number" ? { partlyUnreadablePages } : {}),
+  };
+}
+
+/** PDF to Markdown with inferred headings, lists and tables (PyMuPDF). Long-running: 5 min timeout. */
+export async function pdfToMarkdownPy(
+  inPath: string,
+  outMdPath: string,
+  opts?: DocsScriptOptions,
+): Promise<{ chars: number }> {
+  const stdout = await runDocsScript(
+    "doc_markdown",
+    { path: inPath, out: outMdPath },
+    buildDocsRunOpts(opts, 300_000),
+  ).catch(withDamageClassification);
+  const parsed = parseDocsJson<{ chars?: number; error?: string }>("doc_markdown", stdout);
+  if ("error" in parsed) {
+    throw new Error(`doc_markdown failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
+  if (typeof parsed.chars !== "number") {
+    throw new Error(`doc_markdown failed: ${stdout.slice(0, 200)}`);
+  }
+  return { chars: parsed.chars };
 }
 
 /** PDF to DOCX conversion (pdf2docx). Long-running: 5 min timeout. */
@@ -290,6 +349,49 @@ export async function pdfMetadataSetPy(
   }
 }
 
+export interface PdfMetadataStripResult {
+  /** Info dictionary keys that were present, without the leading slash. */
+  removed: string[];
+  xmpRemoved: boolean;
+  /** PDF/A level the input declared in XMP (e.g. "2B"), null when none. */
+  pdfa: string | null;
+}
+
+/**
+ * Drop the whole Info dictionary and the catalog XMP stream, then write
+ * `metadata` onto the clean document (pikepdf).
+ */
+export async function pdfMetadataStripPy(
+  inPath: string,
+  outPath: string,
+  metadata: Record<string, string>,
+  opts?: DocsScriptOptions,
+): Promise<PdfMetadataStripResult> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    { path: inPath, out: outPath, mode: "strip", metadata },
+    ...(runOpts ? [runOpts] : []),
+  ).catch(withDamageClassification);
+  const parsed = parseDocsJson<{
+    removed?: unknown;
+    xmpRemoved?: unknown;
+    pdfa?: unknown;
+    error?: string;
+  }>("doc_metadata", stdout);
+  if ("error" in parsed) {
+    throw new Error(`doc_metadata strip failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
+  if (!Array.isArray(parsed.removed)) {
+    throw new Error(`doc_metadata strip failed: ${stdout.slice(0, 200)}`);
+  }
+  return {
+    removed: parsed.removed.map(String),
+    xmpRemoved: parsed.xmpRemoved === true,
+    pdfa: typeof parsed.pdfa === "string" && parsed.pdfa ? parsed.pdfa : null,
+  };
+}
+
 /** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min default timeout. */
 export async function htmlToPdfPy(
   inPath: string,
@@ -343,4 +445,33 @@ export async function pdfSignPy(
     throw new Error(`doc_sign failed: ${stdout.slice(0, 200)}`);
   }
   return { placed: parsed.placed };
+}
+
+/**
+ * Convert a font between TTF, OTF, WOFF and WOFF2 (fontTools). A file that is
+ * not a font this can read comes back as `inputError`, the user's fault rather
+ * than a script failure.
+ */
+export async function convertFontPy(
+  inPath: string,
+  outPath: string,
+  format: FontFormat,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "font_convert",
+    { path: inPath, out: outPath, format },
+    ...(runOpts ? [runOpts] : []),
+  );
+  const parsed = parseDocsJson<{ ok?: boolean; inputError?: string; error?: string }>(
+    "font_convert",
+    stdout,
+  );
+  if (typeof parsed.inputError === "string") {
+    throw new ToolInputError(parsed.inputError, { code: "FONT_UNSUPPORTED" });
+  }
+  if ("error" in parsed || parsed.ok !== true) {
+    throw new Error(`font_convert failed: ${formatDocsError(parsed.error, stdout)}`);
+  }
 }

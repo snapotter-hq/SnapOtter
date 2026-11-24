@@ -10,16 +10,19 @@
  * cannot drive are exactly the ones with a contract that says so.
  */
 export const REGISTRY_EXEMPT = new Set([
+  "aspect-ratio-calculator",
   "auto-subtitles",
   "background-replace",
   "barcode-generate",
   "barcode-read",
+  "base64",
   "blur-background",
   "bulk-rename",
   "collage",
   "color-palette",
   "compare",
   "compose",
+  "convert-case",
   "erase-object",
   "favicon",
   "find-duplicates",
@@ -28,6 +31,7 @@ export const REGISTRY_EXEMPT = new Set([
   "image-to-pdf",
   "info",
   "pdf-to-image",
+  "proportion-calculator",
   "qr-generate",
   "sign-pdf",
   "stitch",

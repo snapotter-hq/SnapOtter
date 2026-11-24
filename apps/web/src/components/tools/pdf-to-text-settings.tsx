@@ -1,5 +1,8 @@
 import { ProgressCard } from "@/components/common/progress-card";
-import { ScannedPdfOcrHandoff } from "@/components/common/scanned-pdf-ocr-handoff";
+import {
+  ScannedPdfOcrHandoff,
+  UnreadablePagesOcrHandoff,
+} from "@/components/common/scanned-pdf-ocr-handoff";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -8,9 +11,15 @@ import { useFileStore } from "@/stores/file-store";
 export function PdfToTextSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["pdf-to-text"];
-  const { files } = useFileStore();
+  const { files, currentEntry } = useFileStore();
   const { processFiles, processAllFiles, processing, error, progress } =
     useToolProcessor("pdf-to-text");
+
+  // The .txt keeps those pages as extracted, so say they're there rather than
+  // let the junk pass as text (#954), whole pages or lines within one (#4947).
+  const notes = currentEntry?.status === "completed" ? currentEntry.resultNotes : undefined;
+  const unreadablePages = notes?.unreadablePages;
+  const partlyUnreadablePages = notes?.partlyUnreadablePages;
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
@@ -28,6 +37,28 @@ export function PdfToTextSettings() {
     <div className="space-y-4">
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
       <ScannedPdfOcrHandoff hint={s.scannedHint} label={s.runOcr} testId="pdf-to-text-run-ocr" />
+
+      {unreadablePages && (
+        <p className="text-xs text-muted-foreground" data-testid="pdf-to-text-unreadable-pages">
+          {format(s.unreadablePages, {
+            count: unreadablePages.count,
+            total: unreadablePages.total,
+          })}
+        </p>
+      )}
+
+      {partlyUnreadablePages && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="pdf-to-text-partly-unreadable-pages"
+        >
+          {format(s.partlyUnreadablePages, {
+            count: partlyUnreadablePages.count,
+            total: partlyUnreadablePages.total,
+          })}
+        </p>
+      )}
+      <UnreadablePagesOcrHandoff label={s.runOcr} testId="pdf-to-text-run-ocr-unreadable" />
 
       {processing ? (
         <ProgressCard

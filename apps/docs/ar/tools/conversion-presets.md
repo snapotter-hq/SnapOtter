@@ -1,13 +1,14 @@
 ---
 description: "نقاط نهاية إعدادات تحويل مخصّصة مُولَّدة من كتالوج أدوات SnapOtter."
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: 5ecf0f2b4584
+i18n_output_hash: c2bdc61847c2
+i18n_hash_version: 2
 ---
 
 # إعدادات التحويل المسبقة {#conversion-presets}
 
-يوفّر SnapOtter 83 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
+يوفّر SnapOtter 121 نقطة نهاية إعداد تحويل مخصّصة إلى جانب أدوات المحوِّل الأساسية. يقفل كل إعداد مسبق تنسيق الخرج ويفوّض المعالجة إلى مسار المعالجة الأساسي الخاص به، لذا تطابق السلوك والتحقق وعقد الخرج الأداة الأساسية المدرجة أدناه.
 
 ## نمط نقطة نهاية API {#api-endpoint-pattern}
 
@@ -93,6 +94,10 @@ i18n_output_hash: 5ecf0f2b4584
 | `mp4-to-wav` | MP4 إلى WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | لا شيء |
 | `mov-to-wav` | MOV إلى WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | لا شيء |
 | `mp4-to-ogg` | MP4 إلى OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | لا شيء |
+| `srt-to-vtt` | SRT إلى VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | لا شيء |
+| `vtt-to-srt` | VTT إلى SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | لا شيء |
+| `ass-to-srt` | ASS إلى SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | لا شيء |
+| `srt-to-ass` | SRT إلى ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | لا شيء |
 
 ## إعدادات الصوت المسبقة {#audio-presets}
 
@@ -108,6 +113,36 @@ i18n_output_hash: 5ecf0f2b4584
 | `wav-to-mp3` | WAV إلى MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | لا شيء |
 | `mp3-to-wav` | MP3 إلى WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | لا شيء |
 | `flac-to-mp3` | FLAC إلى MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | لا شيء |
+| `mp3-to-flac` | MP3 إلى FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | لا شيء |
+| `mp3-to-ogg` | MP3 إلى OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | لا شيء |
+| `mp3-to-m4a` | MP3 إلى M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | لا شيء |
+| `wav-to-flac` | WAV إلى FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | لا شيء |
+| `wav-to-ogg` | WAV إلى OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | لا شيء |
+| `wav-to-m4a` | WAV إلى M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | لا شيء |
+| `flac-to-wav` | FLAC إلى WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | لا شيء |
+| `flac-to-ogg` | FLAC إلى OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | لا شيء |
+| `flac-to-m4a` | FLAC إلى M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | لا شيء |
+| `ogg-to-flac` | OGG إلى FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | لا شيء |
+| `ogg-to-m4a` | OGG إلى M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | لا شيء |
+| `m4a-to-flac` | M4A إلى FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | لا شيء |
+| `m4a-to-ogg` | M4A إلى OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | لا شيء |
+| `aac-to-ogg` | AAC إلى OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | لا شيء |
+| `aac-to-m4a` | AAC إلى M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | لا شيء |
+| `opus-to-mp3` | Opus إلى MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | لا شيء |
+| `opus-to-wav` | Opus إلى WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | لا شيء |
+| `opus-to-flac` | Opus إلى FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | لا شيء |
+| `opus-to-ogg` | Opus إلى OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | لا شيء |
+| `opus-to-m4a` | Opus إلى M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | لا شيء |
+| `wma-to-mp3` | WMA إلى MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | لا شيء |
+| `wma-to-wav` | WMA إلى WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | لا شيء |
+| `wma-to-flac` | WMA إلى FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | لا شيء |
+| `wma-to-ogg` | WMA إلى OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | لا شيء |
+| `wma-to-m4a` | WMA إلى M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | لا شيء |
+| `aiff-to-mp3` | AIFF إلى MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | لا شيء |
+| `aiff-to-wav` | AIFF إلى WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | لا شيء |
+| `aiff-to-flac` | AIFF إلى FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | لا شيء |
+| `aiff-to-ogg` | AIFF إلى OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | لا شيء |
+| `aiff-to-m4a` | AIFF إلى M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | لا شيء |
 
 ## إعدادات PDF المسبقة {#pdf-presets}
 
@@ -122,6 +157,10 @@ i18n_output_hash: 5ecf0f2b4584
 | معرّف الإعداد | يحوِّل | المسار | الأداة الأساسية | المدخلات المقبولة | إعدادات اختيارية |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel إلى CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`، `.xls` | لا شيء |
+| `otf-to-ttf` | OTF إلى TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | لا شيء |
+| `woff-to-ttf` | WOFF إلى TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | لا شيء |
+| `woff2-to-ttf` | WOFF2 إلى TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | لا شيء |
+| `ttf-to-woff2` | TTF إلى WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`، `.otf` | لا شيء |
 
 ## ملاحظات {#notes}
 

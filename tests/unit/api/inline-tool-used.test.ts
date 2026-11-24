@@ -161,11 +161,46 @@ describe("inline tool routes emit tool_used (#4819)", () => {
       await emitInlineRequestAuditIfNeeded(req as never, 200, "{}");
     }
 
+    // A read-only probe that shares the "analyze" name stays silent (#4886).
+    const probe = makeRequest();
+    enter(probe, "image-enhancement", { subRoute: "analyze" });
+    await emitInlineRequestAuditIfNeeded(probe as never, 200, "{}");
+
     const redirect = makeRequest();
     enter(redirect, "qr-generate");
     await emitInlineRequestAuditIfNeeded(redirect as never, 304, "");
 
     expect(toolUsed()).toHaveLength(0);
+  });
+
+  it("reports Passport Photo's analyze as a step, not a second run (#4886)", async () => {
+    const ok = makeRequest();
+    enter(ok, "passport-photo", { subRoute: "analyze" });
+    await emitInlineRequestAuditIfNeeded(ok as never, 200, '{"landmarks":{}}');
+
+    const missing = makeRequest();
+    enter(missing, "passport-photo", { subRoute: "analyze" });
+    await emitInlineRequestAuditIfNeeded(
+      missing as never,
+      501,
+      JSON.stringify({ error: "Feature not installed", code: "FEATURE_NOT_INSTALLED" }),
+    );
+
+    const generate = makeRequest();
+    enter(generate, "passport-photo", { subRoute: "generate" });
+    await emitInlineRequestAuditIfNeeded(generate as never, 200, "{}");
+
+    expect(toolUsed().map((t) => t.props)).toEqual([
+      expect.objectContaining({ tool_id: "passport-photo", status: "completed", step: "analyze" }),
+      expect.objectContaining({
+        tool_id: "passport-photo",
+        status: "failed",
+        step: "analyze",
+        error_code: "feature_not_installed",
+        error_kind: "operational",
+      }),
+      expect.not.objectContaining({ step: expect.anything() }),
+    ]);
   });
 
   it("sends nothing when analytics is off", async () => {

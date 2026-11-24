@@ -248,8 +248,13 @@ async function loadSystemJobs(
   for (const fn of Object.values(loggerMock)) fn.mockClear();
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
+  // The team retention backfill (#4938) has its own coverage in
+  // system-jobs.sweeps.test.ts; keeping it off here leaves the sweep's
+  // queued selects and sql calls exactly as these pins expect.
   vi.doMock("../../../../apps/api/src/lib/enterprise-feature.js", () => ({
-    isEnterpriseFeatureEnabled: vi.fn().mockResolvedValue(true),
+    isEnterpriseFeatureEnabled: vi.fn(
+      async (feature: string) => feature !== "team_retention_overrides",
+    ),
   }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");

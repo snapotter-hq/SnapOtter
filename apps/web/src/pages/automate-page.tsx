@@ -49,6 +49,7 @@ import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import { withAnalytics } from "@/lib/lazy-analytics";
+import { openFileInput } from "@/lib/open-file-input";
 import { hasResultWarning } from "@/lib/result-notes";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -422,7 +423,7 @@ function AutomatePageContent({
         addFiles(picked);
       }
     };
-    input.click();
+    openFileInput(input);
   }, [allowIntake, libraryImportAbortRef, addFiles]);
 
   const handleClearFiles = useCallback(() => {
@@ -737,7 +738,7 @@ function AutomatePageContent({
         }
       }
     };
-    input.click();
+    openFileInput(input);
   }, [setSavedPipelines, t]);
 
   const handleDownloadAll = useCallback(() => {

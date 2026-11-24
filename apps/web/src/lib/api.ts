@@ -525,6 +525,25 @@ export async function apiDeleteUserFiles(ids: string[]): Promise<{ deleted: numb
   return res.json();
 }
 
+/** Fetch several library files as one ZIP, in the order given. */
+export async function apiDownloadUserFiles(ids: string[]): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(appUrl("/api/v1/files/download"), {
+      method: "POST",
+      headers: formatHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ ids }),
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      useConnectionStore.getState().setDisconnected();
+    }
+    throw error;
+  }
+  if (!res.ok) await throwWithMessage(res);
+  return res.blob();
+}
+
 export function getFileThumbnailUrl(id: string): string {
   return appUrl(`/api/v1/files/${id}/thumbnail`);
 }

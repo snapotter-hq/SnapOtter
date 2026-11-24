@@ -80,7 +80,7 @@ describe("docs route logic", () => {
       expect(result).toContain("Tools (1 endpoints): Image processing tools");
       expect(result).toContain("Auth (1 endpoints): Authentication");
       expect(result).toContain("## Tools");
-      expect(result).toContain("content-aware-resize, sync");
+      expect(result).toContain("content-aware-resize, async");
       expect(result).toContain("passport-photo, two-phase");
     });
 

@@ -198,7 +198,7 @@ describe("API startup (#2333)", () => {
     // while Sentry's handler is the sole uncaughtException listener.
     const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
     const start = source.indexOf("await initAnalytics();");
-    const end = source.indexOf("await trackEvent(ANALYTICS_EVENTS.INSTANCE_STARTED", start);
+    const end = source.indexOf("await trackInstanceStarted();", start);
     const block = source.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);

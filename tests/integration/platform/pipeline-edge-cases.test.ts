@@ -589,6 +589,58 @@ describe("Pipeline batch rejects password tools", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE REJECTS STEPS THAT CAN'T READ THE PREVIOUS OUTPUT (#4343)
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Pipeline rejects mismatched step modalities (#4343)", () => {
+  const imageToAudio = {
+    steps: [
+      { toolId: "resize", settings: { width: 100 } },
+      { toolId: "trim-audio", settings: { startS: 0, endS: 1 } },
+    ],
+  };
+  const expectedError =
+    "Step 2 (trim-audio): expects audio input, but step 1 (resize) outputs image";
+
+  it("rejects an image-to-audio chain on execute before any step runs", async () => {
+    const res = await executePipeline(PNG_200x150, "test.png", imageToAudio);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(expectedError);
+  });
+
+  it("rejects an image-to-audio chain on batch", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "pipeline", content: JSON.stringify(imageToAudio) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(expectedError);
+  });
+
+  it("rejects saving an image-to-audio chain", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/save",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: { name: "image-to-audio", ...imageToAudio },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(expectedError);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // DELETE PIPELINE EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Delete pipeline edge cases", () => {

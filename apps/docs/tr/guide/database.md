@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter için PostgreSQL veritabanı şeması, tablolar, migrasyonlar ve yedekleme prosedürleri."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: bd5835bc1dc0
+i18n_output_hash: e4f3a0469eb8
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Etkin oturum açma oturumları. Her satır bir oturum belirtecini bir kullanıc�
 
 | Sütun | Tür | Notlar |
 |---|---|---|
-| `id` | varchar | Birincil anahtar (oturum belirteci) |
+| `id` | varchar | Birincil anahtar (oturum belirtecinin SHA-256 özeti) |
 | `userId` | uuid | `users.id` tablosuna yabancı anahtar |
 | `expiresAt` | timestamp | Sona erme zamanı |
 | `createdAt` | timestamp | Oluşturma zamanı |
@@ -189,6 +189,16 @@ RDS, Supabase, Cloud SQL veya kendi çalıştırdığınız herhangi bir kümede
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Ardından süper kullanıcı olarak ya da o `CREATE ROLE` komutunu çalıştıran rolle, sahip rolün onu yönetmesine izin verin:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Postgres 16 ve sonrasında `CREATEROLE`, bir rolün yalnızca kendi oluşturduğu ya da üzerinde `ADMIN OPTION` bulunan rolleri değiştirmesine izin verir. SnapOtter çalışma rolünün parolasını yalnızca artık `DATABASE_URL` ile eşleşmediğinde (örneğin bir rotasyondan sonra) değiştirir ve bu yetki olmadan o açılış başarısız olur. `INHERIT FALSE, SET FALSE` yalnızca yönetimi devreder. Düz bir `WITH ADMIN OPTION`, `snapotter` rolüne çalışma rolünün yetkilerini de verirdi. Postgres 15 ve öncesi bu yetkiye ihtiyaç duymaz ve bu sözdizimini reddeder, orada bu adımı atlayın.
+
+SnapOtter parolayı ayarladığında, kümedeki `password_encryption` değeri `md5` olsa bile bir SCRAM-SHA-256 doğrulayıcısı saklar. Postgres bunu `pg_hba.conf` içindeki bir `md5` satırı üzerinden kabul eder, ancak md5 karmalarını kendisi denetleyen bir bağlantı havuzlayıcısı çalışma rolüyle oturum açamaz.
 
 Ardından SnapOtter'a, aynı ana makineye, porta ve veritabanına işaret eden iki bağlantı dizesini de verin:
 

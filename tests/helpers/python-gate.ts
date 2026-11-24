@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { posix, win32 } from "node:path";
+import { CONVERSION_PRESET_BY_ID } from "../../packages/shared/src/conversion-presets.js";
 
 interface PythonResolutionOptions {
   cwd?: string;
@@ -56,6 +57,7 @@ export const hasPikepdf = hasPython && pythonWith("pikepdf");
 
 export interface GeneratedPythonCapabilities {
   fitz: boolean;
+  fontTools: boolean;
   markdown: boolean;
   pdf2docx: boolean;
   pikepdf: boolean;
@@ -64,6 +66,7 @@ export interface GeneratedPythonCapabilities {
 
 const GENERATED_PYTHON_CAPABILITIES: GeneratedPythonCapabilities = {
   fitz: hasFitz,
+  fontTools: hasPython && pythonWith("fontTools.ttLib") && pythonWith("brotli"),
   markdown: hasPython && pythonWith("markdown"),
   pdf2docx: hasPython && pythonWith("pdf2docx"),
   pikepdf: hasPikepdf,
@@ -73,11 +76,13 @@ const GENERATED_PYTHON_CAPABILITIES: GeneratedPythonCapabilities = {
 const GENERATED_TOOL_MODULES: Readonly<
   Record<string, readonly (keyof GeneratedPythonCapabilities)[]>
 > = {
+  "convert-font": ["fontTools"],
   "flatten-pdf": ["fitz"],
   "html-to-pdf": ["weasyprint"],
   "markdown-to-pdf": ["weasyprint", "markdown"],
   "pdf-metadata": ["pikepdf"],
   "pdf-to-text": ["fitz"],
+  "pdf-to-markdown": ["fitz"],
   "pdf-to-word": ["pdf2docx"],
   "redact-pdf": ["fitz"],
   "sign-pdf": ["fitz"],
@@ -89,8 +94,10 @@ export function findMissingGeneratedPythonPrerequisite(
   settings: unknown,
   capabilities: GeneratedPythonCapabilities = GENERATED_PYTHON_CAPABILITIES,
 ): string | undefined {
-  let modules = GENERATED_TOOL_MODULES[toolId];
-  if (toolId === "epub-convert") {
+  // A conversion preset runs its base tool, so it needs the base's modules.
+  const baseId = CONVERSION_PRESET_BY_ID[toolId]?.base ?? toolId;
+  let modules = GENERATED_TOOL_MODULES[baseId];
+  if (baseId === "epub-convert") {
     const format =
       settings && typeof settings === "object" && "format" in settings
         ? (settings as { format?: unknown }).format

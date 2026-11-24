@@ -17,7 +17,7 @@ const FORMAT_OPTIONS = [
 export function TranscribeAudioSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
+  const { processFiles, processAllFiles, processing, error, warning, downloadUrl, progress } =
     useToolProcessor("transcribe-audio");
 
   const [language, setLanguage] = useState("auto");
@@ -107,6 +107,11 @@ export function TranscribeAudioSettings() {
         <div className="text-destructive rounded-md bg-red-50 p-3 text-sm dark:bg-red-950">
           {error}
         </div>
+      )}
+
+      {/* The server's English warning means no speech was found; show it translated. */}
+      {downloadUrl && warning && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">{ts.noSpeechDetected}</p>
       )}
 
       {/* Download */}

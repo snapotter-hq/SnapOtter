@@ -21,6 +21,7 @@ interface Props {
   locale?: string;
   path?: string; // un-prefixed page path for hreflang, e.g. "/faq" or "/"
   mobileCta?: boolean; // phone-only bottom CTA bar; off for pages that end in their own CTA
+  localeRecall?: boolean; // off for the 404 page, whose path is "/" and would redirect to a localized homepage
 }
 
 const toolCount = TOOLS.length;
@@ -37,6 +38,7 @@ const {
   locale = "en",
   path = "/",
   mobileCta = true,
+  localeRecall = true,
 } = Astro.props;
 
 // A page the index policy drops (#4833) keeps crawlers following its links but
@@ -56,33 +58,37 @@ const htmlDir = dirFor(locale);
          (stored on switch in LanguageSwitcher). Render-blocking so there is no flash.
          Crawler-safe: bots have no localStorage. Only acts on the default English pages,
          and never on the English-only tool-detail pages (which have no localized version),
-         so it can never redirect to a URL that does not exist. -->
-    <script
-      is:inline
-      define:vars={{
-        recallCurrent: locale,
-        recallPath: path,
-        recallLocales: LANDING_LOCALES.filter((c) => c !== "en"),
-      }}
-    >
-      (function () {
-        try {
-          if (recallCurrent !== "en") return;
-          var stored = localStorage.getItem("snapotter:locale");
-          if (!stored || recallLocales.indexOf(stored) === -1) return;
-          var segs = recallPath.split("/").filter(Boolean);
-          if (segs[0] === "tools" && segs.length === 3) return;
-          var target = "/" + stored + (recallPath === "/" ? "/" : recallPath);
-          if (target.charAt(target.length - 1) !== "/") target += "/";
-          // One-shot marker so the localized page can offer a revert banner:
-          // "you were redirected here" is knowable only on this side.
+         so it can never redirect to a URL that does not exist. The 404 page opts out
+         with localeRecall={false}: its path is "/", so it would send a broken link
+         to the localized homepage. -->
+    {localeRecall && (
+      <script
+        is:inline
+        define:vars={{
+          recallCurrent: locale,
+          recallPath: path,
+          recallLocales: LANDING_LOCALES.filter((c) => c !== "en"),
+        }}
+      >
+        (function () {
           try {
-            sessionStorage.setItem("snapotter:recall", "1");
+            if (recallCurrent !== "en") return;
+            var stored = localStorage.getItem("snapotter:locale");
+            if (!stored || recallLocales.indexOf(stored) === -1) return;
+            var segs = recallPath.split("/").filter(Boolean);
+            if (segs[0] === "tools" && segs.length === 3) return;
+            var target = "/" + stored + (recallPath === "/" ? "/" : recallPath);
+            if (target.charAt(target.length - 1) !== "/") target += "/";
+            // One-shot marker so the localized page can offer a revert banner:
+            // "you were redirected here" is knowable only on this side.
+            try {
+              sessionStorage.setItem("snapotter:recall", "1");
+            } catch (e) {}
+            location.replace(target + location.search + location.hash);
           } catch (e) {}
-          location.replace(target + location.search + location.hash);
-        } catch (e) {}
-      })();
-    </script>
+        })();
+      </script>
+    )}
 
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -148,6 +154,11 @@ const htmlDir = dirFor(locale);
     <MachineTranslationBanner locale={locale} />
     <slot />
     {mobileCta && <StickyMobileCta locale={locale} />}
+
+    <script>
+      import { installCtaTracking } from "../lib/cta-tracking";
+      installCtaTracking();
+    </script>
 
     <!-- Scroll-triggered reveal observer -->
     <script is:inline>

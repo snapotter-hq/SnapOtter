@@ -14,6 +14,7 @@ import {
   pdfFlattenPy,
   pdfMetadataGetPy,
   pdfMetadataSetPy,
+  pdfMetadataStripPy,
   pdfPageCountPy,
   pdfRedactPy,
   pdfScrubProducerPy,
@@ -316,6 +317,11 @@ describe("python-docs sidecar JSON parsing", () => {
     ["pdfToWordPy", "doc_to_word", () => pdfToWordPy("/in.pdf", "/out.docx")],
     ["pdfMetadataGetPy", "doc_metadata get", () => pdfMetadataGetPy("/in.pdf")],
     ["pdfMetadataSetPy", "doc_metadata set", () => pdfMetadataSetPy("/in.pdf", "/out.pdf", {})],
+    [
+      "pdfMetadataStripPy",
+      "doc_metadata strip",
+      () => pdfMetadataStripPy("/in.pdf", "/out.pdf", {}),
+    ],
     ["htmlToPdfPy", "doc_html_pdf", () => htmlToPdfPy("/in.html", "/out.pdf", "html")],
     [
       "pdfSignPy",
@@ -817,7 +823,7 @@ with tempfile.TemporaryDirectory() as scratch:
     text_closed.clear()
     fitz.open = lambda _p: TextDoc()
     code, stdout, _ = run_main(text_mod, "doc_text.py", {"path": in_pdf, "out": out_pdf})
-    check("doc_text.py", code == 0 and json.loads(stdout) == {"chars": 11, "hasText": True} and text_closed == [True], f"normal text: {code} {stdout} {text_closed}")
+    check("doc_text.py", code == 0 and json.loads(stdout) == {"chars": 11, "hasText": True, "pages": 1, "emptyPages": 0, "unreadablePages": 0, "partlyUnreadablePages": 0} and text_closed == [True], f"normal text: {code} {stdout} {text_closed}")
 
 print(json.dumps(failures))
 `;

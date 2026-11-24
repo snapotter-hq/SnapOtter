@@ -1,8 +1,8 @@
 ---
 description: "重要度の低い経路に沿ってピクセルを追加または削除するシーム彫刻リサイズで、重要なコンテンツと顔を保持します。"
-i18n_source_hash: f383b28ab62a
+i18n_source_hash: a4adf011b2bd
 i18n_provenance: human
-i18n_output_hash: 9d8d75503812
+i18n_output_hash: 5e8fe074827b
 ---
 
 # コンテンツ対応リサイズ {#content-aware-resize}
@@ -13,7 +13,7 @@ i18n_output_hash: 9d8d75503812
 
 `POST /api/v1/tools/image/content-aware-resize`
 
-**処理:** 同期（結果を直接返します）
+**処理:** 非同期（202 を返し、SSE 経由で `/api/v1/jobs/{jobId}/progress` をポーリングしてステータスを取得）
 
 **モデルバンドル:** 基本操作には不要。顔の保護を有効にすると `face-detection` バンドル（200〜300 MB）を使用します。
 
@@ -39,24 +39,40 @@ curl -X POST http://localhost:1349/api/v1/tools/image/content-aware-resize \
   -F 'settings={"width":800,"protectFaces":true}'
 ```
 
-## レスポンス（200 OK） {#response-200-ok}
+## レスポンス {#response}
+
+### 初期レスポンス（202 Accepted） {#initial-response-202-accepted}
 
 ```json
 {
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress",
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
-  "originalSize": 450000,
-  "processedSize": 380000,
-  "width": 800,
-  "height": 600
+  "async": true
+}
+```
+
+### 最終結果（SSE 経由） {#final-result-via-sse}
+
+```json
+{
+  "phase": "complete",
+  "percent": 100,
+  "result": {
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "downloadUrl": "/api/v1/download/{jobId}/landscape_seam.png",
+    "originalSize": 450000,
+    "processedSize": 380000,
+    "width": 800,
+    "height": 600
+  }
 }
 ```
 
 ## 補足 {#notes}
 
-- このカスタムルートは現在、同期の200レスポンスを返します。
 - コンテンツ対応リサイズには `caire` シームカービングライブラリを使用します。
-- 寸法を縮小する（シームを削除する）のみです。画像を元のサイズより拡大することはできません。
+- シームを削除して縮小するか、シームを挿入して拡大します。各辺は元のサイズの最大2倍まで拡大できます。
 - `protectFaces` オプションはAI顔検出を使って顔領域を高エネルギーとしてマークし、シームが顔を通過するのを防ぎます。
 - `blurRadius` はエネルギーマップ計算前のスムージングを制御します。値が高いほどエネルギーマップがより均一になり、ノイズの多い画像に役立ちます。
 - `sobelThreshold` はエッジがどれだけ積極的に検出されるかに影響します。値が低いほど微細なエッジがより保持されます。

@@ -100,14 +100,12 @@ import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
-import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
 import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
-import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
 import { registerWatermarkImage } from "../../../apps/api/src/routes/tools/watermark-image.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -215,14 +213,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
       ],
       settings: undefined,
       expectedError: "Processing failed",
-    },
-    {
-      name: "vectorize",
-      register: registerVectorize,
-      url: "/api/v1/tools/image/vectorize",
-      files: () => [{ name: "a.png", type: "image/png", data: png }],
-      settings: undefined,
-      expectedError: "Vectorization failed",
     },
     {
       name: "svg-to-raster",
@@ -400,17 +390,11 @@ describe("route catches strip internal paths from details and log raw errors (#1
     }
   });
 
-  it("qr-generate and passport-photo generate mask server paths in 422 details and log the error", async () => {
-    const bgRemoved = await sharp({
-      create: { width: 200, height: 200, channels: 4, background: "#fff" },
-    })
-      .png()
-      .toBuffer();
-    getObjectBuffer.mockResolvedValue(bgRemoved);
-
+  // passport-photo generate now runs as a queued job: its 422 path masking is
+  // pinned in passport-photo-generate-queue.test.ts (#4337).
+  it("qr-generate masks server paths in 422 details and logs the error", async () => {
     const { app, logLines } = await buildLoggedApp((instance) => {
       registerQrGenerate(instance);
-      registerPassportPhoto(instance);
     });
     try {
       putObject.mockRejectedValueOnce(new Error(`qr write failed at ${sampleTempPath}`));
@@ -427,37 +411,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
         requestId: expect.any(String),
       });
       expect(logLines.some((l) => l.includes("qr write failed"))).toBe(true);
-
-      putObject.mockRejectedValueOnce(new Error(`passport write failed at ${sampleTempPath}`));
-      const passRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/passport-photo/generate",
-        payload: {
-          jobId: "job",
-          filename: "face.png",
-          countryCode: "US",
-          landmarks: {
-            leftEye: { x: 0.42, y: 0.45 },
-            rightEye: { x: 0.58, y: 0.45 },
-            eyeCenter: { x: 0.5, y: 0.45 },
-            chin: { x: 0.5, y: 0.7 },
-            forehead: { x: 0.5, y: 0.32 },
-            crown: { x: 0.5, y: 0.25 },
-            nose: { x: 0.5, y: 0.55 },
-            faceCenterX: 0.5,
-          },
-          imageWidth: 200,
-          imageHeight: 200,
-        },
-      });
-      expect(passRes.statusCode, passRes.body).toBe(422);
-      expect(passRes.json()).toEqual({
-        error: "Passport photo generation failed",
-        details: "passport write failed at [internal]",
-        code: "UNPROCESSABLE_ENTITY",
-        requestId: expect.any(String),
-      });
-      expect(logLines.some((l) => l.includes("passport write failed"))).toBe(true);
     } finally {
       await app.close();
     }
@@ -770,7 +723,7 @@ describe("route catches strip internal paths from details and log raw errors (#1
 
   it("html-to-image, webhooks, and siem mask server paths in 400 URL validation details", async () => {
     validateFetchUrlMock.mockRejectedValue(new Error(`DNS lookup failed via ${sampleTempPath}`));
-    const { app, logLines } = await buildLoggedApp(async (instance) => {
+    const { app } = await buildLoggedApp(async (instance) => {
       registerHtmlToImage(instance);
       await registerWebhookRoutes(instance);
       await registerSiemRoutes(instance);
@@ -821,21 +774,6 @@ describe("route catches strip internal paths from details and log raw errors (#1
         code: "BAD_REQUEST",
         requestId: expect.any(String),
       });
-
-      putObject.mockRejectedValueOnce(new Error(`capture write failed at ${sampleTempPath}`));
-      const htmlCaptureRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/html-to-image",
-        payload: { html: "<p>hi</p>" },
-      });
-      expect(htmlCaptureRes.statusCode, htmlCaptureRes.body).toBe(422);
-      expect(htmlCaptureRes.json()).toEqual({
-        error: "Screenshot capture failed",
-        details: "capture write failed at [internal]",
-        code: "UNPROCESSABLE_ENTITY",
-        requestId: expect.any(String),
-      });
-      expect(logLines.some((l) => l.includes("capture write failed"))).toBe(true);
     } finally {
       await app.close();
     }

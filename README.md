@@ -32,11 +32,11 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
 ## Key Features
 
 - **200+ tools across 5 modalities:**
-  - **Image (112):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, plus dedicated format converters (JPG to PNG, HEIC to JPG, WebP to PNG, image to PDF, and more). Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats
-  - **Video (57):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
-  - **Audio (27):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
-  - **PDF (35):** merge, split, compress, convert, protect/unlock, redact, sign, watermark, page numbers, multi-tool page editor, OCR, plus PDF to JPG/PNG/TIFF
-  - **Files (23):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, ZIP create/extract
+  - **Image (113):** resize, crop, compress, convert, watermark, color adjust, beautify screenshots, generate memes, vectorize, GIF tools, find duplicates, passport photos, plus dedicated format converters (JPG to PNG, HEIC to JPG, WebP to PNG, image to PDF, and more). Supports 55+ input formats (including 23 camera RAW formats) and 17 output formats
+  - **Video (63):** convert, compress, trim, resize, crop, merge, video-to-GIF, extract audio, stabilize, change FPS, burn/extract/convert subtitles, plus dedicated converters (MOV to MP4, MKV to MP4, MP4 to MP3, and more)
+  - **Audio (57):** convert, trim, normalize, volume, fade, pitch shift, silence removal, noise reduction, merge/split, waveform, plus dedicated converters (M4A to MP3, AAC to MP3, OGG to WAV, and more)
+  - **PDF (37):** merge, split, compress, convert, protect/unlock, redact, sign, watermark, page numbers, multi-tool page editor, OCR, plus PDF to JPG/PNG/TIFF
+  - **Files (32):** CSV/JSON/XML/YAML conversion, CSV merge/split, Excel to CSV, chart maker, font conversion (OTF to TTF, TTF to WOFF2, and more), text case conversion, proportion calculator, ZIP create/extract, Base64 text encode/decode
 - **Image editor:** Free layer-based editor with brushes, shapes, adjustments, filters, curves, and keyboard shortcuts. Runs in your browser and processes on your hardware
 - **Local AI:** Remove backgrounds, upscale images, restore and colorize old photos, erase objects, blur faces, enhance faces, extract text (OCR from images and PDFs), transcribe audio, auto-generate video subtitles, expand canvas, and fix transparency. All on your hardware, no internet required. Built-in Fast OCR adds about 25 MiB to the official image; the optional accuracy pack installs on demand
 - **OIDC / SSO:** Login with Google, GitHub, Okta, or any OpenID Connect provider
@@ -45,7 +45,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
 - **Self-hosted:** one `docker run` for a single-container quick start (embedded Postgres 17 + Redis 8), or the same Postgres 17 + Redis 8 as a Compose stack for production. No external SaaS dependencies
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
-- **Privacy first:** Your files never leave your network. Basic analytics help us catch bugs and improve tools. Disable them at build time with `SNAPOTTER_ANALYTICS=off` or at runtime with the in-app admin opt-out ([Here's how to do it](https://docs.snapotter.com/guide/deployment.html#analytics))
+- **Privacy first:** Your files never leave your network. A new instance asks its admin on first run before sending any anonymous usage stats or crash reports, and sends nothing until answered. [What is and isn't sent](https://docs.snapotter.com/guide/telemetry), and how to turn it off at build time with `SNAPOTTER_ANALYTICS=off` or later in the app.
 
 ## Deployment
 

@@ -46,13 +46,6 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   };
 });
 
-vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
-  isBrowserAvailable: () => true,
-  captureHtml: async () => Buffer.from("png"),
-  capturePage: async () => Buffer.from("png"),
-}));
-
-import * as aiMod from "@snapotter/ai";
 import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import * as exiftoolMod from "../../../apps/api/src/lib/exiftool.js";
 import {
@@ -73,11 +66,9 @@ import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerCompose } from "../../../apps/api/src/routes/tools/compose.js";
-import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
-import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
@@ -626,8 +617,8 @@ describe("json-bodied routes", () => {
     app = undefined;
   });
 
-  // A plausible face on a 200x200 background-removed image, so generate gets
-  // through the crop maths and reaches the putObject call.
+  // The pre-queue checks of passport-photo's generate; the queued crop itself
+  // is pinned in passport-photo-generate-queue.test.ts (#4337).
   const passportBody = {
     jobId: "job",
     filename: "face.png",
@@ -645,11 +636,6 @@ describe("json-bodied routes", () => {
     imageWidth: 200,
     imageHeight: 200,
   };
-  const bgRemoved = () =>
-    sharp({ create: { width: 200, height: 200, channels: 4, background: "#fff" } })
-      .png()
-      .toBuffer();
-
   const cases = [
     {
       name: "barcode-generate",
@@ -668,29 +654,11 @@ describe("json-bodied routes", () => {
       fail: putObject,
       error: "QR code generation failed",
     },
-    {
-      name: "html-to-image",
-      register: registerHtmlToImage,
-      url: "/api/v1/tools/image/html-to-image",
-      payload: { html: "<p>hi</p>" },
-      fail: putObject,
-      error: "Screenshot capture failed",
-    },
-    {
-      name: "passport-photo generate",
-      register: registerPassportPhoto,
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-      setup: () => getObjectBuffer.mockImplementation(bgRemoved),
-      fail: putObject,
-      error: "Passport photo generation failed",
-    },
   ];
 
   for (const c of cases) {
     const fallbackStatus = c.status ?? 422;
     it(`${c.name} surfaces a storage 503 with its code instead of answering ${fallbackStatus}`, async () => {
-      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw storageDown();
       });
@@ -702,7 +670,6 @@ describe("json-bodied routes", () => {
     });
 
     it(`${c.name} still answers ${fallbackStatus} for an ordinary failure`, async () => {
-      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw new Error("bad input");
       });
@@ -819,90 +786,6 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(getObjectBuffer).not.toHaveBeenCalled();
-  });
-
-  it("passport-photo generate writes output under a fresh jobId rather than the client-supplied jobId", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    putObject.mockResolvedValue(undefined);
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.jobId).toBeTruthy();
-    expect(body.jobId).not.toBe(passportBody.jobId);
-    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/face_passport.jpg`);
-    expect(putObject).toHaveBeenCalledWith(
-      `outputs/${body.jobId}/face_passport.jpg`,
-      expect.any(Buffer),
-    );
-    // The fresh prefix gets its own row so the S3 TTL sweep can expire it.
-    expect(dbInsertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: body.jobId,
-        toolId: "passport-photo",
-        status: "completed",
-        outputRefs: [`outputs/${body.jobId}/face_passport.jpg`],
-      }),
-    );
-  });
-
-  it("passport-photo generate keeps the print sheet under the fresh jobId and its row", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    putObject.mockResolvedValue(undefined);
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: { ...passportBody, printLayout: "4x6" },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    const printKey = `outputs/${body.jobId}/face_passport_print_4x6.jpg`;
-    expect(body.printDownloadUrl).toBe(
-      `/api/v1/download/${body.jobId}/face_passport_print_4x6.jpg`,
-    );
-    expect(putObject).toHaveBeenCalledWith(printKey, expect.any(Buffer));
-    expect(dbInsertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: body.jobId,
-        outputRefs: [`outputs/${body.jobId}/face_passport.jpg`, printKey],
-      }),
-    );
-  });
-
-  it("passport-photo generate answers 500 and writes nothing when the job row can't be recorded", async () => {
-    getObjectBuffer.mockImplementation(bgRemoved);
-    dbInsertValues.mockRejectedValue(new Error('Failed query: insert into "jobs" params: secret'));
-    app = await buildApp(registerPassportPhoto);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/passport-photo/generate",
-      payload: passportBody,
-    });
-    expect(res.statusCode).toBe(500);
-    expect(res.body).not.toMatch(/insert into|secret/);
-    expect(putObject).not.toHaveBeenCalled();
-  });
-
-  it("html-to-image answers a storage fault that mentions a timeout as storage, not a slow page", async () => {
-    putObject.mockImplementation(async () => {
-      throw new SafeError("Storage write timeout.", {
-        statusCode: 503,
-        code: "STORAGE_UNAVAILABLE",
-      });
-    });
-    app = await buildApp(registerHtmlToImage);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/html-to-image",
-      payload: { html: "<p>hi</p>" },
-    });
-    expect(res.statusCode).toBe(503);
-    expect(res.json().code).toBe("STORAGE_UNAVAILABLE");
   });
 
   it("barcode-generate surfaces 507/503 storage and OOM faults and strips internal paths from 400 error messages (#4050)", async () => {
@@ -1788,7 +1671,7 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
   });
 });
 
-describe("outer processing catches in compare, watermark-image, compose, vectorize, and content-aware-resize (#3905)", () => {
+describe("outer processing catches in compare, watermark-image, and compose, plus the vectorize process fn (#3905)", () => {
   const oomMessage =
     "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
 
@@ -1796,7 +1679,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
     putObject.mockReset().mockResolvedValue(undefined);
   });
 
-  it("compare, watermark-image, compose, vectorize, and content-aware-resize surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
+  it("compare, watermark-image, and compose surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
     const png = await sharp({
       create: { width: 16, height: 16, channels: 3, background: "#f00" },
     })
@@ -1810,12 +1693,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
     registerWatermarkImage(app);
     registerCompose(app);
     registerVectorize(app);
-    registerContentAwareResize(app);
     await app.ready();
-
-    const seamCarveSpy = vi
-      .spyOn(aiMod, "seamCarve")
-      .mockResolvedValue({ buffer: png, width: 8, height: 16 });
 
     try {
       const routeCases = [
@@ -1848,20 +1726,6 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
           ],
           settings: undefined,
           expected422Error: "Processing failed",
-        },
-        {
-          toolId: "vectorize",
-          url: "/api/v1/tools/image/vectorize",
-          files: [{ name: "a.png", type: "image/png", data: png }],
-          settings: undefined,
-          expected422Error: "Vectorization failed",
-        },
-        {
-          toolId: "content-aware-resize",
-          url: "/api/v1/tools/image/content-aware-resize",
-          files: [{ name: "a.png", type: "image/png", data: png }],
-          settings: { width: 8 },
-          expected422Error: "Content-aware resize failed",
         },
       ] as const;
 
@@ -2033,40 +1897,21 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
         compositeSpy.mockRestore();
       }
 
-      // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError on HTTP route and registered process fn
-      const grayscaleSpy = vi
-        .spyOn(sharp.prototype, "grayscale")
-        .mockImplementationOnce(function (this: Sharp) {
-          return {
-            png: () => ({
-              toBuffer: async () => {
-                throw new RangeError("Array buffer allocation failed");
-              },
-            }),
-          } as unknown as Sharp;
-        })
-        .mockImplementationOnce(function (this: Sharp) {
-          return {
-            png: () => ({
-              toBuffer: async () => {
-                throw new RangeError("Array buffer allocation failed");
-              },
-            }),
-          } as unknown as Sharp;
-        });
+      // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError in the
+      // registered process fn. The HTTP route is a createToolRoute now (#4337), so the
+      // worker carries this error to the response like any factory tool.
+      const grayscaleSpy = vi.spyOn(sharp.prototype, "grayscale").mockImplementationOnce(function (
+        this: Sharp,
+      ) {
+        return {
+          png: () => ({
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          }),
+        } as unknown as Sharp;
+      });
       try {
-        const vectorizeStepOom = await app.inject({
-          method: "POST",
-          url: "/api/v1/tools/image/vectorize",
-          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
-        });
-        expect(vectorizeStepOom.statusCode, vectorizeStepOom.body).toBe(503);
-        expect(vectorizeStepOom.json()).toEqual({
-          error: oomMessage,
-          code: "ENGINE_UNAVAILABLE",
-          requestId: expect.any(String),
-        });
-
         const vectorizeCfg = getToolConfig("vectorize");
         if (!vectorizeCfg) throw new Error("vectorize missing from toolRegistry");
         await expect(
@@ -2080,43 +1925,7 @@ describe("outer processing catches in compare, watermark-image, compose, vectori
       } finally {
         grayscaleSpy.mockRestore();
       }
-
-      // 4. content-aware-resize seamCarve rejects with V8 RangeError, SIGKILL, or ENOSPC
-      seamCarveSpy
-        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
-        .mockRejectedValueOnce(
-          Object.assign(new Error("caire exited SIGKILL"), { signal: "SIGKILL" }),
-        )
-        .mockRejectedValueOnce(
-          Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/caire'"), {
-            code: "ENOSPC",
-            syscall: "open",
-          }),
-        );
-
-      for (let i = 0; i < 2; i++) {
-        const carveOomRes = await app.inject({
-          method: "POST",
-          url: "/api/v1/tools/image/content-aware-resize",
-          ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
-        });
-        expect(carveOomRes.statusCode, carveOomRes.body).toBe(503);
-        expect(carveOomRes.json()).toEqual({
-          error: oomMessage,
-          code: "ENGINE_UNAVAILABLE",
-          requestId: expect.any(String),
-        });
-      }
-
-      const carveEnospcRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/tools/image/content-aware-resize",
-        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
-      });
-      expect(carveEnospcRes.statusCode, carveEnospcRes.body).toBe(503);
-      expect(carveEnospcRes.json()).toMatchObject({ code: "storage-full" });
     } finally {
-      seamCarveSpy.mockRestore();
       await app.close();
     }
   });

@@ -13,6 +13,25 @@ const { locale = "en" } = Astro.props;
 // README.md, and apps/docs/guide/getting-started.md.
 const DOCKER_CMD =
   "docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/snapotter:latest";
+
+// The URL follows the -p 1349:1349 above; admin / admin is the first-boot login,
+// and the app forces a password change on it (getting-started.md, Quick Start).
+// A third of new instances started with a failed login when this wasn't here.
+// Both stay literal <code> in every locale, so the sentence is split on them.
+const LOGIN = { url: "http://localhost:1349", credentials: "admin / admin" } as const;
+const loginHintParts = t(locale, "home.quickstart.loginHint", {
+  url: "{url}",
+  credentials: "{credentials}",
+})
+  .split(/(\{url\}|\{credentials\})/)
+  .filter(Boolean)
+  .map((part) =>
+    part === "{url}"
+      ? { code: LOGIN.url }
+      : part === "{credentials}"
+        ? { code: LOGIN.credentials }
+        : { text: part },
+  );
 ---
 
 <div class="animate-fade-up mt-6 text-center" style="animation-delay: 0.24s;">
@@ -24,6 +43,8 @@ const DOCKER_CMD =
   <button
     type="button"
     id="hero-docker-copy"
+    data-cta="docker-copy"
+    data-cta-location="hero"
     class="so-cmd group relative inline-flex max-w-full items-center gap-3 rounded-xl border border-white/10 bg-terminal-bg px-4 py-3.5 text-start font-mono text-[0.8125rem] leading-[1.7] text-terminal-fg"
     data-copy={DOCKER_CMD}
     data-copied-status={t(locale, "home.quickstart.copiedStatus")}
@@ -42,9 +63,24 @@ const DOCKER_CMD =
     <span class="copy-toast pointer-events-none absolute -top-7 end-3 rounded-md bg-foreground px-2 py-0.5 font-body text-[0.6875rem] font-semibold text-white opacity-0 transition-opacity">{t(locale, "home.quickstart.copied")}</span>
   </button>
 
+  <p
+    data-testid="hero-login-hint"
+    class="mx-auto mt-3 max-w-xl text-sm text-foreground"
+  >
+    {loginHintParts.map((p) =>
+      "code" in p ? (
+        <code dir="ltr" class="rounded bg-background-alt px-1.5 py-0.5 font-mono text-[0.8125rem]">{p.code}</code>
+      ) : (
+        p.text
+      ),
+    )}
+  </p>
+
   <div class="mt-3.5 flex items-center justify-center">
     <a
       href="https://demo.snapotter.com"
+      data-cta="live-demo"
+      data-cta-location="hero"
       target="_blank"
       rel="noopener noreferrer"
       class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-foreground transition-all hover:-translate-y-px hover:border-primary hover:bg-primary-subtle"
@@ -53,6 +89,12 @@ const DOCKER_CMD =
       {t(locale, "home.quickstart.tryDemo")}
     </a>
   </div>
+
+  <p
+    class="mx-auto mt-4 max-w-2xl text-sm font-medium text-foreground"
+  >
+    {t(locale, "home.quickstart.freeLine")}
+  </p>
 
   <span class="sr-only" aria-live="polite" id="hero-docker-copy-status"></span>
 </div>

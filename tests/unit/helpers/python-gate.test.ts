@@ -6,6 +6,7 @@ import {
 
 const NO_CAPABILITIES = {
   fitz: false,
+  fontTools: false,
   markdown: false,
   pdf2docx: false,
   pikepdf: false,
@@ -105,9 +106,25 @@ describe("generated source Python prerequisites", () => {
     ).toBeUndefined();
   });
 
+  it("skips convert-font without fontTools", () => {
+    expect(findMissingGeneratedPythonPrerequisite("convert-font", {}, NO_CAPABILITIES)).toContain(
+      "fontTools",
+    );
+  });
+
+  it.each(["otf-to-ttf", "woff-to-ttf", "woff2-to-ttf", "ttf-to-woff2"])(
+    "gates the %s preset on its base's fontTools (#5053)",
+    (presetId) => {
+      expect(findMissingGeneratedPythonPrerequisite(presetId, {}, NO_CAPABILITIES)).toContain(
+        "fontTools",
+      );
+    },
+  );
+
   it("allows tools when their Python capability is present", () => {
     const capabilities = {
       fitz: true,
+      fontTools: true,
       markdown: true,
       pdf2docx: true,
       pikepdf: true,
@@ -116,6 +133,9 @@ describe("generated source Python prerequisites", () => {
 
     expect(
       findMissingGeneratedPythonPrerequisite("markdown-to-pdf", {}, capabilities),
+    ).toBeUndefined();
+    expect(
+      findMissingGeneratedPythonPrerequisite("convert-font", {}, capabilities),
     ).toBeUndefined();
   });
 

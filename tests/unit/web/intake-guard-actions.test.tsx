@@ -335,6 +335,8 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
     fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
     expect(createdInputs).toHaveLength(1);
     const fileInput = createdInputs[0];
+    // The picker stays attached while the chooser is open, or WebKit can collect it (#4649).
+    expect(fileInput.isConnected).toBe(true);
 
     // Start a run while the file dialog is still open.
     act(() => {

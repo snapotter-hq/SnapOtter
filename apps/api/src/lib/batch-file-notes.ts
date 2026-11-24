@@ -14,6 +14,10 @@ export interface BatchFileNotes {
   deepEnhanceSkipped?: DeepEnhanceSkipReason;
   /** Chart Maker left rows out because their value wasn't a number (#2060). */
   chartRows?: { charted: number; skipped: number };
+  /** PDF to Text pages whose text layer didn't read as text (#954). */
+  unreadablePages?: { count: number; total: number };
+  /** PDF to Text pages that read, but also hold text in a font that didn't (#4947). */
+  partlyUnreadablePages?: { count: number; total: number };
 }
 
 /** Why image-enhancement's requested Deep Enhance pass didn't run (#950). */
@@ -28,9 +32,10 @@ const DEEP_ENHANCE_SKIP_REASONS: ReadonlySet<string> = new Set([
 /**
  * The note for one child's stored result, or undefined when there is nothing
  * to warn about. Only a scaled-down image, a missed target, a skipped Deep
- * Enhance, or a chart that left rows out gets one: every target-size result carries targetKb, and sending
- * that for every file would grow X-File-Notes with the batch until a proxy's
- * header buffer overflowed. A skipped Deep Enhance often does apply to every
+ * Enhance, a chart that left rows out, or a PDF with wholly or partly
+ * unreadable pages gets one: every target-size result carries targetKb, and
+ * sending that for every file would grow X-File-Notes with the batch until a
+ * proxy's header buffer overflowed. A skipped Deep Enhance often does apply to every
  * file (the bundle isn't installed), which compactFileNotes handles.
  */
 export function pickBatchFileNotes(
@@ -50,6 +55,14 @@ export function pickBatchFileNotes(
   const rows = result.chartRows as { charted?: unknown; skipped?: unknown } | undefined;
   if (rows && typeof rows.charted === "number" && typeof rows.skipped === "number") {
     notes.chartRows = { charted: rows.charted, skipped: rows.skipped };
+  }
+  const pages = result.unreadablePages as { count?: unknown; total?: unknown } | undefined;
+  if (pages && typeof pages.count === "number" && typeof pages.total === "number") {
+    notes.unreadablePages = { count: pages.count, total: pages.total };
+  }
+  const partly = result.partlyUnreadablePages as { count?: unknown; total?: unknown } | undefined;
+  if (partly && typeof partly.count === "number" && typeof partly.total === "number") {
+    notes.partlyUnreadablePages = { count: partly.count, total: partly.total };
   }
   if (Object.keys(notes).length === 0) return undefined;
   if (typeof result.targetKb === "number") notes.targetKb = result.targetKb;

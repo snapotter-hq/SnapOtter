@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
@@ -329,6 +329,34 @@ describe("CRUD edge cases", () => {
       headers: { authorization: `Bearer ${adminToken}` },
     });
     expect(delRes.statusCode).toBe(200);
+
+    // #4350: the response and the audit row both name every moved user.
+    const usernames = [1, 2, 3].map((i) => `multi-u${i}-${suffix}`);
+    const delBody = JSON.parse(delRes.body) as {
+      ok: boolean;
+      reassignedUsers: Array<{ id: string; username: string }>;
+    };
+    expect(delBody.ok).toBe(true);
+    expect(delBody.reassignedUsers.map((u) => u.username).sort()).toEqual(usernames);
+    const movedRows = await db
+      .select({ id: schema.users.id, username: schema.users.username })
+      .from(schema.users)
+      .where(inArray(schema.users.username, usernames));
+    expect(
+      [...delBody.reassignedUsers].sort((a, b) => a.username.localeCompare(b.username)),
+    ).toEqual(movedRows.sort((a, b) => a.username.localeCompare(b.username)));
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "ROLE_DELETED"), eq(schema.auditLog.targetId, roleId)));
+    expect(auditRow?.targetType).toBe("role");
+    const auditDetails = auditRow?.details as {
+      roleName: string;
+      reassignedUsers: Array<{ id: string; username: string }>;
+    };
+    expect(auditDetails.roleName).toBe(roleName);
+    expect(auditDetails.reassignedUsers.map((u) => u.username).sort()).toEqual(usernames);
 
     // Verify all three users were reassigned to "user"
     for (let i = 1; i <= 3; i++) {

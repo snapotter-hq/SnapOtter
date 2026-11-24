@@ -5,18 +5,22 @@ import { BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/sh
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
 import { registerConversionPresets } from "../../../apps/api/src/routes/tools/conversion-presets.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerConvertAudio } from "../../../apps/api/src/routes/tools/convert-audio.js";
+import { registerConvertFont } from "../../../apps/api/src/routes/tools/convert-font.js";
 import { registerConvertSpreadsheet } from "../../../apps/api/src/routes/tools/convert-spreadsheet.js";
+import { registerConvertSubtitles } from "../../../apps/api/src/routes/tools/convert-subtitles.js";
 import { registerConvertVideo } from "../../../apps/api/src/routes/tools/convert-video.js";
 import { registerExtractAudio } from "../../../apps/api/src/routes/tools/extract-audio.js";
 import { registerGifToVideo } from "../../../apps/api/src/routes/tools/gif-to-video.js";
 import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
 import { registerVideoToGif } from "../../../apps/api/src/routes/tools/video-to-gif.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 /**
  * Issue #4417: every raster-to-SVG preset returned a 169-byte SVG whose only
@@ -39,7 +43,9 @@ beforeAll(async () => {
   registerCompress(app);
   registerCompressPdf(app);
   registerConvertAudio(app);
+  registerConvertFont(app);
   registerConvertSpreadsheet(app);
+  registerConvertSubtitles(app);
   registerConvertVideo(app);
   registerExtractAudio(app);
   registerGifToVideo(app);
@@ -118,5 +124,34 @@ describe("registry presets lock settings their base schema accepts", () => {
       return result.success ? [] : [`${preset.id}: ${result.error.message}`];
     });
     expect(rejected).toEqual([]);
+  });
+});
+
+describe("registry presets keep their base's pre-enqueue checks (#5053)", () => {
+  // convert-font refuses a non-font with 400 before a job is queued. A preset
+  // that skipped that hook queued the job and failed it later instead.
+  const FONT_PRESETS = CONVERSION_PRESETS.filter((p) => p.base === "convert-font");
+
+  it.each(FONT_PRESETS.map((p) => p.id))("%s rejects a non-font before queueing", async (id) => {
+    const preValidate = getToolConfig(id)?.preValidate;
+    if (!preValidate) throw new Error(`${id} must forward convert-font's preValidate`);
+    const notAFont = { filename: "x.otf", buffer: Buffer.from("%PDF-1.7 not a font") };
+    // The factory awaits the hook, so a sync throw and a rejection both refuse.
+    await expect(
+      (async () => preValidate({ inputs: [notAFont], settings: {} }))(),
+    ).rejects.toBeInstanceOf(InputValidationError);
+  });
+
+  it.each(FONT_PRESETS.map((p) => p.id))("%s accepts a real font", async (id) => {
+    const preValidate = getToolConfig(id)?.preValidate;
+    if (!preValidate) throw new Error(`${id} must forward convert-font's preValidate`);
+    const font = { filename: "tiny.ttf", buffer: readFixture(fixtures.data.ttf) };
+    await expect(
+      (async () => preValidate({ inputs: [font], settings: {} }))(),
+    ).resolves.toBeUndefined();
+  });
+
+  it("leaves presets of bases without a hook unchanged", () => {
+    expect(getToolConfig("jpg-to-png")?.preValidate).toBeUndefined();
   });
 });

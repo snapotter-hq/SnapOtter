@@ -1,15 +1,18 @@
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isEngineUnavailableResponse,
+  isRecordedRejection,
+  requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import { buildGeneratedMultipartFields } from "../../helpers/generated-multipart.js";
 import { findMissingGeneratedPythonPrerequisite } from "../../helpers/python-gate.js";
-import { waitForGeneratedJobArtifact } from "../settle-job.js";
+import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -76,6 +79,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "svg-to-raster": { buffer: SVG, filename: "test.svg" },
   "smart-crop": IMAGE_FIX,
   "content-aware-resize": IMAGE_FIX,
+  vectorize: IMAGE_FIX,
   // Video tools
   "convert-video": VIDEO_FIX,
   "compress-video": VIDEO_FIX,
@@ -90,12 +94,14 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "stabilize-video": VIDEO_FIX,
   "gif-to-video": { buffer: GIF, filename: "test.gif" },
   "video-to-webp": VIDEO_FIX,
+  "video-to-avif": VIDEO_FIX,
   "video-to-frames": VIDEO_FIX,
   "aspect-pad": VIDEO_FIX,
   "blur-pad": VIDEO_FIX,
   "watermark-video": VIDEO_FIX,
   "burn-subtitles": VIDEO_FIX,
   "embed-subtitles": VIDEO_FIX,
+  "convert-subtitles": { buffer: SRT, filename: "test.srt" },
   "images-to-video": IMAGE_FIX,
   // Audio tools
   "convert-audio": AUDIO_FIX,
@@ -121,6 +127,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "extract-pages": PDF_FIX,
   "remove-pages": PDF_FIX,
   "crop-pdf": PDF_FIX,
+  "resize-pdf-pages": PDF_FIX,
   "nup-pdf": PDF_FIX,
   "booklet-pdf": PDF_FIX,
   "organize-pdf": PDF_FIX,
@@ -435,6 +442,9 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "background box off", settings: { text: "TEST", backgroundBox: false } },
     { label: "shadow on", settings: { text: "TEST", shadow: true } },
     { label: "shadow off", settings: { text: "TEST", shadow: false } },
+    { label: "custom position", settings: { text: "TEST", position: "custom", x: 25, y: 75 } },
+    { label: "wrap off", settings: { text: "TEST", wrap: false } },
+    { label: "narrow max width", settings: { text: "TEST TEST TEST", maxWidth: 10 } },
   ],
 
   "replace-color": [
@@ -570,6 +580,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "mode subject", settings: { mode: "subject", width: 100, height: 100 } },
     { label: "mode face", settings: { mode: "face", width: 100, height: 100 } },
     { label: "mode trim", settings: { mode: "trim" } },
+    { label: "trim padding", settings: { mode: "trim", padding: 20 } },
     { label: "mode attention alias", settings: { mode: "attention", width: 100, height: 100 } },
     { label: "mode content alias", settings: { mode: "content" } },
     {
@@ -609,6 +620,27 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "square mode", settings: { square: true } },
   ],
 
+  vectorize: [
+    { label: "bw default", settings: { colorMode: "bw" } },
+    { label: "bw threshold min", settings: { colorMode: "bw", threshold: 0 } },
+    { label: "bw threshold max", settings: { colorMode: "bw", threshold: 255 } },
+    { label: "bw invert", settings: { colorMode: "bw", invert: true } },
+    { label: "bw path polygon", settings: { colorMode: "bw", pathMode: "polygon" } },
+    { label: "color default", settings: { colorMode: "color" } },
+    { label: "color path none", settings: { colorMode: "color", pathMode: "none" } },
+    {
+      label: "color precision min",
+      settings: { colorMode: "color", colorPrecision: 1, layerDifference: 1 },
+    },
+    {
+      label: "color precision max",
+      settings: { colorMode: "color", colorPrecision: 16, layerDifference: 128 },
+    },
+    { label: "color speckle max", settings: { colorMode: "color", filterSpeckle: 256 } },
+    { label: "color corner min", settings: { colorMode: "color", cornerThreshold: 0 } },
+    { label: "color corner max", settings: { colorMode: "color", cornerThreshold: 180 } },
+  ],
+
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // VIDEO TOOLS
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -637,6 +669,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "short clip", settings: { startS: 0, endS: 0.5 } },
     { label: "precise true", settings: { startS: 0, endS: 0.5, precise: true } },
     { label: "precise false", settings: { startS: 0, endS: 0.5, precise: false } },
+    { label: "ends cut", settings: { mode: "ends", cutStartS: 0.1, cutEndS: 0.1 } },
   ],
 
   "video-to-gif": [
@@ -718,6 +751,15 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "loop false", settings: { loop: false } },
   ],
 
+  "video-to-avif": [
+    { label: "fps min", settings: { fps: 1, width: 64, durationS: 1 } },
+    { label: "fps max", settings: { fps: 30, width: 64, durationS: 1 } },
+    { label: "width max", settings: { width: 1280, durationS: 1 } },
+    { label: "quality min", settings: { quality: 1, width: 64, durationS: 1 } },
+    { label: "quality max", settings: { quality: 100, width: 64, durationS: 1 } },
+    { label: "loop false", settings: { loop: false, width: 64, durationS: 1 } },
+  ],
+
   "video-to-frames": [
     { label: "mode all png", settings: { mode: "all", format: "png" } },
     { label: "mode all jpg", settings: { mode: "all", format: "jpg" } },
@@ -774,6 +816,13 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "language deu", settings: { language: "deu" } },
   ],
 
+  "convert-subtitles": [
+    { label: "to srt", settings: { format: "srt" } },
+    { label: "to vtt", settings: { format: "vtt" } },
+    { label: "to ass", settings: { format: "ass" } },
+    { label: "explicit gb18030", settings: { format: "vtt", encoding: "gb18030" } },
+  ],
+
   "images-to-video": [
     { label: "2s per image", settings: { secondsPerImage: 2 } },
     { label: "0.5s per image", settings: { secondsPerImage: 0.5 } },
@@ -783,6 +832,9 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "resolution square", settings: { resolution: "square" } },
     { label: "fps 10", settings: { fps: 10 } },
     { label: "fps 60", settings: { fps: 60 } },
+    { label: "gif output", settings: { outputFormat: "gif" } },
+    { label: "webp output", settings: { outputFormat: "webp" } },
+    { label: "gif 20ms once", settings: { outputFormat: "gif", frameDelayMs: 20, loop: 1 } },
   ],
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -810,6 +862,7 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   "trim-audio": [
     { label: "short clip", settings: { startS: 0, endS: 0.5 } },
     { label: "offset clip", settings: { startS: 0.1, endS: 0.5 } },
+    { label: "ends cut", settings: { mode: "ends", cutStartS: 0.1, cutEndS: 0.1 } },
   ],
 
   "extract-audio": [
@@ -958,6 +1011,15 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "margin 0", settings: { margin: 0 } },
     { label: "margin 20", settings: { margin: 20 } },
     { label: "margin max", settings: { margin: 2000 } },
+  ],
+
+  "resize-pdf-pages": [
+    { label: "4x6 in label", settings: { pageSize: "4x6in" } },
+    { label: "A4 keep orientation", settings: { pageSize: "a4", keepOrientation: true } },
+    {
+      label: "custom 100x150 mm",
+      settings: { pageSize: "custom", width: 100, height: 150, unit: "mm" },
+    },
   ],
 
   "nup-pdf": [
@@ -1145,8 +1207,6 @@ const AI_GATED_TOOLS = new Set([
   "red-eye-removal",
   "blur-faces",
   "smart-crop",
-  "content-aware-resize",
-  "vectorize",
 ]);
 
 // Accepted status codes: 200 = success, 202 = async, 400 = bad settings,
@@ -1179,8 +1239,20 @@ describe("settings variation matrix", () => {
     const missingPython = allPythonVariationsUnavailable
       ? findMissingGeneratedPythonPrerequisite(toolId, variations[0]?.settings)
       : undefined;
-    const skipTool =
-      (AI_GATED_TOOLS.has(toolId) && !REQUIRE_AI_FEATURES) || allPythonVariationsUnavailable;
+    const aiGate = AI_GATED_TOOLS.has(toolId)
+      ? requiredAiGate(toolId, {
+          requireAiFeatures: REQUIRE_AI_FEATURES,
+          firstMissingBundle: getFirstMissingBundleForTool,
+          dataDir: process.env.DATA_DIR,
+        })
+      : undefined;
+    if (aiGate?.kind === "fail") {
+      it(`${toolId} -- required AI bundle installed`, () => {
+        throw new Error(aiGate.reason);
+      });
+      continue;
+    }
+    const skipTool = aiGate?.kind === "skip" || allPythonVariationsUnavailable;
 
     describe.skipIf(skipTool)(missingPython ? `${toolId} -- ${missingPython}` : toolId, () => {
       const accounting = new GeneratedCaseAccounting(toolId, {
@@ -1276,8 +1348,17 @@ describe("settings variation matrix", () => {
             } catch (error) {
               // Tools whose input needs no probing are admitted normally and
               // only meet the missing engine when ffmpeg is spawned.
-              if (!isEngineUnavailableFailure(error)) throw error;
-              accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+              if (isEngineUnavailableFailure(error)) {
+                accounting.skip("missing-host-binary", `engine unavailable for ${label}`);
+                return;
+              }
+              // A long tool refuses a bad input by failing the job (#5038).
+              if (
+                !isRecordedRejection(await settledJobRow(json.jobId as string), ACCEPTED_STATUSES)
+              ) {
+                throw error;
+              }
+              accounting.reject();
             }
           }
           if (res.statusCode !== 200 && res.statusCode !== 202) accounting.reject();

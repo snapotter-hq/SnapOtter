@@ -73,7 +73,6 @@ describe("filterRelevantTools", () => {
   });
 
   it("matches a plural of an aliased word in its canonical form", () => {
-    // The normalizer maps "photo" to "image" but leaves "photos" alone.
     const imageToPdf = tool("image-to-pdf");
     expect(filterRelevantTools("photos to pdf", [imageToPdf])).toEqual([imageToPdf]);
   });
@@ -87,6 +86,37 @@ describe("filterRelevantTools", () => {
 
   it("keeps everything for a query made only of filler", () => {
     expect(filterRelevantTools("the", [watermark, crop])).toEqual([watermark, crop]);
+  });
+
+  describe("with alias groups (#4899)", () => {
+    const groups = [
+      ["merge", "combine", "join"],
+      ["remove background", "background remover", "cutout"],
+    ];
+    const merge = tool("merge-pdf", { description: "Merge PDF files into one" });
+    const compressPdf = tool("compress-pdf");
+    const bg = tool("remove-background");
+
+    it("matches a query word through another phrase of its group", () => {
+      expect(filterRelevantTools("combine pdf", [merge, compressPdf], groups)).toEqual([merge]);
+      expect(filterRelevantTools("cutout", [bg, crop], groups)).toEqual([bg]);
+    });
+
+    it("needs every word of the alternative phrase", () => {
+      const removePages = tool("remove-pages");
+      expect(filterRelevantTools("cutout", [removePages], groups)).toEqual([]);
+    });
+
+    it("only expands words whose whole phrase is in the query", () => {
+      // "remove" alone is not "remove background", so watermark-image can't
+      // borrow the group's "cutout".
+      const cutoutWatermark = tool("watermark-image", { keywords: ["cutout"] });
+      expect(filterRelevantTools("remove watermark", [cutoutWatermark], groups)).toEqual([]);
+    });
+
+    it("leaves the default behaviour alone without groups", () => {
+      expect(filterRelevantTools("combine pdf", [merge])).toEqual([]);
+    });
   });
 });
 
@@ -160,7 +190,9 @@ describe("unnamedFormatKeywords", () => {
 
   it("is applied to the shipped catalog", () => {
     const keywordsOf = (id: string) => TOOLS.find((entry) => entry.id === id)?.keywords ?? [];
-    expect(keywordsOf("convert-audio")).toEqual(expect.arrayContaining(["opus", "wma"]));
+    expect(keywordsOf("convert-audio")).toEqual(expect.arrayContaining(["amr", "ac3"]));
+    // The #1099 presets name opus and wma, so those rank the presets instead.
+    expect(keywordsOf("convert-audio")).not.toContain("opus");
     expect(keywordsOf("convert")).toEqual(expect.arrayContaining(["nef", "arw", "cr2", "dng"]));
     expect(keywordsOf("convert")).not.toContain("png");
   });

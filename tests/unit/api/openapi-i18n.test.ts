@@ -1,5 +1,5 @@
 // tests/unit/api/openapi-i18n.test.ts
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { load } from "js-yaml";
@@ -75,6 +75,22 @@ describe("generateLocaleLlmsTxt", () => {
     });
     // Still lists the tool by id with the sync mode, never crashes.
     expect(out).toContain("(resize, sync)");
+  });
+
+  it("lists content-aware-resize as async now that it runs on the queue (#4338)", () => {
+    const out = generateLocaleLlmsTxt({
+      spec,
+      sections,
+      toolsBySection: {
+        image: [
+          { id: "content-aware-resize", executionHint: "long" as const },
+          { id: "passport-photo", executionHint: "long" as const },
+        ],
+      },
+      toolStrings: {},
+    });
+    expect(out).toContain("(content-aware-resize, async)");
+    expect(out).toContain("(passport-photo, two-phase)");
   });
 });
 
@@ -186,5 +202,42 @@ describe("openapi.sv.yaml Swedish diacritics (#2047)", () => {
       .filter(([, text]) => foldedPattern.test(text))
       .map(([id, text]) => ({ id, text }));
     expect(offending).toEqual([]);
+  });
+});
+
+describe("OpenAPI intro positioning (#4916)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const specFiles = readdirSync(specDir).filter((f) => /^openapi(\.[A-Za-z-]+)?\.yaml$/.test(f));
+
+  const intro = (file: string) =>
+    (load(readFileSync(join(specDir, file), "utf8")) as { info: { description: string } }).info
+      .description;
+
+  it("describes the product as an open-source file toolkit in English", () => {
+    const text = intro("openapi.yaml");
+    expect(text).toContain("the open-source file toolkit with 200+ tools");
+    expect(text).not.toMatch(/infrastructure/i);
+  });
+
+  it("keeps 200+ in all 21 specs and drops the retired infrastructure wording in English", () => {
+    expect(specFiles).toHaveLength(21);
+    for (const file of specFiles) expect(intro(file), file).toContain("200+");
+  });
+
+  it("no longer carries the translated 'file-processing infrastructure' phrase", () => {
+    const retired = [
+      "infraestructura autoalojada",
+      "Infrastruktur zur Dateiverarbeitung",
+      "infrastructure auto-hébergée",
+      "инфраструктуры обработки файлов",
+      "基盤です",
+      "基础设施",
+      "基礎架構",
+      "인프라입니다",
+    ];
+    for (const file of specFiles) {
+      const first = intro(file).split("\n")[0] ?? "";
+      for (const phrase of retired) expect(first, `${file}: ${phrase}`).not.toContain(phrase);
+    }
   });
 });

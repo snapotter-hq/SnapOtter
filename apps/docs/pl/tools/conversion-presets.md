@@ -1,13 +1,14 @@
 ---
 description: "Dedykowane endpointy predefiniowanych konwersji generowane z katalogu narzędzi SnapOtter."
-i18n_source_hash: faad6efcb9a9
+i18n_source_hash: a9dcab4c4e81
 i18n_provenance: human
-i18n_output_hash: 4268d3b384fa
+i18n_output_hash: 7a0c1d9c47b5
+i18n_hash_version: 2
 ---
 
 # Conversion Presets {#conversion-presets}
 
-SnapOtter udostępnia 83 dedykowane endpointy predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
+SnapOtter udostępnia 121 dedykowanych endpointów predefiniowanych konwersji oprócz podstawowych narzędzi konwertujących. Każdy preset blokuje format wyjściowy i deleguje do swojego podstawowego potoku przetwarzania, więc jego zachowanie, walidacja i kontrakt wyjściowy odpowiadają narzędziu podstawowemu wymienionemu poniżej.
 
 ## API Endpoint Pattern {#api-endpoint-pattern}
 
@@ -93,6 +94,10 @@ Wyślij `multipart/form-data` z częścią `file` oraz opcjonalnym ciągiem JSON
 | `mp4-to-wav` | MP4 na WAV | `/api/v1/tools/video/mp4-to-wav` | `extract-audio` | `.mp4` | brak |
 | `mov-to-wav` | MOV na WAV | `/api/v1/tools/video/mov-to-wav` | `extract-audio` | `.mov` | brak |
 | `mp4-to-ogg` | MP4 na OGG | `/api/v1/tools/video/mp4-to-ogg` | `extract-audio` | `.mp4` | brak |
+| `srt-to-vtt` | SRT na VTT | `/api/v1/tools/video/srt-to-vtt` | `convert-subtitles` | `.srt` | brak |
+| `vtt-to-srt` | VTT na SRT | `/api/v1/tools/video/vtt-to-srt` | `convert-subtitles` | `.vtt` | brak |
+| `ass-to-srt` | ASS na SRT | `/api/v1/tools/video/ass-to-srt` | `convert-subtitles` | `.ass` | brak |
+| `srt-to-ass` | SRT na ASS | `/api/v1/tools/video/srt-to-ass` | `convert-subtitles` | `.srt` | brak |
 
 ## Audio Presets {#audio-presets}
 
@@ -108,6 +113,36 @@ Wyślij `multipart/form-data` z częścią `file` oraz opcjonalnym ciągiem JSON
 | `wav-to-mp3` | WAV na MP3 | `/api/v1/tools/audio/wav-to-mp3` | `convert-audio` | `.wav` | brak |
 | `mp3-to-wav` | MP3 na WAV | `/api/v1/tools/audio/mp3-to-wav` | `convert-audio` | `.mp3` | brak |
 | `flac-to-mp3` | FLAC na MP3 | `/api/v1/tools/audio/flac-to-mp3` | `convert-audio` | `.flac` | brak |
+| `mp3-to-flac` | MP3 na FLAC | `/api/v1/tools/audio/mp3-to-flac` | `convert-audio` | `.mp3` | brak |
+| `mp3-to-ogg` | MP3 na OGG | `/api/v1/tools/audio/mp3-to-ogg` | `convert-audio` | `.mp3` | brak |
+| `mp3-to-m4a` | MP3 na M4A | `/api/v1/tools/audio/mp3-to-m4a` | `convert-audio` | `.mp3` | brak |
+| `wav-to-flac` | WAV na FLAC | `/api/v1/tools/audio/wav-to-flac` | `convert-audio` | `.wav` | brak |
+| `wav-to-ogg` | WAV na OGG | `/api/v1/tools/audio/wav-to-ogg` | `convert-audio` | `.wav` | brak |
+| `wav-to-m4a` | WAV na M4A | `/api/v1/tools/audio/wav-to-m4a` | `convert-audio` | `.wav` | brak |
+| `flac-to-wav` | FLAC na WAV | `/api/v1/tools/audio/flac-to-wav` | `convert-audio` | `.flac` | brak |
+| `flac-to-ogg` | FLAC na OGG | `/api/v1/tools/audio/flac-to-ogg` | `convert-audio` | `.flac` | brak |
+| `flac-to-m4a` | FLAC na M4A | `/api/v1/tools/audio/flac-to-m4a` | `convert-audio` | `.flac` | brak |
+| `ogg-to-flac` | OGG na FLAC | `/api/v1/tools/audio/ogg-to-flac` | `convert-audio` | `.ogg` | brak |
+| `ogg-to-m4a` | OGG na M4A | `/api/v1/tools/audio/ogg-to-m4a` | `convert-audio` | `.ogg` | brak |
+| `m4a-to-flac` | M4A na FLAC | `/api/v1/tools/audio/m4a-to-flac` | `convert-audio` | `.m4a` | brak |
+| `m4a-to-ogg` | M4A na OGG | `/api/v1/tools/audio/m4a-to-ogg` | `convert-audio` | `.m4a` | brak |
+| `aac-to-ogg` | AAC na OGG | `/api/v1/tools/audio/aac-to-ogg` | `convert-audio` | `.aac` | brak |
+| `aac-to-m4a` | AAC na M4A | `/api/v1/tools/audio/aac-to-m4a` | `convert-audio` | `.aac` | brak |
+| `opus-to-mp3` | Opus na MP3 | `/api/v1/tools/audio/opus-to-mp3` | `convert-audio` | `.opus` | brak |
+| `opus-to-wav` | Opus na WAV | `/api/v1/tools/audio/opus-to-wav` | `convert-audio` | `.opus` | brak |
+| `opus-to-flac` | Opus na FLAC | `/api/v1/tools/audio/opus-to-flac` | `convert-audio` | `.opus` | brak |
+| `opus-to-ogg` | Opus na OGG | `/api/v1/tools/audio/opus-to-ogg` | `convert-audio` | `.opus` | brak |
+| `opus-to-m4a` | Opus na M4A | `/api/v1/tools/audio/opus-to-m4a` | `convert-audio` | `.opus` | brak |
+| `wma-to-mp3` | WMA na MP3 | `/api/v1/tools/audio/wma-to-mp3` | `convert-audio` | `.wma` | brak |
+| `wma-to-wav` | WMA na WAV | `/api/v1/tools/audio/wma-to-wav` | `convert-audio` | `.wma` | brak |
+| `wma-to-flac` | WMA na FLAC | `/api/v1/tools/audio/wma-to-flac` | `convert-audio` | `.wma` | brak |
+| `wma-to-ogg` | WMA na OGG | `/api/v1/tools/audio/wma-to-ogg` | `convert-audio` | `.wma` | brak |
+| `wma-to-m4a` | WMA na M4A | `/api/v1/tools/audio/wma-to-m4a` | `convert-audio` | `.wma` | brak |
+| `aiff-to-mp3` | AIFF na MP3 | `/api/v1/tools/audio/aiff-to-mp3` | `convert-audio` | `.aiff` | brak |
+| `aiff-to-wav` | AIFF na WAV | `/api/v1/tools/audio/aiff-to-wav` | `convert-audio` | `.aiff` | brak |
+| `aiff-to-flac` | AIFF na FLAC | `/api/v1/tools/audio/aiff-to-flac` | `convert-audio` | `.aiff` | brak |
+| `aiff-to-ogg` | AIFF na OGG | `/api/v1/tools/audio/aiff-to-ogg` | `convert-audio` | `.aiff` | brak |
+| `aiff-to-m4a` | AIFF na M4A | `/api/v1/tools/audio/aiff-to-m4a` | `convert-audio` | `.aiff` | brak |
 
 ## PDF Presets {#pdf-presets}
 
@@ -122,6 +157,10 @@ Wyślij `multipart/form-data` z częścią `file` oraz opcjonalnym ciągiem JSON
 | ID presetu | Konwertuje | Trasa | Narzędzie podstawowe | Akceptowane wejścia | Ustawienia opcjonalne |
 |-----------|----------|-------|-----------|-----------------|-------------------|
 | `excel-to-csv` | Excel na CSV | `/api/v1/tools/files/excel-to-csv` | `convert-spreadsheet` | `.xlsx`, `.xls` | brak |
+| `otf-to-ttf` | OTF na TTF | `/api/v1/tools/files/otf-to-ttf` | `convert-font` | `.otf` | brak |
+| `woff-to-ttf` | WOFF na TTF | `/api/v1/tools/files/woff-to-ttf` | `convert-font` | `.woff` | brak |
+| `woff2-to-ttf` | WOFF2 na TTF | `/api/v1/tools/files/woff2-to-ttf` | `convert-font` | `.woff2` | brak |
+| `ttf-to-woff2` | TTF na WOFF2 | `/api/v1/tools/files/ttf-to-woff2` | `convert-font` | `.ttf`, `.otf` | brak |
 
 ## Notes {#notes}
 

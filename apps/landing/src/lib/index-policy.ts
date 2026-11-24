@@ -6,13 +6,15 @@
 // update. The two most templated page groups were the localized copies of the
 // alternatives pages and the `x-to-y` converter and preset tool pages, so those are
 // noindexed. Pages that earned impressions before the drop stay indexed even when
-// they fall in one of those groups.
+// they fall in one of those groups. Hand-written tools whose id happens to read
+// `x-to-y` (pdf-to-word, video-to-gif) have their own page copy, so they stay
+// indexed too (#4913); only the generated preset pages are noindexed.
 //
 // Three consumers need the same answer: the page head (robots meta and hreflang),
 // and astro.config.mjs (sitemap filter). Like en-only-paths.ts, this file stays
 // free of `astro:*` and `@/` imports so the config can load it.
 
-import { SUPPORTED_LOCALES, TOOLS } from "@snapotter/shared";
+import { COMPRESS_PRESETS, CONVERSION_PRESETS, SUPPORTED_LOCALES } from "@snapotter/shared";
 
 /**
  * Pages kept indexed whatever group they belong to: the ones that had real search
@@ -29,8 +31,8 @@ export const INDEXED_KEEP_PATHS: readonly string[] = [
 
 const KEEP = new Set(INDEXED_KEEP_PATHS);
 
-/** Converter and preset tools: every tool whose id reads `<from>-to-<to>`. */
-const CONVERTER_TOOL_IDS = new Set(TOOLS.filter((t) => t.id.includes("-to-")).map((t) => t.id));
+/** Tools generated from a preset list rather than written by hand. */
+const PRESET_TOOL_IDS = new Set([...CONVERSION_PRESETS, ...COMPRESS_PRESETS].map((p) => p.id));
 
 const NON_ENGLISH_LOCALES = new Set(
   SUPPORTED_LOCALES.map((l) => l.code).filter((code) => code !== "en"),
@@ -49,7 +51,7 @@ export function isNoindexPath(pathname: string): boolean {
   if (KEEP.has(path)) return false;
 
   const tool = TOOL_DETAIL_RE.exec(path);
-  if (tool) return CONVERTER_TOOL_IDS.has(tool[1]);
+  if (tool) return PRESET_TOOL_IDS.has(tool[1]);
 
   const alternatives = LOCALIZED_ALTERNATIVES_RE.exec(path);
   if (alternatives) return NON_ENGLISH_LOCALES.has(alternatives[1]);

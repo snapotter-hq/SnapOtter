@@ -72,7 +72,7 @@ SnapOtter supports 55+ image formats for input and 17 formats for output.
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Digital cinema, medical imaging |
 | QOI | .qoi | Inline TypeScript codec | Game dev, embedded systems |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhone photos |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | iPhone and Sony camera photos |
 
 ### Legacy/System (4) {#legacy-system-4}
 

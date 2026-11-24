@@ -531,9 +531,7 @@ test("canonical external-server and production commands collect their complete s
   expect(packageJson.scripts["test:e2e:analytics"]).toBe(
     "playwright test --config playwright.analytics-local.config.ts",
   );
-  expect(packageJson.scripts["test:docker"]).toBe(
-    "docker compose -f docker/docker-compose.test.yml up --build --abort-on-container-exit",
-  );
+  expect(packageJson.scripts["test:docker"]).toBe("bash scripts/test-docker.sh");
   expect(packageJson.scripts["test:e2e:production"]).toBe(
     "playwright test --config tests/qa/playwright.qa.config.ts",
   );
@@ -552,7 +550,7 @@ test("canonical external-server and production commands collect their complete s
   );
   expect(productionOutput).toContain("crosscutting.qa.spec.ts");
   expect(productionOutput).toContain("settings-extended.qa.spec.ts");
-  expect(productionOutput).toContain("Total: 397 tests in 9 files");
+  expect(productionOutput).toContain("Total: 398 tests in 9 files");
 });
 
 test("embedded lifecycle tests use exact labeled resources and dynamic loopback ports", () => {
@@ -981,7 +979,7 @@ test("Firefox and WebKit collect the supported cross-browser core suite", () => 
     expect(output, project).toContain("navigation.spec.ts");
     expect(output, project).toContain("home-page.spec.ts");
     expect(output, project).toContain("chunk-reload.spec.ts");
-    expect(output, project).toContain("Total: 59 tests in 6 files");
+    expect(output, project).toContain("Total: 61 tests in 6 files");
   }
 });
 

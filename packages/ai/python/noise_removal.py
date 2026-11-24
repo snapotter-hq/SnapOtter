@@ -27,7 +27,7 @@ _CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "snapotter", "model
 
 # GitHub release URLs for auto-download
 SCUNET_URL = "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth"
-NAFNET_URL = "https://huggingface.co/mikestealth/nafnet-models/resolve/main/NAFNet-SIDD-width64.pth"
+NAFNET_HF_PATH = "mikestealth/nafnet-models/resolve/main/NAFNet-SIDD-width64.pth"
 
 
 def _get_model_path(env_path, filename, url):
@@ -466,7 +466,8 @@ def denoise_maximum(img_array, strength, detail, color_noise, model_path):
             dec_blk_nums=[2, 2, 2, 2],
         )
 
-        resolved_path = _get_model_path(model_path, "NAFNet-SIDD-width64.pth", NAFNET_URL)
+        from offline_guard import hf_url
+        resolved_path = _get_model_path(model_path, "NAFNet-SIDD-width64.pth", hf_url(NAFNET_HF_PATH))
         try:
             checkpoint = torch.load(resolved_path, map_location=device, weights_only=True)
         except Exception:

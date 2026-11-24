@@ -2,7 +2,7 @@
 export const FORMAT_ALIASES: Record<string, string[]> = {
   jpg: ["jpeg", "jpe"],
   tif: ["tiff"],
-  heic: ["heif"],
+  heic: ["heif", "hif"],
   word: ["doc", "docx"],
   excel: ["xls", "xlsx", "spreadsheet"],
   powerpoint: ["ppt", "pptx"],
@@ -92,7 +92,9 @@ const JOINABLE_FORMATS = [
     ...["ass", "srt", "vtt"],
     // Documents and data.
     ...["csv", "epub", "htm", "html", "json", "odp", "ods", "odt", "pdf", "rtf", "text", "tsv"],
-    ...["txt", "xml", "yaml", "yml", "zip"],
+    ...["txt", "xml", "yaml", "yml", "zip", "log"],
+    // Fonts.
+    ...["otf", "ttf", "woff", "woff2"],
     // Words from the x-to-y tool ids (html-to-image, video-to-gif, ...).
     ...["base64", "frames", "images", "raster", "video"],
     // Speech-to-text phrasings ("speech2text", "voice2text").
@@ -167,7 +169,13 @@ export function normalizeSearchQuery(raw: string): string {
     if (tok === "2") tok = "to";
     // Own-property checks: "constructor" must not resolve to Object's.
     if (Object.hasOwn(MISSPELLINGS, tok)) tok = MISSPELLINGS[tok];
-    if (Object.hasOwn(ALIAS_TO_CANONICAL, tok)) tok = ALIAS_TO_CANONICAL[tok];
+    if (Object.hasOwn(ALIAS_TO_CANONICAL, tok)) {
+      tok = ALIAS_TO_CANONICAL[tok];
+    } else if (tok.endsWith("s") && Object.hasOwn(ALIAS_TO_CANONICAL, tok.slice(0, -1))) {
+      // A plural alias ("photos", "jpegs") reads as its singular (#4900). Only a
+      // known alias loses its "s": "ts" and "ass" are formats in their own right.
+      tok = ALIAS_TO_CANONICAL[tok.slice(0, -1)];
+    }
     if (tok === "to") {
       out.push("to");
       continue;

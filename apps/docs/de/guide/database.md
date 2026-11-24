@@ -1,8 +1,8 @@
 ---
 description: "PostgreSQL-Datenbankschema, Tabellen, Migrationen und Backup-Verfahren für SnapOtter."
-i18n_source_hash: 2150213f21da
+i18n_source_hash: fe66824053a2
 i18n_provenance: machine
-i18n_output_hash: 3d541b502f2e
+i18n_output_hash: 6668e1907826
 i18n_hash_version: 2
 ---
 
@@ -34,7 +34,7 @@ Aktive Anmeldesitzungen. Jede Zeile verknüpft ein Sitzungstoken mit einem Benut
 
 | Spalte | Typ | Hinweise |
 |---|---|---|
-| `id` | varchar | Primärschlüssel (Sitzungstoken) |
+| `id` | varchar | Primärschlüssel (SHA-256-Hash des Sitzungstokens) |
 | `userId` | uuid | Fremdschlüssel auf `users.id` |
 | `expiresAt` | timestamp | Ablaufzeitpunkt |
 | `createdAt` | timestamp | Erstellungszeitpunkt |
@@ -189,6 +189,16 @@ Bei RDS, Supabase, Cloud SQL oder jedem Cluster, den Sie selbst betreiben, ist d
 CREATE ROLE snapotter_app LOGIN PASSWORD 'choose-a-strong-password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
 ```
+
+Erlauben Sie dann als Superuser oder als die Rolle, die dieses `CREATE ROLE` ausgeführt hat, der Eigentümerrolle, sie zu verwalten:
+
+```sql
+GRANT snapotter_app TO snapotter WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+```
+
+Ab Postgres 16 darf eine Rolle mit `CREATEROLE` nur Rollen ändern, die sie selbst erstellt hat oder auf denen sie `ADMIN OPTION` hält. SnapOtter ändert das Passwort der Laufzeitrolle nur, wenn es nicht mehr zu `DATABASE_URL` passt (etwa nach einer Rotation), und ohne diese Berechtigung schlägt dieser Start fehl. `INHERIT FALSE, SET FALSE` überträgt nur die Verwaltung und sonst nichts. Ein einfaches `WITH ADMIN OPTION` würde `snapotter` zusätzlich die Rechte der Laufzeitrolle geben. Postgres 15 und älter brauchen die Berechtigung nicht und lehnen diese Syntax ab, lassen Sie sie dort also weg.
+
+Wenn SnapOtter das Passwort setzt, speichert es einen SCRAM-SHA-256-Verifier, auch wenn `password_encryption` im Cluster auf `md5` steht. Postgres akzeptiert das über eine `md5`-Zeile in `pg_hba.conf`, aber ein Connection-Pooler, der md5-Hashes selbst prüft, kann sich nicht als Laufzeitrolle anmelden.
 
 Übergeben Sie SnapOtter dann beide Verbindungszeichenfolgen, die auf denselben Host, Port und dieselbe Datenbank zeigen:
 

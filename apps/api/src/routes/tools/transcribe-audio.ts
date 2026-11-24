@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { transcribeAudio } from "@snapotter/ai";
+import { runFfmpeg } from "@snapotter/media-engine";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { NO_SPEECH_DETECTED_WARNING } from "../../lib/empty-result-warnings.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -47,16 +49,25 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
 
   ctx.report(5, "Preparing audio");
 
-  // Write the input buffer to a temp file (transcribeAudio needs a file path)
   const audioDir = join(ctx.scratchDir, "audio");
   await mkdir(audioDir, { recursive: true });
   const audioPath = join(audioDir, data.filename);
   await writeFile(audioPath, input);
 
+  // faster-whisper decodes with PyAV, which rejects files the ffmpeg CLI plays
+  // fine (a zero-length Vorbis packet, #4980), so whisper only ever sees a
+  // 16 kHz mono WAV that ffmpeg wrote. It sits outside audioDir so an upload
+  // named audio-16k.wav can't be its own output.
+  const wavPath = join(ctx.scratchDir, "audio-16k.wav");
+  await runFfmpeg(
+    ["-i", audioPath, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wavPath],
+    { timeoutMs: 10 * 60_000, signal: ctx.signal },
+  );
+
   ctx.report(10, "Transcribing audio");
 
   const result = await transcribeAudio(
-    audioPath,
+    wavPath,
     { language: settings.language, signal: ctx.signal, toolId: "transcribe-audio" },
     (percent, stage) => ctx.report(percent, stage),
   );
@@ -88,6 +99,7 @@ registerAiJobHandler("transcribe-audio", async (input, data, ctx) => {
     resultPayload: {
       language: result.language,
       segments: segments.length,
+      ...(result.text.trim() === "" && { warning: NO_SPEECH_DETECTED_WARNING }),
     },
   };
 });

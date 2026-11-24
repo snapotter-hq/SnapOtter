@@ -8,6 +8,7 @@
 import { chmod, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gzipSync } from "node:zlib";
+import AdmZip from "adm-zip";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -78,6 +79,7 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../test-server.js";
@@ -530,6 +532,156 @@ describe("File download", () => {
     });
     expect(thumbRes.statusCode).toBe(500);
     expect(JSON.parse(thumbRes.body).error).not.toMatch(/could not generate thumbnail/i);
+  });
+});
+
+// ── Bulk download (#4505) ────────────────────────────────────────
+// WebKit keeps only the last of several <a download> clicks made in one task,
+// so the Files page downloads a multi-file selection as one ZIP.
+async function uploadAs(token: string, filename: string, content: Buffer): Promise<string> {
+  const { body, contentType } = createMultipartPayload([
+    { name: "file", filename, contentType: "image/png", content },
+  ]);
+  const res = await app.inject({
+    method: "POST",
+    url: "/api/v1/files/upload",
+    headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+    body,
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  return (JSON.parse(res.body).files[0] as { id: string }).id;
+}
+
+function bulkDownload(token: string, ids: unknown) {
+  return app.inject({
+    method: "POST",
+    url: "/api/v1/files/download",
+    headers: { authorization: `Bearer ${token}` },
+    payload: { ids },
+  });
+}
+
+describe("Bulk download", () => {
+  it("returns one ZIP holding every requested file, in order, with unique names", async () => {
+    const first = await uploadAs(adminToken, "bulk-dup.png", PNG);
+    const second = await uploadAs(adminToken, "bulk-dup.png", TINY_PNG);
+    const third = await uploadAs(adminToken, "bulk-other.png", PNG);
+
+    const res = await bulkDownload(adminToken, [third, first, second, first]);
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    expect(res.headers["content-disposition"]).toBe('attachment; filename="files.zip"');
+    const entries = new AdmZip(res.rawPayload).getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual([
+      "bulk-other.png",
+      "bulk-dup.png",
+      "bulk-dup_1.png",
+    ]);
+    expect(entries[0].getData().equals(PNG)).toBe(true);
+    expect(entries[1].getData().equals(PNG)).toBe(true);
+    expect(entries[2].getData().equals(TINY_PNG)).toBe(true);
+  });
+
+  it("returns 404 for the whole request when any id does not exist", async () => {
+    const real = await uploadAs(adminToken, "bulk-real.png", PNG);
+    const res = await bulkDownload(adminToken, [real, "00000000-0000-0000-0000-000000000000"]);
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "File not found" });
+  });
+
+  it("answers 404 for another user's file, like the single-file route, unless the caller has files:all", async () => {
+    const { token: userToken } = await createUserAndLogin(app, `bulk_user_${Date.now()}`);
+    const own = await uploadAs(userToken, "bulk-own.png", PNG);
+    const foreign = await uploadAs(adminToken, "bulk-foreign.png", PNG);
+
+    const single = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${foreign}/download`,
+      headers: { authorization: `Bearer ${userToken}` },
+    });
+    expect(single.statusCode).toBe(404);
+
+    const refused = await bulkDownload(userToken, [own, foreign]);
+    expect(refused.statusCode).toBe(404);
+    expect(JSON.parse(refused.body)).toEqual({ error: "File not found" });
+
+    const ownOnly = await bulkDownload(userToken, [own]);
+    expect(ownOnly.statusCode).toBe(200);
+    expect(new AdmZip(ownOnly.rawPayload).getEntries().map((e) => e.entryName)).toEqual([
+      "bulk-own.png",
+    ]);
+
+    const admin = await bulkDownload(adminToken, [own, foreign]);
+    expect(admin.statusCode).toBe(200);
+    expect(new AdmZip(admin.rawPayload).getEntries()).toHaveLength(2);
+  });
+
+  it("rejects a missing, empty, or non-string ids list with 400", async () => {
+    for (const ids of [undefined, [], [42]]) {
+      const res = await bulkDownload(adminToken, ids);
+      expect(res.statusCode, JSON.stringify(ids)).toBe(400);
+    }
+  });
+
+  it("requires authentication", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/download",
+      payload: { ids: ["anything"] },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns 404, not a ZIP, when the first file's blob is missing from storage", async () => {
+    const gone = await uploadAs(adminToken, "bulk-gone.png", PNG);
+    const kept = await uploadAs(adminToken, "bulk-kept.png", PNG);
+    const [row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, gone));
+    await unlink(getStoredFilePath(row.storedName));
+
+    hooks.reportError.mockClear();
+    const res = await bulkDownload(adminToken, [gone, kept]);
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "File not found in storage" });
+    expect(hooks.reportError).not.toHaveBeenCalled();
+  });
+
+  it("never sends a complete ZIP when a later file's blob is missing", async () => {
+    const kept = await uploadAs(adminToken, "bulk-first.png", PNG);
+    const gone = await uploadAs(adminToken, "bulk-later-gone.png", PNG);
+    const [row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, gone));
+    await unlink(getStoredFilePath(row.storedName));
+
+    let payload: Buffer;
+    try {
+      payload = (await bulkDownload(adminToken, [kept, gone])).rawPayload;
+    } catch {
+      return; // the stream was cut, as intended
+    }
+    let names: string[] = [];
+    try {
+      names = new AdmZip(payload).getEntries().map((e) => e.entryName);
+    } catch {
+      return; // truncated archive
+    }
+    expect(names).not.toContain("bulk-later-gone.png");
+    expect(names).not.toEqual(["bulk-first.png"]);
+  });
+
+  it("returns 500 and reports a storage fault on the first file instead of a 404", async () => {
+    const id = await uploadAs(adminToken, "bulk-fault.png", PNG);
+    hooks.streamStoredFileError = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    const res = await bulkDownload(adminToken, [id]);
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
   });
 });
 

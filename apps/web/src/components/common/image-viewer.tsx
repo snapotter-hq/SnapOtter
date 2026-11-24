@@ -42,10 +42,21 @@ interface ImageViewerProps {
   bgPreview?: BgPreviewState;
   imageWrapperStyle?: React.CSSProperties;
   imageWrapperChildren?: React.ReactNode;
+  /** Level reference lines over the preview, drawn outside the rotated image (#732). */
+  gridOverlay?: boolean;
 }
 
 const ZOOM_STEPS = [10, 25, 50, 75, 100, 150, 200, 300, 500, 1000];
 const DEFAULT_ZOOM = 100;
+
+// Difference blending keeps the lines visible on both light and dark photos.
+const GRID_LINE = "rgb(255 255 255 / 0.5)";
+const GRID_STYLE: React.CSSProperties = {
+  backgroundImage: `linear-gradient(to right, ${GRID_LINE} 1px, transparent 1px), linear-gradient(to bottom, ${GRID_LINE} 1px, transparent 1px)`,
+  backgroundSize: "40px 40px",
+  backgroundPosition: "center",
+  mixBlendMode: "difference",
+};
 
 export function ImageViewer({
   src,
@@ -61,6 +72,7 @@ export function ImageViewer({
   imageWrapperStyle,
   imageWrapperChildren,
   resultContext,
+  gridOverlay,
 }: ImageViewerProps) {
   const { t } = useTranslation();
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
@@ -250,7 +262,7 @@ export function ImageViewer({
   );
 
   return (
-    <div className="flex flex-col w-full h-full max-w-3xl mx-auto min-h-0">
+    <div className="flex flex-col w-full h-full min-h-0">
       {/* Toolbar */}
       <div className="flex items-center justify-center gap-1 py-2 px-3 border-b border-border shrink-0">
         <button
@@ -297,133 +309,143 @@ export function ImageViewer({
         </button>
       </div>
 
-      {/* Image area */}
-      <div
-        ref={containerRef}
-        {...bind()}
-        className={cn(
-          "flex-1 flex items-center justify-center overflow-auto p-4",
-          fitMode === "actual" && "touch-none",
-        )}
-        style={{ backgroundColor: "hsl(var(--muted) / 0.2)" }}
-      >
-        {loadError && !imageWrapperStyle ? (
-          errorCard
-        ) : bgPreview?.backgroundSrc || bgPreview?.containerBackground ? (
-          /* Layered bg-removal preview: background layer + subject layer */
-          <div
-            className="relative rounded-sm overflow-hidden"
-            style={{
-              ...(fitMode === "fit"
-                ? { maxWidth: "100%", maxHeight: "100%" }
-                : { transform: `scale(${zoom / 100})`, transformOrigin: "center center" }),
-              display: "inline-block",
-            }}
-          >
-            {/* Background layer: blurred original or solid/gradient */}
-            {bgPreview.backgroundSrc ? (
-              <img
-                src={bgPreview.backgroundSrc}
-                alt="background"
-                className="block select-none"
-                style={{
-                  ...(fitMode === "fit"
-                    ? { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" as const }
-                    : {}),
-                  filter: bgPreview.backgroundBlur || undefined,
-                  transition: "filter 0.15s ease",
-                }}
-                draggable={false}
-              />
-            ) : (
-              /* Solid color or gradient - use subject dimensions */
-              <img
-                src={src}
-                alt="background-sizer"
-                className="block select-none invisible"
-                style={
-                  fitMode === "fit"
-                    ? { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" as const }
-                    : {}
-                }
-                draggable={false}
-              />
-            )}
-
-            {/* Container background (color or gradient) behind subject but on top of bg image */}
-            {bgPreview.containerBackground && !bgPreview.backgroundSrc && (
-              <div
-                className="absolute inset-0"
-                style={{ background: bgPreview.containerBackground }}
-              />
-            )}
-
-            {/* Subject layer: transparent PNG with optional drop shadow */}
-            <img
-              ref={imgRef}
-              src={src}
-              alt={filename}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              className="absolute inset-0 w-full h-full select-none"
+      {/* Image area. The grid sits outside the scroller so a zoomed image can't scroll it away. */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <div
+          ref={containerRef}
+          {...bind()}
+          className={cn(
+            "flex-1 flex items-center justify-center overflow-auto p-4",
+            fitMode === "actual" && "touch-none",
+          )}
+          style={{ backgroundColor: "hsl(var(--muted) / 0.2)" }}
+        >
+          {loadError && !imageWrapperStyle ? (
+            errorCard
+          ) : bgPreview?.backgroundSrc || bgPreview?.containerBackground ? (
+            /* Layered bg-removal preview: background layer + subject layer */
+            <div
+              className="relative rounded-sm overflow-hidden"
               style={{
-                objectFit: "contain" as const,
-                filter: bgPreview.dropShadow || undefined,
-                transition: "filter 0.15s ease",
+                ...(fitMode === "fit"
+                  ? { maxWidth: "100%", maxHeight: "100%" }
+                  : { transform: `scale(${zoom / 100})`, transformOrigin: "center center" }),
+                display: "inline-block",
               }}
-              draggable={false}
-            />
-          </div>
-        ) : imageWrapperStyle ? (
-          <div
-            style={{
-              ...imageWrapperStyle,
-              display: "inline-flex",
-              flexDirection: "column" as const,
-              position: imageWrapperChildren ? ("relative" as const) : undefined,
-              boxSizing: "border-box" as const,
-              overflow: "hidden",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              transition: "all 0.15s ease",
-            }}
-          >
-            {imageWrapperChildren}
-            {loadError ? (
-              /* Keep the wrapper and its overlay children mounted: for
-                 input-overlay tools (pixelate) the overlay is the control for
-                 the next run, so the error card renders in the image's place
-                 instead of replacing the whole branch (#797). */
-              errorCard
-            ) : (
+            >
+              {/* Background layer: blurred original or solid/gradient */}
+              {bgPreview.backgroundSrc ? (
+                <img
+                  src={bgPreview.backgroundSrc}
+                  alt="background"
+                  className="block select-none"
+                  style={{
+                    ...(fitMode === "fit"
+                      ? { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" as const }
+                      : {}),
+                    filter: bgPreview.backgroundBlur || undefined,
+                    transition: "filter 0.15s ease",
+                  }}
+                  draggable={false}
+                />
+              ) : (
+                /* Solid color or gradient - use subject dimensions */
+                <img
+                  src={src}
+                  alt="background-sizer"
+                  className="block select-none invisible"
+                  style={
+                    fitMode === "fit"
+                      ? { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" as const }
+                      : {}
+                  }
+                  draggable={false}
+                />
+              )}
+
+              {/* Container background (color or gradient) behind subject but on top of bg image */}
+              {bgPreview.containerBackground && !bgPreview.backgroundSrc && (
+                <div
+                  className="absolute inset-0"
+                  style={{ background: bgPreview.containerBackground }}
+                />
+              )}
+
+              {/* Subject layer: transparent PNG with optional drop shadow */}
               <img
                 ref={imgRef}
                 src={src}
                 alt={filename}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
-                className="select-none"
+                className="absolute inset-0 w-full h-full select-none"
                 style={{
-                  display: "block",
-                  flex: "0 1 auto",
-                  minHeight: 0,
-                  maxWidth: "100%",
                   objectFit: "contain" as const,
+                  filter: bgPreview.dropShadow || undefined,
+                  transition: "filter 0.15s ease",
                 }}
                 draggable={false}
               />
-            )}
-          </div>
-        ) : (
-          <img
-            ref={imgRef}
-            src={src}
-            alt={filename}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            className={`select-none${isSvg ? "" : " rounded-sm"}`}
-            style={imageStyle}
-            draggable={false}
+            </div>
+          ) : imageWrapperStyle ? (
+            <div
+              style={{
+                ...imageWrapperStyle,
+                display: "inline-flex",
+                flexDirection: "column" as const,
+                position: imageWrapperChildren ? ("relative" as const) : undefined,
+                boxSizing: "border-box" as const,
+                overflow: "hidden",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {imageWrapperChildren}
+              {loadError ? (
+                /* Keep the wrapper and its overlay children mounted: for
+                 input-overlay tools (pixelate) the overlay is the control for
+                 the next run, so the error card renders in the image's place
+                 instead of replacing the whole branch (#797). */
+                errorCard
+              ) : (
+                <img
+                  ref={imgRef}
+                  src={src}
+                  alt={filename}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  className="select-none"
+                  style={{
+                    display: "block",
+                    flex: "0 1 auto",
+                    minHeight: 0,
+                    maxWidth: "100%",
+                    objectFit: "contain" as const,
+                  }}
+                  draggable={false}
+                />
+              )}
+            </div>
+          ) : (
+            <img
+              ref={imgRef}
+              src={src}
+              alt={filename}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              className={`select-none${isSvg ? "" : " rounded-sm"}`}
+              style={imageStyle}
+              draggable={false}
+            />
+          )}
+        </div>
+        {gridOverlay && !loadError && (
+          <div
+            data-testid="image-viewer-grid"
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={GRID_STYLE}
           />
         )}
       </div>

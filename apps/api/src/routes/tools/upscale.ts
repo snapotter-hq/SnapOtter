@@ -21,6 +21,7 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
+import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -109,6 +110,7 @@ async function runUpscale(
     const detected = await resolveOutputFormat(input, filename);
     format = detected.format === "jpeg" ? "jpg" : detected.format;
   }
+  await assertSingleFrameFor(input, format);
 
   const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
   const pythonFormat = needsNodeConversion ? "png" : format;
@@ -159,6 +161,7 @@ async function runUpscale(
       width: result.width,
       height: result.height,
       method: result.method,
+      ...(result.inputResizedTo ? { inputResizedTo: result.inputResizedTo } : {}),
     },
   };
 }

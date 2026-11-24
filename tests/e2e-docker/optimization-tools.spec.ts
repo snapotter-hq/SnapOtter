@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
+import { settleToolResponse } from "./settle-tool-response.js";
 
 // ─── Optimization Tools ────────────────────────────────────────────
 // Tests for: optimize-for-web (extended options), bulk-rename (patterns),
@@ -820,15 +821,16 @@ test.describe("Content-Aware Resize: extended", () => {
         settings: JSON.stringify({ width: 150, height: 150 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
       expect(body.processedSize).toBeGreaterThan(0);
     }
@@ -842,15 +844,16 @@ test.describe("Content-Aware Resize: extended", () => {
         settings: JSON.stringify({ width: 80, height: 80 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
     }
   });
@@ -863,15 +866,16 @@ test.describe("Content-Aware Resize: extended", () => {
         settings: JSON.stringify({ width: 300, height: 300 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
     }
   });
@@ -888,15 +892,16 @@ test.describe("Content-Aware Resize: HEIC & edge cases", () => {
         settings: JSON.stringify({ width: 150, height: 120 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
     }
   });
@@ -909,15 +914,16 @@ test.describe("Content-Aware Resize: HEIC & edge cases", () => {
         settings: JSON.stringify({ width: 40, height: 40 }),
       },
     });
-    if (res.status() === 503) {
-      const body = await res.json();
+    const settled = await settleToolResponse(request, res, token);
+    if (settled.status === 503) {
+      const body = settled.body;
       expect(body.code).toBe("ENGINE_UNAVAILABLE");
-    } else if (res.status() === 501) {
-      const body = await res.json();
+    } else if (settled.status === 501) {
+      const body = settled.body;
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      expect(settled.status).toBe(200);
+      const body = settled.body;
       expect(body.downloadUrl).toBeTruthy();
     }
   });

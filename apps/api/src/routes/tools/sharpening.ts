@@ -40,7 +40,7 @@ export function registerSharpening(app: FastifyInstance) {
         // sharpen, median and convolve sample neighbouring rows. Run over Sharp's
         // stacked frame strip they reach into the next frame and leave a halo
         // along every frame edge, so animation goes a frame at a time (#1083).
-        const core = async (source: Buffer): Promise<Buffer> => {
+        const core = async (source: Buffer, format = outputFormat): Promise<Buffer> => {
           let image = sharp(source);
 
           image = await sharpenAdvanced(image, {
@@ -63,18 +63,14 @@ export function registerSharpening(app: FastifyInstance) {
           // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
           // values >= 1.0 clamp to white. Materialising through PNG casts back to
           // 8-bit uchar first (#2586).
-          const finalImage =
-            outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
-          return await finalImage
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          const finalImage = format.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+          return await finalImage.toFormat(format.format, format.encoderOptions).toBuffer();
         };
 
         let buffer: Buffer;
         try {
           buffer =
-            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
-            (await core(inputBuffer));
+            (await runPerFrame(inputBuffer, outputFormat, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }

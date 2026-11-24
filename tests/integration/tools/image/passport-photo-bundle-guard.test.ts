@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // ── Isolated DATA_DIR (must be set before any feature-status import) ──
 const testRoot = join(tmpdir(), `snapotter-passport-guard-${randomUUID()}`);
@@ -29,6 +29,8 @@ mkdirSync(join(aiDir, "models"), { recursive: true });
 writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
 
 // ── Dynamic imports (after env is set) ───────────────────────────────
+const { initDispatcher, shutdownDispatcher } = await import("@snapotter/ai");
+const { routeAiLogsToPino } = await import("../../../../apps/api/src/lib/ai-log-sink.js");
 const { invalidateCache } = await import("../../../../apps/api/src/lib/feature-status.js");
 const { fixtures, readFixture } = await import("../../../fixtures/index.js");
 const { buildTestApp, createMultipartPayload, loginAsAdmin } = await import("../../test-server.js");
@@ -63,6 +65,16 @@ async function postAnalyze() {
   });
 }
 
+// The both-bundles case spawns the persistent Python dispatcher, which keeps
+// printing startup lines after the request has already failed. Through the
+// console those reach vitest's RPC channel, and one still in flight at worker
+// shutdown fails the shard with "Closing rpc while onUserConsoleLog was
+// pending" (#5093). Pino writes to stdout directly, as the real server does.
+routeAiLogsToPino();
+// A missing Python reports through console.error, a started one through
+// console.log, so the pin below watches every method aiLog's default uses.
+const consoleSpies = (["log", "warn", "error"] as const).map((method) => vi.spyOn(console, method));
+
 beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
@@ -70,6 +82,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  shutdownDispatcher();
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
 });
@@ -103,6 +116,14 @@ describe("passport-photo feature guard (#327)", () => {
     // succeeds (200) or fails downstream in the sidecar (422), but never 501.
     expect(res.statusCode).not.toBe(501);
     expect([200, 422]).toContain(res.statusCode);
+
+    // Wait for the dispatcher to come up or fail so its startup lines have
+    // been logged, then check none of them went through the console.
+    await initDispatcher();
+    const aiConsoleLines = consoleSpies
+      .flatMap((spy) => spy.mock.calls)
+      .filter(([line]) => /^\[(bridge|python)\]/.test(String(line)));
+    expect(aiConsoleLines).toEqual([]);
   }, 60_000);
 
   it("base route also reports face-detection when only background-removal is installed", async () => {

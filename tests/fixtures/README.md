@@ -33,6 +33,7 @@ tests/fixtures/
   audio/
     valid/            # TTS speech (wav/flac/ogg/m4a/aac/opus), tagged MP3
     formats/          # tiny.{mp3,wav,flac,...}, tone-stereo, tone-gap
+    edge/             # speech.ogg with a zero-length Vorbis packet (PyAV rejects it)
     hostile/          # Zero-byte WAV
   document/
     valid/            # PDFs (3-page, 6-page, encrypted, OCR-scanned)

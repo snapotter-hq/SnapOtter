@@ -206,6 +206,33 @@ export function HtmlToImageSettings() {
         {store.capturing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {store.capturing ? ts.capturing : ts.submit}
       </button>
+
+      {store.capturing && store.queued && (
+        <div className="space-y-2">
+          {store.progress !== null && (
+            <div
+              role="progressbar"
+              aria-label={ts.capturing}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(store.progress)}
+              className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, Math.max(0, store.progress))}%` }}
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => store.cancel()}
+            className="w-full rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            {t.common.cancel}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

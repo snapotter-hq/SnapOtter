@@ -25,8 +25,17 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
+import {
+  acceptedJobId,
+  followQueuedJob,
+  QueuedJobFailed,
+  QueuedJobStalled,
+} from "@/lib/follow-queued-job";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
+import { failedFrameMessage } from "@/lib/progress-frames";
+import { safeRandomUUID } from "@/lib/uuid";
 import { useFileStore } from "@/stores/file-store";
 import {
   type AnalyzeResult,
@@ -496,7 +505,14 @@ export function PassportPhotoSettings() {
     });
 
     const controller = new AbortController();
-    const run = beginPassportGenerateRun(() => controller.abort());
+    // Until the answer is read, the server may already have queued the job,
+    // and a cancel sent at the stop could land before the route stamps its
+    // alias (#886). A stop then leaves the request open, and the check after
+    // the answer cancels a 202 by clientJobId (#5115).
+    let awaitingAnswer = false;
+    const run = beginPassportGenerateRun(() => {
+      if (!awaitingAnswer) controller.abort();
+    });
     const targetAnalysis = analyzeResult;
     const isCurrent = () =>
       run.isCurrent() &&
@@ -506,6 +522,12 @@ export function PassportPhotoSettings() {
     setGenerating(true);
     setGenerateError(null);
     setGenerateResult(null);
+    // Names the job before the server answers. A 202 body names the stream to
+    // follow; this id is the fallback when it doesn't.
+    const clientJobId = safeRandomUUID();
+    // Set while the server holds a queued job this run is following, so a run
+    // that stops following it (reset, a new file, a stall) cancels it.
+    let followedJobId: string | null = null;
 
     try {
       const headers = formatHeaders({ "Content-Type": "application/json" });
@@ -525,8 +547,10 @@ export function PassportPhotoSettings() {
         ...(isCustom && customHeightMm ? { customHeightMm } : {}),
         imageWidth: analyzeResult.imageWidth,
         imageHeight: analyzeResult.imageHeight,
+        clientJobId,
       };
 
+      awaitingAnswer = true;
       const response = await fetch(appUrl("/api/v1/tools/image/passport-photo/generate"), {
         method: "POST",
         headers,
@@ -560,22 +584,54 @@ export function PassportPhotoSettings() {
         );
       }
 
-      const raw = await response.json().catch((err: unknown) => {
+      let raw = await response.json().catch((err: unknown) => {
         if (err instanceof SyntaxError) return null;
         throw err;
       });
-      if (!isCurrent()) return;
+      awaitingAnswer = false;
+      if (!isCurrent()) {
+        if (response.status === 202) void cancelAbandonedJob(clientJobId, "passport-photo");
+        return;
+      }
+      // The generate job outlasted the sync window: the server queued it and
+      // the result arrives on the job's progress stream.
+      if (response.status === 202) {
+        followedJobId = acceptedJobId(raw) ?? clientJobId;
+        raw = await followQueuedJob(followedJobId, controller.signal, () => {});
+        followedJobId = null;
+        if (!isCurrent()) return;
+      }
       const result = resolveServerUrls(raw);
       if (!isGenerateResult(result)) {
         throw new Error(t.errors.invalidServerResponse);
       }
       setGenerateResult(result);
     } catch (err) {
+      // A failed frame settled the job; anything else left it running with
+      // nobody to collect it.
+      if (followedJobId && !(err instanceof QueuedJobFailed)) {
+        void cancelAbandonedJob(followedJobId, "passport-photo");
+      }
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
+      if (err instanceof QueuedJobFailed) {
+        setGenerateError(
+          failedFrameMessage(
+            err.frame,
+            t.toolSettings["passport-photo"].photoGenerationFailed,
+            t.errors.canceled,
+          ),
+        );
+        return;
+      }
+      if (err instanceof QueuedJobStalled) {
+        setGenerateError(t.errors.jobTrackingFailed);
+        return;
+      }
       setGenerateError(
         userErrorMessage(t, err, t.toolSettings["passport-photo"].photoGenerationFailed),
       );
     } finally {
+      awaitingAnswer = false;
       run.end();
       if (run.isCurrent()) {
         setGenerating(false);
