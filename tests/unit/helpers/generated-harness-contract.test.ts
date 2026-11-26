@@ -49,6 +49,14 @@ describe("generated QA harness contract", () => {
     expect(text).not.toMatch(/&& !REQUIRE_AI_FEATURES\)/);
   });
 
+  // #5206: the image format matrix must leave optional-bundle-only tools to
+  // the per-request 501 handling instead of skipping the whole tool.
+  it("image format matrix gates optional-bundle-only tools per request, not per tool", () => {
+    const text = source("format-matrix-generated.shared.ts");
+    expect(text).toContain("PER_REQUEST_AI_GATED_TOOLS");
+    expect(text).toMatch(/!PER_REQUEST_AI_GATED_TOOLS\.has\(toolId\)/);
+  });
+
   it("multimodal matrix consumes the shared image-inclusive fixture index", () => {
     const text = source("format-matrix-multimodal.test.ts");
     expect(text).toContain("generatedFixtureDirectories");

@@ -226,6 +226,15 @@ export function featureUnavailableDisposition({
   return "skip";
 }
 
+/**
+ * AI tools whose only bundle is optional and needed by some settings, not by
+ * the tool. smart-crop needs face-detection for mode "face" alone; subject and
+ * trim are plain Sharp. A matrix that skips requiredAiGate for these must
+ * handle a 501 per request, so each case that needs the bundle meets it on its
+ * own (#5206).
+ */
+export const PER_REQUEST_AI_GATED_TOOLS: ReadonlySet<string> = new Set(["smart-crop"]);
+
 export type RequiredAiGate =
   | { kind: "run" }
   | { kind: "skip"; reason: string }

@@ -1,9 +1,15 @@
+import {
+  getOptionalBundleForTool,
+  getRequiredBundlesForTool,
+  PYTHON_SIDECAR_TOOLS,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isEngineUnavailableFailure,
   isRecordedRejection,
+  PER_REQUEST_AI_GATED_TOOLS,
   requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 
@@ -273,4 +279,22 @@ describe("requiredAiGate", () => {
     expect(gate.kind).toBe("fail");
     expect(gate.kind === "fail" && gate.reason).toContain("DATA_DIR=(unset)");
   });
+});
+
+// #5206: a whole-tool AI gate skips every case of a tool whose only bundle is
+// optional, so smart-crop's plain-Sharp modes never ran. A member must still be
+// a sidecar tool, so its bundle-needing settings meet the per-request 501 path.
+describe("PER_REQUEST_AI_GATED_TOOLS", () => {
+  it("holds smart-crop", () => {
+    expect(PER_REQUEST_AI_GATED_TOOLS.has("smart-crop")).toBe(true);
+  });
+
+  it.each([...PER_REQUEST_AI_GATED_TOOLS])(
+    "%s is a sidecar tool with an optional bundle and no required one",
+    (toolId) => {
+      expect(PYTHON_SIDECAR_TOOLS as readonly string[]).toContain(toolId);
+      expect(getRequiredBundlesForTool(toolId)).toEqual([]);
+      expect(getOptionalBundleForTool(toolId)).not.toBeNull();
+    },
+  );
 });

@@ -10,6 +10,7 @@ import {
   featureUnavailableDisposition,
   GeneratedCaseAccounting,
   isRecordedRejection,
+  PER_REQUEST_AI_GATED_TOOLS,
   requiredAiGate,
 } from "../../helpers/generated-case-accounting.js";
 import { formatMatrixPositiveControl } from "../../helpers/generated-fixtures.js";
@@ -162,7 +163,10 @@ export function registerToolFormatMatrix(part: number): void {
         continue;
       }
       it(`${toolId} handles every input format cleanly`, async (context) => {
-        if ((PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId)) {
+        if (
+          (PYTHON_SIDECAR_TOOLS as readonly string[]).includes(toolId) &&
+          !PER_REQUEST_AI_GATED_TOOLS.has(toolId)
+        ) {
           const aiGate = requiredAiGate(toolId, {
             requireAiFeatures: REQUIRE_AI_FEATURES,
             firstMissingBundle: getFirstMissingBundleForTool,
