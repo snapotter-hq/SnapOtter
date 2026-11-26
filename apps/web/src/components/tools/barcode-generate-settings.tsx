@@ -85,10 +85,7 @@ export function BarcodeGenerateSettings() {
     try {
       const res = await fetch(appUrl("/api/v1/tools/image/barcode-generate"), {
         method: "POST",
-        headers: {
-          ...formatHeaders(),
-          "Content-Type": "application/json",
-        },
+        headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ text: text.trim(), type, scale, includeText }),
         signal: controller.signal,
       });
