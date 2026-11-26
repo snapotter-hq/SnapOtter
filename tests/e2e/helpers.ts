@@ -327,6 +327,20 @@ export async function openSettings(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline step settings: /pipeline/save validates each step against the
+// tool's schema, so a step left at its form defaults is rejected with a 400
+// and the save form stays open. Both helpers act on the just-added step,
+// which is the one the builder auto-expands.
+// ---------------------------------------------------------------------------
+export async function giveResizeStepWidth(page: Page, width = "150"): Promise<void> {
+  await page.locator("#resize-width").fill(width);
+}
+
+export async function chooseCompressQuality(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Quality", exact: true }).click();
+}
+
+// ---------------------------------------------------------------------------
 // compressToSlider(): run compress on the test image and return the
 // before/after slider, failing if it never mounts (#1896)
 // ---------------------------------------------------------------------------
