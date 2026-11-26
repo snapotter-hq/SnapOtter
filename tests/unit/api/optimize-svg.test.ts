@@ -172,7 +172,8 @@ describe("optimize-svg", () => {
     } finally {
       clearInterval(ticker);
     }
-    expect(worstGapMs).toBeLessThan(200);
+    // Loaded CI runners add scheduling jitter (260 ms seen); the sync stall is over a second.
+    expect(worstGapMs).toBeLessThan(700);
   });
 
   it("optimizes an SVG larger than the old 2 MB cap", async () => {
