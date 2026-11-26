@@ -520,9 +520,10 @@ jobs:
     runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     env:
       PLAYWRIGHT_RUN_ID: e2e-docs
-      # Site builds need more heap than a memory-capped fleet runner's
-      # default (#4965); 4 GB matches an uncapped hosted runner.
-      NODE_OPTIONS: --max-old-space-size=4096
+      # The docs build outgrew 4 GB (#5261): about 3,950 pages across 21
+      # locales. It passes at 5 GB (peak RSS 4.8 GB), so 6 GB leaves headroom
+      # and still fits the fleet runners' 7 GB cgroup cap (#4965).
+      NODE_OPTIONS: --max-old-space-size=6144
     # vitepress build renders ~3,800 pages and then runs Pagefind over them,
     # which the config allows up to 10 minutes for on a loaded machine. The
     # extra 10 is degraded-apt-mirror headroom (#876).

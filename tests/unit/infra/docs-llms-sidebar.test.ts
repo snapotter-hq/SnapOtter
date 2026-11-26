@@ -94,6 +94,26 @@ describe("llms.txt and llms-full.txt contents", () => {
     );
   });
 
+  // #5261: ignoreFilesPerOutput only filters what each output lists. The plugin
+  // still collected all 21 locales in memory and wrote a .md copy of each, which
+  // pushed `vitepress build` past a 4 GB heap. Top-level ignoreFiles skips them
+  // before they are collected.
+  it("skips the translated trees before the plugin collects them", async () => {
+    const helper = await loadHelper();
+    expect(helper.llmsIgnoreFiles(["de", "zh-CN"])).toEqual(["de/**", "zh-CN/**"]);
+    expect(config).toMatch(/ignoreFiles:\s*llmsIgnoreFiles\(NON_EN\.map\(\(l\) => l\.code\)\)/);
+  });
+
+  it("gives the docs build 6 GB of heap in CI and in the deploy", () => {
+    const ci = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+    const e2eDocs = ci.slice(ci.indexOf("  test-e2e-docs:"));
+    expect(e2eDocs.slice(0, e2eDocs.indexOf("    steps:"))).toContain(
+      "NODE_OPTIONS: --max-old-space-size=6144",
+    );
+    const deploy = readFileSync(resolve(root, ".github/workflows/deploy-docs.yml"), "utf8");
+    expect(deploy).toContain("NODE_OPTIONS: --max-old-space-size=6144");
+  });
+
   it("strips explicit heading ids from titles and headings only", async () => {
     const helper = await loadHelper();
     const input = [
