@@ -23,7 +23,7 @@ describe("optimize-svg landing SEO copy (#5055)", () => {
     ].join(" ");
     expect(copy).toMatch(/compress svg/i);
     expect(copy).toMatch(/\.svgz/);
-    expect(copy).toMatch(/2 MB/);
+    expect(copy).toMatch(/10 MB/);
   });
 
   it("keeps dashes out of the visible copy", () => {

@@ -5762,7 +5762,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
       {
         q: "Is there a file size limit?",
-        a: "SVGs are limited to 2 MB after inflation. A larger file is rejected with a clear error rather than stalling the server.",
+        a: "SVGs are limited to 10 MB after inflation. A larger file is rejected with a clear error rather than stalling the server.",
       },
     ],
   },
