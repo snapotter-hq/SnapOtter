@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, isAiSidecarRunning, test } from "./helpers";
+import { expect, isAiSidecarRunning, mockAllAiFeaturesInstalled, test } from "./helpers";
 
 function fixturePath(name: string): string {
   return path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
@@ -15,6 +15,10 @@ async function uploadFile(page: import("@playwright/test").Page, filePath: strin
 }
 
 test.describe("AI Canvas Expand", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAllAiFeaturesInstalled(page);
+  });
+
   test("standalone /ai-canvas-expand route loads", async ({ loggedInPage: page }) => {
     await page.goto("/image/ai-canvas-expand");
 

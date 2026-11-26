@@ -1,5 +1,5 @@
 import { TOOLS } from "@snapotter/shared";
-import { expect, openSettings, test, uploadTestImage } from "./helpers";
+import { expect, mockAllAiFeaturesInstalled, openSettings, test, uploadTestImage } from "./helpers";
 
 // Tool routes are section-prefixed at runtime (/<section>/<toolId>); resolve the
 // real route from the shared catalog rather than the bare id.
@@ -333,6 +333,10 @@ const NO_DROPZONE_TOOLS = [
 ];
 
 test.describe("Tool Page - Common Structure (Dropzone Tools)", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAllAiFeaturesInstalled(page);
+  });
+
   for (const tool of DROPZONE_TOOLS) {
     test(`${tool.name} (/${tool.id}) shows tool name and dropzone`, async ({
       loggedInPage: page,

@@ -1,6 +1,12 @@
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import {
+  expect,
+  mockAllAiFeaturesInstalled,
+  test,
+  uploadTestImage,
+  waitForProcessing,
+} from "./helpers";
 
 // Settings panels (and their submit buttons) mount only after a file is
 // uploaded. uploadTestImage handles PNGs; svg-to-raster and pdf-to-image need
@@ -48,6 +54,10 @@ test.describe("GUI Expanded Tool Coverage", () => {
   // AI CANVAS EXPAND (0 tests previously -- full coverage)
   // ========================================================================
   test.describe("AI Canvas Expand", () => {
+    test.beforeEach(async ({ page }) => {
+      await mockAllAiFeaturesInstalled(page);
+    });
+
     test("renders tool page with dropzone", async ({ loggedInPage: page }) => {
       await page.goto("/image/ai-canvas-expand");
       await expect(page.getByText("Canvas Expand").first()).toBeVisible();

@@ -9,6 +9,7 @@ import {
   type Page,
   type PageAssertionsToHaveScreenshotOptions,
 } from "@playwright/test";
+import { FEATURE_BUNDLES } from "@snapotter/shared";
 
 // ---------------------------------------------------------------------------
 // login(): fill the login form and submit (for tests that need fresh login)
@@ -176,6 +177,20 @@ export async function mockAiFeaturesInstalled(
         })),
       }),
     }),
+  );
+}
+
+// Report every shipped AI bundle as installed. Specs that drive AI tool pages
+// (the test image carries no bundles) call this in beforeEach instead of
+// listing bundles one by one.
+export async function mockAllAiFeaturesInstalled(page: Page): Promise<void> {
+  await mockAiFeaturesInstalled(
+    page,
+    Object.values(FEATURE_BUNDLES).map((b) => ({
+      id: b.id,
+      name: b.name,
+      enablesTools: b.enablesTools,
+    })),
   );
 }
 
