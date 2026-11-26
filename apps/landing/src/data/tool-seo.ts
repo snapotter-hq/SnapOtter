@@ -5729,6 +5729,43 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "optimize-svg": {
+    searchTitle: "Compress SVG Online - Optimize and Minify SVG Files",
+    longDescription:
+      "Compress SVG files without turning them into bitmaps. Optimize SVG runs svgo over your file to strip editor metadata, comments and redundant attributes, round coordinates to the precision you choose, and run multiple passes until nothing more can be saved. The result stays a clean, scalable SVG.",
+    useCases: [
+      "Compress SVG logos and icons exported from Figma, Illustrator or Inkscape before shipping them",
+      "Cut the size of SVG sprites and illustrations that slow down a page",
+      "Strip editor metadata and comments from SVGs before publishing",
+      "Unpack an .svgz file into a minified plain SVG",
+    ],
+    features: [
+      "Minify SVG with svgo and keep the output as vector",
+      "Adjustable coordinate precision from 0 to 8 decimal places",
+      "Multipass mode that repeats until the file stops shrinking",
+      "Optional metadata and comment removal",
+      "Readable indented output when you need to diff or edit the file",
+      "Accepts .svg and .svgz, with the viewBox and title always kept",
+    ],
+    faqs: [
+      {
+        q: "How do I compress an SVG without losing quality?",
+        a: "Upload the file and keep the defaults. Optimize SVG removes metadata, comments and redundant attributes, and rounds numbers to three decimals, which is invisible at normal sizes. The file stays a vector, so it still scales to any size.",
+      },
+      {
+        q: "Will optimizing break my SVG's scaling or accessibility?",
+        a: "No. The viewBox and the title element are always kept, so the graphic scales the same way and screen readers still get its name.",
+      },
+      {
+        q: "What does the precision setting do?",
+        a: "It sets how many decimal places are kept in path data and numbers. Lower values give smaller files with slightly coarser curves. The default of 3 is safe for most artwork, and icons often survive 1 or 2.",
+      },
+      {
+        q: "Is there a file size limit?",
+        a: "SVGs are limited to 10 MB after inflation. A larger file is rejected with a clear error rather than stalling the server.",
+      },
+    ],
+  },
   vectorize: {
     searchTitle: "Convert Image to SVG - Vectorize Raster Images",
     longDescription:
