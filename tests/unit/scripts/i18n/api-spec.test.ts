@@ -202,6 +202,47 @@ describe("api-spec adapter write/load round-trip", () => {
     expect(got?.stale).toBe(true);
   });
 
+  it("keeps existing locale text for a unit that has no entry (#5012)", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const localized = structuredClone(FIXTURE) as typeof FIXTURE & Record<string, unknown>;
+    localized.info.description = "Vorhandener Text ohne Stempel.";
+    localized["x-i18n"] = { locale: "de", entries: {} };
+    writeFileSync(join(dir, "openapi.de.yaml"), yaml.dump(localized, { lineWidth: -1 }), "utf8");
+
+    const entry = {
+      text: "Groesse aendern",
+      sourceHash: hash("Resize"),
+      provenance: "machine" as const,
+      outputHash: hash("Groesse aendern"),
+    };
+    await adapter.write("de", new Map([["paths./api/v1/tools/image/resize.post.summary", entry]]));
+
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
+    const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
+    expect(written.paths["/api/v1/tools/image/resize"].post.summary).toBe("Groesse aendern");
+    expect(written.info.description).toBe("Vorhandener Text ohne Stempel.");
+    // Still unstamped, so the next export offers it for translation.
+    expect(written["x-i18n"].entries["info.description"]).toBeUndefined();
+  });
+
+  it("render() returns exactly what write() puts on disk", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const entries = new Map([
+      [
+        "tags.Tools.description",
+        {
+          text: "Werkzeuge",
+          sourceHash: hash("Tag prose to translate."),
+          provenance: "machine" as const,
+          outputHash: hash("Werkzeuge"),
+        },
+      ],
+    ]);
+    const rendered = adapter.render("de", entries);
+    await adapter.write("de", entries);
+    expect(readFileSync(join(dir, "openapi.de.yaml"), "utf8")).toBe(rendered);
+  });
+
   it("load() returns an empty Map when the locale spec is absent", async () => {
     const adapter = makeApiSpecAdapter({ dir });
     const loaded = await adapter.load("fr");

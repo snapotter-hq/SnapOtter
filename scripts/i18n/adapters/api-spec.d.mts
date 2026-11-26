@@ -19,6 +19,7 @@ export interface ApiSpecEntry {
 export interface ApiSpecAdapter {
   name: "api";
   extract(): Promise<ApiSpecUnit[]>;
+  render(locale: string, entries: Map<string, ApiSpecEntry>): string;
   write(locale: string, entries: Map<string, ApiSpecEntry>): Promise<void>;
   load(locale: string): Promise<Map<string, ApiSpecEntry>>;
 }
