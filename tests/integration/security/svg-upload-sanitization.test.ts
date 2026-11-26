@@ -182,6 +182,21 @@ describe("an SVG over the element cap is rejected, not stored", () => {
   }
 });
 
+describe("an SVG declaring an encoding other than UTF-8 is rejected, not stored", () => {
+  const SHIFT_JIS_SVG = Buffer.from(
+    '<?xml version="1.0" encoding="Shift_JIS"?><svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>',
+  );
+  for (const url of ["/api/v1/upload", "/api/v1/files/upload"]) {
+    it(`returns 400 with the encoding reason from ${url}`, async () => {
+      const res = await upload(url, "shift-jis.svg", SHIFT_JIS_SVG);
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toMatch(/UTF-8/);
+      expect(body).not.toHaveProperty("files");
+    });
+  }
+});
+
 function uploadDirs(): Set<string> {
   const root = path.join(env.WORKSPACE_PATH, "outputs");
   try {

@@ -179,6 +179,78 @@ describe("decompressSvgz", () => {
   });
 });
 
+describe("sanitizeSvg: character encodings other than UTF-8", () => {
+  const ENCODING_MESSAGE = "SVG must be encoded as UTF-8";
+  const RECT = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>';
+
+  it.each([
+    ["ISO-2022-JP", '<?xml version="1.0" encoding="ISO-2022-JP"?>'],
+    ["Shift_JIS in single quotes", "<?xml version='1.0' encoding='Shift_JIS'?>"],
+    ["windows-1252 with spaces round the =", '<?xml version="1.0" encoding = "windows-1252"?>'],
+    ["UTF-16", '<?xml version="1.0" encoding="UTF-16"?>'],
+    ["an empty name", '<?xml version="1.0" encoding=""?>'],
+    ["UTF-8 and then another name", '<?xml version="1.0" encoding="UTF-8" encoding="EUC-JP"?>'],
+  ])("refuses a declaration naming %s", (_label, declaration) => {
+    expect(() => sanitizeSvg(Buffer.from(declaration + RECT, "latin1"))).toThrow(ENCODING_MESSAGE);
+  });
+
+  it.each([
+    [
+      "a UTF-16LE byte order mark",
+      Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(RECT, "utf16le")]),
+    ],
+    [
+      "a UTF-16BE byte order mark",
+      Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(RECT, "utf16le").swap16()]),
+    ],
+    ["UTF-16LE with no byte order mark", Buffer.from(`<?xml version="1.0"?>${RECT}`, "utf16le")],
+    ["UTF-32BE with no byte order mark", Buffer.from([0, 0, 0, 0x3c, 0, 0, 0, 0x3f])],
+    ["the EBCDIC form of <?xm", Buffer.from([0x4c, 0x6f, 0xa7, 0x94, 0x93, 0x40])],
+  ])("refuses %s", (_label, input) => {
+    expect(() => sanitizeSvg(input)).toThrow(ENCODING_MESSAGE);
+  });
+
+  it("refuses a declaration that removing an element completes", () => {
+    const input = `<<script></script>?xml version="1.0" encoding="ISO-2022-JP"?>${RECT}`;
+    expect(() => sanitizeSvg(Buffer.from(input))).toThrow(ENCODING_MESSAGE);
+  });
+
+  it("refuses a document that removing an element leaves starting with NUL bytes", () => {
+    const input = Buffer.concat([
+      Buffer.from("<script></script>"),
+      Buffer.from([0, 0, 0, 0x3c, 0, 0, 0, 0x73]),
+    ]);
+    expect(() => sanitizeSvg(input)).toThrow(ENCODING_MESSAGE);
+  });
+
+  it("rejects with a 400", () => {
+    const input = Buffer.from(`<?xml version="1.0" encoding="EUC-KR"?>${RECT}`);
+    let caught: unknown;
+    try {
+      sanitizeSvg(input);
+    } catch (err) {
+      caught = err;
+    }
+    expect((caught as { statusCode?: number }).statusCode).toBe(400);
+    expect(isSvgClientError(caught)).toBe(true);
+  });
+
+  it.each([
+    ["no declaration", RECT],
+    ["UTF-8", `<?xml version="1.0" encoding="UTF-8"?>${RECT}`],
+    ["lower-case utf-8 in single quotes", `<?xml version='1.0' encoding='utf-8'?>${RECT}`],
+    ["US-ASCII", `<?xml version="1.0" encoding="US-ASCII"?>${RECT}`],
+    ["a declaration with no encoding", `<?xml version="1.0" standalone="no"?>${RECT}`],
+    ["a UTF-8 byte order mark", `\ufeff<?xml version="1.0" encoding="UTF-8"?>${RECT}`],
+    [
+      "an encoding name in text",
+      '<svg xmlns="http://www.w3.org/2000/svg"><text>encoding="ISO-8859-1"</text></svg>',
+    ],
+  ])("accepts %s unchanged", (_label, input) => {
+    expect(sanitizeSvg(Buffer.from(input)).toString("utf-8")).toBe(input);
+  });
+});
+
 describe("isSvgBuffer", () => {
   it("returns true for buffer starting with <svg", () => {
     const input = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
