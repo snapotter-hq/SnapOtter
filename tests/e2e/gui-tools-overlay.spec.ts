@@ -337,6 +337,107 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.locator("#text-overlay-position")).toHaveValue("top");
       await expect(page.getByTestId("text-overlay-box")).toBeVisible();
     });
+
+    // The default test image is 100x100, too small to drag on or to see a resize, so the
+    // draggable-box tests upload an 800x500 scene instead.
+    async function uploadScene(page: Page): Promise<void> {
+      const chooser = page.waitForEvent("filechooser");
+      await page
+        .getByRole("button", { name: /upload from computer/i })
+        .first()
+        .click();
+      await (await chooser).setFiles(
+        path.join(process.cwd(), "tests", "fixtures", "image", "valid", "test-scene.png"),
+      );
+      await expect(page.getByTestId("text-overlay-box")).toBeVisible();
+    }
+
+    test("dragging the box switches to a custom position and moves the sliders", async ({
+      loggedInPage: page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/image/text-overlay");
+      await uploadScene(page);
+
+      const box = page.getByTestId("text-overlay-box");
+      const preview = page.getByAltText(en.toolSettings["text-overlay"].previewImage);
+      // The tool defaults to the bottom preset; centre gives a known 50/50 start.
+      await page.locator("#text-overlay-position").selectOption("center");
+      await expect(page.locator("#text-overlay-x")).toHaveCount(0);
+
+      const before = await box.boundingBox();
+      const image = await preview.boundingBox();
+      if (!before || !image) throw new Error("preview or box has no layout");
+      const startX = before.x + before.width / 2;
+      const startY = before.y + before.height / 2;
+      const dx = image.width * 0.2;
+      const dy = image.height * 0.2;
+
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + dx / 2, startY + dy / 2, { steps: 5 });
+      await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+      await page.mouse.up();
+
+      await expect(page.locator("#text-overlay-position")).toHaveValue("custom");
+      // The centre starts at 50%, so a 20% drag lands near 70%. The value is rounded to a whole
+      // percent and clamped inside the image, hence the band.
+      const x = page.locator("#text-overlay-x");
+      const y = page.locator("#text-overlay-y");
+      await expect.poll(async () => Number(await x.inputValue())).toBeGreaterThan(65);
+      await expect.poll(async () => Number(await x.inputValue())).toBeLessThan(75);
+      await expect.poll(async () => Number(await y.inputValue())).toBeGreaterThan(65);
+      await expect.poll(async () => Number(await y.inputValue())).toBeLessThan(75);
+
+      const after = await box.boundingBox();
+      if (!after) throw new Error("box has no layout after the drag");
+      expect(after.x).toBeGreaterThan(before.x + dx * 0.8);
+      expect(after.y).toBeGreaterThan(before.y + dy * 0.8);
+
+      await page.getByTestId("text-overlay-submit").click();
+      await waitForProcessing(page);
+      await expect(page.getByTestId("text-overlay-download")).toBeVisible({ timeout: 15_000 });
+    });
+
+    test("arrow keys nudge the box and switch to a custom position", async ({
+      loggedInPage: page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/image/text-overlay");
+      await uploadScene(page);
+
+      await page.locator("#text-overlay-position").selectOption("center");
+      await page.getByTestId("text-overlay-box").focus();
+      await page.keyboard.press("Shift+ArrowRight");
+
+      await expect(page.locator("#text-overlay-position")).toHaveValue("custom");
+      await expect(page.locator("#text-overlay-x")).toHaveValue("60");
+      await expect(page.locator("#text-overlay-y")).toHaveValue("50");
+    });
+
+    test("the preview text keeps its proportion to the image when the window resizes", async ({
+      loggedInPage: page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/image/text-overlay");
+      await uploadScene(page);
+
+      const box = page.getByTestId("text-overlay-box");
+      const preview = page.getByAltText(en.toolSettings["text-overlay"].previewImage);
+      const measure = async () => {
+        const width = (await preview.boundingBox())?.width ?? 0;
+        const fontPx = Number.parseFloat(await box.evaluate((el) => getComputedStyle(el).fontSize));
+        return { width, ratio: width > 0 ? fontPx / width : 0 };
+      };
+
+      const wide = await measure();
+      await page.setViewportSize({ width: 900, height: 700 });
+      // The image only shrinks if the layout reflowed, which keeps the ratio check honest.
+      await expect.poll(async () => (await measure()).width).toBeLessThan(wide.width - 20);
+      await expect
+        .poll(async () => Math.abs((await measure()).ratio - wide.ratio) / wide.ratio)
+        .toBeLessThan(0.02);
+    });
   });
 
   // ========================================================================
