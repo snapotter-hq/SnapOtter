@@ -174,6 +174,63 @@ describe("migrate-from-sqlite", () => {
 });
 
 /**
+ * New installs have no password rules, and migration 0014 pins the old ones
+ * only where users already exist. A 1.x import brings its users in after
+ * migrations ran, so the importer pins them itself (#5089).
+ */
+describe("migrate-from-sqlite (password policy of an imported install)", () => {
+  const policyDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-policy-"));
+
+  async function importWithSettings(
+    name: string,
+    settings: ReadonlyArray<[key: string, value: string]>,
+  ): Promise<Record<string, string>> {
+    const path = join(policyDir, `${name}.db`);
+    buildFixtureSqlite(path);
+    const s = new Database(path);
+    const insert = s.prepare('INSERT INTO settings ("key", value, updated_at) VALUES (?,?,?)');
+    for (const [key, value] of settings) insert.run(key, value, 1750000000);
+    s.close();
+    await truncateMigratedTables();
+    await migrateFromSqlite(path, { force: false });
+    const { rows } = await db.execute(
+      sql`SELECT key, value FROM settings WHERE key LIKE 'password%' ORDER BY key`,
+    );
+    return Object.fromEntries(rows.map((r) => [r.key as string, r.value as string]));
+  }
+
+  afterAll(async () => {
+    await truncateMigratedTables();
+  });
+
+  it("keeps the old default rules for an install that saved none", async () => {
+    expect(await importWithSettings("no-rules-saved", [])).toEqual({
+      passwordMinLength: "8",
+      passwordRequireDigit: "true",
+      passwordRequireLowercase: "true",
+      passwordRequireUppercase: "true",
+    });
+  });
+
+  it("keeps the rules the install saved, including the 2.0/2.1 digit alias", async () => {
+    expect(
+      await importWithSettings("rules-saved", [
+        ["passwordMinLength", "12"],
+        ["passwordRequireUppercase", "false"],
+        ["passwordRequireNumber", "false"],
+        ["passwordRequireSpecial", "true"],
+      ]),
+    ).toEqual({
+      passwordMinLength: "12",
+      passwordRequireDigit: "false",
+      passwordRequireLowercase: "true",
+      passwordRequireSpecial: "true",
+      passwordRequireUppercase: "false",
+    });
+  });
+});
+
+/**
  * Representative 1.x import: a more realistic SQLite database with multiple
  * rows, diverse type-conversion edge cases (booleans, timestamps, JSON
  * columns, NULLs), and all 10 tables populated.
@@ -613,7 +670,8 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
 
   it("settings: plain string values preserved as-is", async () => {
     const rows = (await db.execute(sql`SELECT * FROM settings ORDER BY key`)).rows;
-    expect(rows).toHaveLength(3);
+    // The three 1.x rows, plus the four password defaults an import pins.
+    expect(rows).toHaveLength(7);
     const cookie = rows.find((r) => r.key === "cookieSecret");
     expect(cookie?.value).toBe("super-secret-value");
     const maxUpload = rows.find((r) => r.key === "maxUploadSize");

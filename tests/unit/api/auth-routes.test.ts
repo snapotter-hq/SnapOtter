@@ -318,7 +318,33 @@ describe("computeKeyPrefix (additional coverage)", () => {
 
 const rulesOf = async (password: string) => (await validatePasswordStrength(password))?.rules ?? [];
 
-describe("validatePasswordStrength, default policy", () => {
+describe("validatePasswordStrength, default policy (new installs)", () => {
+  it("accepts any non-empty password", async () => {
+    for (const password of ["a", "password", "otter", "12345678", "        "]) {
+      expect(await validatePasswordStrength(password)).toBeNull();
+    }
+  });
+
+  it("still refuses an empty password, naming a minimum of 1", async () => {
+    expect(await validatePasswordStrength("")).toEqual({
+      rule: "minLength",
+      rules: ["minLength"],
+      message: "Password must be at least 1 character",
+      minLength: 1,
+    });
+  });
+});
+
+// Migration 0014 pinned these on installs that already had users, so they keep
+// enforcing exactly what the default used to be.
+describe("validatePasswordStrength, the policy existing installs keep", () => {
+  beforeEach(() => {
+    policy.values.set("passwordMinLength", "8");
+    policy.values.set("passwordRequireUppercase", "true");
+    policy.values.set("passwordRequireLowercase", "true");
+    policy.values.set("passwordRequireDigit", "true");
+  });
+
   it("accepts valid password", async () => {
     expect(await validatePasswordStrength("MyPass12")).toBeNull();
   });
@@ -496,25 +522,25 @@ describe("validatePasswordStrength, a changed policy (#2039)", () => {
   it("falls back to the default minimum for a stored value that isn't a number", async () => {
     policy.values.set("passwordMinLength", "lots");
 
-    expect((await validatePasswordStrength("Ab1"))?.minLength).toBe(8);
+    expect((await validatePasswordStrength(""))?.minLength).toBe(1);
+    expect(await validatePasswordStrength("a")).toBeNull();
   });
 
   it.each(["", "   ", "0", "-1", "129", "Infinity", "8.5"])(
-    "falls back to the default minimum of 8 when passwordMinLength is %j (#1713)",
+    "falls back to the default minimum of 1 when passwordMinLength is %j (#1713)",
     async (stored) => {
       policy.values.set("passwordMinLength", stored);
 
-      const failure = await validatePasswordStrength("Aa1");
-      expect(failure).toMatchObject({
+      expect(await validatePasswordStrength("")).toMatchObject({
         rule: "minLength",
         rules: ["minLength"],
-        minLength: 8,
+        minLength: 1,
       });
       expect(loggerWarn).toHaveBeenCalledWith(
         { key: "passwordMinLength", value: stored },
         "invalid numeric setting, using default",
       );
-      expect(await validatePasswordStrength("MyPass12")).toBeNull();
+      expect(await validatePasswordStrength("a")).toBeNull();
     },
   );
 

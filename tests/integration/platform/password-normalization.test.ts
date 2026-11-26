@@ -156,10 +156,15 @@ describe("a password set on one keyboard works from another", () => {
 
     it("is not met by a character that expands when normalized", async () => {
       // U+FDFA is one character and eighteen once normalized.
-      const res = await register("\ufdfaAa1");
+      await setSetting("passwordMinLength", "8");
+      try {
+        const res = await register("\ufdfaAa1");
 
-      expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+      } finally {
+        await clearSetting("passwordMinLength");
+      }
     });
 
     it("counts a letter typed as a base plus a combining mark as one character", async () => {

@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { DEFAULT_PASSWORD_MIN_LENGTH } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { closeDb, db, schema } from "../db/index.js";
@@ -117,7 +118,7 @@ export async function generateRecoveryPassword(): Promise<string> {
   const minLength = parseNumericSettingValue(
     "passwordMinLength",
     await getSettingStrict("passwordMinLength"),
-    8,
+    DEFAULT_PASSWORD_MIN_LENGTH,
   );
   const length = Math.max(DEFAULT_GENERATED_PASSWORD_LENGTH, minLength);
   const required = [
