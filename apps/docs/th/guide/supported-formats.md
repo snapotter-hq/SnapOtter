@@ -183,7 +183,7 @@ SnapOtter รองรับรูปแบบรูปภาพ 55+ รูป�
 | Ogg Vorbis | .ogg | สูญเสียคุณภาพ | รูปแบบเปิด |
 | Opus | .opus | สูญเสียคุณภาพ | สมัยใหม่, หน่วงเวลาต่ำ |
 | WMA | .wma | สูญเสียคุณภาพ | Windows Media Audio |
-| AIFF | .aiff | ไม่บีบอัด (PCM) | ไม่บีบอัดของ Apple |
+| AIFF | .aiff, .aif | ไม่บีบอัด (PCM) | ไม่บีบอัดของ Apple |
 | AMR | .amr | สูญเสียคุณภาพ | เสียงพูด / มือถือ |
 | AC-3 | .ac3 | สูญเสียคุณภาพ | Dolby Digital |
 

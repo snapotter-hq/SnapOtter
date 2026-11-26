@@ -59,10 +59,14 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   const { IMAGE_EXT_TO_MIME } = await vi.importActual<
     typeof import("../../../../packages/shared/src/image-mime.js")
   >("../../../../packages/shared/src/image-mime.js");
+  const { mimeForExt } = await vi.importActual<
+    typeof import("../../../../packages/shared/src/file-mime.js")
+  >("../../../../packages/shared/src/file-mime.js");
   vi.doMock("@snapotter/shared", () => ({
     ONBOARDING_FIRST_PROCESSED_KEY: "onboarding.firstProcessedAt",
     ...toolErrors,
     IMAGE_EXT_TO_MIME,
+    mimeForExt,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
     // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load, and
@@ -5521,6 +5525,7 @@ describe("contentTypeForFilename (#2703)", () => {
     ["clip.ogv", "video/ogg"],
     ["voice.opus", "audio/opus"],
     ["track.aiff", "audio/aiff"],
+    ["track.aif", "audio/aiff"],
     ["unknown.xyz", "application/octet-stream"],
     ["output", "application/octet-stream"],
     ["pdf", "application/octet-stream"],
@@ -5613,6 +5618,9 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
+    const { mimeForExt } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/file-mime.js")
+    >("../../../../packages/shared/src/file-mime.js");
 
     const workerMod = await loadWorker("", () => {
       vi.doMock("@snapotter/shared", () => ({
@@ -5623,6 +5631,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
+        mimeForExt,
         ANALYTICS_EVENTS: {},
         TOOLS,
         COMPRESS_PRESETS: [],
@@ -5669,6 +5678,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
+        mimeForExt,
         ANALYTICS_EVENTS: {},
         TOOLS: TOOLS.map((t) =>
           t.id === "adjust-colors" ? { ...t, executionHint: "long" as const } : t,
@@ -5706,6 +5716,9 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
+    const { mimeForExt } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/file-mime.js")
+    >("../../../../packages/shared/src/file-mime.js");
 
     const processV2Mock = vi.fn(async (ctx: { signal: AbortSignal }) => {
       await new Promise<void>((resolve, reject) => {
@@ -5740,6 +5753,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
+          mimeForExt,
           ANALYTICS_EVENTS: {},
           TOOLS,
           COMPRESS_PRESETS: [],
@@ -6148,6 +6162,9 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
       const { IMAGE_EXT_TO_MIME } = await vi.importActual<
         typeof import("../../../../packages/shared/src/image-mime.js")
       >("../../../../packages/shared/src/image-mime.js");
+      const { mimeForExt } = await vi.importActual<
+        typeof import("../../../../packages/shared/src/file-mime.js")
+      >("../../../../packages/shared/src/file-mime.js");
 
       const processV2Mock = vi.fn();
       const trackEventMock = vi.fn();
@@ -6165,6 +6182,7 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
           toolInputErrorCode,
           hasServerErrorStatus,
           IMAGE_EXT_TO_MIME,
+          mimeForExt,
           ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
           TOOLS,
           COMPRESS_PRESETS: [],
@@ -6351,6 +6369,9 @@ describe("tool_used fires once per job across retries (#4450)", () => {
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
+    const { mimeForExt } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/file-mime.js")
+    >("../../../../packages/shared/src/file-mime.js");
 
     const processV2Mock = vi.fn();
     const trackEventMock = vi.fn();
@@ -6363,6 +6384,7 @@ describe("tool_used fires once per job across retries (#4450)", () => {
         toolInputErrorCode,
         hasServerErrorStatus,
         IMAGE_EXT_TO_MIME,
+        mimeForExt,
         ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
         TOOLS,
         COMPRESS_PRESETS: [],
@@ -6540,6 +6562,9 @@ describe("first-processed onboarding marker (#4909)", () => {
     const { IMAGE_EXT_TO_MIME } = await vi.importActual<
       typeof import("../../../../packages/shared/src/image-mime.js")
     >("../../../../packages/shared/src/image-mime.js");
+    const { mimeForExt } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/file-mime.js")
+    >("../../../../packages/shared/src/file-mime.js");
 
     const processV2Mock = vi.fn();
     const trackEventMock = vi.fn();
@@ -6549,6 +6574,7 @@ describe("first-processed onboarding marker (#4909)", () => {
       vi.doMock("@snapotter/shared", () => ({
         ...toolErrors,
         IMAGE_EXT_TO_MIME,
+        mimeForExt,
         ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
         TOOLS,
         COMPRESS_PRESETS: [],

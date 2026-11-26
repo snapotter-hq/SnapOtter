@@ -183,7 +183,7 @@ Ses de FFmpeg tarafından işlenir.
 | Ogg Vorbis | .ogg | Kayıplı | Açık format |
 | Opus | .opus | Kayıplı | Modern, düşük gecikmeli |
 | WMA | .wma | Kayıplı | Windows Media Audio |
-| AIFF | .aiff | Sıkıştırılmamış (PCM) | Apple sıkıştırılmamış |
+| AIFF | .aiff, .aif | Sıkıştırılmamış (PCM) | Apple sıkıştırılmamış |
 | AMR | .amr | Kayıplı | Konuşma / mobil |
 | AC-3 | .ac3 | Kayıplı | Dolby Digital |
 

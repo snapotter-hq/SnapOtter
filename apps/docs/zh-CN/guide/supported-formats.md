@@ -183,7 +183,7 @@ SnapOtter 支持 55+ 种图像输入格式和 17 种输出格式。
 | Ogg Vorbis | .ogg | 有损 | 开放格式 |
 | Opus | .opus | 有损 | 现代、低延迟 |
 | WMA | .wma | 有损 | Windows Media Audio |
-| AIFF | .aiff | 无压缩 (PCM) | Apple 无压缩 |
+| AIFF | .aiff, .aif | 无压缩 (PCM) | Apple 无压缩 |
 | AMR | .amr | 有损 | 语音 / 移动设备 |
 | AC-3 | .ac3 | 有损 | Dolby Digital |
 

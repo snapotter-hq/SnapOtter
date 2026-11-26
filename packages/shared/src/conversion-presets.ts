@@ -147,7 +147,7 @@ const M4A = [".m4a"];
 const OGG = [".ogg"];
 const OPUS = [".opus"];
 const WMA = [".wma"];
-const AIFF = [".aiff"];
+const AIFF = [".aiff", ".aif"];
 
 /** image raster pairs on `convert` */
 function img(

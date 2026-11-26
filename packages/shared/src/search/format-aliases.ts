@@ -7,6 +7,7 @@ export const FORMAT_ALIASES: Record<string, string[]> = {
   excel: ["xls", "xlsx", "spreadsheet"],
   powerpoint: ["ppt", "pptx"],
   markdown: ["md"],
+  aiff: ["aif"],
   image: ["photo", "pic", "picture", "img"],
 };
 

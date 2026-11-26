@@ -4208,6 +4208,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -9954,6 +9955,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10372,6 +10374,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10455,6 +10458,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10596,6 +10600,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10641,6 +10646,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10665,6 +10671,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10729,6 +10736,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10753,6 +10761,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10798,6 +10807,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10843,6 +10853,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10883,6 +10894,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10947,6 +10959,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -10987,6 +11000,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -11028,6 +11042,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -11144,6 +11159,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -11203,6 +11219,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -11268,6 +11285,7 @@
       ".opus",
       ".wma",
       ".aiff",
+      ".aif",
       ".amr",
       ".ac3"
     ],
@@ -14619,7 +14637,7 @@
     "name": "AIFF to MP3",
     "modality": "audio",
     "section": "audio",
-    "acceptedInputs": [".aiff"],
+    "acceptedInputs": [".aiff", ".aif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -14631,7 +14649,7 @@
     "name": "AIFF to WAV",
     "modality": "audio",
     "section": "audio",
-    "acceptedInputs": [".aiff"],
+    "acceptedInputs": [".aiff", ".aif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -14643,7 +14661,7 @@
     "name": "AIFF to FLAC",
     "modality": "audio",
     "section": "audio",
-    "acceptedInputs": [".aiff"],
+    "acceptedInputs": [".aiff", ".aif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -14655,7 +14673,7 @@
     "name": "AIFF to OGG",
     "modality": "audio",
     "section": "audio",
-    "acceptedInputs": [".aiff"],
+    "acceptedInputs": [".aiff", ".aif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,
@@ -14667,7 +14685,7 @@
     "name": "AIFF to M4A",
     "modality": "audio",
     "section": "audio",
-    "acceptedInputs": [".aiff"],
+    "acceptedInputs": [".aiff", ".aif"],
     "executionHint": "fast",
     "isAI": false,
     "registered": true,

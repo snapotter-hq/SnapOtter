@@ -390,6 +390,19 @@ describe("save-result MIME type (#1349)", () => {
     expect(png.mimeType).toBe("image/png");
   });
 
+  it("stores a .aif result as audio/aiff, like .aiff (#5194)", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    // The extension alone sets an audio result's type; nothing sniffs the bytes.
+    const aif = await saveResult(parent.id, "result.aif", Buffer.from("FORM\0\0\0\x04AIFF"));
+
+    expect(aif.mimeType).toBe("audio/aiff");
+  });
+
   it("stores the sniffed type for a HEIC, PSD, and SVG result (#1550)", async () => {
     const { created: parent } = await uploadOne({
       filename: "parent.png",

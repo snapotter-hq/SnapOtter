@@ -183,7 +183,7 @@ SnapOtterは入力で55種類以上、出力で17種類の画像フォーマッ�
 | Ogg Vorbis | .ogg | 非可逆 | オープンフォーマット |
 | Opus | .opus | 非可逆 | モダンで低遅延 |
 | WMA | .wma | 非可逆 | Windows Media Audio |
-| AIFF | .aiff | 無圧縮 (PCM) | Appleの無圧縮 |
+| AIFF | .aiff, .aif | 無圧縮 (PCM) | Appleの無圧縮 |
 | AMR | .amr | 非可逆 | 音声/モバイル |
 | AC-3 | .ac3 | 非可逆 | Dolby Digital |
 

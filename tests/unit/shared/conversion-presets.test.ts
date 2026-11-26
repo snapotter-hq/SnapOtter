@@ -86,7 +86,8 @@ describe("conversion presets", () => {
           continue;
         }
         expect(preset.locked).toEqual({ format: to });
-        expect(preset.sourceInputs).toEqual([`.${from}`]);
+        // .aif is the short AIFF extension (#5194).
+        expect(preset.sourceInputs).toEqual(from === "aiff" ? [".aiff", ".aif"] : [`.${from}`]);
       }
     }
     expect(missing).toEqual([]);

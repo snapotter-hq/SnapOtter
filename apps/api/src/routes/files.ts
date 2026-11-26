@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { pipeline, type Readable, Transform } from "node:stream";
-import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import { hasServerErrorStatus, mimeForExt } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { RESULT_PAYLOAD_FILENAME } from "../jobs/types.js";
@@ -589,59 +589,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 }
 
 export function getContentType(ext: string): string {
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    zip: "application/zip",
-    json: "application/json",
-    csv: "text/csv",
-    tsv: "text/tab-separated-values",
-    txt: "text/plain",
-    md: "text/markdown",
-    markdown: "text/markdown",
-    html: "text/html",
-    htm: "text/html",
-    xml: "application/xml",
-    yaml: "application/yaml",
-    yml: "application/yaml",
-    mp4: "video/mp4",
-    m4v: "video/mp4",
-    mov: "video/quicktime",
-    webm: "video/webm",
-    mkv: "video/x-matroska",
-    avi: "video/x-msvideo",
-    "3gp": "video/3gpp",
-    flv: "video/x-flv",
-    wmv: "video/x-ms-wmv",
-    mpg: "video/mpeg",
-    mpeg: "video/mpeg",
-    ts: "video/mp2t",
-    mts: "video/mp2t",
-    m2ts: "video/mp2t",
-    ogv: "video/ogg",
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    flac: "audio/flac",
-    aac: "audio/aac",
-    m4a: "audio/mp4",
-    ogg: "audio/ogg",
-    opus: "audio/opus",
-    wma: "audio/x-ms-wma",
-    aiff: "audio/aiff",
-    aif: "audio/aiff",
-    amr: "audio/amr",
-    ac3: "audio/ac3",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    odt: "application/vnd.oasis.opendocument.text",
-    rtf: "application/rtf",
-    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    odp: "application/vnd.oasis.opendocument.presentation",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ods: "application/vnd.oasis.opendocument.spreadsheet",
-    epub: "application/epub+zip",
-    srt: "application/x-subrip",
-    vtt: "text/vtt",
-  };
-  const type = map[ext] ?? IMAGE_EXT_TO_MIME[ext] ?? "application/octet-stream";
+  const type = mimeForExt(ext);
   // Text payloads (extracted text, markdown, CSV, subtitles) are written UTF-8.
   // Without an explicit charset a browser can sniff a legacy encoding and
   // mojibake non-Latin scripts like Arabic when the file is viewed inline (#589).
