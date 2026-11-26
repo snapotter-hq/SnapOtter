@@ -5,6 +5,7 @@ import {
   MAX_OPTIMIZE_SVG_BYTES,
   optimizeOnWorker,
   optimizeSvgBuffer,
+  SLOW_HOST_TIMEOUT_MAX_BYTES,
   settingsSchema,
 } from "../../../apps/api/src/routes/tools/optimize-svg.js";
 
@@ -181,8 +182,8 @@ describe("optimize-svg", () => {
     expect(out.text.startsWith("<svg")).toBe(true);
   }, 60_000);
 
-  it("answers a client error when svgo overruns its deadline", async () => {
-    const input = bigSvg(1024 * 1024).toString("utf-8");
+  it("answers a client error when svgo overruns its deadline on a large input", async () => {
+    const input = bigSvg(SLOW_HOST_TIMEOUT_MAX_BYTES * 2).toString("utf-8");
     const err = await optimizeOnWorker(input, {}, 50).catch((e: unknown) => e);
     expect(isToolInputError(err)).toBe(true);
     expect((err as { code?: string }).code).toBe("SVG_TOO_LARGE");
