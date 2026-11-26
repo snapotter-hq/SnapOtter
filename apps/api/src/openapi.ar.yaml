@@ -11571,7 +11571,7 @@ paths:
       tags:
         - Video
       summary: استخراج الترجمات
-      description: سحب مسار الترجمة من فيديو كملف SRT.
+      description: استخراج مسار الترجمة من الفيديو كملف SRT أو WebVTT أو ASS.
       security:
         - bearerAuth: []
       requestBody:
@@ -11590,8 +11590,8 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `format` (string, default "srt") - Output format. One of: srt, vtt, ass
+                    سلسلة JSON تحتوي على الخيارات:
+                    - `format` (نص، الافتراضي "srt") - صيغة الإخراج. واحد من: srt، vtt، ass
             example:
               file: photo.png
       responses:
@@ -29958,9 +29958,9 @@ x-i18n:
       provenance: machine
       outputHash: b146abc30526
     paths./api/v1/tools/video/extract-subtitles.post.description:
-      sourceHash: 4daf70632777
+      sourceHash: 2482d033e3bf
       provenance: machine
-      outputHash: 0a594fb8e319
+      outputHash: ee4b693a0002
     paths./api/v1/tools/video/convert-subtitles.post.summary:
       sourceHash: 74ebb11bf0e2
       provenance: machine
@@ -31305,6 +31305,38 @@ x-i18n:
       sourceHash: d8be42b38707
       provenance: machine
       outputHash: 6d391f85f3fa
+    paths./api/v1/tools/video/srt-to-vtt.post.summary:
+      sourceHash: 9fbd231f0f3f
+      provenance: machine
+      outputHash: c5757e03343d
+    paths./api/v1/tools/video/srt-to-vtt.post.description:
+      sourceHash: 083ea8c9dc08
+      provenance: machine
+      outputHash: 1c5008ba3997
+    paths./api/v1/tools/video/vtt-to-srt.post.summary:
+      sourceHash: aaac20d0be9e
+      provenance: machine
+      outputHash: 4e72e702ebea
+    paths./api/v1/tools/video/vtt-to-srt.post.description:
+      sourceHash: ae0d4c40b051
+      provenance: machine
+      outputHash: e60ccd7067c6
+    paths./api/v1/tools/video/ass-to-srt.post.summary:
+      sourceHash: 689e49b51b5a
+      provenance: machine
+      outputHash: 204356da034e
+    paths./api/v1/tools/video/ass-to-srt.post.description:
+      sourceHash: 1019a9a69b11
+      provenance: machine
+      outputHash: 0a3a8ad3d743
+    paths./api/v1/tools/video/srt-to-ass.post.summary:
+      sourceHash: 3a3c9c9c142a
+      provenance: machine
+      outputHash: 68c321feea9a
+    paths./api/v1/tools/video/srt-to-ass.post.description:
+      sourceHash: bee671d84c4e
+      provenance: machine
+      outputHash: e9ccac98a8ed
     paths./api/v1/tools/audio/m4a-to-mp3.post.summary:
       sourceHash: e4f86f589bd4
       provenance: machine
@@ -36037,6 +36069,10 @@ x-i18n:
       sourceHash: 98f537341452
       provenance: machine
       outputHash: d4a600b877d9
+    ptr:/paths/~1api~1v1~1tools~1video~1extract-subtitles/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 0ba56c1724ad
+      provenance: machine
+      outputHash: 222425b3c4f0
     ptr:/paths/~1api~1v1~1tools~1video~1extract-subtitles/post/responses/200/description:
       sourceHash: 508b50a41540
       provenance: machine
@@ -40334,6 +40370,118 @@ x-i18n:
       provenance: machine
       outputHash: 0bd6546c4ecf
     ptr:/paths/~1api~1v1~1tools~1video~1mp4-to-ogg/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: adc5cf023656
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 864d02d1c62b
+      provenance: machine
+      outputHash: 2ea29b33b269
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: ce5490124d15
+      provenance: machine
+      outputHash: f39531f6fdf1
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: f96c4ef0737a
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: a081d6a07485
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-vtt/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: adc5cf023656
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 042d3d12e4d3
+      provenance: machine
+      outputHash: c17793953348
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 40e24c0ac1ab
+      provenance: machine
+      outputHash: e09ee1d4332c
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: f96c4ef0737a
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: a081d6a07485
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1video~1vtt-to-srt/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: adc5cf023656
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: c842243836d9
+      provenance: machine
+      outputHash: 9011762ad494
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: cf3faf1c014d
+      provenance: machine
+      outputHash: 4c0361b6e736
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: f96c4ef0737a
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: a081d6a07485
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1video~1ass-to-srt/post/responses/422/description:
+      sourceHash: 88ca7e4a48e4
+      provenance: machine
+      outputHash: adc5cf023656
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 4b309b19a1f1
+      provenance: machine
+      outputHash: 2db2427da1c0
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: b9bd0a97b0f3
+      provenance: machine
+      outputHash: 479edd64a059
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/requestBody/content/multipart~1form-data/schema/properties/clientJobId/description:
+      sourceHash: 9e6b02fdac57
+      provenance: machine
+      outputHash: b73c991ab69f
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/responses/200/description:
+      sourceHash: 5e05e3e16ddd
+      provenance: machine
+      outputHash: f96c4ef0737a
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/responses/400/description:
+      sourceHash: 40c7209ea5c6
+      provenance: machine
+      outputHash: a081d6a07485
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 0bd6546c4ecf
+    ptr:/paths/~1api~1v1~1tools~1video~1srt-to-ass/post/responses/422/description:
       sourceHash: 88ca7e4a48e4
       provenance: machine
       outputHash: adc5cf023656
