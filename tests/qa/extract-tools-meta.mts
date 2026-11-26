@@ -5,7 +5,7 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildToolsMeta } from "./build-tools-meta.mts";
+import { buildToolsMeta } from "./build-tools-meta.mjs";
 
 const meta = buildToolsMeta();
 
