@@ -41,6 +41,15 @@ const WB_DEAD_ZONE = 12.5;
  */
 const NEUTRAL_CHROMA = 6;
 
+/**
+ * A tinted grey photo (a sepia or blue scan) is neutral too: all its chroma is
+ * the cast, so mean chroma barely exceeds the channel-mean spread. Below
+ * TINT_MAX_CHROMA, chroma less than TINT_MARGIN above the spread reads as a tint,
+ * not the photo's own colour, so a boost would only deepen the cast (#4984).
+ */
+const TINT_MAX_CHROMA = 15;
+const TINT_MARGIN = 3;
+
 interface ToneDistribution {
   /** Share of pixels with luminance below 64. */
   shadows: number;
@@ -163,7 +172,8 @@ export async function analyzeImage(buffer: Buffer): Promise<AnalysisResult> {
     stats.entropy,
     chroma,
   );
-  const neutral = isGrayscale || chroma < NEUTRAL_CHROMA;
+  const spread = Math.max(rCh.mean, gCh.mean, bCh.mean) - Math.min(rCh.mean, gCh.mean, bCh.mean);
+  const neutral = isGrayscale || isNeutralColour(chroma, spread);
   const tones = await measureTones(buffer);
   const backlit =
     tones.shadows >= BACKLIT_SHADOW_SHARE &&
@@ -263,6 +273,11 @@ async function measureChroma(buffer: Buffer): Promise<number> {
     sum += Math.max(r, g, b) - Math.min(r, g, b);
   }
   return pixels > 0 ? sum / pixels : 0;
+}
+
+function isNeutralColour(chroma: number, spread: number): boolean {
+  if (chroma < NEUTRAL_CHROMA) return true;
+  return chroma < TINT_MAX_CHROMA && chroma - spread < TINT_MARGIN;
 }
 
 function computeScores(

@@ -11,6 +11,9 @@ import type { CorrectionParams, EnhancementMode, Sharp } from "../src/types.js";
 const SCENE_PATH = fileURLToPath(
   new URL("../../../tests/fixtures/image/valid/test-scene.png", import.meta.url),
 );
+const PORTRAIT_PATH = fileURLToPath(
+  new URL("../../../tests/fixtures/image/valid/portrait-color.jpg", import.meta.url),
+);
 
 // ---------------------------------------------------------------------------
 // Synthetic-image builders with KNOWN Sharp stats.
@@ -108,6 +111,20 @@ async function stripes(colors: [number, number, number][], w = 60, h = 32): Prom
   return await sharp(buf, { raw: { width: w, height: h, channels: 3 } })
     .png()
     .toBuffer();
+}
+
+/**
+ * Equal stripes of red, green and blue, each `chroma` above a grey of 100.
+ * The channel means balance out (spread 0), so all the chroma is colour, not
+ * a tint.
+ */
+async function balancedColour(chroma: number): Promise<Buffer> {
+  const hi = 100 + chroma;
+  return await stripes([
+    [hi, 100, 100],
+    [100, hi, 100],
+    [100, 100, hi],
+  ]);
 }
 
 /** Full-range deterministic RGB noise; sharp reports entropy 6.989 for this. */
@@ -421,7 +438,7 @@ describe("analyzeImage corrections", () => {
 
   it("boosts saturation only below 40 (factor 0.6, clamped [0,30])", async () => {
     // saturation 29 (chroma 12) -> round((40 - 29) * 0.6) = 7.
-    expect((await analyzeImage(await solidRgb(100, 100, 112))).corrections.saturation).toBe(7);
+    expect((await analyzeImage(await balancedColour(12))).corrections.saturation).toBe(7);
   });
 
   it("leaves a neutral photo's saturation alone instead of boosting it (#4869)", async () => {
@@ -431,7 +448,51 @@ describe("analyzeImage corrections", () => {
     // Mean chroma 5 is still neutral; 6 is the first colour worth correcting.
     expect((await analyzeImage(await solidRgb(100, 100, 105))).corrections.saturation).toBe(0);
     // chroma 6 -> score round(24.5) = 25 -> round((40 - 25) * 0.6) = 9.
-    expect((await analyzeImage(await solidRgb(100, 100, 106))).corrections.saturation).toBe(9);
+    expect((await analyzeImage(await balancedColour(6))).corrections.saturation).toBe(9);
+  });
+
+  it("leaves a faintly tinted grey photo alone instead of deepening the tint (#4984)", async () => {
+    // The issue's repro: chroma 10 is all blue cast, score 28. It was boosted by 7.
+    expect((await analyzeImage(await solidRgb(100, 100, 110))).corrections.saturation).toBe(0);
+    // A sepia scan: grey steps warmed by 6, 10 and 12. It was boosted by 8.
+    const sepia = await stripes([
+      [60, 57, 54],
+      [140, 135, 130],
+      [200, 194, 188],
+    ]);
+    expect((await analyzeImage(sepia)).corrections.saturation).toBe(0);
+    // Chroma 14 is still a tint; at 15 the colour is strong enough to correct
+    // (score round(31.25) = 31 -> round((40 - 31) * 0.6) = 5).
+    expect((await analyzeImage(await solidRgb(100, 100, 114))).corrections.saturation).toBe(0);
+    expect((await analyzeImage(await solidRgb(100, 100, 115))).corrections.saturation).toBe(5);
+  });
+
+  it("treats chroma within 3 of the channel spread as a tint (#4984)", async () => {
+    // Every pixel has chroma 12. One red stripe in six leaves a blue spread of
+    // 10, so chroma - spread = 2: a tint.
+    const tint = await stripes([
+      [112, 100, 100],
+      [100, 100, 112],
+      [100, 100, 112],
+      [100, 100, 112],
+      [100, 100, 112],
+      [100, 100, 112],
+    ]);
+    expect((await analyzeImage(tint)).corrections.saturation).toBe(0);
+    // One in four leaves a spread of 9, so chroma - spread = 3: colour.
+    const colour = await stripes([
+      [112, 100, 100],
+      [100, 100, 112],
+      [100, 100, 112],
+      [100, 100, 112],
+    ]);
+    expect((await analyzeImage(colour)).corrections.saturation).toBe(7);
+  });
+
+  it("still boosts a muted colour photo whose chroma sits well above its spread (#4984)", async () => {
+    // portrait-color: chroma about 25, spread about 4, score 39 -> boost 1.
+    const buf = await sharp(PORTRAIT_PATH).toBuffer();
+    expect((await analyzeImage(buf)).corrections.saturation).toBe(1);
   });
 
   it("does not boost a colourful photo whose channel means balance out (#4869)", async () => {
@@ -508,9 +569,9 @@ describe("analyzeImage issues", () => {
 
   it("flags desaturated strictly below saturation 30", async () => {
     // saturation 29 (chroma 12) -> flagged.
-    expect((await analyzeImage(await solidRgb(100, 100, 112))).issues).toContain("desaturated");
+    expect((await analyzeImage(await balancedColour(12))).issues).toContain("desaturated");
     // saturation 30 (chroma 13, 29.75 rounds up) -> not flagged.
-    expect((await analyzeImage(await solidRgb(100, 100, 113))).issues).not.toContain("desaturated");
+    expect((await analyzeImage(await balancedColour(13))).issues).not.toContain("desaturated");
   });
 
   it("does not flag a neutral photo as desaturated (#4869)", async () => {
@@ -518,6 +579,10 @@ describe("analyzeImage issues", () => {
       "desaturated",
     );
     expect((await analyzeImage(await solidRgb(100, 100, 105))).issues).not.toContain("desaturated");
+  });
+
+  it("does not flag a faintly tinted grey photo as desaturated (#4984)", async () => {
+    expect((await analyzeImage(await solidRgb(100, 100, 110))).issues).not.toContain("desaturated");
   });
 
   it("flags soft-focus strictly below sharpness 35", async () => {
@@ -551,6 +616,21 @@ describe("analyzeImage suggestedMode", () => {
     // contrast 100, saturation 20, exposure 50 -> document (exercises the &&,
     // and proves it is not short-circuited by the low-light branch).
     expect((await analyzeImage(await twoTone(0, 255))).suggestedMode).toBe("document");
+  });
+
+  it("still suggests document for a tinted page scan, without flagging it desaturated (#4984)", async () => {
+    // Dark text on a page, both tinted blue by 8: chroma 8 -> score 26.
+    const page = await stripes(
+      [
+        [20, 20, 28],
+        [230, 230, 238],
+      ],
+      64,
+      64,
+    );
+    const { suggestedMode, issues } = await analyzeImage(page);
+    expect(suggestedMode).toBe("document");
+    expect(issues).not.toContain("desaturated");
   });
 
   it("falls back to auto when contrast is high but saturation is not low", async () => {
