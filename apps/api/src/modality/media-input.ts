@@ -175,7 +175,12 @@ export class MediaInputHandler implements InputHandler {
         `Subtitle file is ${sizeMb} MB, over the ${limitMb} MB limit (MAX_SUBTITLE_SIZE_MB)`,
       );
     }
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(raw);
+    // A UTF-16 file (Notepad's "Unicode") puts a NUL between ASCII characters,
+    // so decoded as UTF-8 it never matches the sniff below (#5051). Every
+    // subtitle tool then gets it as UTF-8, which ffmpeg reads without
+    // -sub_charenc.
+    const utf16 = decodeUtf16WithBom(raw);
+    const text = utf16 ?? new TextDecoder("utf-8", { fatal: false }).decode(raw);
     // Detect the SRT/VTT cue timecode arrow (e.g. "00:00:01,000 --> 00:00:04,000")
     // by requiring the surrounding timestamp, not a bare "-->" (which also matches
     // non-subtitle text and tripped CodeQL's HTML-comment heuristic).
@@ -184,6 +189,20 @@ export class MediaInputHandler implements InputHandler {
     if (!looksLikeSubtitle) {
       throw new InputValidationError("Not a valid subtitle file (.srt, .vtt, .ass)");
     }
-    return { buffer: raw, filename };
+    return { buffer: utf16 === null ? raw : Buffer.from(utf16, "utf8"), filename };
   }
+}
+
+/**
+ * The text of a buffer that starts with a UTF-16 byte order mark, without the
+ * mark, or null when it has none. A trailing odd byte is dropped.
+ */
+export function decodeUtf16WithBom(raw: Buffer): string | null {
+  if (raw.length < 2) return null;
+  const littleEndian = raw[0] === 0xff && raw[1] === 0xfe;
+  const bigEndian = raw[0] === 0xfe && raw[1] === 0xff;
+  if (!littleEndian && !bigEndian) return null;
+  const body = Buffer.from(raw.subarray(2, raw.length - (raw.length % 2)));
+  if (bigEndian) body.swap16();
+  return body.toString("utf16le");
 }
