@@ -1,7 +1,12 @@
 import { ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import { type Config, optimize } from "svgo";
+import type { Config } from "svgo";
 import { z } from "zod";
+import {
+  runInWorker,
+  WorkerOutOfMemoryError,
+  WorkerTimeoutError,
+} from "../../lib/run-in-worker.js";
 import {
   decompressSvgz,
   isSvgBuffer,
@@ -25,11 +30,17 @@ const IMAGE_UNDECODABLE = "IMAGE_UNDECODABLE";
 const SVG_TOO_LARGE = "SVG_TOO_LARGE";
 
 /**
- * svgo is synchronous JavaScript, and workers share the API process, so a big
- * input stalls every request for as long as it runs: about a second per MB of
- * path data with multipass on. The cap keeps that to a few seconds.
+ * svgo is synchronous JavaScript, so it runs on a worker thread with a
+ * deadline (see svgo-worker.mjs) and can't stall the API process. The byte cap
+ * and the timeout are backstops, not the event-loop guard: about a second per
+ * MB of path data with multipass on, so 10 MB finishes well inside 30 s on a
+ * modern host and a slow one is cut off instead of hanging.
  */
-export const MAX_OPTIMIZE_SVG_BYTES = 2 * 1024 * 1024;
+export const MAX_OPTIMIZE_SVG_BYTES = 10 * 1024 * 1024;
+export const OPTIMIZE_SVG_TIMEOUT_MS = 30_000;
+const OPTIMIZE_SVG_WORKER_HEAP_MB = 512;
+const SVGO_WORKER_URL = new URL("../../lib/svgo-worker.mjs", import.meta.url);
+const TOO_COMPLEX_MESSAGE = "SVG is too complex to optimize within the time limit";
 const TOO_LARGE_MESSAGE = `SVG exceeds the ${MAX_OPTIMIZE_SVG_BYTES / 1024 / 1024} MB optimize limit`;
 
 /** The sanitizer's size, element and nesting caps are client errors; anything else is ours. */
@@ -81,6 +92,26 @@ function sanitizedSvgInput(buffer: Buffer): Buffer {
   return sanitizeOrReject(svg);
 }
 
+/** Runs svgo off the event loop; a job that overruns the deadline or the heap is a client-size error. */
+export async function optimizeOnWorker(
+  svg: string,
+  config: Config,
+  timeoutMs = OPTIMIZE_SVG_TIMEOUT_MS,
+): Promise<string> {
+  try {
+    return await runInWorker<string>(
+      SVGO_WORKER_URL,
+      { svg, config },
+      { timeoutMs, maxOldGenerationSizeMb: OPTIMIZE_SVG_WORKER_HEAP_MB },
+    );
+  } catch (err) {
+    if (err instanceof WorkerTimeoutError || err instanceof WorkerOutOfMemoryError) {
+      throw new ToolInputError(TOO_COMPLEX_MESSAGE, { cause: err, code: SVG_TOO_LARGE });
+    }
+    throw err;
+  }
+}
+
 export async function optimizeSvgBuffer(
   inputBuffer: Buffer,
   settings: OptimizeSvgSettings,
@@ -90,7 +121,7 @@ export async function optimizeSvgBuffer(
 
   let optimized: string;
   try {
-    optimized = optimize(input.toString("utf-8"), svgoConfig(settings)).data;
+    optimized = await optimizeOnWorker(input.toString("utf-8"), svgoConfig(settings));
   } catch (err) {
     // svgo doesn't export SvgoParserError, so match it by name.
     if (err instanceof Error && err.name === "SvgoParserError") {

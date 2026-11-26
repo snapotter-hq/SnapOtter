@@ -107,11 +107,14 @@ describe("optimize-svg", () => {
     expect(JSON.parse(res.body).code).toBe("IMAGE_UNDECODABLE");
   });
 
-  it("refuses an SVG over the optimize size cap with 400 before queuing a job", async () => {
+  it("refuses an SVGZ that inflates past the optimize size cap with 400", async () => {
+    // The raw body can't exceed the test server's 10 MB upload limit, so the cap is reached through inflation.
     const path = `<path d="M0 0${" L1 1".repeat(MAX_OPTIMIZE_SVG_BYTES / 5)}"/>`;
     const res = await run(
-      Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">${path}</svg>`),
-      "big.svg",
+      gzipSync(
+        Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">${path}</svg>`),
+      ),
+      "big.svgz",
     );
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe("SVG_TOO_LARGE");
