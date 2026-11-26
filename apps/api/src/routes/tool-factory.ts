@@ -202,6 +202,7 @@ export interface AnyToolRouteConfig {
     ctx?: ToolProcessCtx,
   ) => Promise<LegacyToolProcessResult>;
   processV2?: ToolProcessV2;
+  missingBundle?: (settings: unknown) => string | null;
   skipStructuralValidation?: boolean;
   redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
 }

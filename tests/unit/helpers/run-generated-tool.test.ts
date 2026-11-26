@@ -3,11 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
-import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import {
+  type AnyToolRouteConfig,
+  getToolConfig,
+} from "../../../apps/api/src/routes/tool-factory.js";
+import { registerSmartCrop } from "../../../apps/api/src/routes/tools/smart-crop.js";
 import type { GeneratedFixture } from "../../helpers/generated-fixtures.js";
 import {
   buildGeneratedProcessInputs,
   findMissingGeneratedPrerequisite,
+  findMissingSettingsBundle,
   isExpectedGeneratedRejection,
   runGeneratedTool,
 } from "../../helpers/run-generated-tool.js";
@@ -173,5 +178,32 @@ describe("generated tool process harness", () => {
     } finally {
       await rm(fixtureRoot, { recursive: true, force: true });
     }
+  });
+
+  // #5213: runGeneratedTool skips the route's per-request 501, so the fuzz and
+  // pairwise harnesses ask missingBundle themselves before each case.
+  it("names an optional bundle the settings need, and fails strict campaigns on it", () => {
+    const faceGated = {
+      toolId: "generated-test",
+      missingBundle: (settings: unknown) =>
+        (settings as { mode?: string }).mode === "face" ? "face-detection" : null,
+    };
+
+    expect(findMissingSettingsBundle(faceGated, { mode: "subject" }, false)).toBeUndefined();
+    expect(findMissingSettingsBundle(faceGated, { mode: "subject" }, true)).toBeUndefined();
+    expect(findMissingSettingsBundle(faceGated, { mode: "face" }, false)).toMatch(/face-detection/);
+    expect(() => findMissingSettingsBundle(faceGated, { mode: "face" }, true)).toThrow(
+      /REQUIRE_AI_FEATURES=1.*face-detection/,
+    );
+
+    const ungated = { toolId: "generated-test" };
+    expect(findMissingSettingsBundle(ungated, { mode: "face" }, true)).toBeUndefined();
+  });
+
+  it("keeps smart-crop's missingBundle on the registered config the harnesses read", () => {
+    registerSmartCrop({ post: () => undefined } as unknown as Parameters<
+      typeof registerSmartCrop
+    >[0]);
+    expect(getToolConfig("smart-crop")?.missingBundle).toBeTypeOf("function");
   });
 });
