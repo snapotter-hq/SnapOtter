@@ -9,7 +9,7 @@ import { localeCodes } from "../../../scripts/i18n/lib/shared-i18n.mjs";
 // #5052 added a format setting to extract-subtitles and four subtitle presets.
 // Their docs page and OpenAPI units must stay translated and hash-current in
 // every locale, or the translated pages go back to saying "SRT only" (#5166).
-const LOCALES = localeCodes().filter((c: string) => c !== "en");
+const LOCALES: string[] = localeCodes().filter((c: string) => c !== "en");
 const API_PATHS = ["extract-subtitles", "srt-to-vtt", "vtt-to-srt", "ass-to-srt", "srt-to-ass"].map(
   (tool) => `/api/v1/tools/video/${tool}`,
 );
@@ -45,16 +45,19 @@ describe("subtitle format and preset translations (#5166)", () => {
     for (const p of API_PATHS) expect(units.some((u) => u.id.startsWith(`paths.${p}.`))).toBe(true);
   });
 
-  it.each(LOCALES)("keeps the API reference units current in %s", async (locale) => {
+  it.each(LOCALES)("keeps the API reference units current in %s", async (locale: string) => {
     const units: Unit[] = (await apiAdapter.extract()).filter((u: Unit) => isApiTarget(u.id));
     expectInSync(units, await apiAdapter.load(locale), locale);
   });
 
-  it.each(LOCALES)("keeps the extract-subtitles docs page current in %s", async (locale) => {
-    const units: Unit[] = (await docsAdapter.extract()).filter(
-      (u: Unit) => u.id === "tools/video/extract-subtitles.md",
-    );
-    expect(units).toHaveLength(1);
-    expectInSync(units, await docsAdapter.load(locale), locale);
-  });
+  it.each(LOCALES)(
+    "keeps the extract-subtitles docs page current in %s",
+    async (locale: string) => {
+      const units: Unit[] = (await docsAdapter.extract()).filter(
+        (u: Unit) => u.id === "tools/video/extract-subtitles.md",
+      );
+      expect(units).toHaveLength(1);
+      expectInSync(units, await docsAdapter.load(locale), locale);
+    },
+  );
 });
