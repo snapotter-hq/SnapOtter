@@ -1,4 +1,4 @@
-import { ToolInputError } from "@snapotter/shared";
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import type { Config } from "svgo";
 import { z } from "zod";
@@ -38,9 +38,16 @@ const SVG_TOO_LARGE = "SVG_TOO_LARGE";
  */
 export const MAX_OPTIMIZE_SVG_BYTES = 10 * 1024 * 1024;
 export const OPTIMIZE_SVG_TIMEOUT_MS = 30_000;
+/**
+ * svgo needs about a second per MB, so a timeout on an input this small means
+ * the host is starved, not that the file is pathological. Over it, a timeout
+ * still reads as "too complex".
+ */
+export const SLOW_HOST_TIMEOUT_MAX_BYTES = 1024 * 1024;
 const OPTIMIZE_SVG_WORKER_HEAP_MB = 512;
 const SVGO_WORKER_URL = new URL("../../lib/svgo-worker.mjs", import.meta.url);
 const TOO_COMPLEX_MESSAGE = "SVG is too complex to optimize within the time limit";
+const BUSY_MESSAGE = "The server is too busy to optimize this SVG right now. Try again shortly";
 const TOO_LARGE_MESSAGE = `SVG exceeds the ${MAX_OPTIMIZE_SVG_BYTES / 1024 / 1024} MB optimize limit`;
 
 /** The sanitizer's size, element and nesting caps are client errors; anything else is ours. */
@@ -92,7 +99,11 @@ function sanitizedSvgInput(buffer: Buffer): Buffer {
   return sanitizeOrReject(svg);
 }
 
-/** Runs svgo off the event loop; a job that overruns the deadline or the heap is a client-size error. */
+/**
+ * Runs svgo off the event loop. Running out of heap is always the input's size.
+ * A deadline overrun is the input's too unless it's small enough that a slow
+ * host explains it, which is a retryable 503 (#5300).
+ */
 export async function optimizeOnWorker(
   svg: string,
   config: Config,
@@ -105,6 +116,17 @@ export async function optimizeOnWorker(
       { timeoutMs, maxOldGenerationSizeMb: OPTIMIZE_SVG_WORKER_HEAP_MB },
     );
   } catch (err) {
+    if (
+      err instanceof WorkerTimeoutError &&
+      Buffer.byteLength(svg) <= SLOW_HOST_TIMEOUT_MAX_BYTES
+    ) {
+      throw new SafeError(BUSY_MESSAGE, {
+        kind: "operational",
+        code: "ENGINE_UNAVAILABLE",
+        statusCode: 503,
+        cause: err,
+      });
+    }
     if (err instanceof WorkerTimeoutError || err instanceof WorkerOutOfMemoryError) {
       throw new ToolInputError(TOO_COMPLEX_MESSAGE, { cause: err, code: SVG_TOO_LARGE });
     }
