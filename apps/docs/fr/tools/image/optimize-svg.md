@@ -1,8 +1,8 @@
 ---
 description: "Minifiez des fichiers SVG avec svgo et conservez le résultat en SVG vectoriel, avec réglages de précision, de passes multiples, de métadonnées et de mise en forme."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 8116f540e745
+i18n_output_hash: 10912efa4152
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Accepte des données de formulaire multipart avec un fichier `.svg` ou `.svgz` e
 |-----------|------|----------|---------|-------------|
 | precision | number | Non | `3` | Nombre de décimales conservées dans les données de tracé et les nombres (0 à 8). Des valeurs plus basses donnent des fichiers plus petits et des courbes un peu moins fines. |
 | multipass | boolean | Non | `true` | Relancer l'optimiseur jusqu'à ce que la sortie cesse de diminuer |
-| removeMetadata | boolean | Non | `true` | Supprimer les commentaires, `<metadata>`, `<desc>` et les données propres aux éditeurs. Désactivez cette option pour les conserver. |
+| removeMetadata | boolean | Non | `true` | Supprimer les commentaires, `<metadata>`, les éléments `<desc>` vides ou générés par des éditeurs et les données propres aux éditeurs. Désactivez cette option pour les conserver. |
 | pretty | boolean | Non | `false` | Indenter la sortie pour la lisibilité au lieu de la minifier sur quelques lignes |
 
 ## Exemple de requête {#example-request}

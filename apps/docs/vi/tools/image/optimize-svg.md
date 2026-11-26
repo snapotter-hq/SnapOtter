@@ -1,8 +1,8 @@
 ---
 description: "Thu nhỏ tệp SVG bằng svgo và giữ kết quả dưới dạng SVG vector, với các tùy chọn về độ chính xác, nhiều lượt chạy, siêu dữ liệu và định dạng."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 3cab5008f857
+i18n_output_hash: 2cd4bbf358a2
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Chấp nhận dữ liệu biểu mẫu multipart với một tệp `.svg` hoặc
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | Số chữ số thập phân được giữ trong dữ liệu đường dẫn và các số (0 đến 8). Giá trị thấp hơn cho tệp nhỏ hơn và đường cong thô hơn một chút. |
 | multipass | boolean | No | `true` | Chạy bộ tối ưu nhiều lần cho đến khi đầu ra không nhỏ thêm nữa |
-| removeMetadata | boolean | No | `true` | Xóa chú thích, `<metadata>`, `<desc>` và dữ liệu riêng của trình chỉnh sửa. Tắt để giữ lại chúng. |
+| removeMetadata | boolean | No | `true` | Xóa chú thích, `<metadata>`, các phần tử `<desc>` trống hoặc do trình chỉnh sửa tạo ra và dữ liệu riêng của trình chỉnh sửa. Tắt để giữ lại chúng. |
 | pretty | boolean | No | `false` | Thụt lề đầu ra để dễ đọc thay vì thu gọn thành vài dòng |
 
 ## Example Request {#example-request}

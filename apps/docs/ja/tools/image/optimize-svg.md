@@ -1,8 +1,8 @@
 ---
 description: "svgo で SVG ファイルを軽量化し、結果をベクターの SVG のまま保持します。精度、複数パス、メタデータ、整形を設定できます。"
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 29ff06e90e96
+i18n_output_hash: 163623748639
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ i18n_hash_version: 2
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | パスデータや数値に残す小数桁数（0～8）。小さい値ほどファイルは小さくなり、曲線はやや粗くなります。 |
 | multipass | boolean | No | `true` | 出力が小さくならなくなるまで最適化を繰り返し実行する |
-| removeMetadata | boolean | No | `true` | コメント、`<metadata>`、`<desc>`、エディター固有のデータを除去する。保持するにはオフにします。 |
+| removeMetadata | boolean | No | `true` | コメント、`<metadata>`、空またはエディターが生成した `<desc>` 要素、エディター固有のデータを除去する。保持するにはオフにします。 |
 | pretty | boolean | No | `false` | 数行にまとめて軽量化する代わりに、読みやすいようインデントして出力する |
 
 ## リクエスト例 {#example-request}

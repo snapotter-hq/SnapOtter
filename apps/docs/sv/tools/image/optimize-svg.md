@@ -1,8 +1,8 @@
 ---
 description: "Minifiera SVG-filer med svgo och behåll resultatet som vektor-SVG, med kontroller för precision, flera pass, metadata och formatering."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 6f73f0926a04
+i18n_output_hash: 365bf519ec7c
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Tar emot multipart-formulärdata med en `.svg`- eller `.svgz`-fil och ett JSON-f
 |-----------|------|----------|---------|-------------|
 | precision | number | Nej | `3` | Antal decimaler som behålls i banddata och tal (0 till 8). Lägre värden ger mindre filer och något grövre kurvor. |
 | multipass | boolean | Nej | `true` | Kör optimeraren upprepade gånger tills utdata slutar bli mindre |
-| removeMetadata | boolean | Nej | `true` | Ta bort kommentarer, `<metadata>`, `<desc>` och redigeringsspecifik data. Stäng av för att behålla dem. |
+| removeMetadata | boolean | Nej | `true` | Ta bort kommentarer, `<metadata>`, tomma eller redigerargenererade `<desc>`-element och redigeringsspecifik data. Stäng av för att behålla dem. |
 | pretty | boolean | Nej | `false` | Dra in utdata för läsbarhet i stället för att minifiera det till få rader |
 
 ## Exempelförfrågan {#example-request}

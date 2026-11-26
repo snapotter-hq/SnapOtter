@@ -1,8 +1,8 @@
 ---
 description: "Minifikasi file SVG dengan svgo dan pertahankan hasilnya sebagai SVG vektor, dengan kontrol presisi, multipass, metadata, dan format."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 55de65d841b2
+i18n_output_hash: a738b4b6a065
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Menerima data formulir multipart dengan file `.svg` atau `.svgz` dan kolom JSON 
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | Jumlah angka desimal yang dipertahankan pada data path dan angka (0 sampai 8). Nilai lebih rendah menghasilkan file lebih kecil dan kurva sedikit lebih kasar. |
 | multipass | boolean | No | `true` | Jalankan pengoptimal berulang kali sampai keluaran tidak mengecil lagi |
-| removeMetadata | boolean | No | `true` | Hapus komentar, `<metadata>`, `<desc>`, dan data khusus editor. Matikan untuk mempertahankannya. |
+| removeMetadata | boolean | No | `true` | Hapus komentar, `<metadata>`, elemen `<desc>` yang kosong atau dibuat oleh editor, dan data khusus editor. Matikan untuk mempertahankannya. |
 | pretty | boolean | No | `false` | Beri indentasi pada keluaran agar mudah dibaca, bukan meminifikasinya menjadi beberapa baris |
 
 ## Example Request {#example-request}

@@ -1,8 +1,8 @@
 ---
 description: "SVG dosyalarını svgo ile küçültün ve sonucu vektör SVG olarak koruyun; hassasiyet, çoklu geçiş, meta veri ve biçimlendirme denetimleriyle."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 0a99caf3c8f1
+i18n_output_hash: 07a15979c5d4
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Bir `.svg` veya `.svgz` dosyası ve bir JSON `settings` alanı içeren multipart
 |-----------|------|----------|---------|-------------|
 | precision | number | Hayır | `3` | Yol verilerinde ve sayılarda korunan ondalık basamak sayısı (0 ile 8). Düşük değerler daha küçük dosyalar ve biraz daha kaba eğriler verir. |
 | multipass | boolean | Hayır | `true` | Çıktı küçülmeyi bırakana kadar optimize ediciyi tekrar tekrar çalıştır |
-| removeMetadata | boolean | Hayır | `true` | Yorumları, `<metadata>`, `<desc>` ve düzenleyiciye özgü verileri kaldır. Korumak için kapatın. |
+| removeMetadata | boolean | Hayır | `true` | Yorumları, `<metadata>`, boş veya düzenleyicilerin ürettiği `<desc>` öğelerini ve düzenleyiciye özgü verileri kaldır. Korumak için kapatın. |
 | pretty | boolean | Hayır | `false` | Çıktıyı birkaç satıra sıkıştırmak yerine okunabilirlik için girintile |
 
 ## Örnek İstek {#example-request}

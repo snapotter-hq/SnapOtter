@@ -1,8 +1,8 @@
 ---
 description: "使用 svgo 压缩 SVG 文件，并将结果保留为矢量 SVG，可控制精度、多遍处理、元数据和格式化。"
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 9b7a1d65734e
+i18n_output_hash: 9726ee9ddc37
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ i18n_hash_version: 2
 |-----------|------|----------|---------|-------------|
 | precision | number | 否 | `3` | 路径数据和数字中保留的小数位数（0 到 8）。数值越低，文件越小，曲线略粗糙。 |
 | multipass | boolean | 否 | `true` | 反复运行优化器，直到输出不再变小 |
-| removeMetadata | boolean | 否 | `true` | 移除注释、`<metadata>`、`<desc>` 和编辑器专用数据。关闭后会保留它们。 |
+| removeMetadata | boolean | 否 | `true` | 移除注释、`<metadata>`、空白或由编辑器生成的 `<desc>` 元素和编辑器专用数据。关闭后会保留它们。 |
 | pretty | boolean | 否 | `false` | 为便于阅读而缩进输出，而不是压缩成几行 |
 
 ## 请求示例 {#example-request}

@@ -1,8 +1,8 @@
 ---
 description: "svgo से SVG फ़ाइलों को छोटा करें और नतीजे को वेक्टर SVG ही रखें, प्रिसिज़न, मल्टीपास, मेटाडेटा और फ़ॉर्मेटिंग के नियंत्रण के साथ।"
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: b63b5cef61db
+i18n_output_hash: 82ad11728002
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ i18n_hash_version: 2
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | पाथ डेटा और संख्याओं में रखे जाने वाले दशमलव अंक (0 से 8)। कम मान से फ़ाइल छोटी होती है और कर्व थोड़े खुरदरे होते हैं। |
 | multipass | boolean | No | `true` | जब तक आउटपुट छोटा होना बंद न हो, ऑप्टिमाइज़र को बार-बार चलाएँ |
-| removeMetadata | boolean | No | `true` | टिप्पणियाँ, `<metadata>`, `<desc>` और एडिटर-विशिष्ट डेटा हटाएँ। इन्हें रखने के लिए इसे बंद करें। |
+| removeMetadata | boolean | No | `true` | टिप्पणियाँ, `<metadata>`, खाली या एडिटर द्वारा बनाए गए `<desc>` एलिमेंट और एडिटर-विशिष्ट डेटा हटाएँ। इन्हें रखने के लिए इसे बंद करें। |
 | pretty | boolean | No | `false` | आउटपुट को कुछ पंक्तियों में समेटने के बजाय पढ़ने में आसान बनाने के लिए इंडेंट करें |
 
 ## Example Request {#example-request}

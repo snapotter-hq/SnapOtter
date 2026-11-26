@@ -1,8 +1,8 @@
 ---
 description: "Minifikuj pliki SVG za pomocą svgo i zachowaj wynik jako wektorowy SVG, z ustawieniami precyzji, wielu przebiegów, metadanych i formatowania."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 78b85a3c5681
+i18n_output_hash: 9a14f2ae4e5d
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Przyjmuje dane formularza multipart z plikiem `.svg` lub `.svgz` oraz polem JSON
 |-----------|------|----------|---------|-------------|
 | precision | number | Nie | `3` | Liczba miejsc po przecinku zachowywanych w danych ścieżek i liczbach (0 do 8). Niższe wartości dają mniejsze pliki i nieco mniej gładkie krzywe. |
 | multipass | boolean | Nie | `true` | Uruchamiaj optymalizator wielokrotnie, aż wynik przestanie się zmniejszać |
-| removeMetadata | boolean | Nie | `true` | Usuń komentarze, `<metadata>`, `<desc>` i dane specyficzne dla edytorów. Wyłącz, aby je zachować. |
+| removeMetadata | boolean | Nie | `true` | Usuń komentarze, `<metadata>`, puste lub wygenerowane przez edytory elementy `<desc>` i dane specyficzne dla edytorów. Wyłącz, aby je zachować. |
 | pretty | boolean | Nie | `false` | Wcinaj wynik dla czytelności zamiast minifikować go do kilku linii |
 
 ## Przykładowe żądanie {#example-request}

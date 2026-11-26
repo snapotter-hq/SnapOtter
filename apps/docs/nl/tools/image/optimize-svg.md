@@ -1,8 +1,8 @@
 ---
 description: "Minimaliseer SVG-bestanden met svgo en bewaar het resultaat als vector-SVG, met instellingen voor precisie, meerdere doorgangen, metadata en opmaak."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 6eeb8eda7e87
+i18n_output_hash: 8b8b65e1567c
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Accepteert multipart-formuliergegevens met een `.svg`- of `.svgz`-bestand en een
 |-----------|------|----------|---------|-------------|
 | precision | number | Nee | `3` | Aantal decimalen dat behouden blijft in padgegevens en getallen (0 tot 8). Lagere waarden geven kleinere bestanden en iets grovere bochten. |
 | multipass | boolean | Nee | `true` | De optimalisatie herhaaldelijk uitvoeren tot de uitvoer niet meer kleiner wordt |
-| removeMetadata | boolean | Nee | `true` | Opmerkingen, `<metadata>`, `<desc>` en editorspecifieke gegevens verwijderen. Zet dit uit om ze te behouden. |
+| removeMetadata | boolean | Nee | `true` | Opmerkingen, `<metadata>`, lege of door editors gegenereerde `<desc>`-elementen en editorspecifieke gegevens verwijderen. Zet dit uit om ze te behouden. |
 | pretty | boolean | Nee | `false` | De uitvoer inspringen voor leesbaarheid in plaats van over weinig regels te minimaliseren |
 
 ## Example Request {#example-request}

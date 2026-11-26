@@ -1,8 +1,8 @@
 ---
 description: "SVG-Dateien mit svgo minimieren und das Ergebnis als Vektor-SVG behalten, mit Steuerung für Genauigkeit, Mehrfachdurchläufe, Metadaten und Formatierung."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 64caa7bee14a
+i18n_output_hash: 22d96ce3db35
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Akzeptiert Multipart-Formulardaten mit einer `.svg`- oder `.svgz`-Datei und eine
 |-----------|------|----------|---------|-------------|
 | precision | number | Nein | `3` | Dezimalstellen, die in Pfaddaten und Zahlen erhalten bleiben (0 bis 8). Niedrigere Werte ergeben kleinere Dateien und etwas gröbere Kurven. |
 | multipass | boolean | Nein | `true` | Den Optimierer wiederholt ausführen, bis die Ausgabe nicht mehr schrumpft |
-| removeMetadata | boolean | Nein | `true` | Kommentare, `<metadata>`, `<desc>` und editorspezifische Daten entfernen. Ausschalten, um sie zu behalten. |
+| removeMetadata | boolean | Nein | `true` | Kommentare, `<metadata>`, leere oder von Editoren erzeugte `<desc>`-Elemente und editorspezifische Daten entfernen. Ausschalten, um sie zu behalten. |
 | pretty | boolean | Nein | `false` | Die Ausgabe zur besseren Lesbarkeit einrücken, statt sie auf wenige Zeilen zu minimieren |
 
 ## Beispielanfrage {#example-request}

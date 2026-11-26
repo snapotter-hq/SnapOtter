@@ -1,8 +1,8 @@
 ---
 description: "Minimizza i file SVG con svgo e mantieni il risultato come SVG vettoriale, con controlli su precisione, passaggi multipli, metadati e formattazione."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: f08efca82cca
+i18n_output_hash: 96384b83d734
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Accetta dati di modulo multipart con un file `.svg` o `.svgz` e un campo JSON `s
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | Cifre decimali mantenute nei dati dei tracciati e nei numeri (da 0 a 8). Valori più bassi producono file più piccoli e curve leggermente meno fini. |
 | multipass | boolean | No | `true` | Esegui l'ottimizzatore più volte finché l'output smette di ridursi |
-| removeMetadata | boolean | No | `true` | Rimuovi commenti, `<metadata>`, `<desc>` e dati specifici dell'editor. Disattivalo per mantenerli. |
+| removeMetadata | boolean | No | `true` | Rimuovi commenti, `<metadata>`, elementi `<desc>` vuoti o generati dagli editor e dati specifici dell'editor. Disattivalo per mantenerli. |
 | pretty | boolean | No | `false` | Indenta l'output per renderlo leggibile invece di minimizzarlo su poche righe |
 
 ## Example Request {#example-request}
