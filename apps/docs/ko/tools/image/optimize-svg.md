@@ -1,8 +1,8 @@
 ---
 description: "svgo로 SVG 파일을 최소화하고 결과를 벡터 SVG로 유지합니다. 정밀도, 다중 패스, 메타데이터, 서식을 설정할 수 있습니다."
-i18n_source_hash: c2601cc2cdd8
+i18n_source_hash: 07a564ab53dd
 i18n_provenance: machine
-i18n_output_hash: 0966549df7b1
+i18n_output_hash: 6344e284cecf
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ i18n_hash_version: 2
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | 경로 데이터와 숫자에 유지할 소수점 자릿수(0~8). 값이 낮을수록 파일이 작아지고 곡선이 약간 거칠어집니다. |
 | multipass | boolean | No | `true` | 출력이 더 줄어들지 않을 때까지 최적화를 반복 실행 |
-| removeMetadata | boolean | No | `true` | 주석, `<metadata>`, `<desc>`, 편집기 전용 데이터를 제거합니다. 유지하려면 끄세요. |
+| removeMetadata | boolean | No | `true` | 주석, `<metadata>`, 비어 있거나 편집기가 생성한 `<desc>` 요소, 편집기 전용 데이터를 제거합니다. 유지하려면 끄세요. |
 | pretty | boolean | No | `false` | 몇 줄로 최소화하는 대신 읽기 쉽도록 출력을 들여쓰기 |
 
 ## Example Request {#example-request}
