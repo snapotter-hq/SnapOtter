@@ -1,8 +1,8 @@
 ---
 description: "Các định dạng tệp được hỗ trợ trên tất cả các modality - hơn 55 định dạng đầu vào hình ảnh, video, audio, PDF, và các định dạng tệp."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: f4d88cdb201a
+i18n_output_hash: 9341bef3b810
 ---
 
 # Các định dạng được hỗ trợ {#supported-formats}

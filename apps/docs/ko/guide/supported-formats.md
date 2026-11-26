@@ -1,8 +1,8 @@
 ---
 description: "모든 모달리티에 걸친 지원 파일 형식 - 55개 이상의 이미지 입력 형식, 비디오, 오디오, PDF, 파일 형식."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: 605faf1f5bd9
+i18n_output_hash: 91ca3b4530f4
 ---
 
 # 지원 형식 {#supported-formats}
