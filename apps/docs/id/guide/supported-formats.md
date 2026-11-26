@@ -1,8 +1,8 @@
 ---
 description: "Format file yang didukung di semua modalitas - 55+ format masukan gambar, video, audio, PDF, dan format file."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: ab3a24f33a69
+i18n_output_hash: 8bc7d23c1093
 ---
 
 # Format yang Didukung {#supported-formats}

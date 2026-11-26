@@ -1,8 +1,8 @@
 ---
 description: "Obsługiwane formaty plików we wszystkich modalnościach - ponad 55 formatów wejściowych obrazów, wideo, audio, PDF oraz formaty plików."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: 58d502fee28e
+i18n_output_hash: 981086d36c21
 ---
 
 # Obsługiwane formaty {#supported-formats}

@@ -1,8 +1,8 @@
 ---
 description: "Stödda filformat över alla modaliteter - 55+ inmatningsformat för bild, video, ljud, PDF och filformat."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: 69fef41bb7b1
+i18n_output_hash: 0cc0e3157dbc
 ---
 
 # Stödda format {#supported-formats}

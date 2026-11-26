@@ -1,8 +1,8 @@
 ---
 description: "Formatos de archivo admitidos en todas las modalidades: más de 55 formatos de entrada de imagen, vídeo, audio, PDF y archivos."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: 61cbc5132bca
+i18n_output_hash: 4da60cc097ef
 ---
 
 # Formatos admitidos {#supported-formats}

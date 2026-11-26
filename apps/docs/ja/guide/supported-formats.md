@@ -1,8 +1,8 @@
 ---
 description: "全モダリティにわたるサポート対象ファイルフォーマット。55種類以上の画像入力フォーマット、ビデオ、オーディオ、PDF、ファイルフォーマット。"
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: f9d3061f0ca9
+i18n_output_hash: cda4745eb1d3
 ---
 
 # サポートされるフォーマット {#supported-formats}

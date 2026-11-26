@@ -1,8 +1,8 @@
 ---
 description: "Ondersteunde bestandsformaten over alle modaliteiten - 55+ afbeeldingsinvoerformaten, video, audio, PDF en bestandsformaten."
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: ee8622311f31
+i18n_output_hash: 47c6cc86273f
 ---
 
 # Ondersteunde formaten {#supported-formats}

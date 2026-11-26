@@ -1,8 +1,8 @@
 ---
 description: "跨所有模态支持的文件格式 - 55+ 种图像输入格式、视频、音频、PDF 和文件格式。"
-i18n_source_hash: e74ad10cd4b2
+i18n_source_hash: 501f5c3c6159
 i18n_provenance: human
-i18n_output_hash: e6302a62d2b1
+i18n_output_hash: 2b8791f09f68
 ---
 
 # 支持的格式 {#supported-formats}
