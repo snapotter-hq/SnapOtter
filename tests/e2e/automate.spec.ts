@@ -1,5 +1,11 @@
 import path from "node:path";
-import { expect, getTestImagePath, test } from "./helpers";
+import {
+  chooseCompressQuality,
+  expect,
+  getTestImagePath,
+  giveResizeStepWidth,
+  test,
+} from "./helpers";
 
 test.describe("Automate Page", () => {
   // Retry flaky tests caused by dev server timing
@@ -210,7 +216,9 @@ test.describe("Automate Page", () => {
 
     await gotoAutomate(page);
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     await addToolStep(page, "Compress", 2);
+    await chooseCompressQuality(page);
 
     const uniqueName = `E2E Pipeline ${Date.now()}`;
     await page.getByRole("button", { name: "Save" }).click();

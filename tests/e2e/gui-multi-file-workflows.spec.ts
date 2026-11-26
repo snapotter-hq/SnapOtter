@@ -1,5 +1,13 @@
 import path from "node:path";
-import { expect, getTestImagePath, test, uploadTestImage, waitForProcessing } from "./helpers";
+import {
+  chooseCompressQuality,
+  expect,
+  getTestImagePath,
+  giveResizeStepWidth,
+  test,
+  uploadTestImage,
+  waitForProcessing,
+} from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Helper: resolve fixture image paths
@@ -706,7 +714,9 @@ test.describe("Pipeline Builder - Save/Load settings preservation", () => {
     await gotoAutomate(page);
 
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     await addToolStep(page, "Compress", 2);
+    await chooseCompressQuality(page);
 
     // Expand Resize step and set width
     const resizeRow = page.locator("[role='button']").filter({ hasText: "Resize" }).first();
@@ -757,7 +767,9 @@ test.describe("Pipeline Builder - Save/Load settings preservation", () => {
     await gotoAutomate(page);
 
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     await addToolStep(page, "Compress", 2);
+    await chooseCompressQuality(page);
     await addToolStep(page, "Convert", 3);
 
     const uniqueName = `E2E Workflow ${Date.now()}`;

@@ -1,5 +1,12 @@
 import path from "node:path";
-import { expect, getTestImagePath, test, waitForProcessing } from "./helpers";
+import {
+  chooseCompressQuality,
+  expect,
+  getTestImagePath,
+  giveResizeStepWidth,
+  test,
+  waitForProcessing,
+} from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Helper: resolve fixture image paths
@@ -666,7 +673,9 @@ test.describe("Pipeline Builder - Save/Load", () => {
     await gotoAutomate(page);
 
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     await addToolStep(page, "Compress", 2);
+    await chooseCompressQuality(page);
 
     const uniqueName = `GUI E2E Pipeline ${Date.now()}`;
 
@@ -697,7 +706,9 @@ test.describe("Pipeline Builder - Save/Load", () => {
 
     // Create and save a pipeline
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     await addToolStep(page, "Compress", 2);
+    await chooseCompressQuality(page);
 
     const uniqueName = `GUI E2E Pipeline ${Date.now()}`;
     await page.getByRole("button", { name: "Save" }).click();
@@ -733,6 +744,7 @@ test.describe("Pipeline Builder - Save/Load", () => {
 
     // Save first pipeline
     await addToolStep(page, "Resize", 1);
+    await giveResizeStepWidth(page);
     const name1 = `GUI E2E Pipeline A ${Date.now()}`;
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByPlaceholder("Pipeline name").fill(name1);
