@@ -18,7 +18,7 @@ Accepts multipart form data with an `.svg` or `.svgz` file and a JSON `settings`
 |-----------|------|----------|---------|-------------|
 | precision | number | No | `3` | Decimal places kept in path data and numbers (0 to 8). Lower values give smaller files and slightly coarser curves. |
 | multipass | boolean | No | `true` | Run the optimizer repeatedly until the output stops shrinking |
-| removeMetadata | boolean | No | `true` | Remove comments, `<metadata>`, `<desc>` and editor-specific data. Turn it off to keep them. |
+| removeMetadata | boolean | No | `true` | Remove comments, `<metadata>`, empty or editor-generated `<desc>` elements and editor-specific data. Turn it off to keep them. |
 | pretty | boolean | No | `false` | Indent the output for readability instead of minifying it onto few lines |
 
 ## Example Request {#example-request}
