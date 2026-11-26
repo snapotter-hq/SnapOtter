@@ -185,6 +185,11 @@ export interface ToolRouteConfig<T> {
    */
   allowPasswordProtectedPdf?: boolean;
   /**
+   * Pixels per inch to rasterize an SVG input at before the tool sees it.
+   * Every SVG becomes a PNG at intake (#5153); this defaults to sharp's 72.
+   */
+  svgDensity?: number;
+  /**
    * When set, produces a redacted copy of settings for the durable DB
    * row. Passwords and other secrets are replaced so they do not persist
    * in the jobs table (retention keeps rows for days). The BullMQ job
@@ -214,6 +219,7 @@ export interface AnyToolRouteConfig {
   processV2?: ToolProcessV2;
   missingBundle?: (settings: unknown) => string | null;
   skipStructuralValidation?: boolean;
+  svgDensity?: number;
   redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
 }
 
@@ -557,6 +563,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                   fname,
                 ),
                 lenient: config.skipStructuralValidation,
+                svgDensity: config.svgDensity,
                 // Reject encrypted PDFs up front only for PDF-only tools (qpdf
                 // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
                 // flag never forces a %PDF- header on non-PDF document tools

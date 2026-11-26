@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
+import {
+  apiToolPath,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  toolInputErrorCode,
+} from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -30,7 +36,7 @@ import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
-import { openSvgAtDensity } from "../../lib/svg-density.js";
+import { renderSvgToPng } from "../../lib/svg-render.js";
 import {
   decompressSvgz,
   isSvgBuffer,
@@ -77,7 +83,9 @@ async function convertSvg(
   filename: string,
   settings: z.infer<typeof settingsSchema>,
 ): Promise<{ buffer: Buffer; filename: string; ext: string }> {
-  let image = openSvgAtDensity(svgBuffer, settings.dpi);
+  let image = sharp(await renderSvgToPng(svgBuffer, { density: settings.dpi })).withDensity(
+    settings.dpi,
+  );
 
   if (settings.width || settings.height) {
     image = image.resize(settings.width, settings.height, { fit: "inside" });
@@ -413,10 +421,12 @@ export function registerSvgToRasterRoute(
             const error =
               imageSizeLimitError(err)?.message ??
               stripInternalPaths(err instanceof Error ? err.message : "Conversion failed");
+            const code = toolInputErrorCode(err);
             faults.push({ filename: file.filename, error });
             errors.push({
               filename: file.filename,
               error,
+              ...(code && { code }),
             });
           }
         }
@@ -811,6 +821,9 @@ export function registerSvgToRasterRoute(
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      if (isToolInputError(err)) {
+        return reply.status(400).send({ error: err.message, code: toolInputErrorCode(err) });
+      }
       const tooLarge = imageSizeLimitError(err);
       if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
       request.log?.warn({ err, toolId: opts.toolId }, "SVG conversion failed");

@@ -1154,8 +1154,9 @@ describe("batch route spooled multipart ingress (#1239)", () => {
 
     expect(reply.statusCode).toBe(202);
     expect(uploadedPayloads).toHaveLength(2);
+    // Stored as the child-rendered PNG, never as SVG text (#5153).
     for (const stored of uploadedPayloads) {
-      expect(stored).toContain("<svg");
+      expect(stored.slice(1, 4)).toBe("PNG");
       expect(stored).not.toContain("<script");
       expect(stored).not.toContain("alert(1)");
     }
@@ -1172,7 +1173,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     });
     expect(metaReply.statusCode).toBe(202);
     expect(uploadedPayloads).toHaveLength(1);
-    expect(uploadedPayloads[0]).toContain("<svg");
+    expect(uploadedPayloads[0].slice(1, 4)).toBe("PNG");
     expect(uploadedPayloads[0]).not.toContain("<script");
     expect(mocks.autoOrient).not.toHaveBeenCalled();
   });
@@ -1218,7 +1219,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       expect(resizeSpy).not.toHaveBeenCalled();
       expect(mocks.autoOrient).not.toHaveBeenCalled();
       expect(uploadedPayloads).toHaveLength(1);
-      expect(uploadedPayloads[0]).toContain("<svg");
+      expect(uploadedPayloads[0].slice(1, 4)).toBe("PNG");
       expect(uploadedPayloads[0]).not.toContain("<script");
       expect(uploadedPayloads[0]).not.toContain("169.254.169.254");
       expect(mocks.recordChildOutcome).toHaveBeenCalledWith(

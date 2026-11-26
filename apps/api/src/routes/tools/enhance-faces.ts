@@ -208,7 +208,6 @@ export function registerEnhanceFaces(app: FastifyInstance) {
           const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
             log: request.log,
             rewriteFilenameToPng: true,
-            rasterizeSvg: true,
           });
           fileBuffer = prepared.buffer;
           filename = prepared.filename;

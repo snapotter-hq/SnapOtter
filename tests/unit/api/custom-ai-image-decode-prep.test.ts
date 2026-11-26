@@ -1295,9 +1295,6 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       }
     }
 
-    const validSvgBuf = Buffer.from(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16"/></svg>',
-    );
     const apngMetaOomSpy = vi
       .spyOn(sharp.prototype, "metadata")
       .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
@@ -1309,26 +1306,16 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       apngMetaOomSpy.mockRestore();
     }
 
-    const pngOomSpy = vi
-      .spyOn(sharp.prototype, "png")
-      .mockImplementationOnce(function (this: Sharp) {
-        return {
-          toBuffer: async () => {
-            throw new RangeError("Array buffer allocation failed");
-          },
-        } as unknown as Sharp;
-      })
-      .mockImplementationOnce(function (this: Sharp) {
-        return {
-          toBuffer: async () => {
-            throw new RangeError("Array buffer allocation failed");
-          },
-        } as unknown as Sharp;
-      });
+    const pngOomSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
+      this: Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as Sharp;
+    });
     try {
-      await expect(
-        prepareRouteImage(validSvgBuf, "icon.svg", "svg", { rasterizeSvg: true }),
-      ).rejects.toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
       await expect(
         prepareRouteImage(validPng, "photo.png", "png", { rasterizeToPng: true }),
       ).rejects.toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);

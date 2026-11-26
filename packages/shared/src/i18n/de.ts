@@ -6235,6 +6235,8 @@ export const de: TranslationKeys = {
         "Dieses PDF ist beschädigt. Lass es durch das Tool „PDF reparieren“ laufen und versuche es dann erneut.",
       PDF_PASSWORD_PROTECTED:
         "Dieses PDF ist passwortgeschützt. Entsperre es mit dem Tool „PDF entsperren“ und versuche es dann erneut.",
+      SVG_TOO_COMPLEX:
+        "Dieses SVG braucht zu lange zum Rendern. Vereinfache seine Filter oder wiederholten Formen und versuche es erneut.",
       IMAGE_TOO_LARGE:
         "Dieses Bild ist zu groß für die Verarbeitung. Verringere seine Abmessungen und versuche es erneut.",
       RESULT_TOO_LARGE:

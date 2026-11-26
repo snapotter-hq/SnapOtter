@@ -6191,6 +6191,8 @@ export const ptBR: TranslationKeys = {
         "Este PDF está danificado. Passe-o pela ferramenta Reparar PDF e tente novamente.",
       PDF_PASSWORD_PROTECTED:
         "Este PDF está protegido por senha. Desbloqueie-o com a ferramenta Desbloquear PDF e tente novamente.",
+      SVG_TOO_COMPLEX:
+        "Este SVG demora demais para ser renderizado. Simplifique os filtros ou as formas repetidas e tente novamente.",
       IMAGE_TOO_LARGE:
         "Esta imagem é grande demais para ser processada. Reduza as dimensões e tente novamente.",
       RESULT_TOO_LARGE:

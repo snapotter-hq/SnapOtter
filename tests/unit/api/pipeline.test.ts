@@ -2233,7 +2233,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       const firstStored = (firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0)).toString(
         "utf-8",
       );
-      expect(firstStored).toContain("<svg");
+      expect(firstStored.slice(1, 4)).toBe("PNG");
       expect(firstStored).not.toContain("<script");
       expect(secondCall ? String(secondCall[0]) : "").toBe(
         `uploads/${lastBatchParentId()}-f1-s0/good.png`,
@@ -3688,7 +3688,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     const firstCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
     const storedBuf = firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0);
     const storedSvg = storedBuf.toString("utf-8");
-    expect(storedSvg).toContain("<svg");
+    expect(storedSvg.slice(1, 4)).toBe("PNG");
     expect(storedSvg).not.toContain("<script");
     expect(storedSvg).not.toContain("alert(1)");
     expect(autoOrient).not.toHaveBeenCalled();
@@ -3739,7 +3739,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(putObjectMock).toHaveBeenCalledTimes(1);
       const execCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
       const execStored = (execCall ? (execCall[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
-      expect(execStored).toContain("<svg");
+      expect(execStored.slice(1, 4)).toBe("PNG");
       expect(execStored).not.toContain("<script");
       expect(execStored).not.toContain("169.254.169.254");
 
@@ -3806,7 +3806,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       const batchStored = (batchCall ? (batchCall[1] as Buffer) : Buffer.alloc(0)).toString(
         "utf-8",
       );
-      expect(batchStored).toContain("<svg");
+      expect(batchStored.slice(1, 4)).toBe("PNG");
       expect(batchStored).not.toContain("<script");
       expect(batchStored).not.toContain("169.254.169.254");
     } finally {

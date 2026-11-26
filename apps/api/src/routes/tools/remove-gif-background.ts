@@ -418,7 +418,6 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
             const preparedBg = await prepareRouteImage(bgBuffer, bgName, bgValidation.format, {
               log: request.log,
               rewriteFilenameToPng: true,
-              rasterizeSvg: true,
               rasterizeToPng: true,
             });
             bgBuffer = preparedBg.buffer;

@@ -103,7 +103,11 @@ import {
   svgClientErrorFields,
 } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
-import { engineUnavailable } from "../modality/image-input.js";
+import {
+  engineUnavailable,
+  rasterizeSvgInput,
+  replaceExtWithPng,
+} from "../modality/image-input.js";
 import { inputHandlerForInput } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
@@ -703,6 +707,22 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       continue;
                     }
                     throw err;
+                  }
+                  try {
+                    processBuffer = await rasterizeSvgInput(processBuffer, {
+                      density: toolConfig.svgDensity,
+                    });
+                    processFilename = replaceExtWithPng(processFilename);
+                  } catch (err) {
+                    if (!(err instanceof InputValidationError)) throw err;
+                    reportEngineUnavailable(err, toolId, request.log);
+                    preFailures.push({
+                      originalIndex: i,
+                      filename: file.filename,
+                      error: err.message,
+                      ...preFailureFaultFields(err),
+                    });
+                    continue;
                   }
                 } else if (!skipPreprocess) {
                   try {

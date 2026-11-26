@@ -6149,6 +6149,8 @@ export const vi: TranslationKeys = {
       PDF_DAMAGED: "PDF này bị hỏng. Hãy xử lý nó bằng công cụ Sửa chữa PDF rồi thử lại.",
       PDF_PASSWORD_PROTECTED:
         "PDF này được bảo vệ bằng mật khẩu. Hãy mở khóa bằng công cụ Mở khóa PDF rồi thử lại.",
+      SVG_TOO_COMPLEX:
+        "SVG này mất quá nhiều thời gian để kết xuất. Hãy đơn giản hóa bộ lọc hoặc các hình lặp lại rồi thử lại.",
       IMAGE_TOO_LARGE: "Hình ảnh này quá lớn để xử lý. Hãy giảm kích thước rồi thử lại.",
       RESULT_TOO_LARGE:
         "Kết quả từ các cài đặt này sẽ quá lớn. Hãy dùng hình ảnh nhỏ hơn hoặc cài đặt cho kết quả nhỏ hơn.",

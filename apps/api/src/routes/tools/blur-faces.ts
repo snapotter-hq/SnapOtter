@@ -214,7 +214,6 @@ export function registerBlurFaces(app: FastifyInstance) {
           const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
             log: request.log,
             rewriteFilenameToPng: true,
-            rasterizeSvg: true,
           });
           fileBuffer = prepared.buffer;
           filename = prepared.filename;
@@ -296,9 +295,7 @@ export function registerBlurFaces(app: FastifyInstance) {
             : ext === "svg" || ext === "svgz"
               ? "svg"
               : "png";
-        const prepared = await prepareRouteImage(inputBuffer, filename, format, {
-          rasterizeSvg: true,
-        });
+        const prepared = await prepareRouteImage(inputBuffer, filename, format, {});
         const orientedBuffer = prepared.buffer;
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         await assertSingleFrameFor(orientedBuffer, outputFormat.format);

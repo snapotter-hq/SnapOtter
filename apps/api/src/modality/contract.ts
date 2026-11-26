@@ -52,6 +52,8 @@ export interface InputHandler {
       maxPixels?: number;
       /** Reject images whose decoded width or height exceeds this side length. */
       maxDimension?: number;
+      /** Pixels per inch an SVG input is rasterized at; defaults to sharp's 72. */
+      svgDensity?: number;
       /** Abort validation, external decoders, and normalization with the job. */
       signal?: AbortSignal;
       /**

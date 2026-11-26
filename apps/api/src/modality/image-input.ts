@@ -22,6 +22,7 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
 import { normalizeOperationalWriteError } from "../lib/object-storage.js";
+import { type RenderSvgOptions, renderSvgToPng } from "../lib/svg-render.js";
 import {
   decompressSvgz,
   isSvgClientError,
@@ -43,6 +44,7 @@ export class ImageInputHandler implements InputHandler {
       scratchDir: string;
       maxDimension?: number;
       maxPixels?: number;
+      svgDensity?: number;
       signal?: AbortSignal;
       log?: FastifyBaseLogger;
       outputFormat?: (input: Buffer) => Promise<string | undefined>;
@@ -192,6 +194,14 @@ export class ImageInputHandler implements InputHandler {
         if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
         throw err;
       }
+      // Tools only ever see the PNG: rendering the SVG anywhere in-process
+      // can't be stopped once it starts (#5153).
+      fileBuffer = await rasterizeSvgInput(fileBuffer, {
+        density: opts.svgDensity,
+        maxPixels: opts.maxPixels,
+        signal: opts.signal,
+      });
+      name = replaceExtWithPng(name);
     }
 
     // AVIF can pass metadata validation but fail pixel decode when
@@ -318,6 +328,35 @@ export function engineUnavailable(err: unknown): InputValidationError {
   );
   converted.cause = err;
   return converted;
+}
+
+export function replaceExtWithPng(filename: string): string {
+  const ext = filename.match(/\.[^.]+$/)?.[0];
+  return ext ? `${filename.slice(0, -ext.length)}.png` : filename;
+}
+
+/**
+ * Rasterize a sanitized SVG to PNG through the deadline-bound child render,
+ * answering the way the rest of intake does: 400 for an SVG too costly to
+ * render or over the pixel cap, 503 when the render process itself can't run,
+ * and 422 for an SVG librsvg can't draw.
+ */
+export async function rasterizeSvgInput(svg: Buffer, opts: RenderSvgOptions): Promise<Buffer> {
+  try {
+    return await renderSvgToPng(svg, opts);
+  } catch (err) {
+    opts.signal?.throwIfAborted();
+    const code = toolInputErrorCode(err);
+    if (code) throw new InputValidationError(errorMessage(err), 400, undefined, code);
+    const fault = asDecoderOutOfMemory(err);
+    if (isDecoderUnavailable(fault)) throw engineUnavailable(fault);
+    if (isPixelSafetyError(err)) throw new InputValidationError(errorMessage(err));
+    throw new InputValidationError(
+      "Failed to render SVG file",
+      422,
+      stripInternalPaths(errorMessage(err)),
+    );
+  }
 }
 
 function boundedSharp(buffer: Buffer, maxPixels?: number) {

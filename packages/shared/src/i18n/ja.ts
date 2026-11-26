@@ -6124,6 +6124,8 @@ export const ja: TranslationKeys = {
         "このPDFは破損しています。PDF 修復ツールで修復してから、もう一度お試しください。",
       PDF_PASSWORD_PROTECTED:
         "このPDFはパスワードで保護されています。PDF ロック解除ツールでロックを解除してから、もう一度お試しください。",
+      SVG_TOO_COMPLEX:
+        "このSVGはレンダリングに時間がかかりすぎます。フィルターや繰り返し図形を簡略化して、もう一度お試しください。",
       IMAGE_TOO_LARGE:
         "この画像は大きすぎて処理できません。サイズを小さくしてもう一度お試しください。",
       RESULT_TOO_LARGE:

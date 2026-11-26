@@ -6170,6 +6170,8 @@ export const id: TranslationKeys = {
       PDF_DAMAGED: "PDF ini rusak. Proses dengan alat Perbaiki PDF, lalu coba lagi.",
       PDF_PASSWORD_PROTECTED:
         "PDF ini dilindungi kata sandi. Buka kuncinya dengan alat Buka Kunci PDF, lalu coba lagi.",
+      SVG_TOO_COMPLEX:
+        "SVG ini terlalu lama dirender. Sederhanakan filter atau bentuk berulangnya, lalu coba lagi.",
       IMAGE_TOO_LARGE: "Gambar ini terlalu besar untuk diproses. Kurangi dimensinya dan coba lagi.",
       RESULT_TOO_LARGE:
         "Hasil dari pengaturan ini akan terlalu besar. Gunakan gambar yang lebih kecil atau pengaturan yang menghasilkan hasil lebih kecil.",

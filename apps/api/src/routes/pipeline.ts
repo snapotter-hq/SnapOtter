@@ -104,7 +104,11 @@ import {
   svgClientErrorFields,
 } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
-import { engineUnavailable } from "../modality/image-input.js";
+import {
+  engineUnavailable,
+  rasterizeSvgInput,
+  replaceExtWithPng,
+} from "../modality/image-input.js";
 import { inputHandlerForInput } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
@@ -634,6 +638,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     return reply.status(unavailable.statusCode).send(body);
                   }
                   throw err;
+                }
+                try {
+                  processBuffer = await rasterizeSvgInput(processBuffer, {
+                    density: getToolConfig(firstToolId ?? "")?.svgDensity,
+                  });
+                  filename = replaceExtWithPng(filename);
+                } catch (err) {
+                  if (!(err instanceof InputValidationError)) throw err;
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
                 }
               } else {
                 try {
@@ -1926,6 +1943,23 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       continue;
                     }
                     throw err;
+                  }
+                  const firstStepToolId = parsedSteps[0]?.resolvedToolId;
+                  try {
+                    processBuffer = await rasterizeSvgInput(processBuffer, {
+                      density: getToolConfig(firstStepToolId ?? "")?.svgDensity,
+                    });
+                    processFilename = replaceExtWithPng(processFilename);
+                  } catch (err) {
+                    if (!(err instanceof InputValidationError)) throw err;
+                    reportEngineUnavailable(err, firstStepToolId ?? "pipeline", request.log);
+                    preFailures.push({
+                      originalIndex: fi,
+                      filename: file.filename,
+                      error: err.message,
+                      ...preFailureFaultFields(err),
+                    });
+                    continue;
                   }
                 } else {
                   try {

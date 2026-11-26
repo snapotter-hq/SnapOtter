@@ -6085,6 +6085,8 @@ export const en = {
       PDF_DAMAGED: "This PDF is damaged. Run it through the Repair PDF tool, then try again.",
       PDF_PASSWORD_PROTECTED:
         "This PDF is password-protected. Unlock it with the Unlock PDF tool, then try again.",
+      SVG_TOO_COMPLEX:
+        "This SVG takes too long to render. Simplify its filters or repeated shapes and try again.",
       IMAGE_TOO_LARGE: "This image is too large to process. Reduce its dimensions and try again.",
       RESULT_TOO_LARGE:
         "The result these settings would produce is too large. Use a smaller image or settings that make a smaller result.",

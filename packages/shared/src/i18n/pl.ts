@@ -6192,6 +6192,8 @@ export const pl: TranslationKeys = {
         "Ten plik PDF jest uszkodzony. Przepuść go przez narzędzie Napraw PDF i spróbuj ponownie.",
       PDF_PASSWORD_PROTECTED:
         "Ten plik PDF jest chroniony hasłem. Odblokuj go narzędziem Odblokuj PDF i spróbuj ponownie.",
+      SVG_TOO_COMPLEX:
+        "Renderowanie tego pliku SVG trwa zbyt długo. Uprość jego filtry lub powtarzane kształty i spróbuj ponownie.",
       IMAGE_TOO_LARGE:
         "Ten obraz jest za duży do przetworzenia. Zmniejsz jego wymiary i spróbuj ponownie.",
       RESULT_TOO_LARGE:
