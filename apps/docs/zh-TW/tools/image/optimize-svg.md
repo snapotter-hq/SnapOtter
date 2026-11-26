@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - 輸入必須是 SVG 或 SVGZ 檔案。點陣圖會被拒絕，回傳 `400`，錯誤碼為 `IMAGE_UNDECODABLE`。
 - `.svgz` 輸入會先被解壓縮，輸出一律是一般的 `.svg`。
-- SVG 解壓縮後限制為 2 MB。較大的檔案會被拒絕，回傳 `400`，錯誤碼為 `SVG_TOO_LARGE`。
+- SVG 解壓縮後限制為 10 MB。較大的檔案會被拒絕，回傳 `400`，錯誤碼為 `SVG_TOO_LARGE`。
 - `viewBox` 和 `<title>` 一律會保留，因此圖形仍可縮放並保留其無障礙名稱。
 - 輸入和輸出都會經過 SVG 清理器，它會移除指令碼和其他主動內容。
 - 對於路徑密集的圖稿，降低 `precision` 最能節省檔案大小。請在 0 到 2 時以目視檢查結果。

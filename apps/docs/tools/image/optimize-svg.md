@@ -44,7 +44,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Input must be an SVG or SVGZ file. A raster image is rejected with a `400` and the code `IMAGE_UNDECODABLE`.
 - `.svgz` input is inflated first, and the output is always a plain `.svg`.
-- The SVG is limited to 2 MB after inflation. A larger file is rejected with a `400` and the code `SVG_TOO_LARGE`.
+- The SVG is limited to 10 MB after inflation. A larger file is rejected with a `400` and the code `SVG_TOO_LARGE`.
 - The `viewBox` and `<title>` are always kept, so the graphic still scales and keeps its accessible name.
 - Input and output both pass through the SVG sanitizer, which strips scripts and other active content.
 - Lowering `precision` is the biggest size saver for path-heavy artwork. Check the result visually at 0 to 2.

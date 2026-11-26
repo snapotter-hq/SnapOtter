@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Đầu vào phải là tệp SVG hoặc SVGZ. Ảnh raster bị từ chối với `400` và mã `IMAGE_UNDECODABLE`.
 - Đầu vào `.svgz` được giải nén trước, và đầu ra luôn là `.svg` thông thường.
-- SVG bị giới hạn 2 MB sau khi giải nén. Tệp lớn hơn bị từ chối với `400` và mã `SVG_TOO_LARGE`.
+- SVG bị giới hạn 10 MB sau khi giải nén. Tệp lớn hơn bị từ chối với `400` và mã `SVG_TOO_LARGE`.
 - `viewBox` và `<title>` luôn được giữ lại, nên hình vẽ vẫn co giãn được và giữ tên truy cập.
 - Cả đầu vào lẫn đầu ra đều đi qua bộ làm sạch SVG, bộ này loại bỏ script và nội dung hoạt động khác.
 - Giảm `precision` giúp tiết kiệm dung lượng nhiều nhất với hình có nhiều đường dẫn. Hãy kiểm tra kết quả bằng mắt ở mức 0 đến 2.

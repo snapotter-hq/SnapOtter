@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Girdi bir SVG veya SVGZ dosyası olmalıdır. Bir raster görsel `400` ve `IMAGE_UNDECODABLE` koduyla reddedilir.
 - `.svgz` girdisi önce açılır ve çıktı her zaman düz bir `.svg` dosyasıdır.
-- SVG, açıldıktan sonra 2 MB ile sınırlıdır. Daha büyük bir dosya `400` ve `SVG_TOO_LARGE` koduyla reddedilir.
+- SVG, açıldıktan sonra 10 MB ile sınırlıdır. Daha büyük bir dosya `400` ve `SVG_TOO_LARGE` koduyla reddedilir.
 - `viewBox` ve `<title>` her zaman korunur, böylece grafik ölçeklenmeye devam eder ve erişilebilir adını korur.
 - Girdi ve çıktı, betikleri ve diğer etkin içeriği kaldıran SVG temizleyicisinden geçer.
 - `precision` değerini düşürmek, yol açısından yoğun çizimlerde en büyük boyut tasarrufunu sağlar. Sonucu 0 ile 2 arasında gözle kontrol edin.

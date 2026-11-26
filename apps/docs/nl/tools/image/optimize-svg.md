@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - De invoer moet een SVG- of SVGZ-bestand zijn. Een rasterafbeelding wordt geweigerd met `400` en de code `IMAGE_UNDECODABLE`.
 - `.svgz`-invoer wordt eerst uitgepakt, en de uitvoer is altijd een gewone `.svg`.
-- De SVG is na het uitpakken beperkt tot 2 MB. Een groter bestand wordt geweigerd met `400` en de code `SVG_TOO_LARGE`.
+- De SVG is na het uitpakken beperkt tot 10 MB. Een groter bestand wordt geweigerd met `400` en de code `SVG_TOO_LARGE`.
 - `viewBox` en `<title>` blijven altijd behouden, zodat de afbeelding blijft schalen en haar toegankelijke naam houdt.
 - Invoer en uitvoer gaan beide door de SVG-sanitizer, die scripts en andere actieve inhoud verwijdert.
 - Een lagere `precision` bespaart het meeste ruimte bij padzware afbeeldingen. Controleer het resultaat visueel bij 0 tot 2.

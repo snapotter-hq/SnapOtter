@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Masukan harus berupa file SVG atau SVGZ. Gambar raster ditolak dengan `400` dan kode `IMAGE_UNDECODABLE`.
 - Masukan `.svgz` diekstrak lebih dulu, dan keluarannya selalu berupa `.svg` biasa.
-- SVG dibatasi 2 MB setelah diekstrak. File yang lebih besar ditolak dengan `400` dan kode `SVG_TOO_LARGE`.
+- SVG dibatasi 10 MB setelah diekstrak. File yang lebih besar ditolak dengan `400` dan kode `SVG_TOO_LARGE`.
 - `viewBox` dan `<title>` selalu dipertahankan, sehingga grafik tetap dapat diskalakan dan mempertahankan nama aksesibelnya.
 - Masukan dan keluaran sama-sama melewati sanitizer SVG, yang menghapus skrip dan konten aktif lainnya.
 - Menurunkan `precision` memberi penghematan ukuran terbesar untuk karya dengan banyak path. Periksa hasilnya secara visual pada nilai 0 sampai 2.

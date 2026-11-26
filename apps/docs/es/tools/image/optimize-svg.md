@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - La entrada debe ser un archivo SVG o SVGZ. Una imagen rasterizada se rechaza con `400` y el código `IMAGE_UNDECODABLE`.
 - La entrada `.svgz` se descomprime primero, y la salida siempre es un `.svg` sin comprimir.
-- El SVG está limitado a 2 MB tras descomprimirlo. Un archivo mayor se rechaza con `400` y el código `SVG_TOO_LARGE`.
+- El SVG está limitado a 10 MB tras descomprimirlo. Un archivo mayor se rechaza con `400` y el código `SVG_TOO_LARGE`.
 - `viewBox` y `<title>` siempre se conservan, así que el gráfico sigue escalando y mantiene su nombre accesible.
 - La entrada y la salida pasan por el sanitizador de SVG, que elimina scripts y otro contenido activo.
 - Bajar `precision` es el mayor ahorro de tamaño en ilustraciones con muchos trazados. Comprueba el resultado visualmente entre 0 y 2.

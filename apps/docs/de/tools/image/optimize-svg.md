@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Die Eingabe muss eine SVG- oder SVGZ-Datei sein. Ein Rasterbild wird mit `400` und dem Code `IMAGE_UNDECODABLE` abgelehnt.
 - `.svgz`-Eingaben werden zuerst entpackt, und die Ausgabe ist immer eine einfache `.svg`-Datei.
-- Das SVG ist nach dem Entpacken auf 2 MB begrenzt. Eine größere Datei wird mit `400` und dem Code `SVG_TOO_LARGE` abgelehnt.
+- Das SVG ist nach dem Entpacken auf 10 MB begrenzt. Eine größere Datei wird mit `400` und dem Code `SVG_TOO_LARGE` abgelehnt.
 - `viewBox` und `<title>` bleiben immer erhalten, damit die Grafik weiterhin skaliert und ihren barrierefreien Namen behält.
 - Eingabe und Ausgabe durchlaufen beide den SVG-Sanitizer, der Skripte und andere aktive Inhalte entfernt.
 - Eine niedrigere `precision` spart bei pfadlastigen Grafiken am meisten Platz. Prüfe das Ergebnis bei 0 bis 2 visuell.

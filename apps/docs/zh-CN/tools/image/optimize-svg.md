@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - 输入必须是 SVG 或 SVGZ 文件。栅格图像会被拒绝，返回 `400`，错误代码为 `IMAGE_UNDECODABLE`。
 - `.svgz` 输入会先被解压，输出始终是普通的 `.svg`。
-- SVG 解压后限制为 2 MB。更大的文件会被拒绝，返回 `400`，错误代码为 `SVG_TOO_LARGE`。
+- SVG 解压后限制为 10 MB。更大的文件会被拒绝，返回 `400`，错误代码为 `SVG_TOO_LARGE`。
 - `viewBox` 和 `<title>` 始终会保留，因此图形仍可缩放并保留其无障碍名称。
 - 输入和输出都会经过 SVG 清理器，它会移除脚本和其他活动内容。
 - 对于路径密集的图稿，降低 `precision` 最能节省体积。请在 0 到 2 时目视检查结果。

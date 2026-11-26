@@ -48,7 +48,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/optimize-svg \
 
 - Indata måste vara en SVG- eller SVGZ-fil. En rasterbild avvisas med `400` och koden `IMAGE_UNDECODABLE`.
 - `.svgz`-indata packas upp först, och utdata är alltid en vanlig `.svg`.
-- SVG-filen är begränsad till 2 MB efter uppackning. En större fil avvisas med `400` och koden `SVG_TOO_LARGE`.
+- SVG-filen är begränsad till 10 MB efter uppackning. En större fil avvisas med `400` och koden `SVG_TOO_LARGE`.
 - `viewBox` och `<title>` behålls alltid, så att grafiken fortfarande skalas och behåller sitt tillgängliga namn.
 - Både indata och utdata passerar SVG-saneraren, som tar bort skript och annat aktivt innehåll.
 - Att sänka `precision` sparar mest utrymme för banintensiv grafik. Kontrollera resultatet visuellt vid 0 till 2.
