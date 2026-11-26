@@ -88,6 +88,10 @@ const CONVERSION_ALIASES = [
   "converter",
 ] as const;
 
+const MULTI_WORD_CONVERSION_ALIAS_PATTERNS = CONVERSION_ALIASES.filter((alias) =>
+  alias.includes(" "),
+).map((alias) => new RegExp(`(^|[^a-z0-9])${alias.split(" ").join("[\\s_-]+")}(?![a-z0-9])`, "gi"));
+
 const CONNECTOR_TOKENS = new Set(["to"]);
 const CONVERSION_INTENT_TOKENS = new Set(contentTokens(CONVERSION_ALIASES.join(" ")));
 const DIRECTION_FILLER_TOKENS = new Set([
@@ -529,7 +533,17 @@ function consecutiveQueryPhrases(values: string[]): string[] {
   return unique(phrases);
 }
 
-function buildQuery(rawQuery: string): {
+// "change format yaml" has to score as "convert yaml": otherwise "change" and
+// "format" count as words the tool must contain, and none does (#5191). Only
+// the phrase is swapped, so "jpg -> png" keeps its arrow.
+function canonicalizeConversionPhrases(rawQuery: string): string {
+  return MULTI_WORD_CONVERSION_ALIAS_PATTERNS.reduce(
+    (query, pattern) => query.replace(pattern, "$1convert"),
+    rawQuery,
+  );
+}
+
+function buildQuery(query: string): {
   normalized: string;
   phrases: string[];
   partialPhrases: string[];
@@ -539,6 +553,7 @@ function buildQuery(rawQuery: string): {
   conversionTargetTokens: string[];
   conversionDirection: ConversionDirection;
 } {
+  const rawQuery = canonicalizeConversionPhrases(query);
   // Split joined forms ("cr3tojpg") so the raw phrase doesn't demand a token
   // no tool contains (#1420).
   const raw = tokenize(plainNormalize(rawQuery)).map(expandCompactConversionToken).join(" ");
@@ -1057,9 +1072,11 @@ function relevantResults(rawQuery: string, candidates: ToolSearchResult[]): Tool
       result,
     ]),
   );
-  return filterRelevantTools(rawQuery, [...byTool.keys()], TASK_ALIAS_GROUPS).flatMap(
-    (tool) => byTool.get(tool) ?? [],
-  );
+  return filterRelevantTools(
+    canonicalizeConversionPhrases(rawQuery),
+    [...byTool.keys()],
+    TASK_ALIAS_GROUPS,
+  ).flatMap((tool) => byTool.get(tool) ?? []);
 }
 
 export function searchTools(
