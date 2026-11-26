@@ -2726,6 +2726,9 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري إضافة النص",
       download: "تنزيل",
       defaultText: "نصك هنا",
+      previewImage: "معاينة الصورة",
+      boxLabel: "مربع النص. اسحبه لنقله أو استخدم مفاتيح الأسهم.",
+      dragHint: "اسحب المربع لتحديد موضع النص. المربع تقريبي، ويُنشأ الملف الذي تنزّله على الخادم.",
     },
     compose: {
       screen: "شاشة",

@@ -2767,6 +2767,11 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajout du texte en superposition",
       download: "Télécharger",
       defaultText: "Votre texte ici",
+      previewImage: "Aperçu de l'image",
+      boxLabel:
+        "Zone de texte. Faites-la glisser pour la déplacer, ou utilisez les touches fléchées.",
+      dragHint:
+        "Faites glisser la zone pour placer le texte. La zone est approximative ; le fichier téléchargé est généré sur le serveur.",
     },
     compose: {
       screen: "Écran",

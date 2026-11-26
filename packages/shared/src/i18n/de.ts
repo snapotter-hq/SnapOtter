@@ -2772,6 +2772,10 @@ export const de: TranslationKeys = {
       progressLabel: "Textüberlagerung wird hinzugefügt",
       download: "Herunterladen",
       defaultText: "Ihr Text hier",
+      previewImage: "Bildvorschau",
+      boxLabel: "Textfeld. Zum Verschieben ziehen oder die Pfeiltasten verwenden.",
+      dragHint:
+        "Ziehen Sie das Feld, um den Text zu platzieren. Das Feld ist nur eine Annäherung; der Download wird auf dem Server gerendert.",
     },
     compose: {
       screen: "Bildschirm",

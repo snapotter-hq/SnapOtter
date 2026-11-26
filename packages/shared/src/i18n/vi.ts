@@ -2746,6 +2746,10 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang thêm lớp phủ văn bản",
       download: "Tải xuống",
       defaultText: "Nhập văn bản tại đây",
+      previewImage: "Xem trước ảnh",
+      boxLabel: "Khung văn bản. Kéo để di chuyển hoặc dùng phím mũi tên.",
+      dragHint:
+        "Kéo khung để đặt văn bản. Khung chỉ mang tính tương đối; tệp tải xuống được tạo trên máy chủ.",
     },
     compose: {
       screen: "Màn hình",

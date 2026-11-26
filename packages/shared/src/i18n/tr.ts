@@ -2755,6 +2755,10 @@ export const tr: TranslationKeys = {
       progressLabel: "Metin kaplaması ekleniyor",
       download: "İndir",
       defaultText: "Metninizi Buraya Yazın",
+      previewImage: "Görsel önizlemesi",
+      boxLabel: "Metin kutusu. Taşımak için sürükleyin veya ok tuşlarını kullanın.",
+      dragHint:
+        "Metni yerleştirmek için kutuyu sürükleyin. Kutu yaklaşıktır; indirilen dosya sunucuda oluşturulur.",
     },
     compose: {
       screen: "Ekran",

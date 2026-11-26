@@ -2705,6 +2705,10 @@ export const ja: TranslationKeys = {
       progressLabel: "テキストオーバーレイを追加中",
       download: "ダウンロード",
       defaultText: "ここにテキストを入力",
+      previewImage: "画像プレビュー",
+      boxLabel: "テキストボックス。ドラッグして移動するか、矢印キーを使います。",
+      dragHint:
+        "ボックスをドラッグしてテキストの位置を決めます。ボックスはおおよその目安で、ダウンロードされるファイルはサーバーで生成されます。",
     },
     compose: {
       screen: "スクリーン",

@@ -2746,6 +2746,10 @@ export const sv: TranslationKeys = {
       progressLabel: "Lägger till textoverlay",
       download: "Ladda ner",
       defaultText: "Din text här",
+      previewImage: "Bildförhandsvisning",
+      boxLabel: "Textruta. Dra för att flytta den eller använd piltangenterna.",
+      dragHint:
+        "Dra rutan för att placera texten. Rutan är ungefärlig; nedladdningen skapas på servern.",
     },
     compose: {
       screen: "Skärm",

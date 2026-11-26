@@ -2690,6 +2690,10 @@ export const en = {
       progressLabel: "Adding text overlay",
       download: "Download",
       defaultText: "Your Text Here",
+      previewImage: "Image preview",
+      boxLabel: "Text box. Drag to move it, or use the arrow keys.",
+      dragHint:
+        "Drag the box to place the text. The box is approximate; the download is rendered on the server.",
     },
     compose: {
       processedKb: "Processed: {size} KB",

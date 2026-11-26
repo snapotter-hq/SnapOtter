@@ -2751,6 +2751,10 @@ export const id: TranslationKeys = {
       progressLabel: "Menambahkan overlay teks",
       download: "Unduh",
       defaultText: "Teks Anda di Sini",
+      previewImage: "Pratinjau gambar",
+      boxLabel: "Kotak teks. Seret untuk memindahkan atau gunakan tombol panah.",
+      dragHint:
+        "Seret kotak untuk menempatkan teks. Kotak ini hanya perkiraan; file unduhan dibuat di server.",
     },
     compose: {
       screen: "Layar",

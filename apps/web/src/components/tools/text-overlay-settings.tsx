@@ -4,18 +4,27 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
+import type { TextOverlayLayout, TextPosition } from "@/lib/text-overlay-placement";
 import { useFileStore } from "@/stores/file-store";
 
-type TextPosition = "top" | "center" | "bottom" | "custom";
+/** Links the controls to the draggable box on the tool page preview. */
+export interface TextOverlayProps {
+  /** Latest layout, for the preview box to draw. */
+  onLayoutChange: (layout: TextOverlayLayout) => void;
+  /** Where the box was last dropped. A new object is a new drop; it sets x, y and "custom". */
+  placement: { x: number; y: number } | null;
+}
 
 export interface TextOverlayControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
+  textOverlayProps?: TextOverlayProps;
 }
 
 export function TextOverlayControls({
   settings: initialSettings,
   onChange,
+  textOverlayProps,
 }: TextOverlayControlsProps) {
   const { t } = useTranslation();
   const ts = t.toolSettings["text-overlay"];
@@ -55,7 +64,24 @@ export function TextOverlayControls({
     onChangeRef.current = onChange;
   });
 
+  const onLayoutChangeRef = useRef(textOverlayProps?.onLayoutChange);
   useEffect(() => {
+    onLayoutChangeRef.current = textOverlayProps?.onLayoutChange;
+  });
+
+  // Skip a drop left over from before this mount, so reopening the tool keeps its own values.
+  const appliedPlacementRef = useRef(textOverlayProps?.placement ?? null);
+  const placement = textOverlayProps?.placement ?? null;
+  useEffect(() => {
+    if (!placement || placement === appliedPlacementRef.current) return;
+    appliedPlacementRef.current = placement;
+    setPosition("custom");
+    setX(placement.x);
+    setY(placement.y);
+  }, [placement]);
+
+  useEffect(() => {
+    onLayoutChangeRef.current?.({ text, fontSize, color, position, x, y, wrap, maxWidth });
     onChangeRef.current?.({
       text,
       fontSize,
@@ -253,7 +279,7 @@ export function TextOverlayControls({
   );
 }
 
-export function TextOverlaySettings() {
+export function TextOverlaySettings({ textOverlayProps }: { textOverlayProps?: TextOverlayProps }) {
   const { t } = useTranslation();
   const ts = t.toolSettings["text-overlay"];
   const { files } = useFileStore();
@@ -282,7 +308,7 @@ export function TextOverlaySettings() {
 
   return (
     <div className="space-y-4">
-      <TextOverlayControls onChange={setSettings} />
+      <TextOverlayControls onChange={setSettings} textOverlayProps={textOverlayProps} />
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 

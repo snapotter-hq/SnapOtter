@@ -2432,6 +2432,9 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在加入文字覆疊",
       download: "下載",
       defaultText: "在此輸入文字",
+      previewImage: "圖片預覽",
+      boxLabel: "文字方塊。拖曳即可移動，也可以使用方向鍵。",
+      dragHint: "拖曳方框來放置文字。方框只是大略位置，下載的檔案由伺服器算繪。",
     },
     compose: {
       screen: "螢幕",

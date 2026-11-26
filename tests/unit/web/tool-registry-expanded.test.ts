@@ -323,9 +323,9 @@ describe("toolRegistry (expanded)", () => {
       expect(entry?.displayMode).toBe("before-after");
     });
 
-    it("text-overlay uses before-after display", () => {
+    it("text-overlay uses interactive-text display (#4957)", () => {
       const entry = getToolRegistryEntry("text-overlay");
-      expect(entry?.displayMode).toBe("before-after");
+      expect(entry?.displayMode).toBe("interactive-text");
     });
 
     it("replace-color uses before-after display", () => {

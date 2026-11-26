@@ -2754,6 +2754,10 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Adicionando texto sobreposto",
       download: "Baixar",
       defaultText: "Seu Texto Aqui",
+      previewImage: "Pré-visualização da imagem",
+      boxLabel: "Caixa de texto. Arraste para mover ou use as teclas de seta.",
+      dragHint:
+        "Arraste a caixa para posicionar o texto. A caixa é aproximada; o arquivo baixado é gerado no servidor.",
     },
     compose: {
       screen: "Tela",

@@ -2755,6 +2755,10 @@ export const pl: TranslationKeys = {
       progressLabel: "Dodawanie nakładki tekstowej",
       download: "Pobierz",
       defaultText: "Twój tekst tutaj",
+      previewImage: "Podgląd obrazu",
+      boxLabel: "Pole tekstowe. Przeciągnij, aby je przesunąć, lub użyj klawiszy strzałek.",
+      dragHint:
+        "Przeciągnij pole, aby umieścić tekst. Pole jest przybliżone; pobierany plik powstaje na serwerze.",
     },
     compose: {
       screen: "Ekran",

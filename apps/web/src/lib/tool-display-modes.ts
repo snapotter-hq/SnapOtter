@@ -16,6 +16,7 @@ export type DisplayMode =
   | "interactive-crop"
   | "interactive-eraser"
   | "interactive-sign"
+  | "interactive-text"
   | "interactive-split"
   | "no-dropzone"
   | "custom-results"
@@ -39,7 +40,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   // Watermark & overlay
   "watermark-text": "before-after",
   "watermark-image": "before-after",
-  "text-overlay": "before-after",
+  "text-overlay": "interactive-text",
   compose: "before-after",
   "meme-generator": "no-dropzone",
 
