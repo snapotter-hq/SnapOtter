@@ -33,6 +33,9 @@ jobs:
       - name: Build Docs
         run: pnpm --filter @snapotter/docs docs:build
         env:
+          # Same heap as the E2E Docs job (#5261); the default is too small
+          # for about 3,950 pages.
+          NODE_OPTIONS: --max-old-space-size=6144
           # Authenticated GitHub API (5,000 req/hr) so the build-time star-count
           # fetch isn't rate-limited on shared runner IPs (60 req/hr unauth).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

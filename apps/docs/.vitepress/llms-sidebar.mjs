@@ -63,6 +63,16 @@ export function llmsIgnorePatterns(localeCodes) {
   };
 }
 
+/**
+ * Pages the plugin never reads at all. Neither LLM file lists the translated
+ * trees, but without this the plugin still held every locale's content in
+ * memory and wrote a .md copy of each, which ran `vitepress build` out of a
+ * 4 GB heap (#5261).
+ */
+export function llmsIgnoreFiles(localeCodes) {
+  return localeCodes.map((code) => `${code}/**`);
+}
+
 // Explicit heading ids (`## Quick Start {#quick-start}`) are VitePress syntax;
 // the plugin copies them into link titles and headings verbatim.
 // The plugin escapes a leading underscore, so `{#_401-x}` arrives as `{#\_401-x}`.

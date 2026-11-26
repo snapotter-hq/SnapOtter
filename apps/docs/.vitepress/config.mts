@@ -7,6 +7,7 @@ import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
 import { t } from "./i18n/ui.mjs";
 import { buildJsonLd } from "./jsonld.mts";
 import {
+  llmsIgnoreFiles,
   llmsIgnorePatterns,
   llmsSidebar,
   stripHeadingIdsFromLlmsOutputs,
@@ -301,6 +302,7 @@ export default defineConfig({
       llmstxt({
         domain: "https://docs.snapotter.com",
         sidebar: llmsSidebar,
+        ignoreFiles: llmsIgnoreFiles(NON_EN.map((l) => l.code)),
         ignoreFilesPerOutput: llmsIgnorePatterns(NON_EN.map((l) => l.code)),
         customLLMsTxtTemplate: `# {title}
 
