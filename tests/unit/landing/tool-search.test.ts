@@ -355,12 +355,15 @@ describe("landing searchTools with real catalog metadata", () => {
   });
 
   // #5191: "change" and "format" counted as words the tool had to contain, so
-  // these phrases found nothing while "convert" found the converter.
+  // these phrases found nothing while "convert" found the converter. A bare
+  // format word ranks that format's presets above the generic converter (as
+  // "convert png" does), so the ttf rows expect the top ttf preset (#5282).
   it.each([
     ["change format yaml", "convert yaml", "yaml-json"],
-    ["change format ttf", "convert ttf", "convert-font"],
+    ["convert ttf", "convert ttf", "ttf-to-woff2"],
+    ["change format ttf", "convert ttf", "ttf-to-woff2"],
     ["change file type xml", "convert xml", "json-xml"],
-    ["format converter ttf", "convert ttf", "convert-font"],
+    ["format converter ttf", "convert ttf", "ttf-to-woff2"],
     ["Change File Type png to jpg", "convert png to jpg", "png-to-jpg"],
     ["change-format jpg -> png", "convert jpg -> png", "jpg-to-png"],
     ["change format", "convert", "convert"],
