@@ -264,6 +264,19 @@ describe("locale specs match what the i18n adapter writes (#5012)", () => {
     expect(rendered === onDisk, regenerate).toBe(true);
   });
 
+  // An unstamped field is an English fallback the next write replaces with the
+  // current English. Hand-written text without a stamp would be lost (#5184).
+  it.each(locales)("openapi.%s.yaml has no unstamped text that differs from English", (locale) => {
+    const english = new Map(proseFields(load(readFileSync(join(specDir, "openapi.yaml"), "utf8"))));
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML
+    const spec = load(readFileSync(join(specDir, `openapi.${locale}.yaml`), "utf8")) as any;
+    const stamped = spec["x-i18n"]?.entries ?? {};
+    const unstamped = proseFields(spec)
+      .filter(([id, text]) => !stamped[id] && text !== english.get(id))
+      .map(([id]) => id);
+    expect(unstamped, "stamp these as provenance: human, or restore the English").toEqual([]);
+  });
+
   it.each(locales)(
     "openapi.%s.yaml machine entries still match their outputHash",
     async (locale) => {

@@ -202,12 +202,15 @@ describe("api-spec adapter write/load round-trip", () => {
     expect(got?.stale).toBe(true);
   });
 
-  it("keeps existing locale text for a unit that has no entry (#5012)", async () => {
+  it("keeps a stamped human translation through a write that has no new entry for it (#5012)", async () => {
     const adapter = makeApiSpecAdapter({ dir });
-    const localized = structuredClone(FIXTURE) as typeof FIXTURE & Record<string, unknown>;
-    localized.info.description = "Vorhandener Text ohne Stempel.";
-    localized["x-i18n"] = { locale: "de", entries: {} };
-    writeFileSync(join(dir, "openapi.de.yaml"), yaml.dump(localized, { lineWidth: -1 }), "utf8");
+    const human = {
+      text: "Vorhandener Text.",
+      sourceHash: hash("Root prose to translate."),
+      provenance: "human" as const,
+      outputHash: hash("Vorhandener Text."),
+    };
+    await adapter.write("de", new Map([["info.description", human]]));
 
     const entry = {
       text: "Groesse aendern",
@@ -215,13 +218,29 @@ describe("api-spec adapter write/load round-trip", () => {
       provenance: "machine" as const,
       outputHash: hash("Groesse aendern"),
     };
-    await adapter.write("de", new Map([["paths./api/v1/tools/image/resize.post.summary", entry]]));
+    const merged = await adapter.load("de");
+    merged.set("paths./api/v1/tools/image/resize.post.summary", entry);
+    await adapter.write("de", merged);
 
     // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
     const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
     expect(written.paths["/api/v1/tools/image/resize"].post.summary).toBe("Groesse aendern");
-    expect(written.info.description).toBe("Vorhandener Text ohne Stempel.");
-    // Still unstamped, so the next export offers it for translation.
+    expect(written.info.description).toBe("Vorhandener Text.");
+    expect(written["x-i18n"].entries["info.description"].provenance).toBe("human");
+  });
+
+  it("writes the current English over an unstamped field so it follows English edits (#5184)", async () => {
+    const adapter = makeApiSpecAdapter({ dir });
+    const localized = structuredClone(FIXTURE) as typeof FIXTURE & Record<string, unknown>;
+    localized.info.description = "Old English fallback.";
+    localized["x-i18n"] = { locale: "de", entries: {} };
+    writeFileSync(join(dir, "openapi.de.yaml"), yaml.dump(localized, { lineWidth: -1 }), "utf8");
+
+    await adapter.write("de", new Map());
+
+    // biome-ignore lint/suspicious/noExplicitAny: parsed YAML fixture assertions
+    const written = yaml.load(readFileSync(join(dir, "openapi.de.yaml"), "utf8")) as any;
+    expect(written.info.description).toBe("Root prose to translate.");
     expect(written["x-i18n"].entries["info.description"]).toBeUndefined();
   });
 

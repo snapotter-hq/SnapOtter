@@ -152,26 +152,14 @@ export function makeApiSpecAdapter({ dir = DEFAULT_DIR } = {}) {
     const english = loadEnglishSpec(dir);
     const localized = clone(english);
     const stamp = {};
-    const file = join(dir, `openapi.${locale}.yaml`);
-    // Text already in the locale file but unstamped (hand-written, or added
-    // before the stamp existed) survives a write that has no entry for it. A
-    // partial import used to put English back over it (#5012). It stays
-    // unstamped, so the next export still offers it for translation. The cost:
-    // an English fallback copied in by an earlier write no longer follows later
-    // English edits until that unit is translated.
-    const current = existsSync(file)
-      ? new Map(proseFields(yaml.load(readFileSync(file, "utf8"))))
-      : new Map();
 
-    // Replace only the prose fields that have a translation or existing locale
-    // text; anything else keeps its English text so the document is always
-    // complete and valid.
+    // Replace only the prose fields that have a stored translation; anything
+    // else keeps its English text so the document is always complete and valid.
+    // Every hand-written translation carries a stamp, so an unstamped field is
+    // an English fallback and follows English edits (#5184). A test pins that.
     for (const [id] of proseFields(english)) {
       const entry = entries.get(id);
-      if (!entry) {
-        if (current.has(id)) setProseField(localized, id, current.get(id));
-        continue;
-      }
+      if (!entry) continue;
       setProseField(localized, id, entry.text);
       stamp[id] = {
         sourceHash: entry.sourceHash,
