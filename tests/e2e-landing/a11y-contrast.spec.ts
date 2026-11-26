@@ -27,8 +27,11 @@ const PAGES = [
   "/alternatives/convertio/",
 ];
 
+// axe on the heaviest pages plus a cold preview server can outrun the 30 s default on
+// slower hosts (the windows WSL2 fleet host, #5240), so each scan gets triple the budget.
 for (const path of PAGES) {
   test(`landing ${path} has no color-contrast violations`, async ({ page }) => {
+    test.slow();
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await waitForRevealsSettled(page);
@@ -50,6 +53,7 @@ const WCAG_PAGES = ["/", "/ar/", "/tools/image/resize/", "/self-hosted/pdf-ocr/"
 
 for (const path of WCAG_PAGES) {
   test(`landing ${path} has no WCAG A/AA or heading-order violations`, async ({ page }) => {
+    test.slow();
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await waitForRevealsSettled(page);
