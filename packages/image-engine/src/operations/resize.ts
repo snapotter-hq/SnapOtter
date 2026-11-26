@@ -137,5 +137,7 @@ export async function resize(image: Sharp, options: ResizeOptions): Promise<Shar
     height,
     fit: resolvedFit,
     withoutEnlargement: withoutEnlargement ?? false,
+    // Omit the key unless requested; Sharp defaults to opaque black.
+    ...(options.background !== undefined ? { background: options.background } : {}),
   });
 }

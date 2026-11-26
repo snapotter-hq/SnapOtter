@@ -244,6 +244,47 @@ describe("resize output allocation safety boundaries", () => {
   });
 });
 
+describe("resize background forwarding", () => {
+  function metadataOnlyImage(): { image: Sharp; resizeSpy: ReturnType<typeof vi.fn> } {
+    const resizeSpy = vi.fn();
+    const fake = {
+      metadata: vi.fn().mockResolvedValue({ width: 64, height: 48 }),
+      resize: resizeSpy,
+    };
+    resizeSpy.mockReturnValue(fake);
+    return { image: fake as unknown as Sharp, resizeSpy };
+  }
+
+  it("forwards background to Sharp when the caller provides one", async () => {
+    const { image, resizeSpy } = metadataOnlyImage();
+    const background = { r: 0, g: 0, b: 0, alpha: 0 };
+
+    await resize(image, { width: 32, height: 32, fit: "contain", background });
+
+    expect(resizeSpy).toHaveBeenCalledWith({
+      width: 32,
+      height: 32,
+      fit: "contain",
+      withoutEnlargement: false,
+      background,
+    });
+  });
+
+  it("omits background entirely when the caller does not provide one", async () => {
+    const { image, resizeSpy } = metadataOnlyImage();
+
+    await resize(image, { width: 32, height: 32, fit: "contain" });
+
+    expect(resizeSpy).toHaveBeenCalledWith({
+      width: 32,
+      height: 32,
+      fit: "contain",
+      withoutEnlargement: false,
+    });
+    expect(resizeSpy.mock.calls[0][0]).not.toHaveProperty("background");
+  });
+});
+
 describe("resize required-input and metadata guards", () => {
   it("rejects a request with no dimensions or percentage", async () => {
     await expect(resize(source(100, 50), {})).rejects.toThrow(

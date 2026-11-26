@@ -44,6 +44,11 @@ export interface ResizeOptions {
   fit?: "contain" | "cover" | "fill" | "inside" | "outside";
   withoutEnlargement?: boolean;
   percentage?: number;
+  /**
+   * Padding colour for `fit: "contain"`. Sharp defaults to opaque black;
+   * callers pass `alpha: 0` when the output format can carry transparency.
+   */
+  background?: { r: number; g: number; b: number; alpha: number };
 }
 
 export interface CropOptions {
