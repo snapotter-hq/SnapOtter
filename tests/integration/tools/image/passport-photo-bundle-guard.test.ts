@@ -30,7 +30,6 @@ writeFileSync(installedPath, JSON.stringify({ bundles: {} }), "utf-8");
 
 // ── Dynamic imports (after env is set) ───────────────────────────────
 const { initDispatcher, shutdownDispatcher } = await import("@snapotter/ai");
-const { routeAiLogsToPino } = await import("../../../../apps/api/src/lib/ai-log-sink.js");
 const { invalidateCache } = await import("../../../../apps/api/src/lib/feature-status.js");
 const { fixtures, readFixture } = await import("../../../fixtures/index.js");
 const { buildTestApp, createMultipartPayload, loginAsAdmin } = await import("../../test-server.js");
@@ -65,12 +64,6 @@ async function postAnalyze() {
   });
 }
 
-// The both-bundles case spawns the persistent Python dispatcher, which keeps
-// printing startup lines after the request has already failed. Through the
-// console those reach vitest's RPC channel, and one still in flight at worker
-// shutdown fails the shard with "Closing rpc while onUserConsoleLog was
-// pending" (#5093). Pino writes to stdout directly, as the real server does.
-routeAiLogsToPino();
 // A missing Python reports through console.error, a started one through
 // console.log, so the pin below watches every method aiLog's default uses.
 const consoleSpies = (["log", "warn", "error"] as const).map((method) => vi.spyOn(console, method));
