@@ -251,12 +251,43 @@ function svgLimitError(message: string): Error & { statusCode: number } {
   return err;
 }
 
+const XML_DECLARATION = /<\?xml([^?>]*)/gi;
+const ENCODING_KEYWORD = /encoding/gi;
+const UTF8_ENCODING = /encoding\s*=\s*(["'])(?:utf-?8|us-ascii|ascii)\1/iy;
+const EBCDIC_XML_START = Buffer.from([0x4c, 0x6f, 0xa7, 0x94]);
+
+/**
+ * True unless `bytes` (and `text`, the same bytes read as UTF-8) is UTF-8 by
+ * every signal an XML parser uses to pick an encoding: a byte order mark, the
+ * first four bytes (a NUL there means UTF-16 or UTF-32), and the `encoding`
+ * of an XML declaration. This module reads everything as UTF-8, so under any
+ * other encoding the text it checks is not the text a renderer reads. Every
+ * `encoding` inside every `<?xml` counts, not just a well-formed declaration
+ * at the start, which is more than any parser honours. Each declaration scan
+ * stops at the next `?` or `>`, so the scans never overlap.
+ */
+function declaresOtherEncoding(bytes: Buffer, text: string): boolean {
+  const head = bytes.subarray(0, 4);
+  if ((head[0] === 0xfe && head[1] === 0xff) || (head[0] === 0xff && head[1] === 0xfe)) return true;
+  if (head.includes(0) || head.equals(EBCDIC_XML_START)) return true;
+  for (const [, declaration] of text.matchAll(XML_DECLARATION)) {
+    for (const { index } of declaration.matchAll(ENCODING_KEYWORD)) {
+      UTF8_ENCODING.lastIndex = index;
+      if (!UTF8_ENCODING.test(declaration)) return true;
+    }
+  }
+  return false;
+}
+
+const ENCODING_MESSAGE = "SVG must be encoded as UTF-8. Save it as UTF-8 and try again.";
+
 export function sanitizeSvg(buffer: Buffer): Buffer {
   const maxSvgSize = env.MAX_SVG_SIZE_MB > 0 ? env.MAX_SVG_SIZE_MB * 1024 * 1024 : Infinity;
   if (buffer.length > maxSvgSize) {
     throw svgLimitError(`SVG exceeds maximum size of ${env.MAX_SVG_SIZE_MB}MB`);
   }
   let svg = buffer.toString("utf-8");
+  if (declaresOtherEncoding(buffer, svg)) throw svgLimitError(ENCODING_MESSAGE);
 
   // ── Pre-processing: strip CDATA sections and decode numeric entities ──
   // CDATA sections can hide script content from regex-based checks.
@@ -377,7 +408,11 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
     "url($1data:,",
   );
 
-  return Buffer.from(svg, "utf-8");
+  // Removing markup can join a declaration together or move other bytes to
+  // the front, so the output gets the same check as the input.
+  const out = Buffer.from(svg, "utf-8");
+  if (declaresOtherEncoding(out, svg)) throw svgLimitError(ENCODING_MESSAGE);
+  return out;
 }
 
 const MAX_SVGZ_DECOMPRESSED_SIZE = 50 * 1024 * 1024;
