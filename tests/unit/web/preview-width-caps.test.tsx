@@ -11,15 +11,19 @@ import { SideBySideComparison } from "@/components/common/side-by-side-compariso
 
 // jsdom has no ResizeObserver; capture the slider's callback to fire it by hand.
 let resizeCallback: (() => void) | null = null;
+let observed: unknown[] = [];
 beforeEach(() => {
   resizeCallback = null;
+  observed = [];
   vi.stubGlobal(
     "ResizeObserver",
     class {
       constructor(cb: () => void) {
         resizeCallback = cb;
       }
-      observe() {}
+      observe(el: unknown) {
+        observed.push(el);
+      }
       disconnect() {}
     },
   );
@@ -62,6 +66,55 @@ describe("preview width caps (#4822)", () => {
 
     // jsdom's cssstyle may fold calc(70dvh * 1.5) to calc(105dvh)
     expect(slider.style.maxWidth).toMatch(/^calc\((70dvh \* 1\.5|105dvh)\)$/);
+  });
+
+  it("before/after slider frame also stops at the height the pane leaves (#4946)", () => {
+    render(
+      <BeforeAfterSlider
+        beforeSrc="blob:before"
+        afterSrc="blob:after"
+        beforeSize={2000}
+        afterSize={1000}
+      />,
+    );
+    const slider = screen.getByRole("slider");
+    const wrapper = slider.parentElement as HTMLElement;
+    const before = screen.getByAltText("Original");
+    setBox(before, { naturalWidth: 3000, naturalHeight: 2000 });
+    fireEvent.load(before);
+
+    // A 400px pane minus the badge row (24px), the 12px gap and the 2px border leaves 362px.
+    setBox(wrapper, { clientHeight: 400 });
+    setBox(wrapper.lastElementChild as HTMLElement, { offsetHeight: 24 });
+    act(() => resizeCallback?.());
+
+    expect(slider.style.maxWidth).toContain("362px");
+    expect(observed).toContain(wrapper);
+    expect(observed).toContain(wrapper.lastElementChild);
+  });
+
+  it("before/after slider reserves no badge row when sizes are absent", () => {
+    render(<BeforeAfterSlider beforeSrc="blob:before" afterSrc="blob:after" />);
+    const slider = screen.getByRole("slider");
+    const wrapper = slider.parentElement as HTMLElement;
+    const before = screen.getByAltText("Original");
+    setBox(before, { naturalWidth: 2000, naturalHeight: 3000 });
+    fireEvent.load(before);
+    setBox(wrapper, { clientHeight: 400 });
+    act(() => resizeCallback?.());
+
+    expect(slider.style.maxWidth).toContain("398px");
+  });
+
+  it("before/after slider keeps the 70dvh cap until the pane has a measured height", () => {
+    render(<BeforeAfterSlider beforeSrc="blob:before" afterSrc="blob:after" />);
+    const slider = screen.getByRole("slider");
+    const before = screen.getByAltText("Original");
+    setBox(before, { naturalWidth: 3000, naturalHeight: 2000 });
+    fireEvent.load(before);
+    act(() => resizeCallback?.());
+
+    expect(slider.style.maxWidth).not.toContain("px");
   });
 
   it("before/after slider re-measures the after layer when the frame resizes", () => {
