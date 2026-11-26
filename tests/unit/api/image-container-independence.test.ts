@@ -945,6 +945,10 @@ describe("resize keeps contain padding transparent", () => {
     return render(1).tiff({ compression: "lzw" }).toBuffer();
   }
 
+  async function transparentAvif(): Promise<Buffer> {
+    return render(1).avif().toBuffer();
+  }
+
   async function transparentAnimation(format: "gif" | "webp"): Promise<Buffer> {
     const image = render(ANIMATED_FRAMES);
     return format === "gif" ? image.gif().toBuffer() : image.webp().toBuffer();
@@ -1044,6 +1048,34 @@ describe("resize keeps contain padding transparent", () => {
     expect(data[3]).toBe(0);
 
     const center = (16 * info.width + 16) * info.channels;
+    expect(data[center + 3]).toBe(255);
+  });
+
+  it("keeps AVIF padding transparent", async () => {
+    const { buffer, contentType } = await runResize(await transparentAvif(), "transparent.avif");
+
+    expect(contentType).toBe("image/avif");
+    const meta = await sharp(buffer).metadata();
+    // Sharp reports AVIF containers as "heif".
+    expect(meta.format).toBe("heif");
+    expect(meta.width).toBe(32);
+    expect(meta.height).toBe(32);
+    expect(meta.channels).toBe(4);
+    expect(meta.hasAlpha).toBe(true);
+
+    // AVIF is lossy, so check alpha on padded borders and tolerate slight RGB
+    // drift on the foreground block.
+    const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    const offset = (x: number, y: number) => (y * info.width + x) * info.channels;
+    expect(data[offset(0, 0) + 3]).toBe(0);
+    expect(data[offset(16, 0) + 3]).toBe(0);
+    expect(data[offset(16, 31) + 3]).toBe(0);
+
+    const center = offset(16, 16);
+    expect(data[center]).toBeGreaterThanOrEqual(250);
+    expect(data[center + 1]).toBeLessThanOrEqual(5);
+    expect(data[center + 2]).toBeLessThanOrEqual(5);
     expect(data[center + 3]).toBe(255);
   });
 
