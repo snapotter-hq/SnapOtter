@@ -438,6 +438,7 @@ function buildBaseTheme() {
                 text: "Optimization",
                 items: [
                   { text: "Optimize for Web", link: "/tools/image/optimize-for-web" },
+                  { text: "Optimize SVG", link: "/tools/image/optimize-svg" },
                   { text: "Remove Image Metadata", link: "/tools/image/strip-metadata" },
                   { text: "Edit Image Metadata", link: "/tools/image/edit-metadata" },
                   { text: "Bulk Rename", link: "/tools/image/bulk-rename" },
