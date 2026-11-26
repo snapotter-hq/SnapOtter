@@ -13,10 +13,10 @@
     "clean": "rm -rf dist .astro"
   },
   "dependencies": {
-    "@astrojs/sitemap": "^3.7.4",
+    "@astrojs/sitemap": "^3.7.6",
     "@snapotter/shared": "workspace:*",
-    "astro": "7.4.2",
-    "lucide": "^1.61.0"
+    "astro": "7.4.13",
+    "lucide": "^1.76.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
