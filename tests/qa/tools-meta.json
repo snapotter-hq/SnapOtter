@@ -384,6 +384,15 @@
     "isAI": false
   },
   {
+    "id": "optimize-svg",
+    "name": "Optimize SVG",
+    "modality": "image",
+    "route": "/image/optimize-svg",
+    "acceptedInputs": [".svg", ".svgz"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "strip-metadata",
     "name": "Remove Image Metadata",
     "modality": "image",
@@ -5716,6 +5725,15 @@
     "modality": "file",
     "route": "/files/merge-csvs",
     "acceptedInputs": [".csv", ".tsv"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
+    "id": "merge-text",
+    "name": "Merge Text Files",
+    "modality": "file",
+    "route": "/files/merge-text",
+    "acceptedInputs": [".txt", ".md", ".markdown", ".csv", ".log"],
     "executionHint": "fast",
     "isAI": false
   },
