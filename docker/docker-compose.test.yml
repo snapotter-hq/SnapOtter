@@ -141,6 +141,9 @@ services:
       - DEFAULT_USERNAME=admin
       - DEFAULT_PASSWORD=admin
       - DATABASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
+      # The Playwright web server creates a throwaway database per run through
+      # this URL; without it the helper falls back to localhost:5432 (#5087).
+      - E2E_PG_BASE_URL=postgres://snapotter:snapotter@postgres:5432/snapotter_test
       - REDIS_URL=redis://redis:6379
       - WORKSPACE_PATH=/tmp/test-workspace
       - MAX_MEGAPIXELS=100
@@ -149,9 +152,9 @@ services:
     tmpfs:
       - /tmp/test-workspace
       - /tmp
+    # scripts/test-docker.sh runs this after test-unit passes. A depends_on on
+    # test-unit would make `compose run test-e2e` run the unit suite again.
     depends_on:
-      test-unit:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
