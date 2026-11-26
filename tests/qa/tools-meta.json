@@ -5720,6 +5720,15 @@
     "isAI": false
   },
   {
+    "id": "merge-text",
+    "name": "Merge Text Files",
+    "modality": "file",
+    "route": "/files/merge-text",
+    "acceptedInputs": [".txt", ".md", ".markdown", ".csv", ".log"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "yaml-json",
     "name": "Convert YAML / JSON",
     "modality": "file",

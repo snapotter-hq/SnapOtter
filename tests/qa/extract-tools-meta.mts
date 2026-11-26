@@ -5,19 +5,9 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PYTHON_SIDECAR_TOOLS, TOOLS } from "../../packages/shared/src/constants.js";
+import { buildToolsMeta } from "./build-tools-meta.mts";
 
-const ai = new Set<string>(PYTHON_SIDECAR_TOOLS as readonly string[]);
-
-const meta = TOOLS.map((t) => ({
-  id: t.id,
-  name: t.name,
-  modality: t.modality,
-  route: t.route,
-  acceptedInputs: t.acceptedInputs,
-  executionHint: t.executionHint,
-  isAI: ai.has(t.id),
-}));
+const meta = buildToolsMeta();
 
 const outPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "tools-meta.json");
 writeFileSync(outPath, `${JSON.stringify(meta, null, 2)}\n`);
