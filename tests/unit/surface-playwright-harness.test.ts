@@ -211,17 +211,29 @@ describe("surface Playwright harness isolation", () => {
       ` ${JSON.stringify(tmpRoot)} --host `,
     );
 
-    const runPreviewCommand = () =>
+    const runPreviewCommand = (env: NodeJS.ProcessEnv = process.env) =>
       spawn("sh", ["-c", `exec ${previewCommand}`], {
         cwd: path.join(root, "apps", "docs"),
-        env: process.env,
+        env,
         stdio: ["ignore", "pipe", "pipe"],
       });
+
+    // A loaded host can take longer than the collision window to reach its bind,
+    // so the colliding child blocks for 5 s before it starts.
+    const slowStartPreload = path.join(tmpRoot, "slow-start.cjs");
+    fs.writeFileSync(
+      slowStartPreload,
+      "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5_000);\n",
+    );
+    const slowStartEnv = {
+      ...process.env,
+      NODE_OPTIONS: `--require ${JSON.stringify(slowStartPreload)}`,
+    };
 
     let collidingChild: ReturnType<typeof runPreviewCommand> | undefined;
     let liveChild: ReturnType<typeof runPreviewCommand> | undefined;
     try {
-      collidingChild = runPreviewCommand();
+      collidingChild = runPreviewCommand(slowStartEnv);
       let collidingStdout = "";
       let collidingStderr = "";
       collidingChild.stdout?.on("data", (chunk) => {
@@ -236,15 +248,15 @@ describe("surface Playwright harness isolation", () => {
         signal: NodeJS.Signals | null;
         timedOut: boolean;
       }>((resolve) => {
+        let timedOut = false;
         const timer = setTimeout(() => {
+          timedOut = true;
           collidingChild?.kill("SIGTERM");
-          collidingChild?.once("exit", () => {
-            resolve({ code: null, signal: "SIGTERM", timedOut: true });
-          });
-        }, 4_000);
-        collidingChild?.once("exit", (code, signal) => {
+        }, 20_000);
+        // "close" waits for stdout and stderr to drain; "exit" can fire first.
+        collidingChild?.once("close", (code, signal) => {
           clearTimeout(timer);
-          resolve({ code, signal, timedOut: false });
+          resolve({ code, signal, timedOut });
         });
       });
 
