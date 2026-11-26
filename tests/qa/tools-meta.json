@@ -384,6 +384,15 @@
     "isAI": false
   },
   {
+    "id": "optimize-svg",
+    "name": "Optimize SVG",
+    "modality": "image",
+    "route": "/image/optimize-svg",
+    "acceptedInputs": [".svg", ".svgz"],
+    "executionHint": "fast",
+    "isAI": false
+  },
+  {
     "id": "strip-metadata",
     "name": "Remove Image Metadata",
     "modality": "image",
