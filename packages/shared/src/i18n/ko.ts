@@ -2680,6 +2680,10 @@ export const ko: TranslationKeys = {
       progressLabel: "텍스트 오버레이 추가 중",
       download: "다운로드",
       defaultText: "여기에 텍스트 입력",
+      previewImage: "이미지 미리보기",
+      boxLabel: "텍스트 상자입니다. 드래그하여 이동하거나 화살표 키를 사용하세요.",
+      dragHint:
+        "상자를 드래그하여 텍스트 위치를 정하세요. 상자는 대략적인 위치이며, 다운로드 파일은 서버에서 생성됩니다.",
     },
     compose: {
       screen: "화면용",

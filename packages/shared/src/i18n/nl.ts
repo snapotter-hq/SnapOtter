@@ -2765,6 +2765,10 @@ export const nl: TranslationKeys = {
       progressLabel: "Tekstoverlay toevoegen",
       download: "Downloaden",
       defaultText: "Jouw tekst hier",
+      previewImage: "Afbeeldingsvoorbeeld",
+      boxLabel: "Tekstvak. Sleep om te verplaatsen of gebruik de pijltoetsen.",
+      dragHint:
+        "Sleep het vak om de tekst te plaatsen. Het vak is bij benadering; de download wordt op de server gemaakt.",
     },
     compose: {
       screen: "Scherm",

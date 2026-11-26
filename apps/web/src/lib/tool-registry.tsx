@@ -19,6 +19,7 @@ import type { BgPreviewState } from "@/components/common/image-viewer";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import type { SignProps } from "@/components/tools/sign-pdf-settings";
+import type { TextOverlayProps } from "@/components/tools/text-overlay-settings";
 import { TOOL_DISPLAY_MODES } from "./tool-display-modes";
 
 // ── Display modes ──────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export interface ToolRegistryEntry {
     cropProps?: CropProps;
     eraserProps?: EraserProps;
     signProps?: SignProps;
+    textOverlayProps?: TextOverlayProps;
   }>;
   /** Optional panel for tools that render custom content in the main area. */
   ResultsPanel?: React.ComponentType;

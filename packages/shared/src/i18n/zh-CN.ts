@@ -2431,6 +2431,9 @@ export const zhCN: TranslationKeys = {
       progressLabel: "正在添加文字叠加",
       download: "下载",
       defaultText: "在此输入文字",
+      previewImage: "图片预览",
+      boxLabel: "文本框。拖动即可移动，也可以使用方向键。",
+      dragHint: "拖动方框来放置文字。方框只是大致位置，下载的文件由服务器渲染。",
     },
     compose: {
       screen: "屏幕",

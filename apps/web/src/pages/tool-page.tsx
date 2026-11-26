@@ -44,6 +44,7 @@ import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import { EraserCanvas } from "@/components/tools/eraser-canvas";
 import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import { SignCanvas, type SignCanvasRef } from "@/components/tools/sign-canvas";
+import { TextOverlayCanvas } from "@/components/tools/text-overlay-canvas";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntakeGuard } from "@/hooks/use-intake-guard";
@@ -61,6 +62,7 @@ import { openFileInput } from "@/lib/open-file-input";
 import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
+import type { TextOverlayLayout } from "@/lib/text-overlay-placement";
 import {
   DOC_CANVAS_TOOLS,
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
@@ -616,6 +618,13 @@ function ToolPageContent({
   // Center of the painted mask as a 0-100 percentage, used to init the slider at the erased spot
   const [eraserSliderInitPos, setEraserSliderInitPos] = useState<number | null>(null);
 
+  // Text overlay: the settings own x/y/position; the canvas gets the layout and reports drops.
+  const [textOverlayLayout, setTextOverlayLayout] = useState<TextOverlayLayout | null>(null);
+  const [textOverlayPlacement, setTextOverlayPlacement] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Sign state
   const signCanvasRef = useRef<SignCanvasRef | null>(null);
   const [signHasSelection, setSignHasSelection] = useState(false);
@@ -1034,6 +1043,10 @@ function ToolPageContent({
             maskedFileCount: eraserMaskedCount,
           }
         : undefined,
+    textOverlayProps:
+      displayMode === "interactive-text"
+        ? { onLayoutChange: setTextOverlayLayout, placement: textOverlayPlacement }
+        : undefined,
     signProps:
       displayMode === "interactive-sign"
         ? {
@@ -1331,6 +1344,16 @@ function ToolPageContent({
           beforeSize={showSizeComparison ? (originalSize ?? undefined) : undefined}
           afterSize={showSizeComparison ? (processedSize ?? undefined) : undefined}
           initialPosition={eraserSliderInitPos ?? 50}
+        />
+      );
+    }
+
+    if (displayMode === "interactive-text" && hasFile && !hasProcessed && originalBlobUrl) {
+      return (
+        <TextOverlayCanvas
+          imageSrc={originalBlobUrl}
+          layout={textOverlayLayout}
+          onPlace={setTextOverlayPlacement}
         />
       );
     }

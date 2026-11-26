@@ -2757,6 +2757,10 @@ export const it: TranslationKeys = {
       progressLabel: "Aggiunta testo in sovrapposizione",
       download: "Scarica",
       defaultText: "Il tuo testo qui",
+      previewImage: "Anteprima dell'immagine",
+      boxLabel: "Casella di testo. Trascinala per spostarla o usa i tasti freccia.",
+      dragHint:
+        "Trascina la casella per posizionare il testo. La casella è approssimativa; il file scaricato viene generato sul server.",
     },
     compose: {
       screen: "Schermo",

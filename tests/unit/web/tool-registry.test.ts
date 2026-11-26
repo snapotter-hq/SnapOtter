@@ -350,6 +350,7 @@ describe("toolRegistry", () => {
       "interactive-eraser",
       "interactive-split",
       "interactive-sign",
+      "interactive-text",
       "no-dropzone",
       "custom-results",
       "media-player",
@@ -444,6 +445,10 @@ describe("toolRegistry", () => {
   it("erase-object uses interactive-eraser display mode", () => {
     const eraseObject = toolRegistry.get("erase-object");
     expect(eraseObject?.displayMode).toBe("interactive-eraser");
+  });
+
+  it("text-overlay uses interactive-text display mode (#4957)", () => {
+    expect(toolRegistry.get("text-overlay")?.displayMode).toBe("interactive-text");
   });
 
   it("split uses interactive-split display mode", () => {

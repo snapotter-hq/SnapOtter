@@ -2743,6 +2743,10 @@ export const es: TranslationKeys = {
       progressLabel: "Agregando texto superpuesto",
       download: "Descargar",
       defaultText: "Tu texto aquí",
+      previewImage: "Vista previa de la imagen",
+      boxLabel: "Cuadro de texto. Arrástrelo para moverlo o use las teclas de flecha.",
+      dragHint:
+        "Arrastre el cuadro para colocar el texto. El cuadro es aproximado; la descarga se genera en el servidor.",
     },
     compose: {
       screen: "Pantalla",
