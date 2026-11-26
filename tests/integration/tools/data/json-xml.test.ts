@@ -125,6 +125,21 @@ describe("json-xml (pure JS, no skipIf)", () => {
     expect(JSON.parse(res.body).code).toBe("NESTING_TOO_DEEP");
   }, 30_000);
 
+  // #4985: an array #text made the builder throw a plain TypeError, and an
+  // object #text came out as the text [object Object].
+  it.each([
+    ["an array", '{"a": {"#text": [1, 2]}}'],
+    ["an object", '{"a": {"#text": {"x": 1}}}'],
+  ])(
+    "rejects %s as #text with a coded 400",
+    async (_label, json) => {
+      const res = await runTool("text.json", Buffer.from(json), { pretty: false });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("INVALID_TEXT_NODE");
+    },
+    30_000,
+  );
+
   // #4379: fast-xml-parser is lenient, so an unclosed root used to come back
   // as a 200 with whatever it had read so far.
   it("rejects XML with an unclosed root instead of returning partial JSON", async () => {
