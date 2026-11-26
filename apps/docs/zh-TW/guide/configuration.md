@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 所有環境變數及其預設值。可設定驗證、儲存空間、AI 模型、分析等項目。"
-i18n_source_hash: caa895c0ba16
+i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 83deec188fce
+i18n_output_hash: 3751006cbe4e
 i18n_hash_version: 2
 ---
 
@@ -17,11 +17,13 @@ i18n_hash_version: 2
 | 變數 | 預設值 | 說明 |
 |---|---|---|
 | `PORT` | `1349` | 伺服器監聽的連接埠。 |
+| `HOST` | `0.0.0.0` | 伺服器監聽的 IP 位址。在橋接網路上（`docker run` 與 Compose 的預設網路），請保留 `0.0.0.0`（或 `::`），否則已發佈的連接埠將無法運作。在原生安裝或使用主機網路的容器中，`127.0.0.1` 可讓 API 不對網路開放；若需遠端存取，請在前端設置反向代理。[內嵌模式](#embedded-mode)僅適用於 `0.0.0.0`、`::` 或 `127.0.0.1`，因為其啟動檢查會呼叫 `127.0.0.1`。若使用其他任何位址（包括 `::1`），容器永遠不會被視為已啟動，之後若發生當機，容器會停止，而不是重新啟動伺服器。任何不是 IP 位址的值（包括 `localhost`）都會讓伺服器在啟動時停止。 |
 | `BASE_PATH` | （空） | 對外公開的部署路徑，例如 `/snapotter`。留空或設為 `/` 時，於網域根路徑提供服務。於執行階段套用，無需重新建置映像檔。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的請求數上限。設為 0 可停用速率限制。 |
 | `CORS_ORIGIN` | （空） | 以逗號分隔的 CORS 允許來源，留空則僅允許同源。 |
 | `LOG_LEVEL` | `info` | 日誌詳細程度。可選值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些對等端可透過 `X-Forwarded-For` 設定用戶端 IP。預設值只信任私有網路中的對等端，因此位於 Docker 網路或區域網路的反向代理會被信任，而公開用戶端偽造的標頭則不會。只有在您掌控的代理伺服器位於公開位址前端時，才設定 `true`。 |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | （未設定） | 預先回答首次執行時的分析問題，因此不會詢問任何人。未設定時，新的執行個體會詢問其管理員，在得到答覆前不傳送任何資料。`off` 讓它在關閉「匿名產品分析」的狀態下啟動；`on` 則在開啟狀態下啟動。它只會在尚未有人做出選擇時填入此設定。一旦設定已儲存（無論是由管理員或由此變數儲存），變更此變數都不再有任何作用；管理員仍可在「設定 > 系統 > 隱私」中變更。 |
 
 ### 驗證 {#authentication}
 
@@ -76,12 +78,15 @@ i18n_hash_version: 2
 |---|---|---|
 | `EMBEDDED` | `auto` | 當 `DATABASE_URL` 與 `REDIS_URL` 皆未設定時自動啟用。設為 `0` 可停用（此時若未設定外部的 `DATABASE_URL`/`REDIS_URL`，應用程式會立即失敗，而不是默默啟動容器內的資料庫）。 |
 | `REDIS_MAXMEMORY` | `512mb` | 內嵌 Redis 的記憶體上限（僅限內嵌模式）。在記憶體受限的主機（例如 Raspberry Pi）上可調低此值。 |
+| `EMBEDDED_PG_PORT` | `5432` | 內嵌 PostgreSQL 的回送連接埠（僅限內嵌模式）。只有在容器共用的網路中 5432 已被占用時才需要變更，例如 `--network host`。它必須與 `EMBEDDED_REDIS_PORT` 不同，且大於 1023，因為 PostgreSQL 以非特權使用者身分執行，無法在主機網路上綁定特權連接埠。 |
+| `EMBEDDED_REDIS_PORT` | `6379` | 同上，適用於內嵌 Redis，它同樣以非特權使用者身分執行。 |
+| `EMBEDDED_DB_PASSWORDS` | （空） | 設為 `1` 可在下次啟動時為內嵌 PostgreSQL 角色與 Redis 產生隨機密碼，並儲存在 `/data/.embedded-db-secrets` 中。此後透過 TCP 登入就需要這些密碼。在由 2.3.0 或更新版本首次建立的磁碟區上，PostgreSQL 超級使用者完全無法透過 TCP 登入；在較舊的磁碟區上，資料庫擁有者就是超級使用者，而保護它的正是其密碼。只要有其他程式共用容器的網路（例如使用 `--network host` 時），就請使用此設定。對該磁碟區而言，它會一直保持啟用：即使您取消設定此變數，每次啟動仍會使用這些密碼；刪除 `/data/.embedded-db-secrets` 只會讓您取得新密碼，或在變數未設定時導致啟動失敗。若容器因其中某個檔案損毀而無法啟動，請使用 `docker run --rm -v <volume>:/data --entrypoint rm snapotter/snapotter:<your tag> -r /data/.embedded-db-secrets/<name>` 刪除該檔案，然後再次啟動容器；下次啟動會產生新的檔案。此變數接受 `1`、`0` 或空值，任何其他值都會讓啟動中止。 |
 | `EMBEDDED_REDIS_TIMEOUT_S` | `180` | 啟動時等待內嵌 Redis 回應 `PING` 的秒數，逾時即放棄。逾時後容器會停止並記錄原因，而不會卡住。為 1 到 999999 的整數秒；沒有無限制的值，因為無限期等待正是此上限要防止的失敗情況。只有在速度較慢的主機觸發逾時時才需要調高。 |
 | `EMBEDDED_POSTGRES_TIMEOUT_S` | `600` | 同上，適用於內嵌 PostgreSQL。計時從首次啟動的 `initdb` 完成後開始，因此涵蓋的是伺服器啟動與當機復原，而非初始資料庫的建立。 |
 
 從 1.x 升級：將舊的 `snapotter.db` 放在磁碟區中的 `/data/snapotter.db`，內嵌模式會在首次啟動時將其匯入內嵌 PostgreSQL。匯入只會執行一次；之後的啟動會略過。
 
-遙測說明：內嵌模式與其他設定一樣，沿用映像檔的分析預設值。已發佈的映像檔預設啟用分析；若要停用，請使用 `--build-arg SNAPOTTER_ANALYTICS=off` 建置，或使用應用程式內管理員的選擇退出功能。
+遙測說明：內嵌模式與其他設定一樣，沿用映像檔的分析預設值。已發佈的映像檔可以傳送分析資料，但新的執行個體會先詢問其管理員，在得到答覆前不傳送任何資料。若要停用，請回答「否」、使用 `--build-arg SNAPOTTER_ANALYTICS=off` 建置、在首次啟動前設定 `SNAPOTTER_ANALYTICS_DEFAULT=off`，或使用應用程式內管理員的選擇退出功能。
 
 ### 處理限制 {#processing-limits}
 
@@ -92,11 +97,16 @@ i18n_hash_version: 2
 | `CONCURRENT_JOBS` | `0`（自動） | 並行執行的批次工作數量。設為 0 會依可用的 CPU 核心數自動偵測。 |
 | `MAX_MEGAPIXELS` | `0`（無限制） | 允許的最大圖片解析度，單位為百萬像素。設為 0 表示無限制。 |
 | `MAX_WORKER_THREADS` | `0`（自動） | 圖片處理的工作執行緒數量上限。設為 0 會依可用的 CPU 核心數自動偵測。 |
-| `PROCESSING_TIMEOUT_S` | `0`（無限制） | 每個請求的最長處理時間，單位為秒。設為 0 表示不逾時。 |
+| `PROCESSING_TIMEOUT_S` | `0`（無限制） | 每次呼叫執行 AI 工具的 Python sidecar 時的逾時時間，單位為秒。設為 0 表示不逾時。它不會限制圖片、PDF 或媒體工作；這些由 `JOB_TIMEOUT_FAST_S` 與 `JOB_TIMEOUT_LONG_S` 負責。 |
+| `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Python AI sidecar 與精準 OCR 執行階段閒置多少秒後會結束並釋放記憶體（暖機後分別約 1.3 GB 與 0.7 GB）。兩者都會在下一個請求時重新啟動，因此閒置結束後的第一次 AI 呼叫需要負擔數秒的函式庫啟動成本。設為 0 可讓它們持續執行。預設值與 `AI_SESSION_IDLE_TIMEOUT` 相同，因此已載入的模型不會早於該設定所指定的時間被卸除。若您調高 `AI_SESSION_IDLE_TIMEOUT`，請將此值調高至相同數值。 |
+| `JOB_TIMEOUT_FAST_S` | `120` | 快速工作池（圖片與文件工具）中單一工作的期限，單位為秒。執行時間超過期限的工作會以逾時錯誤失敗。設為 0 表示無限制。 |
+| `JOB_TIMEOUT_LONG_S` | `7200` | 長時工作池（AI 與媒體工具，以及任何標示為長時間執行的工具）中單一工作的期限，單位為秒。設為 0 表示無限制。平衡與最佳 PDF OCR 會依頁數自行延長期限（每頁 2 分鐘與 5 分鐘），最長 6 小時，因此大型 PDF 不需要調高此值。 |
+| `SYNC_WAIT_MS` | `8000` | 工具請求等候其工作的時間，單位為毫秒；超過此時間後，API 會停止等候並回傳 `202` 及可透過 SSE 追蹤的工作 ID。這不會停止該工作。設為 0 則無論工作耗時多久都會一直等候。 |
 | `MAX_PIPELINE_STEPS` | `20` | 管線中的步驟數量上限。設為 0 表示無限制。 |
 | `MAX_CANVAS_PIXELS` | `0`（無限制） | 輸出圖片的畫布大小上限，單位為像素。設為 0 表示無限制。 |
 | `MAX_SVG_SIZE_MB` | `50` | 清理前可接受的最大 SVG，單位為 MB。`0` 在這裡的行為與前後各列不同：它會完全移除解析前的大小上限，而不是調高上限，因此請保留此項的設定值。 |
 | `MAX_PDF_PAGES` | `0`（無限制） | PDF 轉圖片時允許的 PDF 頁數上限。設為 0 表示無限制。 |
+| `MAX_SETTINGS_PAYLOAD_KB` | `64` | 工具請求可攜帶的 `settings` 欄位大小上限，單位為 KB，以 UTF-8 位元組計算。超過上限的請求會收到 `400`。設為 0 表示無限制。實際的工具設定遠小於 64 KB，因此只有在用戶端傳送異常龐大的設定時才需要調高此值。 |
 
 ### 引擎 {#engines}
 
@@ -109,11 +119,15 @@ SnapOtter 會在容器內的 `$PATH` 上尋找每個處理用的執行檔，因�
 | `QPDF_PATH` | （空） | `qpdf` 的路徑，供 PDF 工具使用，也用於檢查上傳的 PDF。 |
 | `SOFFICE_PATH` | （空） | LibreOffice 的 `soffice` 路徑，用於辦公文件轉換。 |
 | `PDFCPU_PATH` | （空） | `pdfcpu` 的路徑，部分 PDF 工具會使用。 |
+| `GS_PATH` | （空） | Ghostscript 的 `gs` 路徑，供 PDF 工具與 PDF OCR 使用。 |
+| `PANDOC_PATH` | （空） | `pandoc` 的路徑，用於文件轉換。 |
+| `SNAPOTTER_FONT_FILE` | （空） | 繪製到影片上的文字所使用的字型檔（燒錄字幕、影片浮水印）。留空則使用映像檔找到的第一個字型。 |
+| `SNAPOTTER_FONT_FAMILY` | （空） | `SNAPOTTER_FONT_FILE` 的字型家族名稱。留空表示 `Sans`。 |
 | `SNAPOTTER_HW_ACCEL` | （空） | 硬體影片編碼器系列，`nvenc` 或 `vaapi`。留空則使用軟體編碼。 |
 
 `SNAPOTTER_HW_ACCEL` 需要內建該編碼器系列的 ffmpeg，而映像檔中的 ffmpeg 兩者皆不具備。使用映像檔自帶的執行檔時，此設定會退回軟體編碼，並在啟動日誌中說明。若要使用它，請掛載您自行建置的 ffmpeg，將 `FFMPEG_PATH` 與 `FFPROBE_PATH` 指向它，並讓容器存取 GPU 裝置。對於 `nvenc`，還要設定 `NVIDIA_DRIVER_CAPABILITIES=compute,utility,video`：映像檔只要求 `compute,utility`，而沒有 `video` 時，NVIDIA 執行階段不會掛載編碼函式庫，因此編碼器雖會列出，但每次編碼都會失敗。若路徑覆寫指向不存在或不可執行的檔案，也會在啟動日誌中指出，而所有需要該執行檔的工作都會失敗，直到您修正路徑或取消設定為止。
 
-已發佈的 Compose 檔案會從 `.env` 傳遞這六個變數，因此在那裡設定即可。
+已發佈的 Compose 檔案會從 `.env` 傳遞所有這些變數，因此在那裡設定即可。
 
 ### 清理 {#cleanup}
 
