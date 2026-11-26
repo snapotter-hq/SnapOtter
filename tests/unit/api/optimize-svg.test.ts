@@ -3,6 +3,7 @@ import { isToolInputError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   MAX_OPTIMIZE_SVG_BYTES,
+  optimizeOnWorker,
   optimizeSvgBuffer,
   settingsSchema,
 } from "../../../apps/api/src/routes/tools/optimize-svg.js";
@@ -32,6 +33,23 @@ async function run(
   const buf = typeof input === "string" ? Buffer.from(input) : input;
   const result = await optimizeSvgBuffer(buf, { ...DEFAULTS, ...overrides }, name);
   return { ...result, text: result.buffer.toString("utf-8") };
+}
+
+/** A valid SVG whose path data is about `bytes` long: varied coordinates, so svgo has real work to do. */
+function bigSvg(bytes: number): Buffer {
+  let seed = 1;
+  const next = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed / 2147483647) * 100;
+  };
+  const segments: string[] = [];
+  for (let size = 0; size < bytes; ) {
+    const segment = ` L${next().toFixed(6)} ${next().toFixed(6)}`;
+    segments.push(segment);
+    size += segment.length;
+  }
+  const path = `<path d="M0 0${segments.join("")}"/>`;
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${path}</svg>`);
 }
 
 describe("optimize-svg", () => {
@@ -135,5 +153,37 @@ describe("optimize-svg", () => {
   it("rejects out-of-range precision at the settings boundary", () => {
     expect(settingsSchema.safeParse({ precision: 9 }).success).toBe(false);
     expect(settingsSchema.safeParse({ precision: 1.5 }).success).toBe(false);
+  });
+
+  it("keeps the event loop responsive while svgo runs", { timeout: 60_000 }, async () => {
+    let worstGapMs = 0;
+    let last = performance.now();
+    const ticker = setInterval(() => {
+      const now = performance.now();
+      worstGapMs = Math.max(worstGapMs, now - last);
+      last = now;
+    }, 10);
+    try {
+      // Synchronous svgo on 3 MB of path data holds the loop for about a second.
+      await optimizeSvgBuffer(bigSvg(3 * 1024 * 1024), DEFAULTS, "big.svg");
+      // Blocking work finishes before any timer runs, so let the ticker fire once
+      // to record the stall; the 1 ms timeout is due after it.
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    } finally {
+      clearInterval(ticker);
+    }
+    expect(worstGapMs).toBeLessThan(200);
+  });
+
+  it("optimizes an SVG larger than the old 2 MB cap", async () => {
+    const out = await run(bigSvg(3 * 1024 * 1024));
+    expect(out.text.startsWith("<svg")).toBe(true);
+  }, 60_000);
+
+  it("answers a client error when svgo overruns its deadline", async () => {
+    const input = bigSvg(1024 * 1024).toString("utf-8");
+    const err = await optimizeOnWorker(input, {}, 50).catch((e: unknown) => e);
+    expect(isToolInputError(err)).toBe(true);
+    expect((err as { code?: string }).code).toBe("SVG_TOO_LARGE");
   });
 });
