@@ -209,13 +209,13 @@ describe("Generate fills a password the policy accepts (#1567)", () => {
       target: { value: "old-Password1" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: new RegExp(de.changePassword.generateButton) }),
+      screen.getByRole("button", { name: new RegExp(de.changePassword.generateForMeButton) }),
     );
+    fireEvent.click(screen.getByRole("checkbox", { name: de.changePassword.savedConfirm }));
     fireEvent.click(screen.getByRole("button", { name: de.changePassword.changeButton }));
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const { newPassword } = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(newPassword).toHaveLength(20);
-    expect(newPassword).toMatch(/[!@#$%&*()\-_=+]/);
+    expect(newPassword).toMatch(/^(?:[A-Z][a-z]{3,6}-){4}[2-9]{2}$/);
   });
 });
