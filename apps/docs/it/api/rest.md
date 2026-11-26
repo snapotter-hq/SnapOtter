@@ -1,7 +1,7 @@
 ---
 description: "Riferimento completo dell'API REST. Endpoint degli strumenti, elaborazione batch, pipeline, libreria file, autenticazione, team e operazioni di amministrazione."
-i18n_output_hash: a12d1c342b33
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: fab656c4d2e5
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ I preset di compressione funzionano allo stesso modo. `compress-image-to-20kb`, 
 | ID strumento | Nome | Impostazioni principali |
 |---------|------|-------------|
 | `optimize-for-web` | Ottimizza per il web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Ottimizza SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Rimuovi metadati | - |
 | `edit-metadata` | Modifica metadati | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Rinomina in blocco | `pattern` (supporta `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

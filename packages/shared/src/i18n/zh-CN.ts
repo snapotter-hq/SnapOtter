@@ -522,6 +522,10 @@ export const zhCN: TranslationKeys = {
       name: "网页优化",
       description: "通过格式转换、质量控制和实时预览优化网页图片",
     },
+    "optimize-svg": {
+      name: "SVG 优化",
+      description: "使用 svgo 压缩 SVG 代码，结果仍保留为矢量 SVG",
+    },
     "strip-metadata": {
       name: "移除图片元数据",
       description: "移除 EXIF、GPS 和相机信息",
@@ -1436,6 +1440,16 @@ export const zhCN: TranslationKeys = {
       larger: "增大 {percent}%",
       submit: "处理并下载",
       submitBatch: "处理并下载（{count} 个文件）",
+      progressLabel: "优化中",
+    },
+    "optimize-svg": {
+      precision: "小数精度",
+      precisionHint: "坐标中保留的小数位数。位数越少，文件越小。",
+      removeMetadata: "移除注释和元数据",
+      multipass: "执行多轮优化",
+      pretty: "格式化输出",
+      submit: "优化 SVG",
+      submitBatch: "优化 SVG（{count} 个文件）",
       progressLabel: "优化中",
     },
     "strip-metadata": {
@@ -5735,6 +5749,7 @@ export const zhCN: TranslationKeys = {
       TOO_MANY_FRAMES: "此文件的帧数过多，无法处理。",
       FEATURE_INSTALL_BUSY: "安装正在更新 AI 环境，现在无法停止。很快就会完成。",
       MULTI_FRAME_UNSUPPORTED: "此工具一次只能编辑一张图片。请先将各页或各帧拆分为单独的图片。",
+      SVG_TOO_LARGE: "此 SVG 过大或过于复杂，无法优化。",
       CANCELED: "操作已取消。",
       PAGE_OUT_OF_RANGE: "该页码范围包含此 PDF 中不存在的页面。",
       INVALID_PAGE_RANGE: "该页码范围无效。请使用类似 1-3,5 的页码。",

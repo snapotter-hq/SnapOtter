@@ -755,6 +755,10 @@ export const ptBR: TranslationKeys = {
       description:
         "Otimize imagens para web com conversão de formato, controle de qualidade e visualização ao vivo",
     },
+    "optimize-svg": {
+      name: "Otimizar SVG",
+      description: "Reduz o código SVG com svgo e mantém o resultado como SVG vetorial",
+    },
     "strip-metadata": {
       name: "Remover Metadados da Imagem",
       description: "Remova EXIF, GPS e informações da câmera",
@@ -1726,6 +1730,16 @@ export const ptBR: TranslationKeys = {
       larger: "{percent}% maior",
       submit: "Processar e baixar",
       submitBatch: "Processar e baixar ({count} arquivos)",
+      progressLabel: "Otimizando",
+    },
+    "optimize-svg": {
+      precision: "Precisão decimal",
+      precisionHint: "Casas decimais mantidas nas coordenadas. Menos casas geram um arquivo menor.",
+      removeMetadata: "Remover comentários e metadados",
+      multipass: "Executar várias passagens",
+      pretty: "Formatar a saída para leitura",
+      submit: "Otimizar SVG",
+      submitBatch: "Otimizar SVG ({count} arquivos)",
       progressLabel: "Otimizando",
     },
     "strip-metadata": {
@@ -6141,6 +6155,7 @@ export const ptBR: TranslationKeys = {
         "A instalação está atualizando o ambiente de IA e não pode ser interrompida agora. Ela terminará em breve.",
       MULTI_FRAME_UNSUPPORTED:
         "Esta ferramenta edita uma imagem por vez. Divida primeiro as páginas ou quadros em imagens separadas.",
+      SVG_TOO_LARGE: "Este SVG é grande ou complexo demais para otimizar.",
       CANCELED: "A operação foi cancelada.",
       PAGE_OUT_OF_RANGE: "Esse intervalo inclui uma página que este PDF não tem.",
       INVALID_PAGE_RANGE:

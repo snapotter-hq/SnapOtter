@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 9d996ff7366d
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 617c3539b66e
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | टूल ID | नाम | मुख्य सेटिंग्स |
 |---------|------|-------------|
 | `optimize-for-web` | वेब के लिए ऑप्टिमाइज़ करें | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG ऑप्टिमाइज़ | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | मेटाडेटा हटाएँ | - |
 | `edit-metadata` | मेटाडेटा संपादित करें | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | बल्क रीनेम | `pattern` (`{n}`, `{date}`, `{original}` का समर्थन करता है), `startIndex`, `padding` |

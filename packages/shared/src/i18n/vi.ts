@@ -759,6 +759,10 @@ export const vi: TranslationKeys = {
       description:
         "Tối ưu hình ảnh cho web với chuyển đổi định dạng, kiểm soát chất lượng và xem trước trực tiếp",
     },
+    "optimize-svg": {
+      name: "Tối ưu SVG",
+      description: "Thu gọn mã SVG bằng svgo và giữ kết quả ở dạng SVG vector",
+    },
     "strip-metadata": {
       name: "Xóa siêu dữ liệu ảnh",
       description: "Xóa EXIF, GPS và thông tin máy ảnh",
@@ -1723,6 +1727,16 @@ export const vi: TranslationKeys = {
       larger: "Lớn hơn {percent}%",
       submit: "Xử lý & Tải xuống",
       submitBatch: "Xử lý & Tải xuống ({count} tệp)",
+      progressLabel: "Đang tối ưu",
+    },
+    "optimize-svg": {
+      precision: "Độ chính xác thập phân",
+      precisionHint: "Số chữ số thập phân giữ lại trong tọa độ. Ít chữ số hơn cho tệp nhỏ hơn.",
+      removeMetadata: "Xóa chú thích và siêu dữ liệu",
+      multipass: "Chạy nhiều lượt",
+      pretty: "Định dạng đầu ra dễ đọc",
+      submit: "Tối ưu SVG",
+      submitBatch: "Tối ưu SVG ({count} tệp)",
       progressLabel: "Đang tối ưu",
     },
     "strip-metadata": {
@@ -6101,6 +6115,7 @@ export const vi: TranslationKeys = {
         "Quá trình cài đặt đang cập nhật môi trường AI và không thể dừng lúc này. Sẽ sớm hoàn tất.",
       MULTI_FRAME_UNSUPPORTED:
         "Công cụ này chỉ chỉnh sửa từng ảnh một. Hãy tách các trang hoặc khung hình thành các ảnh riêng trước.",
+      SVG_TOO_LARGE: "SVG này quá lớn hoặc quá phức tạp để tối ưu.",
       CANCELED: "Thao tác đã bị hủy.",
       PAGE_OUT_OF_RANGE: "Phạm vi trang đó có một trang mà PDF này không có.",
       INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",

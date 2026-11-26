@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 510342e9d266
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 3e93cb4994d5
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Kompressions-Presets funktionieren genauso. `compress-image-to-20kb`, `compress-
 | Tool-ID | Name | Wichtige Einstellungen |
 |---------|------|-------------|
 | `optimize-for-web` | Für Web optimieren | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG optimieren | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Metadaten entfernen | - |
 | `edit-metadata` | Metadaten bearbeiten | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Massen-Umbenennung | `pattern` (unterstützt `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

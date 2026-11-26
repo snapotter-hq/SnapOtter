@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 8945c7c5ea1a
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 0470247fd3cc
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Preset kompresi bekerja dengan cara yang sama. `compress-image-to-20kb`, `compre
 | ID Tool | Nama | Pengaturan utama |
 |---------|------|-------------|
 | `optimize-for-web` | Optimize for Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimasi SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Strip Metadata | - |
 | `edit-metadata` | Edit Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk Rename | `pattern` (mendukung `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

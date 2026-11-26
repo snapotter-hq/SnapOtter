@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 4c943f9d8481
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 0577e61aedf7
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | 工具 ID | 名称 | 主要设置 |
 |---------|------|-------------|
 | `optimize-for-web` | 网页优化 | `format`（webp/jpeg/avif/png）、`quality`、`maxWidth`、`maxHeight`、`progressive`、`stripMetadata` |
+| `optimize-svg` | SVG 优化 | `precision`（0-8）、`multipass`（bool）、`removeMetadata`（bool）、`pretty`（bool） |
 | `strip-metadata` | 去除元数据 | - |
 | `edit-metadata` | 编辑元数据 | `title`、`description`、`author`、`copyright`、`keywords`、`gps`（lat/lon）、`dateTime` |
 | `bulk-rename` | 批量重命名 | `pattern`（支持 `{n}`、`{date}`、`{original}`）、`startIndex`、`padding` |

@@ -757,6 +757,10 @@ export const fr: TranslationKeys = {
       description:
         "Optimisez les images pour le web avec conversion de format, contrôle de qualité et aperçu en direct",
     },
+    "optimize-svg": {
+      name: "Optimiser un SVG",
+      description: "Minifie le code SVG avec svgo et garde le résultat au format SVG vectoriel",
+    },
     "strip-metadata": {
       name: "Supprimer les métadonnées d'une image",
       description: "Supprimez EXIF, GPS et informations de l'appareil photo",
@@ -1734,6 +1738,17 @@ export const fr: TranslationKeys = {
       larger: "{percent}% plus grand",
       submit: "Traiter et télécharger",
       submitBatch: "Traiter et télécharger ({count} fichiers)",
+      progressLabel: "Optimisation en cours",
+    },
+    "optimize-svg": {
+      precision: "Précision décimale",
+      precisionHint:
+        "Nombre de décimales conservées dans les coordonnées. Moins de décimales donnent un fichier plus léger.",
+      removeMetadata: "Supprimer les commentaires et les métadonnées",
+      multipass: "Effectuer plusieurs passes",
+      pretty: "Indenter la sortie",
+      submit: "Optimiser le SVG",
+      submitBatch: "Optimiser le SVG ({count} fichiers)",
       progressLabel: "Optimisation en cours",
     },
     "strip-metadata": {
@@ -6167,6 +6182,7 @@ export const fr: TranslationKeys = {
         "L'installation met à jour l'environnement AI et ne peut pas être arrêtée maintenant. Elle se terminera sous peu.",
       MULTI_FRAME_UNSUPPORTED:
         "Cet outil modifie une seule image à la fois. Séparez d'abord les pages ou les images en fichiers distincts.",
+      SVG_TOO_LARGE: "Ce SVG est trop volumineux ou trop complexe pour être optimisé.",
       CANCELED: "L'opération a été annulée.",
       PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
       INVALID_PAGE_RANGE:

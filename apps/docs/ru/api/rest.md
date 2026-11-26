@@ -1,8 +1,8 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: e10bba8b6fcb
+i18n_output_hash: 441a7ad1686d
 i18n_hash_version: 2
-i18n_source_hash: 73d17e904bb2
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -173,6 +173,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ID инструмента | Название | Ключевые настройки |
 |---------|------|-------------|
 | `optimize-for-web` | Оптимизация для веба | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Оптимизация SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Удаление метаданных | - |
 | `edit-metadata` | Редактирование метаданных | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Массовое переименование | `pattern` (поддерживает `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

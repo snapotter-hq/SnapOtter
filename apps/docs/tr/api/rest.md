@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 5d99906a61e8
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 861641c96dd2
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Sıkıştırma ön ayarları da aynı şekilde çalışır. `compress-image-to-2
 | Araç Kimliği | Ad | Anahtar ayarlar |
 |---------|------|-------------|
 | `optimize-for-web` | Web İçin İyileştir | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG Optimize Et | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Meta Verileri Kaldır | - |
 | `edit-metadata` | Meta Verileri Düzenle | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (enlem/boylam), `dateTime` |
 | `bulk-rename` | Toplu Yeniden Adlandır | `pattern` (`{n}`, `{date}`, `{original}` destekler), `startIndex`, `padding` |

@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: de64318a0742
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 1e7e9be6f621
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | Tool ID | ชื่อ | การตั้งค่าหลัก |
 |---------|------|-------------|
 | `optimize-for-web` | ปรับให้เหมาะกับเว็บ | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | เพิ่มประสิทธิภาพ SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | ลบเมทาดาทา | - |
 | `edit-metadata` | แก้ไขเมทาดาทา | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | เปลี่ยนชื่อแบบกลุ่ม | `pattern` (รองรับ `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

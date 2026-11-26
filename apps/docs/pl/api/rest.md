@@ -1,8 +1,8 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 97c92876c859
+i18n_output_hash: 11e03710c998
 i18n_hash_version: 2
-i18n_source_hash: 73d17e904bb2
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -173,6 +173,7 @@ Ustawienia wstępne kompresji działają tak samo. `compress-image-to-20kb`, `co
 | ID narzędzia | Nazwa | Kluczowe ustawienia |
 |---------|------|-------------|
 | `optimize-for-web` | Optymalizacja pod kątem internetu | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optymalizacja SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Usuwanie metadanych | - |
 | `edit-metadata` | Edycja metadanych | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Zmiana nazw zbiorczo | `pattern` (obsługuje `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

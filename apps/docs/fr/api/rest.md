@@ -1,7 +1,7 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 13fc29d5c734
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: c0cf3b182753
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Les préréglages de compression fonctionnent de la même manière. `compress-im
 | ID de l'outil | Nom | Paramètres principaux |
 |---------|------|-------------|
 | `optimize-for-web` | Optimiser pour le Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimiser un SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Supprimer les métadonnées | - |
 | `edit-metadata` | Modifier les métadonnées | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Renommage en masse | `pattern` (prend en charge `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

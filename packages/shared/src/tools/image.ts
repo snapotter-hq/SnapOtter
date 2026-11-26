@@ -93,6 +93,18 @@ export const IMAGE_TOOLS: Tool[] = [
     executionHint: "fast",
   },
   {
+    id: "optimize-svg",
+    name: "Optimize SVG",
+    description: "Minify SVG code with svgo and keep the result as a vector SVG",
+    keywords: ["compress svg", "minify svg", "svgo"],
+    category: "optimization",
+    icon: "FileCode",
+    route: "/optimize-svg",
+    modality: "image",
+    acceptedInputs: [".svg", ".svgz"],
+    executionHint: "fast",
+  },
+  {
     id: "strip-metadata",
     name: "Remove Image Metadata",
     description: "Remove EXIF, GPS, and camera info",

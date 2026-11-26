@@ -1,7 +1,7 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: bd3153d93d59
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: ef4c68652adf
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Komprimeringsförinställningar fungerar på samma sätt. `compress-image-to-20k
 | Verktygs-ID | Namn | Nyckelinställningar |
 |---------|------|-------------|
 | `optimize-for-web` | Optimera för webben | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Optimera SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Ta bort metadata | - |
 | `edit-metadata` | Redigera metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Massomdöp | `pattern` (stöder `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

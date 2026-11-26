@@ -11,6 +11,8 @@
 /tools/compress /tools/image/compress/ 301
 /tools/optimize-for-web/ /tools/image/optimize-for-web/ 301
 /tools/optimize-for-web /tools/image/optimize-for-web/ 301
+/tools/optimize-svg/ /tools/image/optimize-svg/ 301
+/tools/optimize-svg /tools/image/optimize-svg/ 301
 /tools/strip-metadata/ /tools/image/strip-metadata/ 301
 /tools/strip-metadata /tools/image/strip-metadata/ 301
 /tools/edit-metadata/ /tools/image/edit-metadata/ 301

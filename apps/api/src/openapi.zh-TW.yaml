@@ -1572,6 +1572,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/tools/image/optimize-svg:
+    post:
+      operationId: optimizeSvg
+      tags:
+        - Image
+      summary: SVG 最佳化
+      description: |
+        使用 svgo 壓縮 SVG 標記，回傳 SVG 而非點陣影像。輸入在最佳化前後都會經過清理。`.svgz` 輸入會先解壓縮，結果寫為一般的 `.svg`。viewBox 和 `<title>` 一律保留。解壓縮後超過 2 MB 的輸入會被拒絕，回傳 400 `SVG_TOO_LARGE`。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 要最佳化的 SVG 或 SVGZ 檔案
+                settings:
+                  type: string
+                  description: |
+                    選項的 JSON 字串：
+                    - `precision` (整數 0-8，預設 3) - 座標和數值中保留的小數位數
+                    - `multipass` (布林值，預設 true) - 重複執行最佳化，直到輸出不再變小
+                    - `removeMetadata` (布林值，預設 true) - 移除註解、`<metadata>`、`<desc>` 和編輯器命名空間
+                    - `pretty` (布林值，預設 false) - 縮排輸出，而不是壓縮成一行
+            example:
+              file: logo.svg
+              settings: '{}'
+      responses:
+        '200':
+          description: 最佳化後的 SVG
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResponse'
+              example:
+                jobId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+                downloadUrl: /api/v1/download/abc123/logo.svg
+                originalSize: 1
+                processedSize: 1
+                previewUrl: example
+                savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
+        '400':
+          description: 輸入無效，包括非 SVG 檔案
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 需要驗證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/image-enhancement:
     post:
       operationId: enhanceImage
@@ -28697,6 +28759,14 @@ x-i18n:
       sourceHash: 10a427197f6e
       provenance: machine
       outputHash: d0e91d44cda3
+    paths./api/v1/tools/image/optimize-svg.post.summary:
+      sourceHash: 61636a7785ef
+      provenance: machine
+      outputHash: 20ed37bc28a7
+    paths./api/v1/tools/image/optimize-svg.post.description:
+      sourceHash: e068976135dd
+      provenance: machine
+      outputHash: 8e7170433ea4
     paths./api/v1/tools/image/image-enhancement.post.summary:
       sourceHash: 246a536c8207
       provenance: machine
@@ -32573,6 +32643,26 @@ x-i18n:
       sourceHash: 88ca7e4a48e4
       provenance: machine
       outputHash: 416c99115a04
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: 17bd2131158d
+      provenance: machine
+      outputHash: 206eedbfed44
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 8d0ddfcfb67f
+      provenance: machine
+      outputHash: 307fda3d45cb
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/200/description:
+      sourceHash: c2b0c7c8aeac
+      provenance: machine
+      outputHash: aa71d0f73b10
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/400/description:
+      sourceHash: 8776a8c77ab9
+      provenance: machine
+      outputHash: 6384f424e8e5
+    ptr:/paths/~1api~1v1~1tools~1image~1optimize-svg/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 6a06a757cbea
     ptr:/paths/~1api~1v1~1tools~1image~1image-enhancement/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
       sourceHash: 98a38389e6c1
       provenance: machine

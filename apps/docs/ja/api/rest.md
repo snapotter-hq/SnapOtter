@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 8cfaefef781a
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 7810fb1fa23a
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | ツール ID | 名前 | 主な設定 |
 |---------|------|-------------|
 | `optimize-for-web` | Web 向け最適化 | `format`（webp/jpeg/avif/png）, `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG最適化 | `precision`（0-8）, `multipass`（bool）, `removeMetadata`（bool）, `pretty`（bool） |
 | `strip-metadata` | メタデータ削除 | - |
 | `edit-metadata` | メタデータ編集 | `title`, `description`, `author`, `copyright`, `keywords`, `gps`（lat/lon）, `dateTime` |
 | `bulk-rename` | 一括リネーム | `pattern`（`{n}`, `{date}`, `{original}` に対応）, `startIndex`, `padding` |

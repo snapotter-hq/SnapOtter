@@ -83,6 +83,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   favicon: "before-after",
   "image-to-pdf": "no-comparison",
   "optimize-for-web": "before-after",
+  "optimize-svg": "before-after",
   "pdf-to-image": "custom-results",
 
   // Adjustments extra

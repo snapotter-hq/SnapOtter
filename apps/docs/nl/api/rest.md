@@ -1,7 +1,7 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: 22829087a148
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: 160e9948eee2
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Compressiepresets werken op dezelfde manier. `compress-image-to-20kb`, `compress
 | Tool-ID | Naam | Belangrijkste instellingen |
 |---------|------|-------------|
 | `optimize-for-web` | Optimaliseren voor web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | SVG optimaliseren | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Metadata verwijderen | - |
 | `edit-metadata` | Metadata bewerken | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Bulk hernoemen | `pattern` (ondersteunt `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |

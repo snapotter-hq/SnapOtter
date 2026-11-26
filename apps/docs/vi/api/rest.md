@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 5af4c4a0679d
-i18n_source_hash: 73d17e904bb2
+i18n_output_hash: a096d5a03ebe
+i18n_source_hash: 8c13236dfbb2
 i18n_provenance: human
 ---
 
@@ -172,6 +172,7 @@ Các preset nén hoạt động theo cách tương tự. `compress-image-to-20kb
 | ID công cụ | Tên | Cài đặt chính |
 |---------|------|-------------|
 | `optimize-for-web` | Tối ưu cho Web | `format` (webp/jpeg/avif/png), `quality`, `maxWidth`, `maxHeight`, `progressive`, `stripMetadata` |
+| `optimize-svg` | Tối ưu SVG | `precision` (0-8), `multipass` (bool), `removeMetadata` (bool), `pretty` (bool) |
 | `strip-metadata` | Xóa Metadata | - |
 | `edit-metadata` | Sửa Metadata | `title`, `description`, `author`, `copyright`, `keywords`, `gps` (lat/lon), `dateTime` |
 | `bulk-rename` | Đổi tên hàng loạt | `pattern` (hỗ trợ `{n}`, `{date}`, `{original}`), `startIndex`, `padding` |
