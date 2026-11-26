@@ -1,8 +1,8 @@
 ---
 description: "Stödda filformat över alla modaliteter - 55+ inmatningsformat för bild, video, ljud, PDF och filformat."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 1d1f58d734df
+i18n_output_hash: 69fef41bb7b1
 ---
 
 # Stödda format {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter stöder 55+ bildformat för inmatning och 17 format för utmatning.
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Digital biograf, medicinsk avbildning |
 | QOI | .qoi | Inbyggd TypeScript-codec | Spelutveckling, inbäddade system |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhone-foton |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | Foton från iPhone och Sony-kameror |
 
 ### Äldre/System (4) {#legacy-system-4}
 

@@ -1,8 +1,8 @@
 ---
 description: "跨所有模态支持的文件格式 - 55+ 种图像输入格式、视频、音频、PDF 和文件格式。"
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 9836bacf1cd8
+i18n_output_hash: e6302a62d2b1
 ---
 
 # 支持的格式 {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter 支持 55+ 种图像输入格式和 17 种输出格式。
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | 数字电影、医学影像 |
 | QOI | .qoi | 内联 TypeScript 编解码器 | 游戏开发、嵌入式系统 |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhone 照片 |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | iPhone 和 Sony 相机照片 |
 
 ### 旧版/系统（4） {#legacy-system-4}
 

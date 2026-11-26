@@ -1,8 +1,8 @@
 ---
 description: "التنسيقات المدعومة عبر جميع الوسائط - أكثر من 55 تنسيق إدخال للصور، والفيديو والصوت وPDF وتنسيقات الملفات."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 2c294d200195
+i18n_output_hash: 0ef276cb965a
 ---
 
 # التنسيقات المدعومة {#supported-formats}
@@ -75,7 +75,7 @@ i18n_output_hash: 2c294d200195
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | السينما الرقمية والتصوير الطبي |
 | QOI | .qoi | برنامج ترميز TypeScript مضمّن | تطوير الألعاب والأنظمة المضمّنة |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | صور iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | صور iPhone وكاميرات Sony |
 
 ### قديم/نظام (4) {#legacy-system-4}
 

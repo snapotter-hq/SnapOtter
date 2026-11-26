@@ -1,8 +1,8 @@
 ---
 description: "Tüm modaliteler genelinde desteklenen dosya formatları - 55+ görüntü giriş formatı, video, ses, PDF ve dosya formatları."
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 39fc493d18f5
+i18n_output_hash: d36d7a688816
 ---
 
 # Desteklenen Formatlar {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter giriş için 55+ görüntü formatını, çıkış için 17 formatı d
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | Dijital sinema, tıbbi görüntüleme |
 | QOI | .qoi | Satır içi TypeScript codec | Oyun geliştirme, gömülü sistemler |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | iPhone fotoğrafları |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | iPhone ve Sony kamera fotoğrafları |
 
 ### Eski/Sistem (4) {#legacy-system-4}
 

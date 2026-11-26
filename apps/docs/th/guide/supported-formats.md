@@ -1,8 +1,8 @@
 ---
 description: "รูปแบบไฟล์ที่รองรับในทุกโมดัลลิตี - รูปแบบอินพุตรูปภาพ 55+ รูปแบบ, วิดีโอ, เสียง, PDF และรูปแบบไฟล์"
-i18n_source_hash: 35e91e8aceff
+i18n_source_hash: e74ad10cd4b2
 i18n_provenance: human
-i18n_output_hash: 22bb1a231aab
+i18n_output_hash: 300d724aa526
 ---
 
 # รูปแบบที่รองรับ {#supported-formats}
@@ -75,7 +75,7 @@ SnapOtter รองรับรูปแบบรูปภาพ 55+ รูป�
 |--------|-----------|---------|-------|
 | JPEG 2000 | .jp2, .j2k, .j2c, .jpc, .jpf, .jpx | opj_decompress / ImageMagick | ภาพยนตร์ดิจิทัล, ภาพทางการแพทย์ |
 | QOI | .qoi | ตัวเข้ารหัส TypeScript แบบอินไลน์ | พัฒนาเกม, ระบบฝังตัว |
-| HEIC/HEIF | .heic, .heif | heif-convert / heif-dec | รูปภาพจาก iPhone |
+| HEIC/HEIF | .heic, .heif, .hif | heif-convert / heif-dec | รูปภาพจาก iPhone และกล้อง Sony |
 
 ### รูปแบบเก่า/ระบบ (4) {#legacy-system-4}
 
