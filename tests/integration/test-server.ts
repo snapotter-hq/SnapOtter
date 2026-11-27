@@ -20,7 +20,7 @@ mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import { getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
+import { getDispatcherStatus, isGpuAvailable, shutdownDispatcher } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
@@ -35,6 +35,7 @@ import { startCancelListener, stopCancelListener } from "../../apps/api/src/jobs
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
+import { routeAiLogsToPino } from "../../apps/api/src/lib/ai-log-sink.js";
 import { stripBasePath } from "../../apps/api/src/lib/base-path.js";
 import { posthogProxyEnabled } from "../../apps/api/src/lib/posthog-proxy.js";
 import { parseTrustProxy } from "../../apps/api/src/lib/trust-proxy.js";
@@ -115,6 +116,9 @@ async function stopSpine(): Promise<void> {
     stopCancelListener(),
     closeQueueEvents(),
   ]);
+  // Workers are closed, so no job still needs the dispatcher. Left running, its
+  // child outlives the fork and keeps logging after the last test.
+  shutdownDispatcher();
   const rejected = results.find(
     (result): result is PromiseRejectedResult => result.status === "rejected",
   );
@@ -148,6 +152,10 @@ export interface TestApp {
 export async function buildTestApp(): Promise<TestApp> {
   // Start the BullMQ job spine (idempotent, once per fork)
   await ensureSpine();
+
+  // Mirrors index.ts. On the console default, a dispatcher line that lands
+  // after a file's last test fails the shard at fork teardown (#5186).
+  routeAiLogsToPino();
 
   // Seed built-in roles, the Default team, and the default admin (all idempotent)
   await ensureBuiltinRoles();
