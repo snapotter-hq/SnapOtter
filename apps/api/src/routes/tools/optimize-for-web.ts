@@ -4,6 +4,7 @@ import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -129,6 +130,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
       try {
         const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
           log: request.log,
+          signal: clientDisconnectSignal(reply),
         });
         fileBuffer = prepared.buffer;
       } catch (rawErr) {

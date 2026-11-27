@@ -31,6 +31,7 @@ import {
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
 } from "../../lib/bg-effects.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -408,6 +409,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
         try {
           const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
             log: request.log,
+            signal: clientDisconnectSignal(reply),
             rewriteFilenameToPng: true,
           });
           fileBuffer = prepared.buffer;
@@ -616,7 +618,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
             bgImageBuffer,
             bgFilename,
             bgValidation.format,
-            { log: request.log },
+            { log: request.log, signal: clientDisconnectSignal(reply) },
           );
           bgImageBuffer = preparedBg.buffer;
         }

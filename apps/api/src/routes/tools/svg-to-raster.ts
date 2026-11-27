@@ -14,6 +14,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import {
   allFailedFault,
@@ -82,8 +83,9 @@ async function convertSvg(
   svgBuffer: Buffer,
   filename: string,
   settings: z.infer<typeof settingsSchema>,
+  signal: AbortSignal,
 ): Promise<{ buffer: Buffer; filename: string; ext: string }> {
-  let image = sharp(await renderSvgToPng(svgBuffer, { density: settings.dpi })).withDensity(
+  let image = sharp(await renderSvgToPng(svgBuffer, { density: settings.dpi, signal })).withDensity(
     settings.dpi,
   );
 
@@ -286,6 +288,7 @@ export function registerSvgToRasterRoute(
       errors: [],
     });
 
+    const signal = clientDisconnectSignal(reply);
     const tasks = files.map((file, index) =>
       queue.add(async () => {
         updateJobProgress({
@@ -396,7 +399,7 @@ export function registerSvgToRasterRoute(
         }
 
         try {
-          const result = await convertSvg(sanitized, file.filename, settings);
+          const result = await convertSvg(sanitized, file.filename, settings, signal);
           results[index] = { buffer: result.buffer, filename: result.filename };
         } catch (rawErr) {
           const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
@@ -765,7 +768,7 @@ export function registerSvgToRasterRoute(
         buffer,
         filename: outFilename,
         ext,
-      } = await convertSvg(fileBuffer, filename, settings);
+      } = await convertSvg(fileBuffer, filename, settings, clientDisconnectSignal(reply));
       const jobId = randomUUID();
       await putObject(`outputs/${jobId}/${outFilename}`, buffer);
 

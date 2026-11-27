@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -97,6 +98,7 @@ beforeEach(() => {
 async function callPhase1Route(settings: Record<string, unknown>) {
   if (!phase1Handler) throw new Error("Phase 1 route handler was not registered");
   const reply = {
+    raw: new EventEmitter(),
     statusCode: 200,
     payload: undefined as unknown,
     status(code: number) {
