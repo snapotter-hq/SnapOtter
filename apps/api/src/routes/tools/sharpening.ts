@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -31,6 +31,7 @@ export function registerSharpening(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "sharpening",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image sharpening failed",
       (s) => s?.method ?? "adaptive",

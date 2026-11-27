@@ -8,7 +8,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, readTiffPagesFor } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 /** Output formats whose encoders keep an alpha channel. */
@@ -39,6 +39,7 @@ export function registerResize(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "resize",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image resize failed",
       (s) => s?.fit ?? "contain",

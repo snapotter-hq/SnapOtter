@@ -1,6 +1,7 @@
 import { isToolInputError } from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import sharp, { type Metadata, type Sharp } from "sharp";
+import { readTiffPagesFor, tiffPageSizesError } from "./animated-image.js";
 import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload } from "./gif-limits.js";
 import { logger } from "./logger.js";
@@ -57,26 +58,20 @@ function isLosslessWebP(buffer: Buffer): boolean {
  * A bare `sharp(buffer).rotate()` decodes page 1 only, which would hand every
  * tool after this a one-page TIFF.
  *
- * Returns null, and the caller keeps page 1 as it did before, when the stack
- * is over the multi-frame workload caps or when the rotated pages differ in
- * size (libvips only writes a page stack whose pages share one size). The warn
- * line says the other pages were left behind.
+ * Returns why not, rather than a stack, when the stack is over the multi-frame
+ * workload caps or when the rotated pages differ in size (libvips only writes a
+ * page stack whose pages share one size).
  */
 async function rotateTiffPages(
   buffer: Buffer,
   meta: Metadata,
-  log: Pick<FastifyBaseLogger, "warn">,
-): Promise<Sharp | null> {
+): Promise<{ stack: Sharp } | { unstackable: string; err?: unknown }> {
   const pages = meta.pages ?? 1;
   try {
     assertGifWorkload({ width: meta.width, height: meta.height, pages }, "Multi-page TIFF input");
   } catch (err) {
     if (!isToolInputError(err)) throw err;
-    log.warn(
-      { err, orientation: meta.orientation, pages, bytes: buffer.length },
-      "autoOrient: TIFF page stack is over the workload cap, keeping page 1 only",
-    );
-    return null;
+    return { unstackable: "TIFF page stack is over the workload cap", err };
   }
   const frames: Buffer[] = [];
   let size: string | undefined;
@@ -87,21 +82,44 @@ async function rotateTiffPages(
     const { data, info } = await frame.png().toBuffer({ resolveWithObject: true });
     const pageSize = `${info.width}x${info.height}`;
     if (size !== undefined && pageSize !== size) {
-      log.warn(
-        { orientation: meta.orientation, pages, bytes: buffer.length },
-        "autoOrient: TIFF pages have different sizes, keeping page 1 only",
-      );
-      return null;
+      return { unstackable: "TIFF pages have different sizes" };
     }
     size = pageSize;
     frames.push(data);
   }
-  return sharp(frames, { join: { across: 1, animated: true } });
+  return { stack: sharp(frames, { join: { across: 1, animated: true } }) };
+}
+
+/**
+ * The refusal a tool gives this page stack, unrotated, when it is going back out
+ * as TIFF. A stack only fails to rotate when its pages differ in size once
+ * turned, so that is the answer when the unrotated pages pass.
+ */
+async function tiffStackRefusal(buffer: Buffer, pages: number): Promise<Error> {
+  try {
+    await readTiffPagesFor(buffer, "tiff");
+  } catch (err) {
+    if (isToolInputError(err)) return err;
+    throw err;
+  }
+  return tiffPageSizesError(pages);
+}
+
+export interface AutoOrientOptions {
+  /**
+   * The format the tool will write for this input. Asked only when a rotated
+   * multi-page TIFF can't be turned as one stack: a TIFF answer then gets the
+   * refusal the same file without its orientation tag gets (#5133), where any
+   * other keeps rotated page 1, as a still output does (#4850). A function,
+   * because callers orient before they have parsed the tool's settings.
+   */
+  outputFormat?: (input: Buffer) => Promise<string | undefined>;
 }
 
 export async function autoOrient(
   buffer: Buffer,
   log: Pick<FastifyBaseLogger, "warn"> = logger,
+  opts: AutoOrientOptions = {},
 ): Promise<Buffer> {
   let meta: Metadata;
   try {
@@ -122,6 +140,7 @@ export async function autoOrient(
   }
   if (!meta.orientation || meta.orientation <= 1) return buffer;
 
+  let refusal: Error | undefined;
   try {
     // Re-encode in the container the image arrived in, at the quality the
     // rest of the pipeline uses. A bare toBuffer() would let Sharp pick both,
@@ -154,9 +173,19 @@ export async function autoOrient(
       if (meta.delay !== undefined) encoderOptions.delay = meta.delay;
       if (meta.loop !== undefined) encoderOptions.loop = meta.loop;
     } else {
-      pipeline =
-        (pages > 1 && output.format === "tiff" && (await rotateTiffPages(buffer, meta, log))) ||
-        sharp(buffer).rotate();
+      const rotated =
+        pages > 1 && output.format === "tiff" ? await rotateTiffPages(buffer, meta) : undefined;
+      if (rotated && "unstackable" in rotated) {
+        if ((await opts.outputFormat?.(buffer)) === "tiff") {
+          refusal = await tiffStackRefusal(buffer, pages);
+          throw refusal;
+        }
+        log.warn(
+          { err: rotated.err, orientation: meta.orientation, pages, bytes: buffer.length },
+          `autoOrient: ${rotated.unstackable}, keeping page 1 only`,
+        );
+      }
+      pipeline = rotated && "stack" in rotated ? rotated.stack : sharp(buffer).rotate();
       if (meta.depth === "ushort" && meta.space) {
         pipeline = pipeline.toColorspace(meta.space);
       }
@@ -164,6 +193,7 @@ export async function autoOrient(
 
     return await pipeline.toFormat(output.format, encoderOptions).toBuffer();
   } catch (err) {
+    if (err === refusal) throw err;
     const oom = asDecoderOutOfMemory(err);
     if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // The tool's own decode of the same buffer is expected to reject it. A warn

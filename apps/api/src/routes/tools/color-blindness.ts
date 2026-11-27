@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -26,6 +26,7 @@ export function registerColorBlindness(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "color-blindness",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Color blindness simulation failed",
       (s) => s?.simulationType ?? "deuteranomaly",

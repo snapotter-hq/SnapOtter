@@ -22,7 +22,11 @@ import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  inputOutputFormat,
+  outputFormatFor,
+  resolveOutputFormat,
+} from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -222,6 +226,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "image-enhancement",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<EnhancementSettings>(
       "Image enhancement failed",
       (s) => s.mode,

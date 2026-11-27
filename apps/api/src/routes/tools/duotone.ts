@@ -4,7 +4,11 @@ import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  type OutputFormat,
+  outputFormatFor,
+  resolveOutputFormat,
+} from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -23,24 +27,30 @@ function parseHex(hex: string) {
   };
 }
 
+const ALPHA_FORMATS = new Set(["png", "webp", "avif", "gif"]);
+
+async function duotoneOutputFormat(inputBuffer: Buffer, filename: string): Promise<OutputFormat> {
+  const resolvedFormat = await resolveOutputFormat(inputBuffer, filename);
+  const inputHasAlpha = (await sharp(inputBuffer).metadata()).hasAlpha === true;
+  // A transparent input whose detected format cannot carry alpha (JPEG, or
+  // TIFF which Sharp's default encoder flattens to 3 channels) switches to
+  // lossless PNG so the rejoined alpha band is not discarded at the end (#1188).
+  return inputHasAlpha && !ALPHA_FORMATS.has(resolvedFormat.format)
+    ? outputFormatFor("png")
+    : resolvedFormat;
+}
+
 export function registerDuotone(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "duotone",
     settingsSchema,
+    outputFormat: async (inputBuffer, _settings, filename) =>
+      (await duotoneOutputFormat(inputBuffer, filename)).format,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Duotone failed",
       () => "duotone",
       async (inputBuffer, settings, filename) => {
-        const resolvedFormat = await resolveOutputFormat(inputBuffer, filename);
-        const ALPHA_FORMATS = new Set(["png", "webp", "avif", "gif"]);
-        const inputHasAlpha = (await sharp(inputBuffer).metadata()).hasAlpha === true;
-        // A transparent input whose detected format cannot carry alpha (JPEG, or
-        // TIFF which Sharp's default encoder flattens to 3 channels) switches to
-        // lossless PNG so the rejoined alpha band is not discarded at the end (#1188).
-        const outputFormat =
-          inputHasAlpha && !ALPHA_FORMATS.has(resolvedFormat.format)
-            ? outputFormatFor("png")
-            : resolvedFormat;
+        const outputFormat = await duotoneOutputFormat(inputBuffer, filename);
 
         // The blend path rebuilds from a raw buffer, and Sharp ignores page hints
         // on raw input, so animation is handled a frame at a time (#1083).

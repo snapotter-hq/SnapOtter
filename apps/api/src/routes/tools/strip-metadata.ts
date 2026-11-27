@@ -10,6 +10,7 @@ import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { inputOutputFormat } from "../../lib/output-format.js";
 import {
   decompressSvgz,
   isSvgBuffer,
@@ -263,6 +264,7 @@ export function registerStripMetadata(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "strip-metadata",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Metadata strip failed",
       () => "strip-metadata",

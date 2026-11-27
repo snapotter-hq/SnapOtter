@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
-import { hasServerErrorStatus } from "@snapotter/shared";
+import { hasServerErrorStatus, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Blend } from "sharp";
 import { z } from "zod";
@@ -12,7 +12,7 @@ import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-dec
 import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 
@@ -94,6 +94,7 @@ export function registerCompose(app: FastifyInstance) {
       const imageHandler = inputHandlerFor("image");
       const base = await imageHandler.prepare(baseBuffer, filename, {
         scratchDir: tmpdir(),
+        outputFormat: (input) => inputOutputFormat(input, settings, filename),
       });
       const overlay = await imageHandler.prepare(overlayBuffer, overlayFilename, {
         scratchDir: tmpdir(),
@@ -190,6 +191,12 @@ export function registerCompose(app: FastifyInstance) {
     } catch (rawErr) {
       if (rawErr instanceof InputValidationError) {
         return sendInputValidationError(reply, rawErr, "compose", request.log);
+      }
+      // A page stack the tool can't keep, refused the way the factory routes
+      // refuse it, so a rotated base and an unrotated one answer alike (#5133).
+      if (isToolInputError(rawErr)) {
+        const code = toolInputErrorCode(rawErr);
+        return reply.status(400).send({ error: rawErr.message, ...(code && { code }) });
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;

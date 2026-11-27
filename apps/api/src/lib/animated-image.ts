@@ -151,10 +151,7 @@ export async function readTiffPagesFor(buffer: Buffer, outputFormat: string): Pr
     const oom = asDecoderOutOfMemory(err);
     if (oom instanceof DecoderOutOfMemoryError) throw oom;
     if (err instanceof Error && /differs from page/.test(err.message)) {
-      throw new ToolInputError(
-        `This TIFF has ${pages} pages of different sizes. Only a TIFF whose pages all share one size can be edited with every page kept.`,
-        { code: "IMAGE_UNDECODABLE" },
-      );
+      throw tiffPageSizesError(pages);
     }
     return STILL;
   }
@@ -164,6 +161,14 @@ export async function readTiffPagesFor(buffer: Buffer, outputFormat: string): Pr
     "Multi-page TIFF input",
   );
   return { animated: true, pages, pageHeight: workload.height, width: workload.width };
+}
+
+/** A TIFF whose pages can't be kept together because they differ in size. */
+export function tiffPageSizesError(pages: number): ToolInputError {
+  return new ToolInputError(
+    `This TIFF has ${pages} pages of different sizes. Only a TIFF whose pages all share one size can be edited with every page kept.`,
+    { code: "IMAGE_UNDECODABLE" },
+  );
 }
 
 /**

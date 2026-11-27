@@ -3,7 +3,7 @@ import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { renderTextOverlays } from "../../lib/text-overlay-render.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -31,6 +31,7 @@ export function registerTextOverlay(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "text-overlay",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Text overlay failed",
       (s) => s?.position ?? "bottom",

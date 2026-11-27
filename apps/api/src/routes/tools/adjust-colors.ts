@@ -13,7 +13,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { inputOutputFormat, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -268,6 +268,7 @@ export function registerColorAdjustments(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "adjust-colors",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: guardedProcessColorAdjustments,
   });
   // Backwards-compatible alias routes consolidated into adjust-colors. These
@@ -278,6 +279,7 @@ export function registerColorAdjustments(app: FastifyInstance) {
       toolId,
       section: "image",
       settingsSchema,
+      outputFormat: inputOutputFormat,
       process: guardedProcessColorAdjustments,
     });
   }

@@ -65,6 +65,18 @@ function resolveOutputFormat(
   return map[outputFormat] ?? { sharpFormat: null, ext: originalExt };
 }
 
+/** The format the tiles go out in, for autoOrient (#5133). */
+async function tileOutputFormat(
+  input: Buffer,
+  settings: z.infer<typeof settingsSchema>,
+): Promise<string> {
+  return (
+    resolveOutputFormat(settings.outputFormat, "").sharpFormat ??
+    (await sharp(input).metadata()).format ??
+    ""
+  );
+}
+
 function applyTileFormat(
   pipeline: Sharp,
   sharpFormat: SharpFormat | null,
@@ -229,7 +241,17 @@ export function registerSplit(app: FastifyInstance) {
 
     try {
       if (!isSvg) {
-        fileBuffer = await autoOrient(fileBuffer);
+        try {
+          fileBuffer = await autoOrient(fileBuffer, undefined, {
+            outputFormat: (input) => tileOutputFormat(input, settings),
+          });
+        } catch (err) {
+          // Only the orientation refusal is a 400 here; a later decode
+          // failure keeps the 422 below.
+          if (!isToolInputError(err)) throw err;
+          const code = toolInputErrorCode(err);
+          return reply.status(400).send({ error: err.message, ...(code && { code }) });
+        }
       }
       const metadata = await sharp(fileBuffer).metadata();
       const fullW = metadata.width ?? 0;
@@ -359,6 +381,8 @@ export function registerSplit(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "split",
     settingsSchema,
+    outputFormat: (input, settings) =>
+      tileOutputFormat(input, settings as z.infer<typeof settingsSchema>),
     process: withImageEncodeContext<unknown>(
       "Image split failed",
       (s) => (s as z.infer<typeof settingsSchema>)?.outputFormat ?? "original",

@@ -4,7 +4,11 @@ import sharp from "sharp";
 import { z } from "zod";
 import { isAnimated, isMultiPageTiff, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import {
+  inputOutputFormat,
+  outputFormatFor,
+  resolveOutputFormat,
+} from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -43,6 +47,7 @@ export function registerReplaceColor(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "replace-color",
     settingsSchema,
+    outputFormat: inputOutputFormat,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Color replacement failed",
       (s) => (s?.makeTransparent ? "transparent" : "replace"),

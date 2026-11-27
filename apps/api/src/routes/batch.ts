@@ -17,7 +17,9 @@ import {
   FEATURE_BUNDLES,
   hasServerErrorStatus,
   isSafeMessageError,
+  isToolInputError,
   TOOLS,
+  toolInputErrorCode,
   toolSection,
 } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
@@ -101,7 +103,7 @@ import { inputHandlerForInput } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
-import { getToolConfig } from "./tool-factory.js";
+import { getToolConfig, orientOutputFormat } from "./tool-factory.js";
 
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -698,8 +700,25 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   }
                 } else if (!skipPreprocess) {
                   try {
-                    processBuffer = await autoOrient(processBuffer);
+                    processBuffer = await autoOrient(processBuffer, undefined, {
+                      outputFormat: orientOutputFormat(
+                        toolId,
+                        () => requestedSettingsList[i],
+                        processFilename,
+                      ),
+                    });
                   } catch (rawErr) {
+                    if (isToolInputError(rawErr)) {
+                      const code = toolInputErrorCode(rawErr);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: rawErr.message,
+                        statusCode: 400,
+                        ...(code && { code }),
+                      });
+                      continue;
+                    }
                     const err = asDecoderOutOfMemory(rawErr);
                     if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);

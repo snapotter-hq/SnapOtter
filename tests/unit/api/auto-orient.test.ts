@@ -9,6 +9,8 @@ const loggerMock = vi.hoisted(() => ({
 }));
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
+import { isToolInputError, toolInputErrorCode } from "@snapotter/shared";
+import { readTiffPagesFor } from "../../../apps/api/src/lib/animated-image.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { MAX_GIF_FRAMES } from "../../../apps/api/src/lib/gif-limits.js";
@@ -718,6 +720,88 @@ describe("autoOrient", () => {
       expect.objectContaining({ pages: MAX_GIF_FRAMES + 1, orientation: 6 }),
       expect.stringContaining("workload cap"),
     );
+  });
+
+  /** The refusal readTiffPagesFor gives the same file with no orientation tag. */
+  async function unrotatedRefusal(tiff: Buffer): Promise<{ message: string; code?: string }> {
+    const err = await readTiffPagesFor(tiff, "tiff").then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(Error);
+    return { message: (err as Error).message, code: toolInputErrorCode(err) };
+  }
+
+  async function overCapTiff(orientation?: number): Promise<Buffer> {
+    const page = await sharp({
+      create: { width: 4, height: 2, channels: 3, background: { r: 0, g: 0, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+    const stack = sharp(Array(MAX_GIF_FRAMES + 1).fill(page), {
+      join: { across: 1, animated: true },
+    });
+    return await (orientation ? stack.withMetadata({ orientation }) : stack)
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+  }
+
+  it("refuses a rotated TIFF with mixed page sizes going out as TIFF, as it does unrotated (#5133)", async () => {
+    const expected = await unrotatedRefusal(
+      readFixture(fixtures.image.edge.multipageMixedSizesTiff),
+    );
+    const tiff = readFixture(fixtures.image.edge.multipageMixedSizesOrientedTiff);
+
+    const err = await autoOrient(tiff, undefined, { outputFormat: async () => "tiff" }).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+
+    expect(isToolInputError(err)).toBe(true);
+    expect({ message: (err as Error).message, code: toolInputErrorCode(err) }).toEqual(expected);
+    expect(expected.message).toContain("2 pages of different sizes");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a rotated TIFF over the page cap going out as TIFF, as it does unrotated (#5133)", async () => {
+    const expected = await unrotatedRefusal(await overCapTiff());
+
+    const err = await autoOrient(await overCapTiff(6), undefined, {
+      outputFormat: async () => "tiff",
+    }).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+
+    expect(isToolInputError(err)).toBe(true);
+    expect({ message: (err as Error).message, code: toolInputErrorCode(err) }).toEqual(expected);
+    expect(expected.code).toBe("TOO_MANY_FRAMES");
+  });
+
+  it("still keeps rotated page 1 of an unstackable TIFF when the output is not TIFF (#5133)", async () => {
+    const tiff = readFixture(fixtures.image.edge.multipageMixedSizesOrientedTiff);
+
+    const result = await autoOrient(tiff, undefined, { outputFormat: async () => "png" });
+    const meta = await sharp(result).metadata();
+
+    expect(meta.pages ?? 1).toBe(1);
+    expect([meta.width, meta.height]).toEqual([20, 40]);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ pages: 2, orientation: 6 }),
+      expect.stringContaining("different sizes"),
+    );
+  });
+
+  it("only asks for the output format when a TIFF stack can't be rotated (#5133)", async () => {
+    const outputFormat = vi.fn(async () => "tiff");
+
+    const result = await autoOrient(await createOrientedMultipageTiff(6), undefined, {
+      outputFormat,
+    });
+    await autoOrient(await createImageWithOrientation(6), undefined, { outputFormat });
+
+    expect((await sharp(result).metadata()).pages).toBe(3);
+    expect(outputFormat).not.toHaveBeenCalled();
   });
 
   it("keeps 16-bit samples when rotating a multi-page TIFF (#4849)", async () => {

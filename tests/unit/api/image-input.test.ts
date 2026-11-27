@@ -1,3 +1,4 @@
+import { ToolInputError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -222,8 +223,41 @@ describe("ImageInputHandler request logger (#1417)", () => {
       log: log as never,
     });
 
-    expect(mocks.autoOrient).toHaveBeenCalledWith(RAW, log);
+    expect(mocks.autoOrient).toHaveBeenCalledWith(RAW, log, { outputFormat: undefined });
     expect(result).toEqual({ buffer: ORIENTED, filename: "scan.jpg" });
+  });
+});
+
+describe("ImageInputHandler tool output format (#5133)", () => {
+  beforeEach(() => {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "tiff",
+      width: 10,
+      height: 10,
+    });
+  });
+
+  it("hands the tool's output format to autoOrient", async () => {
+    const outputFormat = vi.fn(async () => "tiff");
+
+    await new ImageInputHandler().prepare(RAW, "scan.tiff", { scratchDir: "/tmp/x", outputFormat });
+
+    expect(mocks.autoOrient).toHaveBeenCalledWith(RAW, undefined, { outputFormat });
+  });
+
+  it("answers autoOrient's page-stack refusal with a 400 that keeps its code", async () => {
+    const message = "This TIFF has 2 pages of different sizes.";
+    mocks.autoOrient.mockRejectedValueOnce(
+      new ToolInputError(message, { code: "IMAGE_UNDECODABLE" }),
+    );
+
+    const err = await new ImageInputHandler()
+      .prepare(RAW, "scan.tiff", { scratchDir: "/tmp/x" })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InputValidationError);
+    expect(err).toMatchObject({ message, statusCode: 400, code: "IMAGE_UNDECODABLE" });
   });
 });
 
@@ -523,7 +557,7 @@ describe("ImageInputHandler AVIF fallback logging (#1548)", () => {
     expect(result).toEqual({ buffer: ORIENTED, filename: "photo.png" });
     expect(mocks.decodeAnyFormat).toHaveBeenCalledWith(RAW, "avif", expect.any(Object));
     // the CLI decoder's output is what goes on to autoOrient, with the same logger
-    expect(mocks.autoOrient).toHaveBeenCalledWith(DECODED, log);
+    expect(mocks.autoOrient).toHaveBeenCalledWith(DECODED, log, { outputFormat: undefined });
     expect(log.info).toHaveBeenCalledOnce();
     expect(log.info.mock.calls[0][0]).toMatchObject({
       err: expect.objectContaining({ message: "heif: Unsupported bitstream" }),
