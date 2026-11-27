@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { ToolInputError } from "@snapotter/shared";
 import { env } from "../config.js";
@@ -16,6 +17,12 @@ const SHARP_DEFAULT_PIXEL_LIMIT = 0x3fff * 0x3fff;
 // An 8-bit RGBA PNG of incompressible pixels stays under 5 bytes per pixel.
 const OUTPUT_BYTES_PER_PIXEL = 5;
 const OUTPUT_SLACK_BYTES = 1024 * 1024;
+// A hostile file is asked for again on every thumbnail, preview and batch pass.
+// Remembering its timeout spares a full deadline per request (#5345). The
+// memory is short so a file that only timed out on a loaded host soon gets
+// another chance.
+const TIMEOUT_MEMORY_MS = 60 * 1000;
+const TIMEOUT_MEMORY_MAX_ENTRIES = 256;
 
 // Runs as `node -e` so it needs no file on disk next to the compiled module.
 // One libvips thread keeps a hostile file to a single core until the deadline.
@@ -54,6 +61,29 @@ export interface RenderSvgOptions {
   /** Override the deadline; defaults to most of JOB_TIMEOUT_FAST_S, where 0 means none. */
   deadlineMs?: number;
   signal?: AbortSignal;
+}
+
+// Insertion order doubles as age order: entries are only ever added or evicted.
+const timedOutRenders = new Map<string, number>();
+
+function timedOutKey(svg: Buffer, options: Record<string, unknown>): string {
+  return createHash("sha256").update(JSON.stringify(options)).update(svg).digest("hex");
+}
+
+function hasTimedOut(key: string): boolean {
+  const expiresAt = timedOutRenders.get(key);
+  if (expiresAt === undefined) return false;
+  if (expiresAt > Date.now()) return true;
+  timedOutRenders.delete(key);
+  return false;
+}
+
+function rememberTimeout(key: string): void {
+  timedOutRenders.delete(key);
+  timedOutRenders.set(key, Date.now() + TIMEOUT_MEMORY_MS);
+  if (timedOutRenders.size > TIMEOUT_MEMORY_MAX_ENTRIES) {
+    timedOutRenders.delete(timedOutRenders.keys().next().value as string);
+  }
 }
 
 export function svgRenderDeadlineMs(): number {
@@ -113,6 +143,12 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
     selfDeadlineMs: deadlineMs > 0 ? deadlineMs + CHILD_DEADLINE_GRACE_MS : 0,
   };
   opts.signal?.throwIfAborted();
+  // Hashing is skipped while nothing is remembered, the common case.
+  if (deadlineMs > 0 && timedOutRenders.size > 0) {
+    if (hasTimedOut(timedOutKey(baked.buffer, childOptions))) {
+      return Promise.reject(svgTooComplexError(deadlineMs));
+    }
+  }
 
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -175,7 +211,10 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
         );
       }
       // A deadline that fires after the child finished still leaves a complete result.
-      if (timedOut && code !== 0) return finish(svgTooComplexError(deadlineMs));
+      if (timedOut && code !== 0) {
+        rememberTimeout(timedOutKey(baked.buffer, childOptions));
+        return finish(svgTooComplexError(deadlineMs));
+      }
       if (opts.signal?.aborted) return finish(opts.signal.reason);
       if (code === 0) return finish(null, Buffer.concat(stdout));
       const message = Buffer.concat(stderr).toString("utf-8").trim();
