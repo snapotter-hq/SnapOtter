@@ -1,12 +1,24 @@
 ---
 description: "Versionsanteckningar och versionshistorik för SnapOtter. Se vad som är nytt, förbättrat och åtgärdat i varje version."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: a280f74a26b9
+i18n_output_hash: 50fc6b7899df
 i18n_hash_version: 2
 ---
 
 # Ändringslogg {#changelog}
+
+## Ej släppt {#unreleased}
+
+### Ändrat {#unreleased-changed}
+
+- **Innehållsmedveten storleksändring körs nu som ett bakgrundsjobb.** `POST /api/v1/tools/image/content-aware-resize` höll tidigare begäran öppen under hela sömskärningen och svarade `200` med resultatet. Nu svarar det `202 Accepted` med ett `jobId`, `statusUrl` och `progressUrl`, som de andra långvariga verktygen. Följ `/api/v1/jobs/{jobId}/progress` över SSE: `result` i ramen med `phase: "complete"` har samma fält `downloadUrl`, `originalSize`, `processedSize`, `width` och `height` som den gamla svarskroppen `200` hade, och ett bearbetningsfel kommer som en `phase: "failed"`-ram i stället för ett `422`. Ramens `httpStatus` är `400` när indatan var problemet (en bild över 25 MP, eller mer än 2x förstoring), där den gamla routen svarade `422`. Du kan nu avbryta ett pågående jobb och skicka ditt eget `clientJobId`. En begäran utan `width`, `height` eller `square` får nu `400` `"Invalid settings"`, med det gamla meddelandet i `details`. (#4338)
+- **Bild till SVG (`vectorize`) körs nu som ett köat jobb.** `POST /api/v1/tools/image/vectorize` spårade tidigare direkt i begäran och svarade alltid `200`. Nu går det genom jobbkön som andra verktyg: en spårning som blir klar inom det synkrona väntefönstret svarar fortfarande `200` med samma kropp, och en längre svarar `202` med ett jobb-ID, `statusUrl` och `progressUrl`. API-klienter som bara hanterar `200` bör följa jobbet när de får `202`. Jobbet kan nu avbrytas och rapporterar förlopp, och felkropparna använder verktygens standardformer (en saknad fil säger `No file provided`; en bild som inte går att avkoda är ett `400`). SVG-utdata är oförändrad. (#4337)
+- **Generering av passfoto körs nu som ett köat jobb.** `POST /api/v1/tools/image/passport-photo/generate` beskar tidigare direkt i begäran och svarade alltid `200`. En beskärning som blir klar inom det synkrona väntefönstret svarar fortfarande `200` med samma kropp (plus `originalSize` och `processedSize`), och en långsammare svarar `202` med ett jobb-ID, `statusUrl` och `progressUrl`; `result` i `phase: "complete"`-ramen innehåller `downloadUrl`, `dimensions`, `spec` och `printDownloadUrl`. API-klienter som bara hanterar `200` bör följa jobbet när de får `202`. Kroppen tar en valfri `clientJobId`, och jobbet kan avbrytas. Felstatus innan jobbet startar är oförändrade (`400`, `404`, `410 ANALYSIS_EXPIRED`); ett bearbetningsfel svarar fortfarande `422` med `details` och bär nu även ett `code` när det finns ett, till exempel `TARGET_SIZE_UNREACHABLE`. Analyssteget är oförändrat. (#4337)
+
+### Föråldrat {#unreleased-deprecated}
+
+- **De fem bildoperationerna för komprimering till en storlek är föråldrade.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` och `-500kb` är markerade som föråldrade i OpenAPI-specifikationen och finns kvar i minst en minorversion. Skicka `POST /api/v1/tools/image/compress` med `settings` satt till `{"mode":"targetSize","targetSizeKb":20}` (eller 50, 100, 200, 500). Utdata är densamma. PDF-förinställningarnas sökvägar är oförändrade.
 
 ## v2.3.0 {#v2-3-0}
 

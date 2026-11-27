@@ -1,12 +1,24 @@
 ---
 description: "SnapOtter의 릴리스 노트와 버전 기록입니다. 각 릴리스의 새로운 기능, 개선 사항, 수정 사항을 확인하세요."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: 2e673d59a965
+i18n_output_hash: a7796cea2186
 i18n_hash_version: 2
 ---
 
 # 변경 이력 {#changelog}
+
+## 미출시 {#unreleased}
+
+### 변경 사항 {#unreleased-changed}
+
+- **콘텐츠 인식 리사이즈가 이제 백그라운드 작업으로 실행됩니다.** `POST /api/v1/tools/image/content-aware-resize`는 이전에 seam carve가 끝날 때까지 요청을 열어 둔 채 `200`로 결과를 응답했습니다. 이제는 다른 오래 걸리는 도구와 마찬가지로 `202 Accepted`를 응답하며, `jobId`, `statusUrl`, `progressUrl`이 함께 옵니다. `/api/v1/jobs/{jobId}/progress`는 SSE로 따라가세요. `result`는 `phase: "complete"` 프레임에서 `downloadUrl`, `originalSize`, `processedSize`, `width`, `height` 필드를 그대로 가지며, 이는 예전 `200` 본문과 같습니다. 처리 실패는 `phase: "failed"` 프레임으로 도착합니다(`422`가 아닙니다). 입력에 문제가 있을 때(25 MP를 넘는 이미지, 또는 2x를 넘는 확대) 그 프레임의 `httpStatus`는 `400`이며, 예전 라우트는 `422`을 응답했습니다. 이제 실행 중인 작업을 취소하고 직접 만든 `clientJobId`를 전달할 수 있습니다. `width`, `height`, `square`이 없는 요청은 이제 `400` `"Invalid settings"`를 받으며, 예전 메시지는 `details`에 들어 있습니다. (#4338)
+- **이미지를 SVG로 변환(`vectorize`)이 이제 대기열 작업으로 실행됩니다.** `POST /api/v1/tools/image/vectorize`는 이전에 요청 중에 트레이스를 수행하고 항상 `200`을 응답했습니다. 이제는 다른 도구처럼 작업 대기열을 거칩니다. 동기 대기 시간 안에 끝나는 트레이스는 같은 본문으로 `200`을 응답하고, 더 오래 걸리면 `202`을 응답하며 작업 ID, `statusUrl`, `progressUrl`이 함께 옵니다. `200`만 처리하는 API 클라이언트는 `202`을 받으면 작업을 따라가야 합니다. 이제 작업을 취소할 수 있고 진행률도 보고하며, 오류 본문은 표준 도구 형식을 사용합니다(파일이 없으면 `No file provided`, 디코딩할 수 없는 이미지는 `400`입니다). SVG 출력은 달라지지 않습니다. (#4337)
+- **증명사진 생성이 이제 대기열 작업으로 실행됩니다.** `POST /api/v1/tools/image/passport-photo/generate`는 이전에 요청 중에 자르기를 수행하고 항상 `200`을 응답했습니다. 동기 대기 시간 안에 끝나는 자르기는 `200`을 응답하고(본문은 같고 `originalSize`와 `processedSize`이 추가됩니다), 더 느린 경우 `202`을 응답하며 작업 ID, `statusUrl`, `progressUrl`이 함께 옵니다. `result`는 `phase: "complete"` 프레임에서 `downloadUrl`, `dimensions`, `spec`, `printDownloadUrl`를 전달합니다. `200`만 처리하는 API 클라이언트는 `202`을 받으면 작업을 따라가야 합니다. 본문은 선택 사항인 `clientJobId`를 받으며, 작업을 취소할 수 있습니다. 작업이 시작되기 전의 오류 상태는 그대로입니다(`400`, `404`, `410 ANALYSIS_EXPIRED`). 처리 실패는 여전히 `422`과 `details`을 응답하며, 이제 `code`이 있으면(예: `TARGET_SIZE_UNREACHABLE`) 함께 전달합니다. 분석 단계는 달라지지 않습니다. (#4337)
+
+### 지원 중단 예정 {#unreleased-deprecated}
+
+- **이미지 목표 용량 압축 작업 다섯 가지가 지원 중단 예정입니다.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, `-500kb`는 OpenAPI 명세에서 지원 중단 예정으로 표시되었으며 최소 한 번의 마이너 릴리스 동안 유지됩니다. `POST /api/v1/tools/image/compress`를 보내면서 `settings`를 `{"mode":"targetSize","targetSizeKb":20}`(또는 50, 100, 200, 500)로 설정하세요. 출력은 같습니다. PDF 프리셋 경로는 달라지지 않습니다.
 
 ## v2.3.0 {#v2-3-0}
 

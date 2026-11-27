@@ -1,12 +1,24 @@
 ---
 description: "Catatan rilis dan riwayat versi untuk SnapOtter. Lihat apa yang baru, ditingkatkan, dan diperbaiki di setiap rilis."
-i18n_source_hash: 952098c65251
-i18n_provenance: human
-i18n_output_hash: 318966c81746
+i18n_source_hash: 8cacf16b4c4d
+i18n_provenance: machine
+i18n_output_hash: 4f3ccbe31a7e
 i18n_hash_version: 2
 ---
 
 # Changelog {#changelog}
+
+## Belum dirilis {#unreleased}
+
+### Perubahan {#unreleased-changed}
+
+- **Resize sadar-konten kini berjalan sebagai job latar belakang.** `POST /api/v1/tools/image/content-aware-resize` dulu menahan request tetap terbuka selama seluruh proses seam carve dan menjawab `200` beserta hasilnya. Kini ia menjawab `202 Accepted` dengan `jobId`, `statusUrl`, dan `progressUrl`, seperti tool berjalan lama lainnya. Ikuti `/api/v1/jobs/{jobId}/progress` lewat SSE: `result` pada frame dengan `phase: "complete"` memiliki kolom `downloadUrl`, `originalSize`, `processedSize`, `width`, dan `height` yang sama seperti isi `200` yang lama, dan kegagalan pemrosesan datang sebagai frame `phase: "failed"`, bukan `422`. `httpStatus` pada frame itu bernilai `400` jika masalahnya ada di input (gambar di atas 25 MP, atau pembesaran lebih dari 2x), sedangkan route lama menjawab `422`. Sekarang Anda bisa membatalkan job yang sedang berjalan dan mengirim `clientJobId` sendiri. Request tanpa `width`, `height`, atau `square` kini mendapat `400` `"Invalid settings"`, dengan pesan lama di `details`. (#4338)
+- **Image to SVG (`vectorize`) kini berjalan sebagai job dalam antrean.** `POST /api/v1/tools/image/vectorize` dulu melakukan trace saat request berlangsung dan selalu menjawab `200`. Kini ia melewati antrean job seperti tool lain: trace yang selesai dalam jendela tunggu sinkron tetap menjawab `200` dengan isi yang sama, dan yang lebih lama menjawab `202` berisi job id, `statusUrl`, dan `progressUrl`. Klien API yang hanya menangani `200` sebaiknya mengikuti job saat menerima `202`. Job kini bisa dibatalkan dan melaporkan progres, dan isi error memakai bentuk tool standar (file yang hilang menghasilkan `No file provided`; gambar yang tidak bisa didekode adalah `400`). Output SVG tidak berubah. (#4337)
+- **Generate foto paspor kini berjalan sebagai job dalam antrean.** `POST /api/v1/tools/image/passport-photo/generate` dulu melakukan crop saat request berlangsung dan selalu menjawab `200`. Crop yang selesai dalam jendela tunggu sinkron tetap menjawab `200` dengan isi yang sama (ditambah `originalSize` dan `processedSize`), dan yang lebih lambat menjawab `202` berisi job id, `statusUrl`, dan `progressUrl`; `result` pada frame `phase: "complete"` membawa `downloadUrl`, `dimensions`, `spec`, dan `printDownloadUrl`. Klien API yang hanya menangani `200` sebaiknya mengikuti job saat menerima `202`. Isi request menerima `clientJobId` opsional, dan job bisa dibatalkan. Status error sebelum job dimulai tidak berubah (`400`, `404`, `410 ANALYSIS_EXPIRED`); kegagalan pemrosesan tetap menjawab `422` dengan `details`, dan kini juga membawa `code` jika ada, misalnya `TARGET_SIZE_UNREACHABLE`. Langkah analisis tidak berubah. (#4337)
+
+### Usang {#unreleased-deprecated}
+
+- **Lima operasi kompres-ke-ukuran untuk gambar kini usang.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb`, dan `-500kb` ditandai usang di spesifikasi OpenAPI dan akan tetap ada setidaknya selama satu rilis minor. Kirim `POST /api/v1/tools/image/compress` dengan `settings` diatur ke `{"mode":"targetSize","targetSizeKb":20}` (atau 50, 100, 200, 500). Hasilnya sama. Jalur preset PDF tidak berubah.
 
 ## v2.3.0 {#v2-3-0}
 

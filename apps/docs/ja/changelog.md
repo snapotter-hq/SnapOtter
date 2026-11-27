@@ -1,12 +1,24 @@
 ---
 description: "SnapOtter のリリースノートとバージョン履歴です。各リリースの新機能、改善点、修正内容を確認できます。"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: 42736e10bab1
+i18n_output_hash: 6c43e59705d5
 i18n_hash_version: 2
 ---
 
 # 変更履歴 {#changelog}
+
+## 未リリース {#unreleased}
+
+### 変更 {#unreleased-changed}
+
+- **コンテンツに応じたリサイズがバックグラウンドジョブとして実行されるようになりました。** `POST /api/v1/tools/image/content-aware-resize` は以前、シームカービングが終わるまでリクエストを開いたままにし、`200` で結果を返していました。今後は他の長時間ツールと同様に、`202 Accepted` を返し、`jobId`、`statusUrl`、`progressUrl` を含みます。`/api/v1/jobs/{jobId}/progress` は SSE で追跡してください。`result` は、`phase: "complete"` のフレームで、`downloadUrl`、`originalSize`、`processedSize`、`width`、`height` の各フィールドを持ちます。これは以前の `200` の本文と同じです。処理の失敗は `phase: "failed"` フレームとして届きます (`422` ではありません)。入力に問題がある場合 (25 MP を超える画像、または 2x を超える拡大)、そのフレームの `httpStatus` は `400` になります。従来のルートは `422` を返していました。実行中のジョブをキャンセルしたり、独自の `clientJobId` を渡したりできるようになりました。`width`、`height`、`square` のいずれもないリクエストは、`400` `"Invalid settings"` を返すようになり、従来のメッセージは `details` に入ります。(#4338)
+- **画像から SVG への変換 (`vectorize`) がキュー経由のジョブとして実行されるようになりました。** `POST /api/v1/tools/image/vectorize` は以前、リクエスト中にトレースを行い、常に `200` を返していました。今後は他のツールと同様にジョブキューを通ります。同期待機ウィンドウ内に終わるトレースは、これまでと同じ本文で `200` を返し、それより長くかかるものは `202` を返し、ジョブ ID、`statusUrl`、`progressUrl` が付きます。`200` だけを処理する API クライアントは、`202` が返ったらジョブを追跡してください。ジョブはキャンセルでき、進捗も報告されます。エラーの本文は標準のツール形式になりました (ファイルがない場合は `No file provided`、デコードできない画像は `400` です)。SVG の出力は変わりません。(#4337)
+- **証明写真の生成がキュー経由のジョブとして実行されるようになりました。** `POST /api/v1/tools/image/passport-photo/generate` は以前、リクエスト中に切り抜きを行い、常に `200` を返していました。同期待機ウィンドウ内に終わる切り抜きは、`200` を返し、本文はこれまでと同じです (`originalSize` と `processedSize` が加わります)。時間がかかるものは `202` を返し、ジョブ ID、`statusUrl`、`progressUrl` が付きます。`result` は `phase: "complete"` のフレームで `downloadUrl`、`dimensions`、`spec`、`printDownloadUrl` を運びます。`200` だけを処理する API クライアントは、`202` が返ったらジョブを追跡してください。本文では任意の `clientJobId` を指定でき、ジョブはキャンセルできます。ジョブ開始前のエラーステータスは変わりません (`400`、`404`、`410 ANALYSIS_EXPIRED`)。処理の失敗は引き続き `422` と `details` を返し、`code` がある場合 (`TARGET_SIZE_UNREACHABLE` など) はそれも含むようになりました。分析ステップは変わりません。(#4337)
+
+### 非推奨 {#unreleased-deprecated}
+
+- **画像の目標サイズ圧縮操作 5 つが非推奨になりました。** `/api/v1/tools/image/compress-image-to-20kb`、`-50kb`、`-100kb`、`-200kb`、`-500kb` は OpenAPI 仕様で非推奨とされ、少なくとも 1 つのマイナーリリースの間は残ります。`POST /api/v1/tools/image/compress` を送り、`settings` に `{"mode":"targetSize","targetSizeKb":20}` (または 50、100、200、500) を設定してください。出力は同じです。PDF のプリセットのパスは変わりません。
 
 ## v2.3.0 {#v2-3-0}
 

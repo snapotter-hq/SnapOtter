@@ -1,12 +1,24 @@
 ---
 description: "Informacje o wydaniach i historia wersji SnapOtter. Zobacz, co nowego, ulepszonego i naprawionego w każdym wydaniu."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: e60498ac698b
+i18n_output_hash: 804db1f1fa82
 i18n_hash_version: 2
 ---
 
 # Dziennik zmian {#changelog}
+
+## Niewydane {#unreleased}
+
+### Zmieniono {#unreleased-changed}
+
+- **Zmiana rozmiaru z uwzględnieniem treści działa teraz jako zadanie w tle.** `POST /api/v1/tools/image/content-aware-resize` wcześniej trzymał żądanie otwarte przez cały czas wycinania szwów i odpowiadał `200` z wynikiem. Teraz odpowiada `202 Accepted` z `jobId`, `statusUrl` i `progressUrl`, tak jak inne długo działające narzędzia. Śledź `/api/v1/jobs/{jobId}/progress` przez SSE: `result` w ramce z `phase: "complete"` zawiera te same pola `downloadUrl`, `originalSize`, `processedSize`, `width` i `height`, które miała dawna treść odpowiedzi `200`, a błąd przetwarzania przychodzi jako ramka `phase: "failed"` zamiast `422`. `httpStatus` w tej ramce ma wartość `400`, gdy problemem było wejście (obraz powyżej 25 MP lub powiększenie ponad 2x), podczas gdy stara trasa odpowiadała `422`. Teraz można anulować działające zadanie i przekazać własny `clientJobId`. Żądanie bez `width`, `height` lub `square` dostaje teraz `400` `"Invalid settings"`, a dawny komunikat trafia do `details`. (#4338)
+- **Obraz na SVG (`vectorize`) działa teraz jako zadanie w kolejce.** `POST /api/v1/tools/image/vectorize` wcześniej trasował w trakcie żądania i zawsze odpowiadał `200`. Teraz przechodzi przez kolejkę zadań jak inne narzędzia: trasowanie, które kończy się w oknie synchronicznego oczekiwania, nadal odpowiada `200` z tą samą treścią, a dłuższe odpowiada `202` z identyfikatorem zadania, `statusUrl` i `progressUrl`. Klienci API, które obsługują tylko `200`, powinni śledzić zadanie, gdy dostaną `202`. Zadanie można teraz anulować i raportuje postęp, a treści błędów używają standardowych kształtów narzędzi (brak pliku zwraca `No file provided`; obraz, którego nie da się zdekodować, to `400`). Wynikowy SVG się nie zmienił. (#4337)
+- **Generowanie zdjęcia paszportowego działa teraz jako zadanie w kolejce.** `POST /api/v1/tools/image/passport-photo/generate` wcześniej kadrował w trakcie żądania i zawsze odpowiadał `200`. Kadrowanie, które kończy się w oknie synchronicznego oczekiwania, nadal odpowiada `200` z tą samą treścią (plus `originalSize` i `processedSize`), a wolniejsze odpowiada `202` z identyfikatorem zadania, `statusUrl` i `progressUrl`; `result` w ramce `phase: "complete"` zawiera `downloadUrl`, `dimensions`, `spec` i `printDownloadUrl`. Klienci API, które obsługują tylko `200`, powinni śledzić zadanie, gdy dostaną `202`. Treść żądania przyjmuje opcjonalny `clientJobId`, a zadanie można anulować. Statusy błędów przed startem zadania się nie zmieniły (`400`, `404`, `410 ANALYSIS_EXPIRED`); błąd przetwarzania nadal odpowiada `422` z `details` i teraz dodaje też `code`, gdy jest dostępny, na przykład `TARGET_SIZE_UNREACHABLE`. Krok analizy się nie zmienił. (#4337)
+
+### Wycofywane {#unreleased-deprecated}
+
+- **Pięć operacji kompresji obrazu do rozmiaru jest wycofywanych.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` i `-500kb` są oznaczone jako wycofywane w specyfikacji OpenAPI i zostaną przynajmniej przez jedno wydanie pomocnicze. Wyślij `POST /api/v1/tools/image/compress` z `settings` ustawionym na `{"mode":"targetSize","targetSizeKb":20}` (lub 50, 100, 200, 500). Wynik jest taki sam. Ścieżki presetów PDF się nie zmieniły.
 
 ## v2.3.0 {#v2-3-0}
 

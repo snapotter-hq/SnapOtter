@@ -1,12 +1,24 @@
 ---
 description: "Ghi chú phát hành và lịch sử phiên bản của SnapOtter. Xem những gì mới, được cải thiện và được sửa trong từng bản phát hành."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: b066c244efc7
+i18n_output_hash: f329498de25f
 i18n_hash_version: 2
 ---
 
 # Nhật ký thay đổi {#changelog}
+
+## Chưa phát hành {#unreleased}
+
+### Thay đổi {#unreleased-changed}
+
+- **Thay đổi kích thước theo nội dung giờ chạy như một công việc nền.** `POST /api/v1/tools/image/content-aware-resize` trước đây giữ yêu cầu mở suốt quá trình seam carve và trả lời `200` kèm kết quả. Giờ nó trả lời `202 Accepted` kèm `jobId`, `statusUrl` và `progressUrl`, giống các công cụ chạy lâu khác. Theo dõi `/api/v1/jobs/{jobId}/progress` qua SSE: `result` trên khung có `phase: "complete"` chứa các trường `downloadUrl`, `originalSize`, `processedSize`, `width` và `height` giống như phần thân `200` cũ, và lỗi xử lý sẽ đến dưới dạng khung `phase: "failed"` thay vì `422`. Trường `httpStatus` của khung đó là `400` khi vấn đề nằm ở đầu vào (ảnh trên 25 MP, hoặc phóng to hơn 2x), trong khi tuyến cũ trả lời `422`. Giờ bạn có thể hủy một công việc đang chạy và truyền `clientJobId` của riêng mình. Một yêu cầu không có `width`, `height` hoặc `square` giờ nhận `400` `"Invalid settings"`, với thông báo cũ nằm trong `details`. (#4338)
+- **Chuyển ảnh sang SVG (`vectorize`) giờ chạy như một công việc trong hàng đợi.** `POST /api/v1/tools/image/vectorize` trước đây dò đường viền ngay trong yêu cầu và luôn trả lời `200`. Giờ nó đi qua hàng đợi công việc như các công cụ khác: một lần dò hoàn tất trong khoảng chờ đồng bộ vẫn trả lời `200` với cùng phần thân, còn lần lâu hơn trả lời `202` kèm job id, `statusUrl` và `progressUrl`. Các máy khách API chỉ xử lý `200` nên theo dõi công việc khi nhận `202`. Công việc giờ có thể hủy và báo tiến trình, còn phần thân lỗi dùng các dạng chuẩn của công cụ (thiếu tệp báo `No file provided`; ảnh không giải mã được là `400`). Đầu ra SVG không đổi. (#4337)
+- **Tạo ảnh hộ chiếu giờ chạy như một công việc trong hàng đợi.** `POST /api/v1/tools/image/passport-photo/generate` trước đây cắt ảnh ngay trong yêu cầu và luôn trả lời `200`. Một lần cắt hoàn tất trong khoảng chờ đồng bộ vẫn trả lời `200` với cùng phần thân (thêm `originalSize` và `processedSize`), còn lần chậm hơn trả lời `202` kèm job id, `statusUrl` và `progressUrl`; `result` trên khung `phase: "complete"` mang `downloadUrl`, `dimensions`, `spec` và `printDownloadUrl`. Các máy khách API chỉ xử lý `200` nên theo dõi công việc khi nhận `202`. Phần thân nhận thêm `clientJobId` tùy chọn, và công việc có thể hủy. Các trạng thái lỗi trước khi công việc bắt đầu không đổi (`400`, `404`, `410 ANALYSIS_EXPIRED`); lỗi xử lý vẫn trả lời `422` kèm `details`, và giờ còn mang thêm `code` khi có, chẳng hạn `TARGET_SIZE_UNREACHABLE`. Bước phân tích không đổi. (#4337)
+
+### Không dùng nữa {#unreleased-deprecated}
+
+- **Năm thao tác nén ảnh về dung lượng mục tiêu không còn được khuyến khích dùng.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` và `-500kb` được đánh dấu là không dùng nữa trong đặc tả OpenAPI và sẽ còn ít nhất một bản phát hành phụ. Hãy gửi `POST /api/v1/tools/image/compress` với `settings` đặt là `{"mode":"targetSize","targetSizeKb":20}` (hoặc 50, 100, 200, 500). Đầu ra giống nhau. Các đường dẫn preset PDF không đổi.
 
 ## v2.3.0 {#v2-3-0}
 

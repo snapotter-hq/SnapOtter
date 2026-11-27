@@ -1,12 +1,24 @@
 ---
 description: "Notes de version et historique des versions de SnapOtter. Découvrez les nouveautés, les améliorations et les correctifs de chaque version."
-i18n_source_hash: 952098c65251
-i18n_provenance: human
-i18n_output_hash: 5554c14f0c75
+i18n_source_hash: 8cacf16b4c4d
+i18n_provenance: machine
+i18n_output_hash: 126e7afa4b74
 i18n_hash_version: 2
 ---
 
 # Journal des modifications {#changelog}
+
+## Non publié {#unreleased}
+
+### Modifié {#unreleased-changed}
+
+- **Le redimensionnement sensible au contenu s'exécute désormais comme une tâche en arrière-plan.** `POST /api/v1/tools/image/content-aware-resize` gardait la requête ouverte pendant toute la découpe des coutures et répondait `200` avec le résultat. Il répond maintenant `202 Accepted` avec un `jobId`, `statusUrl` et `progressUrl`, comme les autres outils de longue durée. Suivez `/api/v1/jobs/{jobId}/progress` via SSE : le `result` de la trame avec `phase: "complete"` contient les mêmes champs `downloadUrl`, `originalSize`, `processedSize`, `width` et `height` que l'ancien corps `200`, et un échec de traitement arrive sous forme de trame `phase: "failed"` au lieu d'un `422`. Le `httpStatus` de cette trame vaut `400` quand le problème venait de l'entrée (une image de plus de 25 MP, ou un agrandissement de plus de 2x), là où l'ancienne route répondait `422`. Vous pouvez désormais annuler une tâche en cours et fournir votre propre `clientJobId`. Une requête sans `width`, `height` ni `square` reçoit maintenant `400` `"Invalid settings"`, avec l'ancien message dans `details`. (#4338)
+- **Image vers SVG (`vectorize`) s'exécute désormais comme une tâche en file d'attente.** `POST /api/v1/tools/image/vectorize` vectorisait pendant la requête et répondait toujours `200`. Il passe maintenant par la file de tâches comme les autres outils : une vectorisation qui se termine dans la fenêtre d'attente synchrone répond toujours `200` avec le même corps, et une plus longue répond `202` avec un identifiant de tâche, `statusUrl` et `progressUrl`. Les clients d'API qui ne gèrent que `200` doivent suivre la tâche quand ils reçoivent `202`. La tâche peut maintenant être annulée et signale sa progression, et les corps d'erreur utilisent les formes standard des outils (un fichier manquant indique `No file provided` ; une image non décodable est une `400`). La sortie SVG est inchangée. (#4337)
+- **La génération de photo d'identité s'exécute désormais comme une tâche en file d'attente.** `POST /api/v1/tools/image/passport-photo/generate` recadrait pendant la requête et répondait toujours `200`. Un recadrage qui se termine dans la fenêtre d'attente synchrone répond toujours `200` avec le même corps (plus `originalSize` et `processedSize`), et un plus lent répond `202` avec un identifiant de tâche, `statusUrl` et `progressUrl` ; le `result` de la trame `phase: "complete"` contient `downloadUrl`, `dimensions`, `spec` et `printDownloadUrl`. Les clients d'API qui ne gèrent que `200` doivent suivre la tâche quand ils reçoivent `202`. Le corps accepte un `clientJobId` facultatif, et la tâche peut être annulée. Les statuts d'erreur avant le démarrage de la tâche sont inchangés (`400`, `404`, `410 ANALYSIS_EXPIRED`) ; un échec de traitement répond toujours `422` avec `details`, et inclut maintenant aussi un `code` quand il y en a un, comme `TARGET_SIZE_UNREACHABLE`. L'étape d'analyse est inchangée. (#4337)
+
+### Obsolète {#unreleased-deprecated}
+
+- **Les cinq opérations de compression d'images vers une taille cible sont obsolètes.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` et `-500kb` sont marquées comme obsolètes dans la spécification OpenAPI et resteront au moins une version mineure. Envoyez `POST /api/v1/tools/image/compress` avec `settings` réglé sur `{"mode":"targetSize","targetSizeKb":20}` (ou 50, 100, 200, 500). La sortie est la même. Les chemins des préréglages PDF sont inchangés.
 
 ## v2.3.0 {#v2-3-0}
 

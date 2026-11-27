@@ -1,12 +1,24 @@
 ---
 description: "Release notes en versiegeschiedenis van SnapOtter. Bekijk wat er nieuw, verbeterd en opgelost is in elke release."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: 6ba81a86cbaa
+i18n_output_hash: 405d891ba9c2
 i18n_hash_version: 2
 ---
 
 # Changelog {#changelog}
+
+## Niet uitgebracht {#unreleased}
+
+### Gewijzigd {#unreleased-changed}
+
+- **Inhoudsbewuste resize draait nu als achtergrondjob.** `POST /api/v1/tools/image/content-aware-resize` hield de request vroeger open tijdens de hele seam carve en antwoordde `200` met het resultaat. Nu antwoordt het `202 Accepted` met een `jobId`, `statusUrl` en `progressUrl`, zoals de andere langlopende tools. Volg `/api/v1/jobs/{jobId}/progress` via SSE: de `result` op het frame met `phase: "complete"` heeft dezelfde velden `downloadUrl`, `originalSize`, `processedSize`, `width` en `height` als de oude `200`-body, en een verwerkingsfout komt aan als een `phase: "failed"`-frame in plaats van een `422`. De `httpStatus` van dat frame is `400` wanneer de invoer het probleem was (een afbeelding boven 25 MP, of meer dan 2x vergroting), waar de oude route `422` antwoordde. U kunt nu een lopende job annuleren en uw eigen `clientJobId` meegeven. Een request zonder `width`, `height` of `square` krijgt nu `400` `"Invalid settings"`, met het oude bericht in `details`. (#4338)
+- **Image to SVG (`vectorize`) draait nu als job in de wachtrij.** `POST /api/v1/tools/image/vectorize` traceerde vroeger tijdens de request en antwoordde altijd `200`. Het loopt nu via de jobwachtrij zoals andere tools: een trace die binnen het synchrone wachtvenster klaar is, antwoordt nog steeds `200` met dezelfde body, en een langere antwoordt `202` met een job-id, `statusUrl` en `progressUrl`. API-clients die alleen `200` afhandelen, moeten de job volgen wanneer ze `202` krijgen. De job kan nu worden geannuleerd en meldt voortgang, en foutbodies gebruiken de standaardvormen van tools (een ontbrekend bestand geeft `No file provided`; een afbeelding die niet te decoderen is, geeft `400`). De SVG-uitvoer blijft ongewijzigd. (#4337)
+- **Pasfoto genereren draait nu als job in de wachtrij.** `POST /api/v1/tools/image/passport-photo/generate` sneed vroeger bij op de request en antwoordde altijd `200`. Een uitsnede die binnen het synchrone wachtvenster klaar is, antwoordt nog steeds `200` met dezelfde body (plus `originalSize` en `processedSize`), en een tragere antwoordt `202` met een job-id, `statusUrl` en `progressUrl`; de `result` op het `phase: "complete"`-frame bevat `downloadUrl`, `dimensions`, `spec` en `printDownloadUrl`. API-clients die alleen `200` afhandelen, moeten de job volgen wanneer ze `202` krijgen. De body accepteert een optionele `clientJobId`, en de job kan worden geannuleerd. Foutstatussen voordat de job start blijven ongewijzigd (`400`, `404`, `410 ANALYSIS_EXPIRED`); een verwerkingsfout antwoordt nog steeds `422` met `details`, en bevat nu ook een `code` wanneer die er is, zoals `TARGET_SIZE_UNREACHABLE`. De analysestap blijft ongewijzigd. (#4337)
+
+### Verouderd {#unreleased-deprecated}
+
+- **De vijf comprimeren-naar-grootte-bewerkingen voor afbeeldingen zijn verouderd.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` en `-500kb` zijn in de OpenAPI-specificatie als verouderd gemarkeerd en blijven minstens één minor release bestaan. Stuur `POST /api/v1/tools/image/compress` met `settings` ingesteld op `{"mode":"targetSize","targetSizeKb":20}` (of 50, 100, 200, 500). De uitvoer is hetzelfde. De PDF-presetpaden blijven ongewijzigd.
 
 ## v2.3.0 {#v2-3-0}
 
