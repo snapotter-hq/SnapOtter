@@ -22,7 +22,7 @@ vi.mock("@/lib/lazy-analytics", () => ({
 }));
 
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { useFeaturesStore } from "@/stores/features-store";
 
 function makeBundleState(overrides: Partial<FeatureBundleState> = {}): FeatureBundleState {
@@ -163,6 +163,8 @@ describe("FeatureInstallPrompt download ETA (#1145)", () => {
 
   beforeEach(() => {
     storage.set("snapotter-locale", "de");
+    // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+    vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
     vi.spyOn(Date, "now").mockReturnValue(NOW);
   });
 

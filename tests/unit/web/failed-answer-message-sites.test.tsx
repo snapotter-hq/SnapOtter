@@ -29,7 +29,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 import { Dropzone } from "@/components/common/dropzone";
 import { PdfToImageSettings } from "@/components/tools/pdf-to-image-settings";
-import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders, useTranslation } from "@/contexts/i18n-context";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { format } from "@/lib/format";
 import { AutomatePage } from "@/pages/automate-page";
@@ -109,6 +109,8 @@ const localStorageMock = {
 };
 
 beforeEach(() => {
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   storageMap.clear();
   vi.stubGlobal("localStorage", localStorageMock);
   vi.stubGlobal(

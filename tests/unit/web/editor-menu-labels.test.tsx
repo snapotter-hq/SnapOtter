@@ -26,7 +26,7 @@ vi.stubGlobal("localStorage", {
 });
 
 import { EditorMenuBar } from "@/components/editor/editor-menu-bar";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 
 const callbacks = {
   onNewDocument: () => {},
@@ -39,6 +39,8 @@ const callbacks = {
 
 function renderDe() {
   localStorage.setItem("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(
     <MemoryRouter>
       <I18nProvider>
@@ -55,6 +57,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("editor menu bar i18n (#923)", () => {

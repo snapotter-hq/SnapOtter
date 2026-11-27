@@ -19,7 +19,7 @@ vi.stubGlobal("localStorage", {
 });
 
 import { OcrQualityControl, useOcrQuality } from "@/components/tools/ocr-quality-control";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -62,6 +62,8 @@ function Harness({ initialLanguage = "auto" }: { initialLanguage?: string }) {
 }
 
 beforeEach(() => {
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   storage.clear();
   useAuth.mockReturnValue({ hasPermission: () => true });
   useFeaturesStore.setState({

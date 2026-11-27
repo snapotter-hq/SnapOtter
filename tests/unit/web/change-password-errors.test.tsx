@@ -25,7 +25,7 @@ vi.stubGlobal("localStorage", {
 // would fetch the auth config, which would shift this file's fetch call indices.
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ username: "admin" }) }));
 
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { ChangePasswordPage } from "@/pages/change-password-page";
 
@@ -34,12 +34,15 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
   cleanup();
   fetchMock.mockReset();
+  vi.restoreAllMocks();
 });
 
 function answer(status: number, body: Record<string, unknown>) {

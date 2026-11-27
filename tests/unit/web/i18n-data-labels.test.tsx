@@ -24,11 +24,13 @@ import { NewDocumentDialog } from "@/components/editor/common/new-document-dialo
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { CropOptions } from "@/components/editor/options/crop-options";
 import { EyedropperOptions } from "@/components/editor/options/eyedropper-options";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, localeLoaders } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 
 function renderDe(ui: React.ReactNode) {
   localStorage.setItem("snapotter-locale", "de");
+  // The real de chunk import can outlast findBy's 1 s budget on a slow host (#5202).
+  vi.spyOn(localeLoaders, "de").mockResolvedValue({ de });
   return render(<I18nProvider>{ui}</I18nProvider>);
 }
 
@@ -40,6 +42,7 @@ afterEach(() => {
   useEditorStore.setState({ cropState: null });
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("data-structure label sweep (#922)", () => {
