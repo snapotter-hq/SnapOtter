@@ -286,6 +286,57 @@ test.describe("GUI Watermark & Overlay Tools", () => {
 
       await expect(page.getByTestId("text-overlay-download")).toBeVisible({ timeout: 15_000 });
     });
+
+    // #5302: Top and Bottom use a pixel margin on the server, so one preview box can't match
+    // every file in a batch. Custom percentages land the same on all of them.
+    const batchFixtures = ["test-100x100.jpg", "qr-code.png"].map((name) =>
+      path.join(process.cwd(), "tests", "fixtures", "image", "valid", name),
+    );
+
+    async function uploadFixtures(page: Page, count: number) {
+      await page.goto("/image/text-overlay");
+      const chooser = page.waitForEvent("filechooser");
+      await page
+        .getByRole("button", { name: /upload from computer/i })
+        .first()
+        .click();
+      await (await chooser).setFiles(batchFixtures.slice(0, count));
+      await expect(page.locator("#text-overlay-position")).toBeVisible();
+    }
+
+    test("hides the draggable box for a Top batch of two files", async ({ loggedInPage: page }) => {
+      await uploadFixtures(page, 2);
+      // The default position is Bottom, so go through Custom to prove the box was there first.
+      await page.locator("#text-overlay-position").selectOption("custom");
+      await expect(page.getByTestId("text-overlay-box")).toBeVisible();
+
+      await page.locator("#text-overlay-position").selectOption("top");
+
+      await expect(page.getByTestId("text-overlay-box")).toHaveCount(0);
+    });
+
+    test("keeps the draggable box for a Custom batch of two files", async ({
+      loggedInPage: page,
+    }) => {
+      await uploadFixtures(page, 2);
+
+      await page.locator("#text-overlay-position").selectOption("top");
+      await expect(page.getByTestId("text-overlay-box")).toHaveCount(0);
+      await page.locator("#text-overlay-position").selectOption("custom");
+
+      await expect(page.getByTestId("text-overlay-box")).toBeVisible();
+    });
+
+    test("keeps the draggable box for a Top position on a single file", async ({
+      loggedInPage: page,
+    }) => {
+      await uploadFixtures(page, 1);
+
+      await page.locator("#text-overlay-position").selectOption("top");
+
+      await expect(page.locator("#text-overlay-position")).toHaveValue("top");
+      await expect(page.getByTestId("text-overlay-box")).toBeVisible();
+    });
   });
 
   // ========================================================================

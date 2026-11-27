@@ -62,7 +62,7 @@ import { openFileInput } from "@/lib/open-file-input";
 import { playerDownloadClaim, shouldShowConversionCard, videoAreaView } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
-import type { TextOverlayLayout } from "@/lib/text-overlay-placement";
+import { placementVariesByFile, type TextOverlayLayout } from "@/lib/text-overlay-placement";
 import {
   DOC_CANVAS_TOOLS,
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
@@ -1348,7 +1348,13 @@ function ToolPageContent({
       );
     }
 
-    if (displayMode === "interactive-text" && hasFile && !hasProcessed && originalBlobUrl) {
+    if (
+      displayMode === "interactive-text" &&
+      hasFile &&
+      !hasProcessed &&
+      originalBlobUrl &&
+      !(textOverlayLayout && placementVariesByFile(textOverlayLayout.position, files.length))
+    ) {
       return (
         <TextOverlayCanvas
           imageSrc={originalBlobUrl}
