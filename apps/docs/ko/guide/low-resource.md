@@ -1,7 +1,8 @@
 ---
-i18n_source_hash: b859c4f3b301
+description: "SnapOtter를 Raspberry Pi, 오래된 노트북, 2 GB VPS에서 실행하기: 기대할 수 있는 성능, 권장 상한, 건너뛸 기능."
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: ef65a6a914ad
+i18n_output_hash: 3a5d65d37115
 i18n_hash_version: 2
 ---
 # 저사양 환경 구성 {#low-resource-setups}
@@ -82,17 +83,18 @@ Pi급 장비를 위한 참고 사항입니다.
 
 ## 튜닝 항목 {#tuning-knobs}
 
-모든 상한은 환경 변수이며, 자세한 내용은 [구성](/ko/guide/configuration)에 있습니다. `0`는 무제한 또는 자동을 의미합니다. 작은 하드웨어에서 중요한 항목은 다음과 같습니다.
+모든 상한은 환경 변수이며, 자세한 내용은 [구성](/ko/guide/configuration)에 있습니다. `0`은 무제한 또는 자동을 의미합니다. 작은 하드웨어에서 중요한 항목은 다음과 같습니다.
 
 | 변수 | 작은 장비 권장값 | 보호하는 대상 |
 |---|---|---|
 | [`CONCURRENT_JOBS`](/ko/guide/configuration#env-concurrent-jobs) | `1` | 병렬로 실행되는 작업 수. 자동 감지는 CPU 코어 수에서 1을 뺀 값을 사용하는데, 큰 장비에서는 괜찮지만 메모리 압박을 받는 2코어 장비에서는 너무 공격적입니다. |
 | [`MAX_WORKER_THREADS`](/ko/guide/configuration#env-max-worker-threads) | `2` | 이미지 처리 스레드 풀. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/ko/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | 마지막 요청 이후 AI Python 프로세스와 OCR 런타임이 메모리에 남아 있는 시간. 로드된 상태에서는 1~2 GB를 점유하므로, 시간을 줄이면 메모리를 더 빨리 돌려받는 대신 다음 AI 호출에 몇 초가 더 걸립니다. 프로세스가 종료되면 캐시된 모델이 사라지므로 [`AI_SESSION_IDLE_TIMEOUT`](/ko/guide/configuration#env-ai-session-idle-timeout)도 함께 낮추세요. |
 | [`MAX_BATCH_SIZE`](/ko/guide/configuration#env-max-batch-size) | `5` | 1~2 GB 장비에서 가장 먼저 메모리가 부족해지는 곳이 배치입니다. |
 | [`MAX_UPLOAD_SIZE_MB`](/ko/guide/configuration#env-max-upload-size-mb) | `100` | 거대한 파일 하나가 작업 공간 전체를 차지하는 것을 막습니다. |
-| [`MAX_MEGAPIXELS`](/ko/guide/configuration#env-max-megapixels) | `50` | 100 MP 이상 이미지를 디코딩하면 파일 크기와 관계없이 RAM을 소모합니다. |
+| [`MAX_MEGAPIXELS`](/ko/guide/configuration#env-max-megapixels) | `50` | 100 MP 이상 이미지를 디코딩하면 파일 크기와 관계없이 RAM을 소모합니다. 약 268 MP를 넘는 이미지는 `0`으로 설정해도 거부됩니다. |
 | [`MAX_VIDEO_DURATION_S`](/ko/guide/configuration#env-max-video-duration-s) | `300` | 긴 트랜스코딩은 작은 CPU를 몇 분에서 몇 시간 동안 독점합니다. |
-| [`PROCESSING_TIMEOUT_S`](/ko/guide/configuration#env-processing-timeout-s) | `600` | 폭주한 작업이 결국 장비를 놓아 주도록 하는 하드 상한. |
+| [`JOB_TIMEOUT_LONG_S`](/ko/guide/configuration#env-job-timeout-long-s) | `3600` | AI 및 미디어 작업의 하드 상한으로, 폭주한 작업이 결국 장비를 놓아 주도록 합니다. 기본값은 2시간입니다. 이미지 및 문서 작업은 이미 [`JOB_TIMEOUT_FAST_S`](/ko/guide/configuration#env-job-timeout-fast-s)(기본 120초)에서 중단됩니다. |
 
 이 상한은 서버가 받아들이는 항목에 적용되므로, 가능한 한 작게 잡기보다 실제로 사용하는 항목에 맞춰 설정하세요. 비디오를 전혀 쓰지 않는다면 `MAX_VIDEO_DURATION_S` 상한은 손해가 없습니다. 문서를 매일 스캔한다면 [`MAX_PDF_PAGES`](/ko/guide/configuration#env-max-pdf-pages)은 제한하지 마세요.
 
@@ -102,4 +104,4 @@ Pi급 장비를 위한 참고 사항입니다.
 - **일상적인 작업으로서의 비디오 재인코딩.** 가끔 트랜스코딩하는 것은 괜찮지만(단지 느릴 뿐입니다), 꾸준한 트랜스코딩 대기열에는 Pi가 아니라 CPU 코어가 필요합니다.
 - **사용하지 않는 도구 전반.** 관리자는 설정에서 개별 도구를 끌 수 있으며, 그러면 UI에서 사라지고 API 라우트도 등록되지 않습니다. 그것만으로 메모리가 절약되지는 않지만, 공유 중인 작은 인스턴스가 하드웨어가 감당할 수 없는 작업에 쓰이는 것을 막아 줍니다.
 
-나중에 인스턴스를 더 큰 하드웨어로 옮기면 상한을 제거하고(`0`로 되돌리세요) 같은 데이터 볼륨을 그대로 사용할 수 있습니다.
+나중에 인스턴스를 더 큰 하드웨어로 옮기면 상한을 제거하고(`0`으로 되돌리세요) 같은 데이터 볼륨을 그대로 사용할 수 있습니다.

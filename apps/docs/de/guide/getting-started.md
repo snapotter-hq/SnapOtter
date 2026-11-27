@@ -1,8 +1,8 @@
 ---
 description: "Installieren Sie SnapOtter mit Docker in einem Befehl, melden Sie sich an und öffnen Sie Ihr erstes Werkzeug. Behandelt GPU-Beschleunigung, kleine Rechner, Docker Compose und den Build aus dem Quellcode."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: ef095237d7d1
+i18n_output_hash: 747e7e951b5a
 i18n_hash_version: 2
 ---
 
@@ -33,9 +33,9 @@ Führen Sie auf einem Raspberry Pi, einem alten Notebook oder einem kleinen VPS 
 :::
 
 ::: tip Anonyme Produktanalysen
-SnapOtter enthält standardmäßig anonyme Produktanalysen. Um sie auszuschalten, öffnen Sie **Einstellungen → System → Datenschutz** und schalten Sie **Anonyme Produktanalysen** aus. Das wirkt sofort für die gesamte Instanz.
+SnapOtter enthält anonyme Produktanalysen. Eine neue Instanz fragt beim ersten Start ihren Administrator und sendet nichts, bis dieser geantwortet hat. Um sie später auszuschalten, öffnen Sie **Einstellungen → System → Datenschutz** und schalten Sie **Anonyme Produktanalysen** aus. Das wirkt sofort für die gesamte Instanz.
 
-Sie können auch die Umgebungsvariable `SNAPOTTER_TELEMETRY=0` setzen (`false` und `off` funktionieren ebenfalls), um die gesamte Telemetrie der Instanz ohne Neubau zu deaktivieren.
+Sie können auch die Umgebungsvariable `SNAPOTTER_TELEMETRY=0` (`false` und `off` funktionieren ebenfalls) setzen, um die gesamte Telemetrie der Instanz ohne Neubau zu deaktivieren.
 
 Die Fehlerüberwachung erfolgt über [Sentry](https://sentry.io), das SnapOtter über sein Open-Source-Programm unterstützt.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalität | Anzahl | Beispielwerkzeuge |
 |----------|-------|---------------|
-| **Bild** | 112 | Größe ändern, Zuschneiden, Komprimieren, Konvertieren, Hintergrund entfernen, Hochskalieren, OCR, Wasserzeichen, Collage, Kolorieren, GIF-Werkzeuge, Formatvorgaben |
+| **Bild** | 114 | Größe ändern, Zuschneiden, Komprimieren, Konvertieren, Hintergrund entfernen, Hochskalieren, OCR, Wasserzeichen, Collage, Kolorieren, GIF-Werkzeuge, Formatvorgaben |
 | **Video** | 63 | Kürzen, Zuschneiden, Komprimieren, Konvertieren, Zusammenführen, Audio extrahieren, Automatische Untertitel, Video zu GIF, Größe ändern, Stabilisieren, Formatvorgaben |
 | **Audio** | 57 | Kürzen, Zusammenführen, Konvertieren, Normalisieren, Rauschreduzierung, Transkribieren, Tonhöhe ändern, Überblenden, Klingelton-Ersteller, Formatvorgaben |
 | **PDF / Dokument** | 37 | Zusammenführen, Teilen, Komprimieren, OCR, Wasserzeichen, Schwärzen, Word zu PDF, Excel zu PDF, Drehen, Schützen, Reparieren |
-| **Dateien** | 25 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP extrahieren, Diagramm-Ersteller, YAML/JSON |
+| **Dateien** | 32 | CSV zu JSON, JSON zu XML, CSVs zusammenführen, CSV teilen, ZIP erstellen, ZIP extrahieren, Diagramm-Ersteller, YAML/JSON, Schriftart konvertieren, Proportionsrechner, Base64, Formatvorgaben |
 
 ### Pipelines {#pipelines}
 

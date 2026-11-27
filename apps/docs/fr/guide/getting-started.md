@@ -1,8 +1,8 @@
 ---
 description: "Installez SnapOtter avec Docker en une seule commande, connectez-vous et ouvrez votre premier outil. Couvre l'accélération GPU, les petites machines, Docker Compose et la compilation depuis les sources."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 1ef4ca1dc082
+i18n_output_hash: 25c500fa1b15
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Sur un Raspberry Pi, un vieil ordinateur portable ou un petit VPS, exécutez une
 :::
 
 ::: tip Analyses de produit anonymes
-SnapOtter inclut par défaut des analyses de produit anonymes. Pour les désactiver, ouvrez **Paramètres → Système → Confidentialité** et désactivez **Analyses de produit anonymes**. Elles s'arrêtent immédiatement pour toute l'instance.
+SnapOtter inclut des analyses de produit anonymes. Une nouvelle instance interroge son administrateur lors de la première exécution et n'envoie rien tant qu'il n'a pas répondu. Pour les désactiver plus tard, ouvrez **Paramètres → Système → Confidentialité** et désactivez **Analyses de produit anonymes**. Elles s'arrêtent immédiatement pour toute l'instance.
 
 Vous pouvez aussi définir la variable d'environnement `SNAPOTTER_TELEMETRY=0` (`false` et `off` fonctionnent également) pour désactiver toute la télémétrie de l'instance sans reconstruction.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalité | Nombre | Exemples d'outils |
 |----------|-------|---------------|
-| **Image** | 112 | Redimensionner, Recadrer, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
+| **Image** | 114 | Redimensionner, Recadrer, Compresser, Convertir, Supprimer l'arrière-plan, Agrandir, OCR, Filigrane, Collage, Coloriser, Outils GIF, préréglages de format |
 | **Vidéo** | 63 | Couper, Recadrer, Compresser, Convertir, Fusionner, Extraire l'audio, Sous-titres automatiques, Vidéo vers GIF, Redimensionner, Stabiliser, préréglages de format |
 | **Audio** | 57 | Couper, Fusionner, Convertir, Normaliser, Réduction du bruit, Transcrire, Changement de hauteur, Fondu, Créateur de sonneries, préréglages de format |
 | **PDF / Document** | 37 | Fusionner, Diviser, Compresser, OCR, Filigrane, Caviarder, Word vers PDF, Excel vers PDF, Pivoter, Protéger, Réparer |
-| **Fichiers** | 25 | CSV vers JSON, JSON vers XML, Fusionner des CSV, Diviser un CSV, Créer un ZIP, Extraire un ZIP, Créateur de graphiques, YAML/JSON |
+| **Fichiers** | 32 | CSV vers JSON, JSON vers XML, Fusionner des CSV, Diviser un CSV, Créer un ZIP, Extraire un ZIP, Créateur de graphiques, YAML/JSON, Convertir une police, Calculatrice de proportions, Base64, préréglages de format |
 
 ### Pipelines {#pipelines}
 

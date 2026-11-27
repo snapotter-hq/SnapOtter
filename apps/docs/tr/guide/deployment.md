@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 42dc341dbccd
+i18n_output_hash: c938395e2b6c
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 `--gpus all` ve NVIDIA Container Toolkit doğru kurulmuş olmasına rağmen AI araçları CPU üzerinde çalışıyorsa, etkilenen paketi (örneğin Arka Plan Kaldırma) **Settings → AI Features** bölümünden yeniden kurun. Kurucu, ONNX Runtime'ın GPU sürümünü geri yükler; başka bir paketin (örneğin transkripsiyon) getirdiği yalnızca CPU'ya yönelik sürüm, paylaşılan AI ortamında bunu gölgeleyebilir. Eski bir imajda arayüzden yeniden kurulum GPU'yu geri getirmezse [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) içindeki elle onarım adımlarına bakın.
 
+## Proxmox LXC {#proxmox-lxc}
+
+Proxmox LXC kurucusu bu depoda değil, [community-scripts](https://community-scripts.org) projesinde bakımı yapılan bir araçtır. Docker örneklerindeki `admin` / `admin` varsayılanlarını kullanmaz. Kurulum, `admin` kullanıcısı için rastgele 20 karakterlik bir parola üretir ve bunu konteynerin içine kaydeder. Konteynerde bir kabuk açın ve şunu çalıştırın:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Aynı değer, `DEFAULT_PASSWORD` olarak `/opt/snapotter_data/.env` içinde de bulunur. Bu değişken hesabı yalnızca ilk çalıştırmada oluşturur; dolayısıyla parolayı sonradan uygulamada değiştirdiyseniz dosya artık onunla eşleşmez.
+
 ## Donanım Gereksinimleri {#hardware-requirements}
 
 Bu sayılar, NVIDIA RTX 4070'li modern bir amd64 iş istasyonundan bir Raspberry Pi'ye kadar çeşitli sistemlerde yapılan kıyaslamalardan gelir: her sistemde araç kataloğunun tamamı çalıştırıldı ve gerçek alt sınırı bulmak için Docker kaynak sınırları taranarak denendi.
@@ -330,7 +340,7 @@ Bazı araçlar birden fazla paylaşılan pakete bağlıdır. Örneğin Passport 
 | Yüksek Kaliteli Inpainting (`inpaint-hq`) | 5-7 GB | 8 GB ana makine RAM'i (~6 GB boş) |
 | **Tüm paketler** | **~25 GB kurulu** | **4 GB (`inpaint-hq` ile 8 GB)** |
 
-Hızlı OCR, Tesseract aracılığıyla imaja yerleşiktir, yaklaşık 25 MiB ekler ve isteğe bağlı OCR paketini ya da onun 4 GiB bellek gereksinimini gerektirmez. Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler; Korece (`ko`) ve Arapçayı (`ar`) desteklemez. Her ikisi de `balanced` veya `best` kullanır, dolayısıyla doğru paketi gerektirir. Doğru paket resmi Linux amd64 ve arm64 konteynerlerinde bulunur ve ONNX Runtime'ı CPU üzerinde çalıştırır. NVIDIA ana makineleri de aynı CPU OCR çalışma zamanını kullanır, bu nedenle OCR, CUDA sürümüne ya da GPU mimarisine bağlı değildir. Doğru çalışma zamanı en az 4 GiB etkin bellek gerektirir: yapılandırılmış konteyner cgroup sınırı, o yoksa ana makine belleği. SnapOtter, imzalı uyumluluk alt sınırının altındaki sistemleri paketi indirmeden önce reddeder. Doğru paket kurulumu, libc ve Python ABI'sinin garanti edilemediği bare-metal/hazır arşivlerde de reddedilir. Bu desteklenmeyen ana makinelerde Korece ve Arapça OCR açık bir uyumsuzluk hatası döndürür ve sessizce Hızlı OCR'a geri dönmez. Korece için açıkça istenen bir Hızlı OCR isteği, iş kuyruğa alınmadan önce `fast-korean-unsupported` nedeniyle `FEATURE_INCOMPATIBLE` döndürür.
+Hızlı OCR, Tesseract aracılığıyla imaja yerleşiktir, yaklaşık 25 MiB ekler ve isteğe bağlı OCR paketini ya da onun 4 GiB bellek gereksinimini gerektirmez. Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler; Korece (`ko`) ve Arapçayı (`ar`) desteklemez. Her ikisi de `balanced` veya `best` kullanır, dolayısıyla doğru paketi gerektirir. Doğru paket resmi Linux amd64 ve arm64 konteynerlerinde bulunur ve ONNX Runtime'ı CPU üzerinde çalıştırır. NVIDIA ana makineleri de aynı CPU OCR çalışma zamanını kullanır, bu nedenle OCR, CUDA sürümüne ya da GPU mimarisine bağlı değildir. Doğru çalışma zamanı en az 4 GiB etkin bellek gerektirir: yapılandırılmış konteyner cgroup sınırı, o yoksa ana makine belleği. SnapOtter, imzalı uyumluluk alt sınırının altındaki sistemleri paketi indirmeden önce reddeder. Doğru paket kurulumu, libc ve Python ABI'sinin garanti edilemediği bare-metal/hazır arşivlerde de reddedilir. Bu desteklenmeyen ana makinelerde Korece ve Arapça OCR açık bir uyumsuzluk hatası döndürür ve sessizce Hızlı OCR'a geri dönmez. Korece için açıkça istenen bir Hızlı OCR isteği, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE` döndürür ve nedeni `fast-korean-unsupported` olarak bildirir.
 
 Aynı `DATA_DIR` birimini paylaşan kopyalar aynı CPU mimarisini kullanmalıdır; çok kopyalı dağıtımları düğüm benzeşimiyle sabitleyin. Karışık amd64/arm64 kopyaları ayrı veri birimleri ve bağımsız SnapOtter dağıtımları gerektirir.
 
@@ -390,9 +400,9 @@ Varsayılan 4 çekirdek sınırlı uygulama konteynerine karşı paralel görün
 
 | Eşzamanlı İstek | Ort. Yanıt Süresi | Hata |
 |---|---|---|
-| 1 | 0,4 sn | 0 |
-| 5 | 1,2 sn | 0 |
-| 10 | 2,1 sn | 0 |
+| 1 | 0.4s | 0 |
+| 5 | 1.2s | 0 |
+| 10 | 2.1s | 0 |
 
 Çalışan havuzu doyuma ulaştıkça yanıt süresi doğrusalın altında artar ve hata oluşmaz. Uygulama konteynerinin `cpus:` sınırını yükseltmek (veya daha fazla çekirdekli bir ana makine kullanmak) tavanı yükseltir. Ağır işlerin (video dönüştürme, CPU üzerinde AI) tüm süre boyunca bir çalışanı tuttuğunu unutmayın; bu nedenle CPU'yu yalnızca istek sayısına göre değil, beklenen eşzamanlı ağır iş sayısına göre boyutlandırın.
 
@@ -406,7 +416,7 @@ Desteklenen her biçim, kullanılan çözücü ve mevcut kalite denetimleri hakk
 
 - **İçeriğe duyarlı yeniden boyutlandırma**, caire ikili dosyasındaki bir sınırlama nedeniyle büyük görüntülerde (>5 MP) çöker. Daha küçük görüntülerde sorunsuz çalışır.
 - **HEIF çözme** 13-23 saniye sürer. HEIC (Apple'ın varyantı) 0,3-0,9 saniye ile çok daha hızlıdır.
-- **Büyütme**, küçük görüntülerin ötesinde her şeyde CPU'da zaman aşımına uğrar. Pratik kullanım için GPU gerekir.
+- **Büyütme**, GPU olmadan CPU tavanını (varsayılan olarak 4 MP, yüksek ölçek katsayılarında daha düşük) aşan bir girdiyi büyütmeden önce küçültür ve bir GPU'dan çok daha yavaş çalışır. [`MAX_CPU_UPSCALE_MP`](/tr/guide/configuration#processing-limits), ana makinede yeterli RAM varsa bu tavanı yükseltir veya kaldırır.
 - **CodeFormer** yüz iyileştirmesi GFPGAN'dan belirgin biçimde yavaştır (GPU'da 53 sn'ye karşı 2 sn). Çoğu kullanım için GFPGAN önerilir.
 
 ### Birden fazla replikada AI paketi kurulumu {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter çalışma zamanında iki konuma yazar: `/data` (kullanıcı dosyalar�
 
 İzinlerin nasıl işleneceği konteynerin nasıl başlatıldığına bağlıdır:
 
-**Varsayılan (root olarak başlar, `snapotter` kullanıcısına düşer)**: giriş noktası root olarak başlar, bağlanan birimlerin sahipliğini düzeltir, ardından `gosu` ile ayrıcalıksız `snapotter` kullanıcısına düşer. Adlandırılmış birimler hiçbir yapılandırma olmadan çalışır. Bind mount'larda, yazdığı dosyaların size ait olması için `PUID`/`PGID` değerlerini ana makine kullanıcınıza ayarlayın (yukarıya bakın).
+**Varsayılan (root olarak başlar, `snapotter` kullanıcısına düşer)**: giriş noktası root olarak başlar, bağlanan birimlerin sahipliğini düzeltir, ardından ayrıcalıksız `snapotter` kullanıcısına `gosu` aracılığıyla düşer. Adlandırılmış birimler hiçbir yapılandırma olmadan çalışır. Bind mount'larda, yazdığı dosyaların size ait olması için `PUID`/`PGID` değerlerini ana makine kullanıcınıza ayarlayın (yukarıya bakın).
 
 **Kubernetes / OpenShift (`runAsUser` ile root olmayan)**: doğrudan root olmayan bir kullanıcıyla başlatılan konteyner birimlerin sahipliğini kendisi değiştiremez; bu yüzden orkestratör onları yazılabilir yapmalıdır. `fsGroup` değerini ayarlayın:
 
@@ -493,8 +503,8 @@ Başlangıç hatası kullanılacak UID'yi tam olarak belirtir; bu yüzden en hı
 | [`RATE_LIMIT_PER_MIN`](/tr/guide/configuration#env-rate-limit-per-min) | `1000` | IP başına dakikadaki API istekleri (devre dışı bırakmak için 0 yapın) |
 | [`MAX_USERS`](/tr/guide/configuration#env-max-users) | `0` (sınırsız) | En fazla kullanıcı hesabı sayısı |
 | [`TRUST_PROXY`](/tr/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Hangi eşlerin istemci IP'sini `X-Forwarded-For` üzerinden ayarlayabileceği. Varsayılan olarak yalnızca özel ağlar |
-| `PUID` | `999` | Bu UID olarak çalıştır (bind mount izinleri için) |
-| `PGID` | `999` | Bu GID olarak çalıştır (bind mount izinleri için) |
+| `PUID` | `999` | Bu UID olarak çalıştır (bind mount izinleri için). Yazılabilir bir kök dosya sistemi gerektirir; bkz. [güvenlik kılavuzu](/tr/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Bu GID olarak çalıştır (bind mount izinleri için). Yazılabilir bir kök dosya sistemi gerektirir; bkz. [güvenlik kılavuzu](/tr/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/tr/guide/configuration#env-log-level) | `info` | Günlük ayrıntı düzeyi: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/tr/guide/configuration#env-concurrent-jobs) | `0` (otomatik) | En fazla paralel AI işleme işi |
 | [`SESSION_DURATION_HOURS`](/tr/guide/configuration#env-session-duration-hours) | `168` | Oturum açma oturumu ömrü (7 gün) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Proxy kimlik bilgilerini Compose dosyasının dışında tutun (örneğin korumalı bir `.env` dosyasında veya secret içinde). TLS doğrulamasını devre dışı bırakmayın: imzalı OCR dizini sürüm üst verilerinin kimliğini doğrular, normal TLS doğrulaması ise aktarımı ve diğer tüm giden istekleri korumaya devam eder.
+
+huggingface.co'nun kendisi bir proxy gerektirmek yerine engelliyse veya hız sınırına takılıyorsa, AI indirmelerini `HF_ENDPOINT` ile bir Hugging Face yansısına yönlendirin (örneğin `HF_ENDPOINT: https://hf-mirror.com`). Bkz. [Yansı üzerinden indirme](/tr/api/ai#downloading-through-a-mirror).
 
 ## Sağlık Denetimi {#health-check}
 
@@ -603,7 +615,7 @@ location /snapotter/ {
 
 Bu örnek ön eki korur. İletmeden önce `/snapotter` ön ekini kaldıran proxy'ler de desteklenir. Dahili sağlık denetimleri `/api/v1/health` adresini kullanmaya devam edebilir. OIDC veya SAML için ayrıca [`EXTERNAL_URL=https://example.com/snapotter`](/tr/guide/oidc#env-external-url) değerini ayarlayın ve kimlik sağlayıcının geri çağırma URL'lerini sırasıyla `/snapotter/api/auth/oidc/callback` veya `/snapotter/api/auth/saml/callback` içerecek şekilde güncelleyin.
 
-API betikleri değişmeden çalışmaya devam eder: API yanıtlarındaki URL'ler, örneğin bir aracın `downloadUrl` değeri, `BASE_PATH` ne olursa olsun `/api/` ile başlar. Bunları alan adı köküne göre çözümlemek yerine örneğinizin temel URL'sine ekleyin (`https://example.com/snapotter` + `/api/v1/download/...`).
+API betikleri değişmeden çalışmaya devam eder: API yanıtlarındaki URL'ler, örneğin bir aracın `downloadUrl` değeri, `/api/` ile başlar, `BASE_PATH` ne olursa olsun. Bunları alan adı köküne göre çözümlemek yerine örneğinizin temel URL'sine ekleyin (`https://example.com/snapotter` + `/api/v1/download/...`).
 
 Arayüzü ön ekli URL üzerinden açın (`https://example.com/snapotter`). Ön eksiz gelen bir tarayıcı otomatik olarak oraya yönlendirilir; yalnızca API isteklerinin uygulamaya ön eksiz ulaşması beklenir. Günlüklerde `Requests arrive under /snapotter/ but BASE_PATH is empty` görünüyorsa proxy'niz, `BASE_PATH` değerinin bildirmediği bir ön eki iletiyor demektir: `BASE_PATH` değerini bu ön eke ayarlayın veya ön eki proxy'de kaldırın.
 
@@ -702,7 +714,7 @@ Semantic-release sürümü commit geçmişinden belirler. `latest` Docker etiket
 
 ## Analitik {#analytics}
 
-SnapOtter, hataları yakalamaya ve özellikleri geliştirmeye yardımcı olmak için anonim ürün analitiği (araç kullanım örüntüleri, hata raporları) içerir. Varsayılan olarak açıktır. Dosyalarınız, dosya adlarınız ve kişisel verileriniz hiçbir zaman buna dahil değildir. SnapOtter analitik devre dışıyken normal çalışır.
+SnapOtter, hataları yakalamaya ve özellikleri geliştirmeye yardımcı olmak için anonim ürün analitiği (araç kullanım örüntüleri, hata raporları) içerir. Yeni bir örnek ilk çalıştırmada yöneticisine sorar ve yanıtlanana kadar hiçbir şey göndermez. Dosyalarınız, dosya adlarınız ve kişisel verileriniz hiçbir zaman buna dahil değildir. SnapOtter analitik devre dışıyken normal çalışır.
 
 ### Analitiği devre dışı bırakma {#disabling-analytics}
 

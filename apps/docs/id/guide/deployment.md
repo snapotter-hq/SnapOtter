@@ -1,8 +1,8 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 5e0058f91086
+i18n_output_hash: a46ff6afbdc3
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Jika alat AI berjalan di CPU padahal `--gpus all` dan NVIDIA Container Toolkit sudah diatur dengan benar, instal ulang bundel yang terdampak (misalnya Background Removal) dari **Settings → AI Features**. Penginstal memulihkan build GPU dari ONNX Runtime, yang bisa tertutup oleh build khusus CPU yang dibawa bundel lain (seperti transkripsi) di lingkungan AI bersama. Jika instal ulang dari UI tidak memulihkan GPU pada image yang lebih lama, lihat perbaikan manual di [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+Penginstal Proxmox LXC dikelola di proyek [community-scripts](https://community-scripts.org), bukan di repositori ini. Penginstal ini tidak memakai default `admin` / `admin` dari contoh Docker. Proses instalasi membuat kata sandi acak sepanjang 20 karakter untuk pengguna `admin` dan menyimpannya di dalam kontainer. Buka shell di kontainer lalu jalankan:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Nilai yang sama ada di `DEFAULT_PASSWORD` pada `/opt/snapotter_data/.env`. Variabel itu hanya mengisi akun saat pertama kali dijalankan, jadi jika Anda sudah mengganti kata sandi di aplikasi, isi file tersebut tidak lagi cocok.
+
 ## Kebutuhan Perangkat Keras {#hardware-requirements}
 
 Angka-angka ini berasal dari benchmark pada berbagai sistem, mulai dari workstation amd64 modern dengan NVIDIA RTX 4070 hingga Raspberry Pi, dengan menjalankan seluruh katalog alat pada masing-masing sistem dan menyapu batas sumber daya Docker untuk menemukan batas bawah yang sebenarnya.
@@ -406,7 +416,7 @@ Lihat [daftar format lengkap](/id/guide/supported-formats) untuk detail setiap f
 
 - **Content-aware resize** crash pada gambar besar (>5 MP) karena keterbatasan pada binary caire. Berfungsi baik dengan gambar yang lebih kecil.
 - **Decode HEIF** memakan waktu 13-23 detik. HEIC (varian Apple) jauh lebih cepat, yaitu 0,3-0,9 detik.
-- **Upscale** mengalami timeout di CPU untuk gambar yang lebih dari kecil. GPU diperlukan untuk penggunaan praktis.
+- **Upscale** tanpa GPU memperkecil input yang melebihi batas CPU (4 MP secara default, lebih rendah pada faktor skala tinggi) sebelum di-upscale, dan berjalan jauh lebih lambat daripada di GPU. [`MAX_CPU_UPSCALE_MP`](/id/guide/configuration#processing-limits) menaikkan atau menghapus batas tersebut jika host memiliki RAM yang cukup.
 - Peningkatan wajah **CodeFormer** jauh lebih lambat daripada GFPGAN (53 dtk vs 2 dtk di GPU). GFPGAN direkomendasikan untuk sebagian besar kasus penggunaan.
 
 ### Instalasi bundel AI dengan beberapa replika {#ai-bundle-installs-with-several-replicas}
@@ -434,13 +444,13 @@ Stack Compose sudah me-mount `SnapOtter-workspace`.
 
 ### Bind mount vs. named volume {#bind-mounts-vs-named-volumes}
 
-**Named volume** (direkomendasikan) - Docker mengelola izin secara otomatis:
+**Named volume** (direkomendasikan): Docker mengelola izin secara otomatis:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - Anda yang mengelola izin. Atur [`PUID`](/id/guide/configuration#env-puid)/[`PGID`](/id/guide/configuration#env-pgid) agar sesuai dengan pengguna host Anda:
+**Bind mount**: Anda yang mengelola izin. Atur [`PUID`](/id/guide/configuration#env-puid)/[`PGID`](/id/guide/configuration#env-pgid) agar sesuai dengan pengguna host Anda:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -455,9 +465,9 @@ SnapOtter menulis ke dua lokasi saat runtime: `/data` (file pengguna, log, model
 
 Cara izin ditangani bergantung pada bagaimana kontainer dijalankan:
 
-**Default (dimulai sebagai root, turun ke `snapotter`)** - entrypoint dimulai sebagai root, memperbaiki kepemilikan volume yang di-mount, lalu turun ke pengguna `snapotter` tanpa hak istimewa melalui `gosu`. Named volume bekerja tanpa konfigurasi. Untuk bind mount, atur `PUID`/`PGID` ke pengguna host Anda (di atas) agar file yang ditulisnya dimiliki oleh Anda.
+**Default (dimulai sebagai root, turun ke `snapotter`)**: entrypoint dimulai sebagai root, memperbaiki kepemilikan volume yang di-mount, lalu turun ke pengguna `snapotter` tanpa hak istimewa melalui `gosu`. Named volume bekerja tanpa konfigurasi. Untuk bind mount, atur `PUID`/`PGID` ke pengguna host Anda (di atas) agar file yang ditulisnya dimiliki oleh Anda.
 
-**Kubernetes / OpenShift (non-root melalui `runAsUser`)** - dijalankan langsung sebagai pengguna non-root, kontainer tidak dapat melakukan chown pada volume sendiri, sehingga orkestrator harus membuatnya dapat ditulis. Atur `fsGroup`:
+**Kubernetes / OpenShift (non-root melalui `runAsUser`)**: dijalankan langsung sebagai pengguna non-root, kontainer tidak dapat melakukan chown pada volume sendiri, sehingga orkestrator harus membuatnya dapat ditulis. Atur `fsGroup`:
 
 ```yaml
 securityContext:
@@ -468,10 +478,10 @@ securityContext:
 
 Direktori yang dapat ditulis pada image dimiliki grup GID 0 dan dapat ditulis oleh grup, sehingga pod yang berjalan dengan **UID sembarang** plus grup suplementer root (default OpenShift) dapat menulis tanpa `chown`.
 
-**TrueNAS Scale (dan setup "UID asing" lainnya)** - TrueNAS menjalankan aplikasi sebagai pengguna non-root (sering `568:568`) dan me-mount dataset host yang dimiliki pengguna lain, sehingga baik entrypoint maupun `fsGroup` tidak dapat membuatnya dapat ditulis dengan sendirinya. Pilih salah satu:
+**TrueNAS Scale (dan setup "UID asing" lainnya)**: TrueNAS menjalankan aplikasi sebagai pengguna non-root (sering `568:568`) dan me-mount dataset host yang dimiliki pengguna lain, sehingga baik entrypoint maupun `fsGroup` tidak dapat membuatnya dapat ditulis dengan sendirinya. Pilih salah satu:
 
-- **Jalankan aplikasi sebagai root** (direkomendasikan) - biarkan pengguna aplikasi tidak diatur atau atur ke `0`, dan biarkan entrypoint default memperbaiki izin lalu turun ke `snapotter`.
-- **Jalankan sebagai UID `999`** - atur pengguna/grup aplikasi ke `999:999` (pengguna `snapotter` bawaan SnapOtter) agar sesuai dengan kepemilikan image.
+- **Jalankan aplikasi sebagai root** (direkomendasikan): biarkan pengguna aplikasi tidak diatur atau atur ke `0`, dan biarkan entrypoint default memperbaiki izin lalu turun ke `snapotter`.
+- **Jalankan sebagai UID `999`**: atur pengguna/grup aplikasi ke `999:999` (pengguna `snapotter` bawaan SnapOtter) agar sesuai dengan kepemilikan image.
 - **`chown` dataset host** ke UID yang digunakan kontainer, dari shell TrueNAS:
 
   ```bash
@@ -493,8 +503,8 @@ Error startup menyebutkan UID yang tepat untuk digunakan, jadi cara tercepat ada
 | [`RATE_LIMIT_PER_MIN`](/id/guide/configuration#env-rate-limit-per-min) | `1000` | Permintaan API per menit per IP (atur 0 untuk menonaktifkan) |
 | [`MAX_USERS`](/id/guide/configuration#env-max-users) | `0` (tanpa batas) | Jumlah maksimum akun pengguna |
 | [`TRUST_PROXY`](/id/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Peer mana yang boleh menetapkan IP klien melalui `X-Forwarded-For`. Secara default hanya jaringan privat |
-| `PUID` | `999` | Jalankan sebagai UID ini (untuk izin bind mount) |
-| `PGID` | `999` | Jalankan sebagai GID ini (untuk izin bind mount) |
+| `PUID` | `999` | Jalankan sebagai UID ini (untuk izin bind mount). Memerlukan filesystem root yang dapat ditulis; lihat [panduan keamanan](/id/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Jalankan sebagai GID ini (untuk izin bind mount). Memerlukan filesystem root yang dapat ditulis; lihat [panduan keamanan](/id/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/id/guide/configuration#env-log-level) | `info` | Tingkat detail log: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/id/guide/configuration#env-concurrent-jobs) | `0` (otomatis) | Maksimum job pemrosesan AI paralel |
 | [`SESSION_DURATION_HOURS`](/id/guide/configuration#env-session-duration-hours) | `168` | Masa berlaku sesi login (7 hari) |
@@ -518,7 +528,9 @@ services:
       - ./company-ca.pem:/etc/snapotter/custom-ca.pem:ro
 ```
 
-Simpan kredensial proxy di luar file Compose (misalnya dalam file atau secret `.env` yang terlindungi). Jangan menonaktifkan verifikasi TLS: indeks OCR bertanda tangan mengautentikasi metadata rilis, sedangkan validasi TLS normal tetap melindungi transport dan setiap permintaan keluar lainnya.
+Simpan kredensial proxy di luar file Compose (misalnya dalam file atau secret `.env` yang dilindungi). Jangan menonaktifkan verifikasi TLS: indeks OCR bertanda tangan mengautentikasi metadata rilis, sedangkan validasi TLS normal tetap melindungi transport dan setiap permintaan keluar lainnya.
+
+Jika huggingface.co sendiri diblokir atau dibatasi lajunya dan bukan sekadar memerlukan proxy, arahkan unduhan AI ke mirror Hugging Face dengan `HF_ENDPOINT` (misalnya `HF_ENDPOINT: https://hf-mirror.com`). Lihat [Mengunduh melalui mirror](/id/api/ai#downloading-through-a-mirror).
 
 ## Health Check {#health-check}
 
@@ -719,7 +731,7 @@ Semantic-release menentukan versi dari riwayat commit. Tag Docker `latest` selal
 
 ## Analitik {#analytics}
 
-SnapOtter menyertakan analitik produk anonim (pola penggunaan alat, laporan error) untuk membantu menemukan bug dan meningkatkan fitur. Analitik ini aktif secara default. File, nama file, dan data pribadi Anda tidak pernah menjadi bagian darinya. SnapOtter bekerja normal dengan analitik dinonaktifkan.
+SnapOtter menyertakan analitik produk anonim (pola penggunaan alat, laporan error) untuk membantu menemukan bug dan meningkatkan fitur. Instance baru menanyakan administratornya saat pertama kali dijalankan dan tidak mengirim apa pun sampai pertanyaan itu dijawab. File, nama file, dan data pribadi Anda tidak pernah menjadi bagian darinya. SnapOtter bekerja normal dengan analitik dinonaktifkan.
 
 ### Menonaktifkan analitik {#disabling-analytics}
 
@@ -745,4 +757,3 @@ services:
       args:
         SNAPOTTER_ANALYTICS: "off"
 ```
-

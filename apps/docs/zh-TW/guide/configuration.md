@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 所有環境變數及其預設值。可設定驗證、儲存空間、AI 模型、分析等項目。"
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 271430b3be7e
+i18n_output_hash: 0bb14d260ee4
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ i18n_hash_version: 2
 | `HOST` | `0.0.0.0` | 伺服器監聽的 IP 位址。在橋接網路上（`docker run` 與 Compose 的預設網路），請保留 `0.0.0.0`（或 `::`），否則已發佈的連接埠將無法運作。在原生安裝或使用主機網路的容器中，`127.0.0.1` 可讓 API 不對網路開放；若需遠端存取，請在前端設置反向代理。[內嵌模式](#embedded-mode)僅適用於 `0.0.0.0`、`::` 或 `127.0.0.1`，因為其啟動檢查會呼叫 `127.0.0.1`。若使用其他任何位址（包括 `::1`），容器永遠不會被視為已啟動，之後若發生當機，容器會停止，而不是重新啟動伺服器。任何不是 IP 位址的值（包括 `localhost`）都會讓伺服器在啟動時停止。 |
 | `BASE_PATH` | （空） | 對外公開的部署路徑，例如 `/snapotter`。留空或設為 `/` 時，於網域根路徑提供服務。於執行階段套用，無需重新建置映像檔。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每個 IP 每分鐘的請求數上限。設為 0 可停用速率限制。 |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | 每個 IP 每分鐘對 API 金鑰管理端點（列出、建立、撤銷）的請求數上限。用於工具呼叫的金鑰不受影響。沒有無限制的值：`0` 會拒絕對這些端點的所有請求。 |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | 每個 IP 每分鐘對 API 金鑰管理端點（列出、建立、撤銷）的請求數上限。用於工具呼叫的金鑰不受影響。設為 `0` 表示無限制。 |
 | `CORS_ORIGIN` | （空） | 以逗號分隔的 CORS 允許來源，留空則僅允許同源。 |
 | `LOG_LEVEL` | `info` | 日誌詳細程度。可選值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些對等端可透過 `X-Forwarded-For` 設定用戶端 IP。預設值只信任私有網路中的對等端，因此位於 Docker 網路或區域網路的反向代理會被信任，而公開用戶端偽造的標頭則不會。只有在您掌控的代理伺服器位於公開位址前端時，才設定 `true`。 |
@@ -38,7 +38,7 @@ i18n_hash_version: 2
 | `MAX_USERS` | `0`（無限制） | 已註冊使用者帳號的數量上限。設為 0 表示無限制。 |
 | `SESSION_DURATION_HOURS` | `168` | 登入工作階段的有效時間，單位為小時（預設為 7 天）。 |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | 設為 `true` 可略過首次登入時強制變更密碼的提示。 |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | 每個 IP 每分鐘的登入請求數上限。超出後的嘗試會收到 `429`，直到這一分鐘結束。同一使用者名稱的反覆失敗通常會先觸發 `LOGIN_THROTTLE_MAX_FAILURES`。管理員可以在 Settings > System 中覆寫它。沒有無限制的值：`0` 會拒絕所有登入。從原始碼建置則從 10 開始。 |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | 每個 IP 每分鐘的登入請求數上限。超出後的嘗試會收到 `429`，直到這一分鐘結束。同一使用者名稱的反覆失敗通常會先觸發 `LOGIN_THROTTLE_MAX_FAILURES`。管理員可以在 Settings > System 中覆寫它。設為 `0` 表示無限制。從原始碼建置則從 10 開始。 |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | 一個使用者名稱在 `LOGIN_THROTTLE_WINDOW_S` 內允許的密碼登入失敗次數，超過後該使用者名稱的後續嘗試會收到 `429`，不論來自哪個 IP。隨著最早的失敗紀錄移出視窗，它們會重新被放行。設為 0 可關閉該限制。 |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | 該視窗的長度，單位為秒。必須至少為 1；設為 0 時伺服器會拒絕啟動。 |
 
@@ -47,9 +47,9 @@ i18n_hash_version: 2
 | 變數 | 預設值 | 說明 |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` 或 `s3`。S3 與 MinIO 需要具備 s3_storage 功能的授權，並設定下方的 `S3_*` 變數。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 連線字串，也是處理每個請求所用的連線。在 2.3.0 及更新版本中，同時設定 `DATABASE_MIGRATION_URL` 後，此連線會成為最小權限的執行階段角色，僅擁有應用程式資料表的 DML 權限，別無其他。Compose 堆疊會將它指向 `postgres` 服務；若要使用內嵌模式，請將它（連同 `REDIS_URL`）保持未設定。 |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 連線字串，也是處理每個請求所用的連線。在 2.3.0 及更新版本中，同時設定 `DATABASE_MIGRATION_URL` 後，此連線會成為最小權限的執行階段角色，僅擁有應用程式資料表的 DML 權限，別無其他。Compose 堆疊會將它指向 `postgres` 服務；若要使用內嵌模式，請將它（連同 `REDIS_URL`）保持未設定。若要透過 unix socket 連線，請在 `host` 中指定 socket 目錄，例如 `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`，並將該目錄掛載到容器中。 |
 | `DATABASE_MIGRATION_URL` | （空） | 特權連線，僅在啟動期間用於執行遷移並授權給執行階段角色，在處理第一個請求之前即關閉。若留空，SnapOtter 會以單一角色執行，由 `DATABASE_URL` 同時負責這兩項工作。請參閱[最小權限角色](/zh-TW/guide/database#least-privilege-roles)。 |
-| `REDIS_URL` | `redis://localhost:6379` | Redis 連線字串（供 BullMQ 工作佇列使用）。Compose 會將它指向 `redis` 服務。 |
+| `REDIS_URL` | `redis://localhost:6379` | Redis 連線字串（供 BullMQ 工作佇列使用）。Compose 會將它指向 `redis` 服務。若要使用 unix socket，請使用 `unix:///run/redis/redis.sock?db=5`（若 Redis 需要密碼，請加上 `&password=...`），並將 socket 掛載到容器中。 |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 處理期間存放暫存檔案的目錄，會自動清理。映像檔將其設為 `/tmp/workspace`。 |
 | `FILES_STORAGE_PATH` | `./data/files` | 存放持久性使用者檔案（上傳的圖片、儲存的結果）的目錄。映像檔將其設為 `/data/files`。 |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | 每位使用者在檔案庫中可保留內容的上限，單位為 MB。超過上限的儲存會被拒絕，並提示已用量與上限。為使用者設定的配額會覆寫該值。設為 0 表示無限制。 |
@@ -65,7 +65,7 @@ i18n_hash_version: 2
 | `S3_SECRET_ACCESS_KEY` | （空） | 密鑰。必填。檔案慣例相同：`S3_SECRET_ACCESS_KEY_FILE`。 |
 | `S3_REGION` | `us-east-1` | 儲存貯體所在區域。 |
 | `S3_ENDPOINT` | （空） | MinIO、R2、Backblaze 及其他相容 S3 儲存服務的自訂端點。留空表示使用 AWS。 |
-| `S3_FORCE_PATH_STYLE` | `false` | 對於 MinIO，以及其他需要 `endpoint/bucket/key` 而非虛擬主機定址的服務，請設為 `true`。 |
+| `S3_FORCE_PATH_STYLE` | `false` | 設為 `true` 以支援 MinIO，以及其他需要 `endpoint/bucket/key` 而非虛擬主機定址的服務。 |
 | `S3_PREFIX` | （空） | 金鑰前綴，讓同一個儲存貯體可容納多個執行個體。 |
 
 ### 靜態資料加密 {#encryption-at-rest}
@@ -100,11 +100,11 @@ i18n_hash_version: 2
 | `MAX_UPLOAD_SIZE_MB` | `0`（無限制） | 每次上傳的檔案大小上限，單位為 MB。設為 0 表示無限制。已發佈的映像檔預設為 `0`；從原始碼建置則從 100 開始。 |
 | `MAX_BATCH_SIZE` | `0`（無限制） | 單一批次請求中的檔案數量上限。設為 0 表示無限制。已發佈的映像檔預設為 `0`；從原始碼建置則從 100 開始。 |
 | `CONCURRENT_JOBS` | `0`（自動） | 並行執行的批次工作數量。設為 0 會依可用的 CPU 核心數自動偵測。 |
-| `MAX_MEGAPIXELS` | `0`（無限制） | 允許的最大圖片解析度，單位為百萬像素。設為 0 表示無限制。 |
+| `MAX_MEGAPIXELS` | `0`（應用程式不設限） | 允許的最大圖片解析度，單位為百萬像素。設為 0 可移除 SnapOtter 自身的限制。圖片解碼器仍會拒絕超過約 268 MP（16383 x 16383 像素）的圖片，因此設定高於 268 的值不會有額外效果。 |
 | `MAX_CPU_UPSCALE_MP` | `4` | 在沒有 GPU 的主機上，AI 放大接受的最大輸入，單位為百萬像素。放大後的輸出也被限制在該值的 16 倍以內（預設 64 MP），因此較高的放大倍率會進一步降低輸入上限。較大的圖片會先縮小到合適尺寸再放大；如果縮小後結果不會比原圖更大，則該請求會被拒絕。Lanczos 會略過輸入上限，但不會略過輸出上限。設為 0 表示不設上限，這需要大量記憶體：RealESRGAN 內部一律會建立一個 4x 緩衝區。 |
 | `MAX_WORKSPACE_SIZE_GB` | `0`（無限制） | 工作區中上傳檔案與已儲存結果的總大小上限，單位為 GB。超過後，上傳與工具請求會收到 503，直到檔案在 `FILE_MAX_AGE_HOURS` 之後過期。設為 0 表示無限制；當磁碟可用空間不足 0.5 GB 時，本機儲存仍會以 503 拒絕寫入。已發佈的映像檔預設為 `0`；從原始碼建置則從 10 開始。 |
 | `MAX_WORKER_THREADS` | `0`（自動） | 圖片處理的工作執行緒數量上限。設為 0 會依可用的 CPU 核心數自動偵測。 |
-| `PROCESSING_TIMEOUT_S` | `0`（無限制） | 每次呼叫執行 AI 工具的 Python sidecar 時的逾時時間，單位為秒。設為 0 表示不逾時。它不會限制圖片、PDF 或媒體工作；這些由 `JOB_TIMEOUT_FAST_S` 與 `JOB_TIMEOUT_LONG_S` 負責。 |
+| `PROCESSING_TIMEOUT_S` | `0`（不設限） | 每次呼叫執行 AI 工具的 Python sidecar 時的逾時時間，單位為秒。設為 0 表示不逾時。它不會限制圖片、PDF 或媒體工作；這些由 `JOB_TIMEOUT_FAST_S` 與 `JOB_TIMEOUT_LONG_S` 負責。 |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Python AI sidecar 與精準 OCR 執行階段閒置多少秒後會結束並釋放記憶體（暖機後分別約 1.3 GB 與 0.7 GB）。兩者都會在下一個請求時重新啟動，因此閒置結束後的第一次 AI 呼叫需要負擔數秒的函式庫啟動成本。設為 0 可讓它們持續執行。預設值與 `AI_SESSION_IDLE_TIMEOUT` 相同，因此已載入的模型不會早於該設定所指定的時間被卸除。若您調高 `AI_SESSION_IDLE_TIMEOUT`，請將此值調高至相同數值。 |
 | `AI_SESSION_IDLE_TIMEOUT` | `0`（自動） | 已載入的 AI 模型在最後一次使用後保留在 sidecar 快取中的秒數。自動值為 600。由 Python sidecar 讀取，該 sidecar 在 `AI_SIDECAR_IDLE_TIMEOUT` 之後結束時也會捨棄所有快取的模型。 |
 | `AI_SESSION_CACHE_BYTES` | `0`（自動） | 已快取 AI 模型的記憶體預算，單位為位元組。自動值為 GPU 記憶體的 40%，在僅有 CPU 的主機上則完全不快取。在 CPU 主機上設定它可將模型快取在記憶體中；在 GPU 主機上設為 1 可關閉快取。由 Python sidecar 讀取。 |
@@ -121,9 +121,9 @@ i18n_hash_version: 2
 | `MAX_AUDIO_DURATION_S` | `0`（無限制） | 同上，針對音訊工具。 |
 | `MAX_VIDEO_BITRATE_KBPS` | `0`（無限制） | 影片工具接受的最高整體位元率，單位為千位元每秒。設為 0 表示無限制。 |
 | `PREVIEW_TIMEOUT_S` | `300` | 為影片或音訊檔編碼一個瀏覽器內預覽片段的時間上限，單位為秒。文件預覽改用 `LIBREOFFICE_TIMEOUT_S`。設為 0 表示不設上限。 |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | 一次 LibreOffice 轉換（Word、Excel 與 PowerPoint 轉 PDF、文件轉換器以及文件預覽）的時間上限，單位為秒。這裡的 `0` 並不表示無限制；它會回復為 120。 |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | 一次 LibreOffice 轉換（Word、Excel 與 PowerPoint 轉 PDF、文件轉換器以及文件預覽）的時間上限，單位為秒。設為 `0` 表示不設上限。 |
 | `GIF_BG_MAX_FRAMES` | `150` | 移除 GIF 背景在一個動畫中接受的最大影格數。更長的動畫會收到 `400`，其中包含影格數。設為 0 表示不限制影格數；另有獨立的像素預算仍然適用。 |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0`（停用） | 媒體與文件引擎啟動的每個 ffmpeg、Ghostscript、qpdf、LibreOffice、pandoc 與 pdfcpu 處理程序的位址空間上限，單位為 MB。讀取上傳圖片的解碼器（ImageMagick、exiftool 及其 ffmpeg 備援）不受限制。超出上限的處理程序會被終止，而不是把整個容器推向記憶體不足（OOM）終止器。它限制的是虛擬記憶體而不是常駐記憶體，所以請預留餘裕。AI sidecar 從不受限。設為 0 可停用該限制，改為依靠容器記憶體上限。 |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0`（停用） | 下列各輔助處理程序的位址空間上限，單位為 MB：媒體與文件引擎中的 ffmpeg、ffprobe、Ghostscript、qpdf、LibreOffice、pandoc 與 pdfcpu，以及針對圖片的 exiftool、HEIF、JPEG XL 與 JPEG 2000 解碼器和編碼器、RAW 解碼器，以及 ffmpeg 備援解碼器。ImageMagick 不受此限制，因為它有自己的記憶體限制，AI sidecar 同樣不受限。超出上限的處理程序會被終止，而不是把整個容器推向記憶體不足（OOM）終止器。它限制的是虛擬記憶體而不是常駐記憶體，所以請設定得遠高於處理程序實際用量。JPEG XL 編碼器需求最高：一張 24 MP 的圖片需要約 1.8 GB，在 1 GB 時會失敗，而增加執行緒或 CPU 也無法大幅改變這一點。啟用此上限時，HEIF 編碼器會被限制為兩個工作執行緒，使 24 MP 的編碼降到約 0.8 GB，代價是編碼速度較慢。請從 `2048` 開始，並且只有在測試過您最大的檔案之後才調低。設為 0 可關閉此限制，改為依靠容器記憶體上限。 |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | 工具請求可攜帶的 `settings` 欄位大小上限，單位為 KB，以 UTF-8 位元組計算。超過上限的請求會收到 `400`。設為 0 表示無限制。實際的工具設定遠小於 64 KB，因此只有在用戶端傳送異常龐大的設定時才需要調高此值。 |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | 燒錄字幕與嵌入字幕接受的最大字幕檔（`.srt`、`.vtt`、`.ass`），單位為 MB。更大的檔案會收到 `400`，其中包含檔案大小與上限。設為 0 表示不設上限。一部長片的字幕檔通常遠小於 1 MB。 |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | 編輯中繼資料寫入單一標籤（演出者、描述、關鍵字等）的最長值，單位為字元。更長的值會收到 `400`，其中包含標籤與上限。設為 0 表示不設上限。如果您儲存較長的說明或描述，請調高它。標籤值還必須能放入 `MAX_SETTINGS_PAYLOAD_KB` 與作業系統的單一引數上限（Linux 上為 128 KB）。 |
@@ -157,7 +157,12 @@ SnapOtter 會在容器內的 `$PATH` 上尋找每個處理用的執行檔，因�
 | `CLEANUP_INTERVAL_MINUTES` | `60` | 清理工作的執行頻率。 |
 | `JOBS_RETENTION_DAYS` | `30` | 已完成的工作紀錄（完成、失敗或取消）在每 6 小時執行一次的保留清理將其刪除之前保留的天數。管理員可以在 Settings > System 中覆寫它。處於法律保全狀態的使用者與團隊會保留其紀錄。設為 0 可永久保留。 |
 | `AUDIT_RETENTION_DAYS` | `0`（永久） | 稽核日誌項目的保留天數。覆寫與法律保全規則相同。開啟防竄改稽核日誌時不會刪除任何內容。設為 0 可永久保留。 |
-| `SNAPOTTER_LICENSE_KEY` | （空） | 用於解鎖企業功能（如 SAML、SCIM 與 S3 儲存）的授權金鑰。在啟動時讀取，因此變更後請重新啟動。無效或已過期的金鑰會記錄一則警告，伺服器將在沒有這些功能的情況下執行。在容器中，您也可以改為透過 `SNAPOTTER_LICENSE_KEY_FILE` 掛載它（參見 [Docker secrets](/guide/security#docker-secrets)）。 |
+
+### 企業授權 {#enterprise-license}
+
+| 變數 | 預設值 | 說明 |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | （空） | 用於解鎖企業功能（如 SAML、SCIM 與 S3 儲存）的授權金鑰。在啟動時讀取，因此變更後請重新啟動。無效或已過期的金鑰會記錄一則警告，伺服器將在沒有這些功能的情況下執行。在容器中，您也可以改為透過 `SNAPOTTER_LICENSE_KEY_FILE` 掛載它（參見 [Docker secrets](/zh-TW/guide/security#docker-secrets)）。 |
 
 ### 外觀 {#appearance}
 
@@ -171,8 +176,8 @@ SnapOtter 會在容器內的 `$PATH` 上尋找每個處理用的執行檔，因�
 
 | 變數 | 預設值 | 說明 |
 |---|---|---|
-| `PUID` | `999` | 以此 UID 執行容器程序。使用綁定掛載時，請設為與主機使用者相符的值（`id -u`）。 |
-| `PGID` | `999` | 以此 GID 執行容器程序。使用綁定掛載時，請設為與主機群組相符的值（`id -g`）。 |
+| `PUID` | `999` | 以此 UID 執行容器程序。使用綁定掛載時，請設為與主機使用者相符的值（`id -u`）。需要可寫入的根檔案系統；請參閱[安全性指南](/zh-TW/guide/security#why-read-only-is-not-set)。 |
+| `PGID` | `999` | 以此 GID 執行容器程序。使用綁定掛載時，請設為與主機群組相符的值（`id -g`）。需要可寫入的根檔案系統；請參閱[安全性指南](/zh-TW/guide/security#why-read-only-is-not-set)。 |
 
 ## Docker 範例 {#docker-example}
 

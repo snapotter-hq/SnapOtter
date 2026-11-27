@@ -1,14 +1,14 @@
 ---
 description: "Przewodnik utwardzania bezpieczeństwa SnapOtter. Bezpieczeństwo kontenera, izolacja sieci, sekrety Docker, wdrożenie w Kubernetes i artefakty zgodności."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: e92c259d7968
+i18n_output_hash: c3ccd64bc609
 i18n_hash_version: 2
 ---
 
 # Bezpieczeństwo i utwardzanie {#security-hardening}
 
-SnapOtter przetwarza pliki w całości w Twojej infrastrukturze. Domyślnie wysyła anonimowe, pozbawione treści dane analityczne produktu i raporty o awariach, aby pomagać w rozwoju projektu. Nigdy nie wysyła plików, ich nazw, zawartości, wyników OCR, metadanych obrazów ani tekstu dokumentów. Opcjonalna opinia jest wysyłana dopiero po jej przesłaniu przez użytkownika, tylko gdy analityka jest włączona, a pola kontaktowe są dołączane wyłącznie za wyraźną zgodą na kontakt. Administrator może jednym kliknięciem wyłączyć analitykę i zbieranie opinii w Settings > System > Privacy, bez przebudowy. Przetwarzanie plików zawsze odbywa się wewnątrz kontenera.
+SnapOtter przetwarza pliki w całości w Twojej infrastrukturze. Może wysyłać anonimowe, pozbawione treści dane analityczne produktu i raporty o awariach, aby pomagać w rozwoju projektu, ale nowa instancja najpierw pyta o to administratora i nie wysyła niczego, dopóki nie otrzyma odpowiedzi. Nigdy nie wysyła plików, ich nazw, zawartości, wyników OCR, metadanych obrazów ani tekstu dokumentów. Opcjonalna opinia jest wysyłana dopiero po jej przesłaniu przez użytkownika, tylko gdy analityka jest włączona, a pola kontaktowe są dołączane wyłącznie za wyraźną zgodą na kontakt. Administrator może jednym kliknięciem wyłączyć analitykę i zbieranie opinii w Settings > System > Privacy, bez przebudowy. Przetwarzanie plików zawsze odbywa się wewnątrz kontenera.
 
 Kontener działa jako dedykowany użytkownik bez uprawnień roota (`snapotter`), a wszystkie uprawnienia (capabilities) systemu Linux są odebrane poza minimalnym wymaganym zestawem. Pełna polityka ujawniania podatności i architektura bezpieczeństwa są opisane w [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) na GitHub.
 
@@ -28,7 +28,7 @@ W przypadku wdrożenia dostępnego z internetu należy powiązać port 1349 z lo
 
 ### Dlaczego `read_only` nie jest ustawione {#why-read-only-is-not-set}
 
-`read_only: true` nie jest ustawione, ponieważ remapowanie [PUID](/pl/guide/configuration#env-puid)/[PGID](/pl/guide/configuration#env-pgid) zapisuje do `/etc/passwd` i `/etc/group` przy starcie. Jeśli zamiast PUID/PGID używana jest flaga Docker `--user` lub `runAsUser` w Kubernetes, można bezpiecznie włączyć główny system plików tylko do odczytu.
+`read_only: true` nie jest ustawione, ponieważ remapowanie [PUID](/pl/guide/configuration#env-puid)/[PGID](/pl/guide/configuration#env-pgid) zapisuje do `/etc/passwd` i `/etc/group` przy starcie. Jeśli zamiast PUID/PGID używana jest flaga Docker `--user` lub `runAsUser` w Kubernetes, można bezpiecznie włączyć główny system plików tylko do odczytu. Jeśli ustawisz PUID lub PGID na wartość inną niż 999 przy głównym systemie plików tylko do odczytu, kontener zatrzyma się przy starcie z komunikatem o tym, zanim zmieni właściciela czegokolwiek, co już znajduje się w /data. Obraz all-in-one również działa z głównym systemem plików tylko do odczytu, gdy PUID i PGID nie są ustawione, o ile /run i /tmp są zamontowane jako tmpfs, a /run pozwala na exec, ponieważ s6-overlay uruchamia stamtąd swój nadzorca.
 
 ## Izolacja sieci {#network-isolation}
 

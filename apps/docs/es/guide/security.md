@@ -1,14 +1,14 @@
 ---
 description: "Guía de endurecimiento de seguridad de SnapOtter. Seguridad de contenedores, aislamiento de red, secretos de Docker, despliegue en Kubernetes y artefactos de cumplimiento."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 1fc31a2de362
+i18n_output_hash: 6a1ab90dd1cc
 i18n_hash_version: 2
 ---
 
 # Seguridad y endurecimiento {#security-hardening}
 
-SnapOtter procesa los archivos íntegramente en su infraestructura. De forma predeterminada envía analítica de producto anónima y sin contenido, además de informes de fallos, para ayudar a mejorar el proyecto. Nunca envía sus archivos, nombres de archivo, contenido de archivos, resultados de OCR, metadatos de imagen ni texto de documentos. Los comentarios opcionales solo se envían después de que un usuario los remita, solo cuando la analítica está habilitada, y los campos de contacto se incluyen únicamente con consentimiento explícito de contacto. Un administrador puede desactivar la analítica y la captura de comentarios con un clic en Settings > System > Privacy, sin necesidad de recompilar. El procesamiento de archivos siempre permanece dentro de su contenedor.
+SnapOtter procesa los archivos íntegramente en su infraestructura. Puede enviar analítica de producto anónima y sin contenido, además de informes de fallos, para ayudar a mejorar el proyecto, pero una instancia nueva pregunta primero a su administrador y no envía nada hasta que este responda. Nunca envía sus archivos, nombres de archivo, contenido de archivos, resultados de OCR, metadatos de imagen ni texto de documentos. Los comentarios opcionales solo se envían después de que un usuario los remita, solo cuando la analítica está habilitada, y los campos de contacto se incluyen únicamente con consentimiento explícito de contacto. Un administrador puede desactivar la analítica y la captura de comentarios con un clic en Settings > System > Privacy, sin necesidad de recompilar. El procesamiento de archivos siempre permanece dentro de su contenedor.
 
 El contenedor se ejecuta como un usuario dedicado sin privilegios de root (`snapotter`) con todas las capacidades de Linux eliminadas, salvo el conjunto mínimo necesario. Para la política completa de divulgación de vulnerabilidades y la arquitectura de seguridad, consulte [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) en GitHub.
 
@@ -28,7 +28,7 @@ Para un despliegue expuesto a internet, enlace el puerto 1349 a loopback y termi
 
 ### Por qué `read_only` no está definido {#why-read-only-is-not-set}
 
-`read_only: true` no está definido porque el remapeo de [PUID](/es/guide/configuration#env-puid)/[PGID](/es/guide/configuration#env-pgid) escribe en `/etc/passwd` y `/etc/group` durante el arranque. Si utiliza la opción `--user` de Docker o `runAsUser` de Kubernetes en lugar de PUID/PGID, puede habilitar con seguridad un sistema de archivos raíz de solo lectura.
+`read_only: true` no está definido porque el remapeo de [PUID](/es/guide/configuration#env-puid)/[PGID](/es/guide/configuration#env-pgid) escribe en `/etc/passwd` y `/etc/group` durante el arranque. Si utiliza la opción `--user` de Docker o `runAsUser` de Kubernetes en lugar de PUID/PGID, puede habilitar con seguridad un sistema de archivos raíz de solo lectura. Si define PUID o PGID con un valor distinto de 999 en una raíz de solo lectura, el contenedor se detiene al arrancar con un mensaje que lo indica, antes de cambiar el propietario de cualquier elemento que ya esté en /data. La imagen todo en uno también se ejecuta con una raíz de solo lectura cuando PUID y PGID no están definidos, siempre que /run y /tmp sean montajes tmpfs y /run permita exec, porque s6-overlay inicia desde ahí su supervisor.
 
 ## Aislamiento de red {#network-isolation}
 

@@ -1,8 +1,8 @@
 ---
 description: "Zarządzaj użytkownikami, wbudowanymi i niestandardowymi rolami, uprawnieniami, kluczami API, zespołami, sesjami i dziennikiem audytu w SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 4151b87bf65f
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 6835c8975705
 i18n_hash_version: 2
 ---
 
@@ -119,7 +119,7 @@ Wszystkie 17 uprawnień można delegować za pośrednictwem ról niestandardowyc
 - Uprawnienia celu muszą być zawarte w **efektywnych** uprawnieniach aktora. Dlatego klucz API o ograniczonym zakresie nie może wykonywać uprawnień pominiętych w jego zakresie.
 - Dostęp do narzędzi roli docelowej musi być ograniczony dostępem do narzędzi aktora.
 - Wyłączone konto jest sprawdzane pod kątem jego pierwotnej roli, gdy ta rola jest rejestrowana jako `disabled:<original-role>`.
-- Usunięcie roli niestandardowej wymaga również uprawnień do przypisania wbudowanej funkcji zastępczej `user`; niepełnosprawni członkowie pozostają wyłączeni jako `disabled:user`.
+- Usunięcie roli niestandardowej wymaga również uprawnień do przypisania wbudowanej funkcji zastępczej `user`; wyłączeni członkowie pozostają wyłączeni jako `disabled:user`.
 
 Globalne dane uwierzytelniające i konfiguracja są bardziej rygorystyczne: wydawanie lub unieważnianie tokena SCIM oraz importowanie konfiguracji instancji wymagają wbudowanej roli `admin` z pełnymi skutecznymi uprawnieniami administratora.
 
@@ -147,7 +147,16 @@ Gdy ustawiony jest tryb `tool`, ale funkcja enterprise nie jest dostępna, SnapO
 
 ### Usuwanie roli niestandardowej {#deleting-a-custom-role}
 
-Gdy rola niestandardowa zostanie usunięta, wszyscy przypisani do niej użytkownicy są automatycznie przenoszeni do roli `user`.
+Gdy rola niestandardowa zostanie usunięta, wszyscy przypisani do niej użytkownicy są automatycznie przenoszeni do wbudowanej roli `user`. Wyłączeni członkowie pozostają wyłączeni jako `disabled:user`. Okno ustawień informuje o tym w potwierdzeniu usunięcia, wraz z liczbą użytkowników, którzy zostaną przeniesieni.
+
+Odpowiedź `DELETE /api/v1/roles/{id}` zawiera listę przeniesionych użytkowników, a wpis audytu `ROLE_DELETED` zapisuje tę samą listę w `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Zespoły {#teams}
 

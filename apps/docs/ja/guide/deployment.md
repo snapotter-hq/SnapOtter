@@ -1,8 +1,8 @@
 ---
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 0ce6d49d02b8
+i18n_output_hash: f3b2c0108495
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 `--gpus all` と NVIDIA Container Toolkit が正しくセットアップされているのに AI ツールが CPU で動く場合は、該当するバンドル (たとえば背景除去) を **Settings → AI Features** から再インストールしてください。インストーラーが ONNX Runtime の GPU ビルドを復元します。共有 AI 環境では、別のバンドル (文字起こしなど) が取り込んだ CPU 専用ビルドに、GPU ビルドが隠されてしまうことがあります。古いイメージで UI からの再インストールでは GPU が復元されない場合は、[issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) にある手動の修復手順を参照してください。
 
+## Proxmox LXC {#proxmox-lxc}
+
+Proxmox LXC インストーラーは、このリポジトリではなく [community-scripts](https://community-scripts.org) プロジェクトで管理されています。Docker の例にある `admin` / `admin` のデフォルト値は使いません。インストール時に `admin` ユーザー用のランダムな 20 文字のパスワードが生成され、コンテナ内に保存されます。コンテナ内でシェルを開き、次を実行してください。
+
+```bash
+cat ~/snapotter.creds
+```
+
+`DEFAULT_PASSWORD` と同じ値が `/opt/snapotter_data/.env` にもあります。この変数は初回起動時にアカウントを作成するときだけ使われるため、その後アプリ内でパスワードを変更した場合、このファイルの内容はもう一致しません。
+
 ## ハードウェア要件 {#hardware-requirements}
 
 ここに示す数値は、NVIDIA RTX 4070 を搭載した最新の amd64 ワークステーションから Raspberry Pi までさまざまなシステムでベンチマークを取り、それぞれでツールカタログ全体を実行しつつ Docker のリソース制限を変えながら実際の下限を探ったものです。
@@ -330,7 +340,7 @@ SnapOtter は、これらのモデルのダウンロードを意図的に Docker
 | 高品質インペインティング (`inpaint-hq`) | 5-7 GB | ホスト RAM 8 GB (空き約 6 GB) |
 | **すべてのバンドル** | **インストール後約 25 GB** | **4 GB (`inpaint-hq` を使う場合は 8 GB)** |
 
-Fast OCR は Tesseract を通じてイメージに組み込まれており、容量は約 25 MiB 増えるだけで、オプションの OCR パックも 4 GiB のメモリ要件も必要ありません。Fast は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応していますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応していません。この 2 つは `balanced` または `best` を使うため、高精度パックが必要です。高精度パックは公式の Linux amd64 および arm64 コンテナで利用でき、ONNX Runtime を CPU 上で実行します。NVIDIA ホストでもその同じ CPU OCR ランタイムを使うため、OCR は CUDA のバージョンや GPU アーキテクチャに依存しません。高精度ランタイムには、少なくとも 4 GiB の実効メモリが必要です。これは設定されたコンテナの cgroup 制限で、設定がなければホストのメモリです。SnapOtter は、署名付きの互換性の最小要件を下回るシステムを、パックをダウンロードする前に拒否します。また、libc と Python ABI を保証できないベアメタル / ビルド済みアーカイブでは、高精度パックのインストールも拒否されます。そうしたサポート対象外のホストでは、韓国語とアラビア語の OCR は明示的な非互換エラーを返し、黙って Fast にフォールバックすることはありません。韓国語に対して Fast を明示的に要求した場合は、ジョブがキューに入る前に `fast-korean-unsupported` の理由とともに `FEATURE_INCOMPATIBLE` が返されます。
+Fast OCR は Tesseract を通じてイメージに組み込まれており、容量は約 25 MiB 増えるだけで、オプションの OCR パックも 4 GiB のメモリ要件も必要ありません。Fast は `auto`、`en`、`de`、`es`、`fr`、`zh`、`ja` に対応していますが、韓国語 (`ko`) とアラビア語 (`ar`) には対応していません。この 2 つは `balanced` または `best` を使うため、高精度パックが必要です。高精度パックは公式の Linux amd64 および arm64 コンテナで利用でき、ONNX Runtime を CPU 上で実行します。NVIDIA ホストでもその同じ CPU OCR ランタイムを使うため、OCR は CUDA のバージョンや GPU アーキテクチャに依存しません。高精度ランタイムには、少なくとも 4 GiB の実効メモリが必要です。これは設定されたコンテナの cgroup 制限で、設定がなければホストのメモリです。SnapOtter は、署名付きの互換性の最小要件を下回るシステムを、パックをダウンロードする前に拒否します。また、libc と Python ABI を保証できないベアメタル / ビルド済みアーカイブでは、高精度パックのインストールも拒否されます。そうしたサポート対象外のホストでは、韓国語とアラビア語の OCR は明示的な非互換エラーを返し、黙って Fast にフォールバックすることはありません。韓国語に対して Fast を明示的に要求した場合は、ジョブがキューに入る前に `FEATURE_INCOMPATIBLE` が `fast-korean-unsupported` の理由とともに返されます。
 
 同じ `DATA_DIR` を共有するレプリカは、同じ CPU アーキテクチャでなければなりません。複数レプリカのデプロイでは、ノードアフィニティで固定してください。amd64 と arm64 が混在するレプリカには、別々のデータボリュームと独立した SnapOtter デプロイが必要です。
 
@@ -406,7 +416,7 @@ SnapOtter は **55 以上の入力フォーマット**と **14 の出力フォ�
 
 - **コンテンツに応じたリサイズ**は、caire バイナリの制限により、大きな画像 (5 MP 超) でクラッシュします。小さい画像では問題なく動作します。
 - **HEIF のデコード**には 13-23 秒かかります。HEIC (Apple の派生形式) は 0.3-0.9 秒と、はるかに高速です。
-- **アップスケール**は、小さな画像を超えると CPU ではタイムアウトします。実用には GPU が必要です。
+- **アップスケール**は、GPU がない場合、CPU の上限 (デフォルトでは 4 MP、高い倍率ではそれより低くなります) を超える入力を縮小してからアップスケールするため、GPU よりもはるかに遅くなります。ホストに十分な RAM がある場合は、[`MAX_CPU_UPSCALE_MP`](/ja/guide/configuration#processing-limits) でその上限を引き上げたり解除したりできます。
 - **CodeFormer** による顔補正は GFPGAN よりも大幅に遅くなります (GPU で 53 秒に対して 2 秒)。ほとんどの用途では GFPGAN を推奨します。
 
 ### 複数レプリカでの AI バンドルのインストール {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter は実行時に 2 か所へ書き込みます。`/data` (ユーザー�
 
 権限の扱いは、コンテナの起動方法によって異なります。
 
-**デフォルト (root で起動し、`snapotter` に降格)**: エントリーポイントは root で起動し、マウントされたボリュームの所有権を修正してから、`gosu` を使って特権のない `snapotter` ユーザーに降格します。名前付きボリュームは設定なしで動作します。バインドマウントでは、`PUID`/`PGID` をホストのユーザーに設定して (上記)、書き込まれるファイルが自分の所有になるようにしてください。
+**デフォルト (root で起動し、`snapotter` に降格)**: エントリーポイントは root で起動し、マウントされたボリュームの所有権を修正してから、特権のない `snapotter` ユーザーに `gosu` を使って降格します。名前付きボリュームは設定なしで動作します。バインドマウントでは、`PUID`/`PGID` をホストのユーザーに設定して (上記)、書き込まれるファイルが自分の所有になるようにしてください。
 
 **Kubernetes / OpenShift (`runAsUser` による非 root)**: root 以外のユーザーとして直接起動された場合、コンテナ自体はボリュームを chown できないため、オーケストレーター側でボリュームを書き込み可能にする必要があります。`fsGroup` を設定してください。
 
@@ -493,8 +503,8 @@ securityContext:
 | [`RATE_LIMIT_PER_MIN`](/ja/guide/configuration#env-rate-limit-per-min) | `1000` | IP ごとの 1 分あたりの API リクエスト数 (0 にすると無効) |
 | [`MAX_USERS`](/ja/guide/configuration#env-max-users) | `0` (無制限) | ユーザーアカウントの最大数 |
 | [`TRUST_PROXY`](/ja/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` を通じてクライアント IP を設定できるピア。デフォルトではプライベートネットワークのみ |
-| `PUID` | `999` | この UID で実行 (バインドマウントの権限用) |
-| `PGID` | `999` | この GID で実行 (バインドマウントの権限用) |
+| `PUID` | `999` | この UID で実行 (バインドマウントの権限用)。書き込み可能なルートファイルシステムが必要です。[セキュリティガイド](/ja/guide/security#why-read-only-is-not-set)を参照してください |
+| `PGID` | `999` | この GID で実行 (バインドマウントの権限用)。書き込み可能なルートファイルシステムが必要です。[セキュリティガイド](/ja/guide/security#why-read-only-is-not-set)を参照してください |
 | [`LOG_LEVEL`](/ja/guide/configuration#env-log-level) | `info` | ログの詳細度: fatal、error、warn、info、debug、trace |
 | [`CONCURRENT_JOBS`](/ja/guide/configuration#env-concurrent-jobs) | `0` (自動) | 並列 AI 処理ジョブの最大数 |
 | [`SESSION_DURATION_HOURS`](/ja/guide/configuration#env-session-duration-hours) | `168` | ログインセッションの有効期間 (7 日) |
@@ -519,6 +529,8 @@ services:
 ```
 
 プロキシの認証情報は、Compose ファイルの外 (たとえば保護された `.env` ファイルやシークレット) に置いてください。TLS 検証は無効にしないでください。署名付きの OCR インデックスはリリースメタデータを認証しますが、通常の TLS 検証は引き続き通信経路と、その他すべてのアウトバウンドリクエストを保護します。
+
+huggingface.co 自体がブロックまたはスロットリングされていて、プロキシでは解決できない場合は、`HF_ENDPOINT` で AI のダウンロード先を Hugging Face のミラーに向けてください (例: `HF_ENDPOINT: https://hf-mirror.com`)。[ミラー経由でのダウンロード](/ja/api/ai#downloading-through-a-mirror)を参照してください。
 
 ## ヘルスチェック {#health-check}
 
@@ -578,7 +590,7 @@ server {
 
 ### サブパスでのデプロイ {#subpath}
 
-`https://example.com/snapotter` で提供するには、SnapOtter コンテナの環境に [`BASE_PATH=/snapotter`](/ja/guide/configuration#env-base-path) を設定して再起動します。公式の CPU 用および GPU 用 Compose ファイルでも、シェルまたは Compose の `.env` ファイルから `BASE_PATH` を指定できます。同じイメージがどのパスでも動作し、フロントエンドの再ビルドは不要です。
+`https://example.com/snapotter` で提供するには、SnapOtter コンテナの環境に [`BASE_PATH=/snapotter`](/ja/guide/configuration#env-base-path) を設定して再起動します。公式の CPU 用および GPU 用 Compose ファイルでも、`BASE_PATH` をシェルまたは Compose の `.env` ファイルから指定できます。同じイメージがどのパスでも動作し、フロントエンドの再ビルドは不要です。
 
 `BASE_PATH` には、英字、数字、`_`、または `-` を含む、スラッシュ区切りのセグメントを指定できます。`/apps/snapotter` のようなネストしたパスも使えます。末尾のスラッシュは省略できます。ルートでのデプロイでは、空のまま (デフォルト) にするか、`/` を設定してください。
 
@@ -603,7 +615,7 @@ location /snapotter/ {
 
 この例ではプレフィックスを保持します。転送前に `/snapotter` を取り除くプロキシにも対応しています。内部のヘルスチェックは引き続き `/api/v1/health` を使えます。OIDC または SAML を使う場合は、[`EXTERNAL_URL=https://example.com/snapotter`](/ja/guide/oidc#env-external-url) も設定し、IdP のコールバック URL を、それぞれ `/snapotter/api/auth/oidc/callback` または `/snapotter/api/auth/saml/callback` を含むように更新してください。
 
-API スクリプトはそのまま動作し続けます。ツールの `downloadUrl` など、API レスポンス内の URL は、`BASE_PATH` の値に関係なく `/api/` で始まります。これらはドメインのルートに対して解決するのではなく、インスタンスのベース URL (`https://example.com/snapotter` + `/api/v1/download/...`) に付け足してください。
+API スクリプトはそのまま動作し続けます。ツールの `downloadUrl` など、API レスポンス内の URL は `/api/` で始まり、`BASE_PATH` の値には左右されません。これらはドメインのルートに対して解決するのではなく、インスタンスのベース URL (`https://example.com/snapotter` + `/api/v1/download/...`) に付け足してください。
 
 UI はプレフィックス付きの URL (`https://example.com/snapotter`) で開いてください。プレフィックスなしでアクセスしたブラウザは自動的にそちらへ転送されます。プレフィックスなしでアプリに到達することが想定されているのは API リクエストだけです。ログに `Requests arrive under /snapotter/ but BASE_PATH is empty` と出る場合は、プロキシが `BASE_PATH` に宣言されていないプレフィックスを転送しています。`BASE_PATH` にそのプレフィックスを設定するか、プロキシ側でプレフィックスを取り除いてください。
 
@@ -702,7 +714,7 @@ semantic-release は、コミット履歴からバージョンを決定します
 
 ## アナリティクス {#analytics}
 
-SnapOtter には、バグの発見と機能の改善に役立てるための匿名のプロダクトアナリティクス (ツールの利用パターン、エラーレポート) が含まれています。デフォルトで有効です。ファイル、ファイル名、個人データが含まれることはありません。アナリティクスを無効にしても、SnapOtter は通常どおり動作します。
+SnapOtter には、バグの発見と機能の改善に役立てるための匿名のプロダクトアナリティクス (ツールの利用パターン、エラーレポート) が含まれています。新しいインスタンスでは、初回起動時に管理者に確認し、回答があるまでは何も送信しません。ファイル、ファイル名、個人データが含まれることはありません。アナリティクスを無効にしても、SnapOtter は通常どおり動作します。
 
 ### アナリティクスの無効化 {#disabling-analytics}
 

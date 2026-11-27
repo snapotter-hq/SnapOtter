@@ -1,8 +1,8 @@
 ---
 description: "Gestiona usuarios, roles integrados y personalizados, permisos, claves de API, equipos, sesiones y el registro de auditoría en SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 30d0b7dc598e
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 477f71d31aad
 i18n_hash_version: 2
 ---
 
@@ -83,12 +83,12 @@ Los 17 permisos. Control total sobre la instancia.
 | `pipelines:all` | Ver y gestionar los pipelines de todos los usuarios |
 | `settings:read` | Ver la configuración de la instancia |
 | `settings:write` | Modificar la configuración de la instancia |
-| `users:manage` | Crear y administrar cuentas de usuario dentro de los límites de autoridad del actor. |
+| `users:manage` | Crear y administrar cuentas de usuario dentro de los límites de autoridad del actor |
 | `teams:manage` | Crear, actualizar y eliminar equipos |
 | `features:manage` | Instalar y gestionar bundles de funciones de IA |
 | `system:health` | Acceder a los endpoints de estado y disponibilidad |
 | `audit:read` | Ver el registro de auditoría y listar roles |
-| `compliance:manage` | Gestionar el ciclo de vida del RGPD y las funciones de cumplimiento; Las operaciones destructivas del usuario siguen estando limitadas por la autoridad. |
+| `compliance:manage` | Gestionar el ciclo de vida del RGPD y las funciones de cumplimiento; las operaciones destructivas sobre usuarios siguen limitadas por la autoridad |
 | `webhooks:manage` | Configurar webhooks salientes |
 | `security:manage` | Gestionar la configuración de seguridad (lista de IP permitidas, imposición de SSO) |
 
@@ -115,13 +115,13 @@ Los nombres de rol deben tener entre 2 y 30 caracteres, alfanuméricos en minús
 
 Los 17 permisos se pueden delegar a través de roles personalizados, pero un permiso administrativo no hace que ese rol sea equivalente al rol integrado `admin`. Las mutaciones de usuario autorizadas por `users:manage`, las operaciones destructivas autorizadas por `compliance:manage` y la gestión de roles personalizados autorizada por `security:manage` están limitadas por la autoridad actual del actor:
 
-- Los roles integrados siguen `admin` > `editor` > `user`; Los roles personalizados están debajo de los roles integrados.
-- Los permisos del objetivo deben estar contenidos en los permisos **efectivos** del actor. Por lo tanto, una clave API con ámbito no puede ejercer permisos omitidos en su ámbito.
-- El acceso a la herramienta de un rol objetivo debe estar contenido en el acceso a la herramienta del propio actor.
-- Una cuenta deshabilitada se compara con su función original cuando esa función se registra como `disabled:<original-role>`.
-- Eliminar un rol personalizado también requiere autoridad para asignar el respaldo `user` incorporado; los miembros discapacitados permanecen discapacitados como `disabled:user`.
+- Los roles integrados siguen `admin` > `editor` > `user`; los roles personalizados están por debajo de los roles integrados.
+- Los permisos del objetivo deben estar contenidos en los permisos **efectivos** del actor. Por lo tanto, una clave de API con alcance limitado no puede ejercer permisos omitidos en su alcance.
+- El acceso a herramientas de un rol objetivo debe estar contenido en el acceso a herramientas del propio actor.
+- Una cuenta deshabilitada se compara con su rol original cuando ese rol se registra como `disabled:<original-role>`.
+- Eliminar un rol personalizado también requiere autoridad para asignar el rol integrado de respaldo `user`; los miembros deshabilitados siguen deshabilitados como `disabled:user`.
 
-Las credenciales y la configuración globales son más estrictas: emitir o revocar el token SCIM e importar la configuración de la instancia requieren la función `admin` incorporada con autoridad de administrador efectiva completa.
+Las credenciales y la configuración globales son más estrictas: emitir o revocar el token SCIM e importar la configuración de la instancia requieren el rol integrado `admin` con autoridad de administrador efectiva completa.
 
 ### Permisos a nivel de herramienta {#tool-level-permissions}
 
@@ -147,7 +147,16 @@ Cuando el modo `tool` está establecido pero la función empresarial no está di
 
 ### Eliminar un rol personalizado {#deleting-a-custom-role}
 
-Cuando se elimina un rol personalizado, todos los usuarios asignados a él se reasignan automáticamente al rol `user`.
+Cuando se elimina un rol personalizado, todos los usuarios asignados a él se reasignan automáticamente al rol integrado `user`. Los miembros deshabilitados siguen deshabilitados como `disabled:user`. El cuadro de diálogo de configuración lo indica en su confirmación de eliminación, junto con cuántos usuarios se moverán.
+
+La respuesta de `DELETE /api/v1/roles/{id}` enumera los usuarios que se movieron, y la entrada de auditoría `ROLE_DELETED` registra la misma lista en `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Equipos {#teams}
 

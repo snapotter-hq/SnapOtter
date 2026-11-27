@@ -1,8 +1,8 @@
 ---
 description: "إدارة المستخدمين، والأدوار المدمجة والمخصصة، والأذونات، ومفاتيح API، والفرق، والجلسات، وسجل التدقيق في SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 81189a078fea
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 455f2d567d66
 i18n_hash_version: 2
 ---
 
@@ -147,7 +147,16 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### حذف دور مخصص {#deleting-a-custom-role}
 
-عند حذف دور مخصص، يُعاد تعيين جميع المستخدمين المُخصَّصين له تلقائياً إلى الدور `user`.
+عند حذف دور مخصص، يُعاد تعيين جميع المستخدمين المُخصَّصين له تلقائياً إلى الدور المدمج `user`. يبقى الأعضاء المعطلون معطلين بصيغة `disabled:user`. يذكر مربع حوار الإعدادات ذلك في تأكيد الحذف، مع عدد المستخدمين الذين سيُنقلون.
+
+تسرد استجابة `DELETE /api/v1/roles/{id}` المستخدمين الذين نُقلوا، ويسجّل إدخال التدقيق `ROLE_DELETED` القائمة نفسها ضمن `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## الفرق {#teams}
 

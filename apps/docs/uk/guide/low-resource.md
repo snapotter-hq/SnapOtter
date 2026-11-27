@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 4b5680392f16
+i18n_output_hash: 25b7950ef2f9
 i18n_hash_version: 2
 ---
 # Налаштування для обмежених ресурсів {#low-resource-setups}
@@ -88,11 +88,12 @@ services:
 |---|---|---|
 | [`CONCURRENT_JOBS`](/uk/guide/configuration#env-concurrent-jobs) | `1` | Скільки завдань виконується паралельно. Автовизначення бере кількість ядер CPU мінус одне, що нормально для великих машин і надто агресивно для 2-ядерної машини під тиском пам'яті. |
 | [`MAX_WORKER_THREADS`](/uk/guide/configuration#env-max-worker-threads) | `2` | Пул потоків обробки зображень. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/uk/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Як довго процес Python для AI і середовище OCR залишаються завантаженими після останнього запиту. Поки вони «теплі», вони займають 1-2 ГБ, тож коротше вікно швидше повертає пам'ять ціною кількох секунд під час наступного виклику AI. Зменште також [`AI_SESSION_IDLE_TIMEOUT`](/uk/guide/configuration#env-ai-session-idle-timeout), адже вихід із процесу скидає кешовані моделі. |
 | [`MAX_BATCH_SIZE`](/uk/guide/configuration#env-max-batch-size) | `5` | Саме на пакетах машинам з 1-2 ГБ першими не вистачає пам'яті. |
 | [`MAX_UPLOAD_SIZE_MB`](/uk/guide/configuration#env-max-upload-size-mb) | `100` | Не дає одному величезному файлу зайняти весь робочий простір. |
-| [`MAX_MEGAPIXELS`](/uk/guide/configuration#env-max-megapixels) | `50` | Декодування зображення понад 100 МП потребує RAM незалежно від розміру файла. |
+| [`MAX_MEGAPIXELS`](/uk/guide/configuration#env-max-megapixels) | `50` | Декодування зображення понад 100 МП потребує RAM незалежно від розміру файла. Зображення понад приблизно 268 МП відхиляються навіть при `0`. |
 | [`MAX_VIDEO_DURATION_S`](/uk/guide/configuration#env-max-video-duration-s) | `300` | Довгі транскодування монополізують слабкий CPU на хвилини чи години. |
-| [`PROCESSING_TIMEOUT_S`](/uk/guide/configuration#env-processing-timeout-s) | `600` | Жорстка межа, щоб завдання, що вийшло з-під контролю, зрештою звільнило машину. |
+| [`JOB_TIMEOUT_LONG_S`](/uk/guide/configuration#env-job-timeout-long-s) | `3600` | Жорстка межа для AI-завдань і завдань з медіа, щоб завдання, що вийшло з-під контролю, зрештою звільнило машину. За замовчуванням це дві години. Завдання із зображеннями та документами вже зупиняються на [`JOB_TIMEOUT_FAST_S`](/uk/guide/configuration#env-job-timeout-fast-s) (за замовчуванням 120 секунд). |
 
 Ці ліміти стосуються того, що приймає сервер, тож задавайте їх відповідно до того, чим ви реально користуєтеся, а не якомога меншими. Якщо ви ніколи не працюєте з відео, ліміт `MAX_VIDEO_DURATION_S` нічого не коштує; якщо ви щодня скануєте документи, не обмежуйте [`MAX_PDF_PAGES`](/uk/guide/configuration#env-max-pdf-pages).
 

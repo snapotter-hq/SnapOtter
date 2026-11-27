@@ -1,8 +1,8 @@
 ---
 description: "Kelola pengguna, peran bawaan dan kustom, izin, kunci API, tim, sesi, dan log audit di SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 1fe371a11f65
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 8ab19303f0ce
 i18n_hash_version: 2
 ---
 
@@ -147,7 +147,16 @@ Ketika mode `tool` disetel tetapi fitur enterprise tidak tersedia, SnapOtter men
 
 ### Menghapus peran kustom {#deleting-a-custom-role}
 
-Saat peran kustom dihapus, semua pengguna yang ditetapkan padanya secara otomatis ditetapkan ulang ke peran `user`.
+Saat peran kustom dihapus, semua pengguna yang ditetapkan padanya secara otomatis ditetapkan ulang ke peran `user` bawaan. Anggota yang dinonaktifkan tetap dinonaktifkan sebagai `disabled:user`. Dialog pengaturan menyampaikan hal ini dalam konfirmasi hapusnya, beserta jumlah pengguna yang akan dipindahkan.
+
+Respons `DELETE /api/v1/roles/{id}` mencantumkan pengguna yang dipindahkan, dan entri audit `ROLE_DELETED` mencatat daftar yang sama di bawah `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Tim {#teams}
 

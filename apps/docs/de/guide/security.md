@@ -1,14 +1,14 @@
 ---
 description: "Sicherheitshärtungsleitfaden für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker Secrets, Kubernetes-Bereitstellung und Compliance-Artefakte."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: a879be887635
+i18n_output_hash: 01adadb726fb
 i18n_hash_version: 2
 ---
 
 # Sicherheit und Härtung {#security-hardening}
 
-SnapOtter verarbeitet Dateien vollständig auf Ihrer Infrastruktur. Standardmäßig sendet es anonyme, inhaltsfreie Produktanalysen und Absturzberichte, um das Projekt zu verbessern. Es sendet niemals Ihre Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur bei aktivierten Analysen, und Kontaktfelder sind nur mit ausdrücklicher Kontakteinwilligung enthalten. Ein Administrator kann Analysen und die Feedbackerfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, ohne Neubau. Die Dateiverarbeitung bleibt immer innerhalb Ihres Containers.
+SnapOtter verarbeitet Dateien vollständig auf Ihrer Infrastruktur. Es kann anonyme, inhaltsfreie Produktanalysen und Absturzberichte senden, um das Projekt zu verbessern. Eine neue Instanz fragt jedoch zuerst ihren Administrator und sendet nichts, bis dieser geantwortet hat. Es sendet niemals Ihre Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur bei aktivierten Analysen, und Kontaktfelder sind nur mit ausdrücklicher Kontakteinwilligung enthalten. Ein Administrator kann Analysen und die Feedbackerfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, ohne Neubau. Die Dateiverarbeitung bleibt immer innerhalb Ihres Containers.
 
 Der Container läuft als dedizierter Nicht-root-Benutzer (`snapotter`), bei dem alle Linux-Capabilities bis auf die minimal erforderliche Menge entfernt sind. Die vollständige Richtlinie zur Offenlegung von Schwachstellen und die Sicherheitsarchitektur finden Sie in [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) auf GitHub.
 
@@ -28,7 +28,7 @@ Binden Sie bei einer aus dem Internet erreichbaren Bereitstellung Port 1349 an L
 
 ### Warum `read_only` nicht gesetzt ist {#why-read-only-is-not-set}
 
-`read_only: true` ist nicht gesetzt, weil die [PUID](/de/guide/configuration#env-puid)/[PGID](/de/guide/configuration#env-pgid)-Umsetzung beim Start nach `/etc/passwd` und `/etc/group` schreibt. Wenn Sie anstelle von PUID/PGID das Docker-Flag `--user` oder Kubernetes `runAsUser` verwenden, können Sie bedenkenlos ein schreibgeschütztes Root-Dateisystem aktivieren.
+`read_only: true` ist nicht gesetzt, weil die [PUID](/de/guide/configuration#env-puid)/[PGID](/de/guide/configuration#env-pgid)-Umsetzung beim Start nach `/etc/passwd` und `/etc/group` schreibt. Wenn Sie anstelle von PUID/PGID das Docker-Flag `--user` oder Kubernetes `runAsUser` verwenden, können Sie bedenkenlos ein schreibgeschütztes Root-Dateisystem aktivieren. Wenn Sie PUID oder PGID bei schreibgeschütztem Root auf einen anderen Wert als 999 setzen, bricht der Container beim Start mit einer entsprechenden Meldung ab, bevor er den Eigentümer von irgendetwas in /data ändert. Das All-in-One-Image läuft ebenfalls mit schreibgeschütztem Root, wenn PUID und PGID nicht gesetzt sind, solange /run und /tmp als tmpfs eingebunden sind und /run die Ausführung erlaubt, weil s6-overlay seinen Supervisor von dort startet.
 
 ## Netzwerkisolierung {#network-isolation}
 

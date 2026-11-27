@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。包含硬件要求、GPU 设置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 18e231e99240
+i18n_output_hash: 2ff11778a274
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 如果即使 `--gpus all` 和 NVIDIA Container Toolkit 已正确设置，AI 工具仍在 CPU 上运行，请在 **设置 → AI 功能** 中重新安装受影响的功能包（例如背景移除）。安装程序会恢复 ONNX Runtime 的 GPU 版本；否则，其他功能包（例如转录）引入的仅 CPU 版本可能会在共享的 AI 环境中遮蔽它。如果在较旧的镜像上从界面重新安装无法恢复 GPU，请参见 [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) 中的手动修复方法。
 
+## Proxmox LXC {#proxmox-lxc}
+
+Proxmox LXC 安装程序由 [community-scripts](https://community-scripts.org) 项目维护，不在本仓库中。它不使用 Docker 示例中的 `admin` / `admin` 默认值。安装时会为 `admin` 用户生成一个随机的 20 位字符密码，并保存在容器内。请在容器中打开 shell 并运行：
+
+```bash
+cat ~/snapotter.creds
+```
+
+同样的值也存放在 `DEFAULT_PASSWORD` 中，位于 `/opt/snapotter_data/.env` 里。该变量只会在首次运行时用于创建账户，因此如果你之后在应用中修改了密码，该文件就不再与之一致。
+
 ## 硬件要求 {#hardware-requirements}
 
 这些数据来自在一系列系统上进行的基准测试，范围从配备 NVIDIA RTX 4070 的现代 amd64 工作站到树莓派。我们在每台设备上运行了完整的工具目录，并通过调整 Docker 资源限制来找出真实的下限。
@@ -406,7 +416,7 @@ SnapOtter 支持 **55 种以上输入格式**和 **14 种输出格式**，包括
 
 - **内容感知缩放**在处理大图（大于 5 MP）时会崩溃，这是 caire 二进制文件的限制。处理较小的图像时正常。
 - **HEIF 解码**需要 13-23 秒。HEIC（Apple 的变体）要快得多，仅需 0.3-0.9 秒。
-- **放大**在 CPU 上处理稍大的图像就会超时。实际使用需要 GPU。
+- 没有 GPU 时，**放大**会先把超出 CPU 上限（默认 4 MP，放大倍数较高时更低）的输入缩小再放大，而且运行速度比在 GPU 上慢得多。如果主机有足够的内存，[`MAX_CPU_UPSCALE_MP`](/zh-CN/guide/configuration#processing-limits)可以提高或取消该上限。
 - **CodeFormer** 人脸增强明显慢于 GFPGAN（GPU 上为 53 秒对 2 秒）。大多数场景推荐使用 GFPGAN。
 
 ### 多副本部署下安装 AI 功能包 {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter 在运行时会写入两个位置：`/data`（用户文件、日志、
 
 权限的处理方式取决于容器的启动方式：
 
-**默认（以 root 启动，再降权到 `snapotter`）**：入口脚本以 root 启动，修正已挂载卷的所有权，然后通过 `gosu` 降权到无特权的 `snapotter` 用户。命名卷无需任何配置即可使用。对于绑定挂载，请将 `PUID`/`PGID` 设置为你的宿主机用户（见上文），这样它写入的文件才归你所有。
+**默认（以 root 启动，再降权到 `snapotter`）**：入口脚本以 root 启动，修正已挂载卷的所有权，然后降权到无特权的 `snapotter` 用户（通过 `gosu`）。命名卷无需任何配置即可使用。对于绑定挂载，请将 `PUID`/`PGID` 设置为你的宿主机用户（见上文），这样它写入的文件才归你所有。
 
 **Kubernetes / OpenShift（通过 `runAsUser` 以非 root 运行）**：直接以非 root 用户启动时，容器无法自行对卷执行 chown，因此必须由编排器让这些卷可写。请设置 `fsGroup`：
 
@@ -472,7 +482,7 @@ securityContext:
 
 - **以 root 运行应用**（推荐）：不设置应用的用户，或将其设置为 `0`，让默认入口脚本修正权限并降权到 `snapotter`。
 - **以 UID `999` 运行**：将应用的用户/组设置为 `999:999`（SnapOtter 内置的 `snapotter` 用户），使其与镜像的所有权一致。
-- 在 TrueNAS shell 中，对宿主机数据集执行 `chown`，将其所有者改为容器所运行的 UID：
+- **对宿主机数据集执行 `chown`**，将其所有者改为容器所运行的 UID，在 TrueNAS shell 中操作：
 
   ```bash
   # Use the UID from the startup error (or run `id` inside the container)
@@ -493,8 +503,8 @@ securityContext:
 | [`RATE_LIMIT_PER_MIN`](/zh-CN/guide/configuration#env-rate-limit-per-min) | `1000` | 每个 IP 每分钟的 API 请求数（设为 0 可禁用） |
 | [`MAX_USERS`](/zh-CN/guide/configuration#env-max-users) | `0`（无限制） | 最大用户账户数 |
 | [`TRUST_PROXY`](/zh-CN/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认仅限私有网络 |
-| `PUID` | `999` | 以该 UID 运行（用于绑定挂载权限） |
-| `PGID` | `999` | 以该 GID 运行（用于绑定挂载权限） |
+| `PUID` | `999` | 以该 UID 运行（用于绑定挂载权限）。需要可写的根文件系统，参见[安全指南](/zh-CN/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | 以该 GID 运行（用于绑定挂载权限）。需要可写的根文件系统，参见[安全指南](/zh-CN/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/zh-CN/guide/configuration#env-log-level) | `info` | 日志详细程度：fatal、error、warn、info、debug、trace |
 | [`CONCURRENT_JOBS`](/zh-CN/guide/configuration#env-concurrent-jobs) | `0`（自动） | 最大并行 AI 处理任务数 |
 | [`SESSION_DURATION_HOURS`](/zh-CN/guide/configuration#env-session-duration-hours) | `168` | 登录会话有效期（7 天） |
@@ -519,6 +529,8 @@ services:
 ```
 
 请将代理凭据放在 Compose 文件之外（例如放在受保护的 `.env` 文件或 secret 中）。不要禁用 TLS 验证：签名的 OCR 索引用于验证发布元数据，而常规的 TLS 校验仍然保护传输过程以及所有其他出站请求。
+
+如果被屏蔽或限速的是 huggingface.co 本身，而不是需要代理，请用 `HF_ENDPOINT` 将 AI 下载指向 Hugging Face 镜像（例如 `HF_ENDPOINT: https://hf-mirror.com`）。请参见[通过镜像下载](/zh-CN/api/ai#downloading-through-a-mirror)。
 
 ## 健康检查 {#health-check}
 
@@ -580,7 +592,7 @@ server {
 
 要在 `https://example.com/snapotter` 提供服务，请在
 SnapOtter 容器环境中设置 [`BASE_PATH=/snapotter`](/zh-CN/guide/configuration#env-base-path) 并重启。官方的 CPU 和 GPU Compose
-文件也接受来自你的 shell 或 Compose `.env` 文件的 `BASE_PATH`。同一个
+文件也接受 `BASE_PATH`，可来自你的 shell 或 Compose `.env` 文件。同一个
 镜像可以在任意路径下工作，无需重新构建前端。
 
 `BASE_PATH` 接受以斜杠分隔的路径段，其中可包含字母、数字、`_` 或
@@ -613,7 +625,7 @@ location /snapotter/ {
 `/snapotter/api/auth/saml/callback`。
 
 API 脚本无需任何修改即可继续工作：API 响应中的 URL，例如工具的
-`downloadUrl`，无论 `BASE_PATH` 为何值，都以 `/api/` 开头。请将它们追加到
+`downloadUrl`，都以 `/api/` 开头，无论 `BASE_PATH` 为何值。请将它们追加到
 实例的基础 URL 之后（`https://example.com/snapotter` + `/api/v1/download/...`），
 而不要基于域名根路径来解析。
 
@@ -719,7 +731,7 @@ Semantic-release 根据提交历史确定版本号。`latest` Docker 标签始�
 
 ## 分析 {#analytics}
 
-SnapOtter 包含匿名的产品分析（工具使用模式、错误报告），以帮助发现缺陷并改进功能。该功能默认开启。你的文件、文件名和个人数据绝不会包含在内。禁用分析后，SnapOtter 仍可正常工作。
+SnapOtter 包含匿名的产品分析（工具使用模式、错误报告），以帮助发现缺陷并改进功能。新实例在首次运行时会先询问管理员，在得到回答之前不会发送任何数据。你的文件、文件名和个人数据绝不会包含在内。禁用分析后，SnapOtter 仍可正常工作。
 
 ### 禁用分析 {#disabling-analytics}
 

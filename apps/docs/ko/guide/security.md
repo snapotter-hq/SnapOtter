@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter 보안 강화 가이드. 컨테이너 보안, 네트워크 격리, Docker 시크릿, Kubernetes 배포, 규정 준수 산출물."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: f0d08afdb2d1
+i18n_output_hash: ad55d900e7c9
 i18n_hash_version: 2
 ---
 
 # 보안 및 강화 {#security-hardening}
 
-SnapOtter는 파일을 전적으로 사용자의 인프라 안에서 처리합니다. 프로젝트 개선을 돕기 위해 기본적으로 내용이 없는 익명 제품 분석과 충돌 보고서를 전송합니다. 파일, 파일 이름, 파일 내용, OCR 출력, 이미지 메타데이터, 문서 텍스트는 절대 전송하지 않습니다. 선택 사항인 피드백은 사용자가 제출한 뒤에만, 분석이 활성화된 경우에만 전송되며, 연락처 필드는 명시적인 연락 동의가 있을 때만 포함됩니다. 관리자는 설정 > 시스템 > 개인정보 보호에서 한 번의 클릭으로 분석과 피드백 수집을 끌 수 있으며 다시 빌드할 필요가 없습니다. 파일 처리는 항상 컨테이너 안에서만 이루어집니다.
+SnapOtter는 파일을 전적으로 사용자의 인프라 안에서 처리합니다. 프로젝트 개선을 돕기 위해 내용이 없는 익명 제품 분석과 충돌 보고서를 전송할 수 있지만, 새 인스턴스는 먼저 관리자에게 묻고 답을 받기 전에는 아무것도 전송하지 않습니다. 파일, 파일 이름, 파일 내용, OCR 출력, 이미지 메타데이터, 문서 텍스트는 절대 전송하지 않습니다. 선택 사항인 피드백은 사용자가 제출한 뒤에만, 분석이 활성화된 경우에만 전송되며, 연락처 필드는 명시적인 연락 동의가 있을 때만 포함됩니다. 관리자는 설정 > 시스템 > 개인정보 보호에서 한 번의 클릭으로 분석과 피드백 수집을 끌 수 있으며 다시 빌드할 필요가 없습니다. 파일 처리는 항상 컨테이너 안에서만 이루어집니다.
 
 컨테이너는 필요한 최소 권한을 제외한 모든 Linux 권한을 제거한 전용 비루트 사용자(`snapotter`)로 실행됩니다. 전체 취약점 공개 정책과 보안 아키텍처는 GitHub의 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)를 참고하세요.
 
@@ -19,7 +19,7 @@ SnapOtter는 파일을 전적으로 사용자의 인프라 안에서 처리합�
 두 스택 모두 다음 제어를 적용합니다.
 
 - 메모리, 스왑, CPU, PID 제한으로 폭주하는 네이티브 처리를 가둡니다.
-- 모든 서비스가 모든 Linux 권한을 제거합니다. 애플리케이션은 볼륨 소유권 설정, 단방향 `gosu` 신원 전환, 정상적인 시그널 전달을 위해 `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL`만 다시 추가합니다. PostgreSQL과 Redis는 공식 엔트리포인트에 필요한 일부만 받습니다.
+- 모든 서비스가 모든 Linux 권한을 제거합니다. 애플리케이션은 `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL`만 다시 추가하며, 이는 볼륨 소유권 설정, 단방향 `gosu` 신원 전환, 정상적인 시그널 전달을 위한 것입니다. PostgreSQL과 Redis는 공식 엔트리포인트에 필요한 일부만 받습니다.
 - `security_opt: [no-new-privileges:true]`는 애플리케이션, PostgreSQL, Redis 컨테이너의 프로세스가 추가 권한을 얻지 못하게 합니다. 이는 `gosu`와 호환됩니다. 엔트리포인트는 root로 시작해 볼륨을 준비한 뒤 전용 `snapotter` 사용자로만 전환합니다.
 - PostgreSQL과 Redis 이미지 입력은 다이제스트로 고정됩니다. 애플리케이션도 `latest` 대신 확인된 릴리스 태그나 다이제스트로 고정해야 합니다.
 - 상태 확인, 크기가 제한된 JSON 로그 로테이션, 내구성 있는 Redis AOF, 재시작 정책은 표준 파일에 중앙에서 정의되어 있습니다.
@@ -28,7 +28,7 @@ SnapOtter는 파일을 전적으로 사용자의 인프라 안에서 처리합�
 
 ### `read_only`를 설정하지 않는 이유 {#why-read-only-is-not-set}
 
-[PUID](/ko/guide/configuration#env-puid)/[PGID](/ko/guide/configuration#env-pgid) 재매핑이 시작 시 `/etc/passwd`와 `/etc/group`에 쓰기 때문에 `read_only: true`는 설정되어 있지 않습니다. PUID/PGID 대신 Docker의 `--user` 플래그나 Kubernetes `runAsUser`를 사용한다면 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있습니다.
+`read_only: true`를 설정하지 않은 것은 [PUID](/ko/guide/configuration#env-puid)/[PGID](/ko/guide/configuration#env-pgid) 재매핑이 시작 시 `/etc/passwd`와 `/etc/group`에 쓰기 때문입니다. PUID/PGID 대신 Docker의 `--user` 플래그나 Kubernetes `runAsUser`를 사용한다면 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있습니다. 읽기 전용 루트에서 PUID나 PGID를 999가 아닌 값으로 설정하면, 컨테이너는 /data에 이미 있는 어떤 항목의 소유자도 바꾸기 전에 시작 단계에서 그 사실을 알리는 메시지와 함께 중지됩니다. 올인원 이미지도 PUID와 PGID를 설정하지 않았다면 읽기 전용 루트로 실행할 수 있습니다. 다만 /run과 /tmp가 tmpfs 마운트여야 하고 /run에서 exec이 허용되어야 합니다. s6-overlay가 그곳에서 감독 프로세스를 시작하기 때문입니다.
 
 ## 네트워크 격리 {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose 시크릿(Swarm 없이)을 사용하려면 Compose v2.23 이상�
 
 ## Kubernetes 배포 {#kubernetes-deployment}
 
-엔트리포인트는 컨테이너가 이미 비루트로 실행 중인 것을 감지하면(예: Kubernetes `runAsUser`를 통해) gosu 권한 전환을 자동으로 건너뜁니다. 이 경우 마운트된 볼륨의 소유권을 직접 변경할 수 없으므로, 쓰기 가능한지 확인하고 그렇지 않으면 실행 가능한 안내와 함께 일찍 종료합니다. `fsGroup`와 외부 UID 구성(TrueNAS, OpenShift)은 [스토리지 권한](/ko/guide/deployment#storage-permissions)을 참고하세요.
+엔트리포인트는 컨테이너가 이미 비루트로 실행 중인 것을 감지하면(예: Kubernetes `runAsUser`를 통해) gosu 권한 전환을 자동으로 건너뜁니다. 이 경우 마운트된 볼륨의 소유권을 직접 변경할 수 없으므로, 쓰기 가능한지 확인하고 그렇지 않으면 실행 가능한 안내와 함께 일찍 종료합니다. [스토리지 권한](/ko/guide/deployment#storage-permissions)에서 `fsGroup`와 외부 UID 구성(TrueNAS, OpenShift)을 확인하세요.
 
 **권장 Pod SecurityContext:**
 

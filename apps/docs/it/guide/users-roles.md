@@ -1,8 +1,8 @@
 ---
 description: "Gestisci utenti, ruoli integrati e personalizzati, permessi, chiavi API, team, sessioni e il log di audit in SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: c8c63a327ad8
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 914aa0bc6276
 i18n_hash_version: 2
 ---
 
@@ -83,7 +83,7 @@ Tutti e 17 i permessi. Controllo completo sull'istanza.
 | `pipelines:all` | Visualizzare e gestire le pipeline di tutti gli utenti |
 | `settings:read` | Visualizzare le impostazioni dell'istanza |
 | `settings:write` | Modificare le impostazioni dell'istanza |
-| `users:manage` | Crea e gestisci gli account utente entro i limiti di autorità dell'attore |
+| `users:manage` | Creare e gestire gli account utente entro i limiti di autorità dell'attore |
 | `teams:manage` | Creare, aggiornare ed eliminare team |
 | `features:manage` | Installare e gestire i bundle di funzionalità AI |
 | `system:health` | Accedere agli endpoint di salute e prontezza |
@@ -119,7 +119,7 @@ Tutte le 17 autorizzazioni possono essere delegate tramite ruoli personalizzati,
 - Le autorizzazioni del target devono essere contenute nelle autorizzazioni **effettive** dell'attore. Una chiave API con ambito pertanto non può esercitare le autorizzazioni omesse dal suo ambito.
 - L'accesso allo strumento di un ruolo target deve essere contenuto dall'accesso allo strumento stesso dell'attore.
 - Un account disabilitato viene confrontato con il suo ruolo originale quando tale ruolo viene registrato come `disabled:<original-role>`.
-- L'eliminazione di un ruolo personalizzato richiede anche l'autorizzazione per assegnare il fallback `user` integrato; i membri disabili rimangono disabilitati come `disabled:user`.
+- L'eliminazione di un ruolo personalizzato richiede anche l'autorizzazione per assegnare il fallback `user` integrato; i membri disabilitati rimangono disabilitati come `disabled:user`.
 
 Le credenziali globali e la configurazione sono più rigorose: l'emissione o la revoca del token SCIM e l'importazione della configurazione dell'istanza richiedono il ruolo `admin` integrato con completa autorità di amministrazione effettiva.
 
@@ -147,7 +147,16 @@ Quando è impostata la modalità `tool` ma la funzionalità enterprise non è di
 
 ### Eliminazione di un ruolo personalizzato {#deleting-a-custom-role}
 
-Quando un ruolo personalizzato viene eliminato, tutti gli utenti ad esso assegnati vengono automaticamente riassegnati al ruolo `user`.
+Quando un ruolo personalizzato viene eliminato, tutti gli utenti ad esso assegnati vengono automaticamente riassegnati al ruolo `user` integrato. I membri disabilitati rimangono disabilitati come `disabled:user`. La finestra delle impostazioni lo indica nella conferma di eliminazione, insieme al numero di utenti che verranno spostati.
+
+La risposta `DELETE /api/v1/roles/{id}` elenca gli utenti che sono stati spostati e la voce di audit `ROLE_DELETED` registra lo stesso elenco in `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Team {#teams}
 

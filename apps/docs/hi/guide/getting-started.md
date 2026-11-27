@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter को Docker के साथ एक ही कमांड में इंस्टॉल करें, साइन इन करें और अपना पहला tool खोलें। इसमें GPU acceleration, छोटी मशीनें, Docker Compose और source से build शामिल हैं।"
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 8899ab6fa908
+i18n_output_hash: 50b72d883703
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Raspberry Pi, पुराने laptop, या छोटे VPS पर एक �
 :::
 
 ::: tip गुमनाम Product Analytics
-SnapOtter में डिफ़ॉल्ट रूप से गुमनाम product analytics शामिल हैं। इसे बंद करने के लिए **Settings → System → Privacy** खोलें और **Anonymous Product Analytics** बंद करें। यह पूरे instance के लिए तुरंत बंद हो जाता है।
+SnapOtter में गुमनाम product analytics शामिल हैं। नया instance पहले रन पर अपने एडमिन से पूछता है और जवाब मिलने तक कुछ नहीं भेजता। इसे बाद में बंद करने के लिए **Settings → System → Privacy** खोलें और **Anonymous Product Analytics** बंद करें। यह पूरे instance के लिए तुरंत बंद हो जाता है।
 
 आप environment variable `SNAPOTTER_TELEMETRY=0` भी सेट कर सकते हैं (`false` और `off` भी काम करते हैं), जिससे बिना rebuild के instance की सारी telemetry बंद हो जाती है।
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modality | संख्या | उदाहरण Tools |
 |----------|-------|---------------|
-| **Image** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
+| **Image** | 114 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, format presets |
 | **Video** | 63 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, format presets |
 | **Audio** | 57 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, format presets |
 | **PDF / Document** | 37 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **Files** | 25 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| **Files** | 32 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON, Convert Font, Proportion Calculator, Base64, format presets |
 
 ### Pipelines {#pipelines}
 

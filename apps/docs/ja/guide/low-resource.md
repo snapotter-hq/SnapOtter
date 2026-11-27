@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: d5137b522771
+i18n_output_hash: 92de5d21620e
 i18n_hash_version: 2
 ---
 # 低リソース環境のセットアップ {#low-resource-setups}
@@ -88,11 +88,12 @@ Pi クラスのマシンに関する注意点:
 |---|---|---|
 | [`CONCURRENT_JOBS`](/ja/guide/configuration#env-concurrent-jobs) | `1` | 並列で実行するジョブの数。自動検出では CPU コア数から 1 を引いた値を使います。大きなマシンでは問題ありませんが、メモリに余裕のない 2 コアのマシンでは過剰です。 |
 | [`MAX_WORKER_THREADS`](/ja/guide/configuration#env-max-worker-threads) | `2` | 画像処理のスレッドプール。 |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/ja/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | 最後のリクエストの後、AI の Python プロセスと OCR ランタイムがロードされたままになる時間。ウォーム状態では 1 から 2 GB を保持するため、この時間を短くするとメモリが早く戻ります。代わりに、次の AI 呼び出しが数秒遅くなります。プロセスが終了するとキャッシュされたモデルも破棄されるため、[`AI_SESSION_IDLE_TIMEOUT`](/ja/guide/configuration#env-ai-session-idle-timeout) も下げてください。 |
 | [`MAX_BATCH_SIZE`](/ja/guide/configuration#env-max-batch-size) | `5` | 1 から 2 GB のマシンでは、まずバッチでメモリが不足します。 |
 | [`MAX_UPLOAD_SIZE_MB`](/ja/guide/configuration#env-max-upload-size-mb) | `100` | 巨大なファイル 1 つがワークスペース全体を占有するのを防ぎます。 |
-| [`MAX_MEGAPIXELS`](/ja/guide/configuration#env-max-megapixels) | `50` | 100 MP を超える画像のデコードは、ファイルサイズにかかわらず RAM を消費します。 |
+| [`MAX_MEGAPIXELS`](/ja/guide/configuration#env-max-megapixels) | `50` | 100 MP を超える画像のデコードは、ファイルサイズにかかわらず RAM を消費します。約 268 MP を超える画像は、`0` でも拒否されます。 |
 | [`MAX_VIDEO_DURATION_S`](/ja/guide/configuration#env-max-video-duration-s) | `300` | 長時間のトランスコードは、小さな CPU を数分から数時間占有します。 |
-| [`PROCESSING_TIMEOUT_S`](/ja/guide/configuration#env-processing-timeout-s) | `600` | 暴走したジョブがいずれマシンを解放するための厳格な上限。 |
+| [`JOB_TIMEOUT_LONG_S`](/ja/guide/configuration#env-job-timeout-long-s) | `3600` | AI とメディアのジョブに対する厳格な上限。暴走したジョブがいずれマシンを解放します。デフォルトは 2 時間です。画像とドキュメントのジョブは、すでに [`JOB_TIMEOUT_FAST_S`](/ja/guide/configuration#env-job-timeout-fast-s)（デフォルトでは 120 秒）で停止します。 |
 
 これらの上限はサーバーが受け付ける内容に適用されます。できるだけ小さくするのではなく、実際の使い方に合わせて設定してください。動画をまったく使わないなら `MAX_VIDEO_DURATION_S` の上限は問題になりませんが、毎日ドキュメントをスキャンするなら [`MAX_PDF_PAGES`](/ja/guide/configuration#env-max-pdf-pages) に上限を設けないでください。
 

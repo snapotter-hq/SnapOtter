@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 0a95c6135c4b
+i18n_output_hash: f66510244d65
 i18n_hash_version: 2
 ---
 # Configuraciones de bajos recursos {#low-resource-setups}
@@ -88,11 +88,12 @@ Todos los topes son variables de entorno, documentadas por completo en [Configur
 |---|---|---|
 | [`CONCURRENT_JOBS`](/es/guide/configuration#env-concurrent-jobs) | `1` | Cuántos trabajos se ejecutan en paralelo. La detección automática usa los núcleos de CPU menos uno, lo cual está bien en máquinas grandes y es demasiado ambicioso en un equipo de 2 núcleos con presión de memoria. |
 | [`MAX_WORKER_THREADS`](/es/guide/configuration#env-max-worker-threads) | `2` | Pool de hilos de procesamiento de imágenes. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/es/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Cuánto tiempo permanecen cargados el proceso de Python de IA y el runtime de OCR tras la última solicitud. Ocupan de 1 a 2 GB mientras están activos, así que una ventana más corta devuelve la memoria antes, a costa de unos segundos en la siguiente llamada de IA. Reduzca también [`AI_SESSION_IDLE_TIMEOUT`](/es/guide/configuration#env-ai-session-idle-timeout), ya que al terminar el proceso se descartan los modelos en caché. |
 | [`MAX_BATCH_SIZE`](/es/guide/configuration#env-max-batch-size) | `5` | Los lotes son lo primero que agota la memoria en máquinas de 1 a 2 GB. |
 | [`MAX_UPLOAD_SIZE_MB`](/es/guide/configuration#env-max-upload-size-mb) | `100` | Evita que un único archivo enorme ocupe todo el espacio de trabajo. |
-| [`MAX_MEGAPIXELS`](/es/guide/configuration#env-max-megapixels) | `50` | Decodificar una imagen de más de 100 MP consume RAM sea cual sea el tamaño del archivo. |
+| [`MAX_MEGAPIXELS`](/es/guide/configuration#env-max-megapixels) | `50` | Decodificar una imagen de más de 100 MP consume RAM sea cual sea el tamaño del archivo. Las imágenes de más de unos 268 MP se rechazan incluso con `0`. |
 | [`MAX_VIDEO_DURATION_S`](/es/guide/configuration#env-max-video-duration-s) | `300` | Las transcodificaciones largas monopolizan una CPU pequeña durante minutos u horas. |
-| [`PROCESSING_TIMEOUT_S`](/es/guide/configuration#env-processing-timeout-s) | `600` | Límite máximo para que un trabajo descontrolado acabe liberando la máquina. |
+| [`JOB_TIMEOUT_LONG_S`](/es/guide/configuration#env-job-timeout-long-s) | `3600` | Límite máximo para los trabajos de IA y multimedia, de modo que un trabajo descontrolado acabe liberando la máquina. El valor predeterminado es de dos horas. Los trabajos de imagen y documentos ya se detienen en [`JOB_TIMEOUT_FAST_S`](/es/guide/configuration#env-job-timeout-fast-s) (120 segundos de forma predeterminada). |
 
 Estos topes se aplican a lo que acepta el servidor, así que ajústelos a lo que realmente utiliza en lugar de hacerlos lo más pequeños posible. Si nunca usa vídeo, un tope de `MAX_VIDEO_DURATION_S` no cuesta nada; si escanea documentos a diario, no limite [`MAX_PDF_PAGES`](/es/guide/configuration#env-max-pdf-pages).
 

@@ -1,8 +1,8 @@
 ---
 description: "Varsayılan değerleriyle tüm SnapOtter ortam değişkenleri. Kimlik doğrulamayı, depolamayı, AI modellerini, analitiği ve daha fazlasını yapılandırın."
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: c91113b45737
+i18n_output_hash: 52e3eb4f1b46
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Tüm yapılandırma ortam değişkenleri üzerinden yapılır. Her değişkenin 
 | `HOST` | `0.0.0.0` | Sunucunun dinlediği IP adresi. Bir köprü (bridge) ağında (`docker run` ve Compose için varsayılan) `0.0.0.0` (veya `::`) değerini koruyun; aksi halde yayımlanan portlar çalışmaz hale gelir. Doğrudan (native) bir kurulumda veya ana makine ağındaki bir konteynerde `127.0.0.1`, API'yi ağın dışında tutar; uzaktan erişim için önüne bir ters vekil sunucu (reverse proxy) koyun. [Gömülü mod](#embedded-mode) yalnızca `0.0.0.0`, `::` veya `127.0.0.1` ile çalışır, çünkü başlangıç denetimi `127.0.0.1` adresini çağırır. Başka herhangi bir adresle, `::1` dahil, konteyner hiçbir zaman başlamış sayılmaz ve sonradan yaşanan bir çökme, sunucuyu yeniden başlatmak yerine konteyneri durdurur. IP adresi olmayan her değer, `localhost` dahil, sunucuyu başlangıçta durdurur. |
 | `BASE_PATH` | (boş) | Genel dağıtım yolu, örn. `/snapotter`. Boş bırakılırsa veya `/` verilirse alan adının kökünden sunulur. Çalışma zamanında uygulanır; imajın yeniden derlenmesi gerekmez. |
 | `RATE_LIMIT_PER_MIN` | `1000` | IP başına dakikadaki en fazla istek sayısı. Hız sınırlamasını kapatmak için 0 yapın. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | API anahtarı yönetim uç noktalarına (listeleme, oluşturma, iptal) IP başına dakikadaki en fazla istek sayısı. Araç çağrılarında kullanılan anahtarlar bundan etkilenmez. Sınırsız değer yoktur: `0`, bu uç noktalara gelen her isteği reddeder. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | API anahtarı yönetim uç noktalarına (listeleme, oluşturma, iptal) IP başına dakikadaki en fazla istek sayısı. Araç çağrılarında kullanılan anahtarlar bundan etkilenmez. Sınır olmaması için `0` yapın. |
 | `CORS_ORIGIN` | (boş) | CORS için izin verilen kaynakların virgülle ayrılmış listesi. Boşsa yalnızca aynı kaynağa izin verilir. |
 | `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi. Şunlardan biri: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Hangi eşlerin istemci IP'sini `X-Forwarded-For` üzerinden ayarlayabileceği. Varsayılan değer yalnızca özel ağdaki bir eşe güvenir; böylece Docker ağındaki veya LAN'daki bir ters vekil sunucu (reverse proxy) güvenilir sayılır, genel ağdaki bir istemcinin taklit ettiği başlık ise sayılmaz. `true` değerini yalnızca önünüzde, genel bir adreste kontrol ettiğiniz bir vekil sunucu varsa ayarlayın. |
@@ -38,7 +38,7 @@ Aşağıdaki iki boolean değişken yalnızca `true` ve `false` değerlerini kab
 | `MAX_USERS` | `0` (sınırsız) | Kayıtlı kullanıcı hesaplarının en fazla sayısı. Sınırsız için 0 yapın. |
 | `SESSION_DURATION_HOURS` | `168` | Oturum ömrü, saat cinsinden (varsayılan 7 gündür). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | İlk oturum açmadaki zorunlu parola değiştirme istemini atlamak için `true` yapın. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | IP başına dakikadaki en fazla oturum açma isteği. Dakika dolana kadar sonraki denemeler `429` alır. Tek bir kullanıcı adı için tekrarlanan başarısız denemeler genellikle önce `LOGIN_THROTTLE_MAX_FAILURES` sınırına takılır. Bir yönetici bunu Settings > System altında değiştirebilir. Sınırsız değer yoktur: `0`, her oturum açma isteğini reddeder. Kaynaktan derlemede değer 10 ile başlar. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | IP başına dakikadaki en fazla oturum açma isteği. Dakika dolana kadar sonraki denemeler `429` alır. Tek bir kullanıcı adı için tekrarlanan başarısız denemeler genellikle önce `LOGIN_THROTTLE_MAX_FAILURES` sınırına takılır. Bir yönetici bunu Settings > System altında değiştirebilir. Sınır olmaması için `0` yapın. Kaynaktan derlemede değer 10 ile başlar. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Bir kullanıcı adının `LOGIN_THROTTLE_WINDOW_S` süresi içinde yapabileceği başarısız parola ile oturum açma sayısı; bu sayıdan sonra, hangi IP'den gelirse gelsin, o kullanıcı adı için yapılan denemeler `429` alır. En eski başarısız denemeler pencereden çıktıkça tekrar izin verilir. Kısıtlamayı kapatmak için 0 yapın. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Bu pencerenin uzunluğu, saniye cinsinden. En az 1 olmalıdır; sunucu 0 değeriyle başlamayı reddeder. |
 
@@ -47,9 +47,9 @@ Aşağıdaki iki boolean değişken yalnızca `true` ve `false` değerlerini kab
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` veya `s3`. S3 ve MinIO, s3_storage özelliğini içeren bir lisansın yanı sıra aşağıdaki `S3_*` değişkenlerini gerektirir. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL bağlantı dizesi ve her isteğin sunulduğu bağlantı. 2.3.0 ve sonrasında `DATABASE_MIGRATION_URL` değerini de ayarlayın; bu durumda bu bağlantı, uygulamanın tabloları üzerinde yalnızca DML yetkisine sahip olan en düşük yetkili çalışma zamanı rolü olur. Compose yığını bunu `postgres` servisine yönlendirir; gömülü modu kullanmak için bunu (`REDIS_URL` ile birlikte) ayarlamadan bırakın. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL bağlantı dizesi ve her isteğin sunulduğu bağlantı. 2.3.0 ve sonrasında `DATABASE_MIGRATION_URL` değerini de ayarlayın; bu durumda bu bağlantı, uygulamanın tabloları üzerinde yalnızca DML yetkisine sahip olan en düşük yetkili çalışma zamanı rolü olur. Compose yığını bunu `postgres` servisine yönlendirir; gömülü modu kullanmak için bunu (`REDIS_URL` ile birlikte) ayarlamadan bırakın. Bir unix soketi üzerinden bağlanmak için soket dizinini `host` içinde, `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql` örneğindeki gibi belirtin ve o dizini konteynere bağlayın. |
 | `DATABASE_MIGRATION_URL` | (boş) | Yalnızca açılış sırasında, migrasyonları çalıştırmak ve çalışma zamanı rolüne yetki vermek için kullanılan, ilk istekten önce kapatılan yetkili bağlantı. Boş bırakırsanız SnapOtter tek rolle çalışır ve her iki işi de `DATABASE_URL` yapar. Bkz. [En düşük yetkili roller](/tr/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis bağlantı dizesi (BullMQ iş kuyrukları için kullanılır). Compose bunu `redis` servisine yönlendirir. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis bağlantı dizesi (BullMQ iş kuyrukları için kullanılır). Compose bunu `redis` servisine yönlendirir. Bir unix soketi için `unix:///run/redis/redis.sock?db=5` kullanın (Redis parola istiyorsa `&password=...` ekleyin) ve soketi konteynere bağlayın. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | İşleme sırasında geçici dosyalar için dizin. Otomatik olarak temizlenir. İmaj `/tmp/workspace` değerini ayarlar. |
 | `FILES_STORAGE_PATH` | `./data/files` | Kalıcı kullanıcı dosyaları (yüklenen görseller, kaydedilen sonuçlar) için dizin. İmaj `/data/files` değerini ayarlar. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Her kullanıcının Dosyalar kitaplığında tutabileceği veri miktarı sınırı, megabayt cinsinden. Sınırı aşacak bir kayıt, kullanılan miktar ve sınırla birlikte reddedilir. Kullanıcıya tanımlanan bir kota bu değerin yerine geçer. Sınırsız için 0 yapın. |
@@ -65,7 +65,7 @@ Yalnızca `STORAGE_MODE=s3` olduğunda okunur. Zorunlu üç değişkenden biri e
 | `S3_SECRET_ACCESS_KEY` | (boş) | Gizli anahtar. Zorunlu. Aynı dosya kuralı geçerlidir: `S3_SECRET_ACCESS_KEY_FILE`. |
 | `S3_REGION` | `us-east-1` | Bucket bölgesi. |
 | `S3_ENDPOINT` | (boş) | MinIO, R2, Backblaze ve diğer S3 uyumlu depolar için özel uç nokta. Boşsa AWS kullanılır. |
-| `S3_FORCE_PATH_STYLE` | `false` | MinIO ve sanal ana makine adresleme yerine `endpoint/bucket/key` isteyen her şey için `true` yapın. |
+| `S3_FORCE_PATH_STYLE` | `false` | `true` yapın; MinIO ve sanal ana makine adresleme yerine `endpoint/bucket/key` isteyen her şey için geçerlidir. |
 | `S3_PREFIX` | (boş) | Anahtar öneki; böylece tek bir bucket birden fazla örneği barındırabilir. |
 
 ### Hareketsiz durumda şifreleme {#encryption-at-rest}
@@ -100,11 +100,11 @@ Telemetri notu: gömülü mod, diğer tüm yapılandırmalar gibi imajın analit
 | `MAX_UPLOAD_SIZE_MB` | `0` (sınırsız) | Yükleme başına en büyük dosya boyutu, megabayt cinsinden. Sınırsız için 0 yapın. Yayımlanan imaj `0` ile gelir; kaynaktan derlemede değer 100 ile başlar. |
 | `MAX_BATCH_SIZE` | `0` (sınırsız) | Tek bir toplu istekteki en fazla dosya sayısı. Sınırsız için 0 yapın. Yayımlanan imaj `0` ile gelir; kaynaktan derlemede değer 100 ile başlar. |
 | `CONCURRENT_JOBS` | `0` (otomatik) | Paralel çalışan toplu iş sayısı. Kullanılabilir CPU çekirdeklerine göre otomatik algılamak için 0 yapın. |
-| `MAX_MEGAPIXELS` | `0` (sınırsız) | İzin verilen en yüksek görsel çözünürlüğü, megapiksel cinsinden. Sınırsız için 0 yapın. |
+| `MAX_MEGAPIXELS` | `0` (uygulama sınırı yok) | İzin verilen en yüksek görsel çözünürlük, megapiksel cinsinden. SnapOtter'ın kendi sınırını kaldırmak için 0 yapın. Görsel kod çözücü yine de yaklaşık 268 MP (16383 x 16383 piksel) üzerindeki her şeyi reddeder; bu yüzden 268'in üzerinde bir değerin ek bir etkisi olmaz. |
 | `MAX_CPU_UPSCALE_MP` | `4` | GPU'su olmayan bir ana makinede yapay zekâ ile büyütmenin kabul ettiği en büyük girdi, megapiksel cinsinden. Büyütülmüş çıktı da bu değerin 16 katıyla sınırlanır (varsayılan olarak 64 MP); bu yüzden yüksek bir ölçek çarpanı girdi sınırını daha da düşürür. Daha büyük bir görsel, büyütmeden önce sığacak şekilde küçültülür; bu işlem sonucu özgün görselden büyük yapmayacaksa istek bunun yerine reddedilir. Lanczos girdi sınırını atlar ama çıktı sınırını atlamaz. Sınırsız için 0 yapın; bu çok fazla RAM gerektirir: RealESRGAN içeride her zaman 4x bir tampon oluşturur. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (sınırsız) | Çalışma alanındaki yüklemelerin ve saklanan sonuçların toplam boyutu için sınır, GB cinsinden. Sınır aşıldığında, dosyalar `FILE_MAX_AGE_HOURS` sonunda silinene kadar yüklemeler ve araç istekleri 503 alır. Sınırsız için 0 yapın; yerel depolama, diskte 0,5 GB'tan az boş alan kaldığında yine de yazmaları 503 ile reddeder. Yayımlanan imaj `0` ile gelir; kaynaktan derlemede değer 10 ile başlar. |
 | `MAX_WORKER_THREADS` | `0` (otomatik) | Görsel işleme için en fazla worker thread sayısı. Kullanılabilir CPU çekirdeklerine göre otomatik algılamak için 0 yapın. |
-| `PROCESSING_TIMEOUT_S` | `0` (sınır yok) | AI araçlarını çalıştıran Python sidecar'a yapılan her çağrı için zaman aşımı, saniye cinsinden. Zaman aşımı olmaması için 0 yapın. Görsel, PDF veya medya işlerini sınırlamaz; bunu `JOB_TIMEOUT_FAST_S` ve `JOB_TIMEOUT_LONG_S` yapar. |
+| `PROCESSING_TIMEOUT_S` | `0` (sınır yok) | AI araçlarını çalıştıran Python sidecar'a yapılan her çağrı için zaman aşımı, saniye cinsinden. Sınır olmaması için 0 yapın. Görsel, PDF veya medya işlerini sınırlamaz; bunu `JOB_TIMEOUT_FAST_S` ve `JOB_TIMEOUT_LONG_S` yapar. |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Python AI sidecar'ının ve doğru OCR çalışma zamanının, kapanıp belleklerini serbest bırakmadan önce boşta bekledikleri saniye sayısı (ısındıktan sonra yaklaşık 1,3 GB ve 0,7 GB). İkisi de bir sonraki istekte yeniden başlar; bu yüzden boşta kapanmanın ardından yapılan ilk AI çağrısı, birkaç saniyelik kitaplık başlatma maliyetini öder. Çalışır durumda tutmak için 0 yapın. Varsayılan değer `AI_SESSION_IDLE_TIMEOUT` ile aynıdır; böylece yüklenen modeller o ayarın belirttiğinden daha erken bırakılmaz. `AI_SESSION_IDLE_TIMEOUT` değerini artırırsanız bunu da aynı değere artırın. |
 | `AI_SESSION_IDLE_TIMEOUT` | `0` (otomatik) | Yüklenmiş bir yapay zekâ modelinin son kullanımından sonra sidecar'da önbellekte kalacağı süre, saniye cinsinden. Otomatik değer 600'dür. Python sidecar tarafından okunur; sidecar, `AI_SIDECAR_IDLE_TIMEOUT` sonunda kapandığında önbelleğe alınmış tüm modelleri de bırakır. |
 | `AI_SESSION_CACHE_BYTES` | `0` (otomatik) | Önbelleğe alınan yapay zekâ modelleri için bellek bütçesi, bayt cinsinden. Otomatik değer GPU belleğinin %40'ıdır; yalnızca CPU kullanan bir ana makinede hiç önbellekleme yapılmaz. Modelleri RAM'de önbelleğe almak için bunu bir CPU ana makinesinde ayarlayın; bir GPU ana makinesinde önbelleklemeyi kapatmak için 1 yapın. Python sidecar tarafından okunur. |
@@ -121,9 +121,9 @@ Telemetri notu: gömülü mod, diğer tüm yapılandırmalar gibi imajın analit
 | `MAX_AUDIO_DURATION_S` | `0` (sınırsız) | Aynısı, ses araçları için. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (sınırsız) | Video araçlarının kabul ettiği en yüksek toplam bit hızı, saniyedeki kilobit cinsinden. Sınırsız için 0 yapın. |
 | `PREVIEW_TIMEOUT_S` | `300` | Bir video veya ses dosyasının tarayıcı içi önizleme klibini kodlamak için zaman sınırı, saniye cinsinden. Belge önizlemeleri bunun yerine `LIBREOFFICE_TIMEOUT_S` kullanır. Sınır olmaması için 0 yapın. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Tek bir LibreOffice dönüştürmesi için zaman sınırı (Word, Excel ve PowerPoint'ten PDF'ye, belge dönüştürücüleri ve belge önizlemeleri), saniye cinsinden. `0` burada sınırsız anlamına gelmez; 120 değerine döner. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Tek bir LibreOffice dönüştürmesi için zaman sınırı (Word, Excel ve PowerPoint'ten PDF'ye, belge dönüştürücüleri ve belge önizlemeleri), saniye cinsinden. Sınır olmaması için `0` yapın. |
 | `GIF_BG_MAX_FRAMES` | `150` | GIF Arka Planını Kaldır aracının tek bir animasyonda kabul ettiği en fazla kare sayısı. Daha uzun animasyonlar, kare sayısını belirten bir `400` alır. Kare sınırı olmaması için 0 yapın; ayrı bir piksel bütçesi yine de geçerlidir. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (kapalı) | Medya ve belge motorlarının başlattığı her ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc ve pdfcpu işlemi için adres alanı sınırı, megabayt cinsinden. Yüklenen görselleri okuyan kod çözücüler (ImageMagick, exiftool ve bunların ffmpeg yedeği) sınırlanmaz. Sınırı aşan bir işlem, tüm konteyneri bellek yetersizliği (OOM) sonlandırıcısına sürüklemek yerine sonlandırılır. Bu, fiziksel belleği değil sanal belleği sınırlar; bu yüzden pay bırakın. Yapay zekâ sidecar'ı hiçbir zaman sınırlanmaz. Kapatmak ve konteyner bellek sınırına güvenmek için 0 yapın. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (kapalı) | Şu yardımcı işlemlerin her biri için adres alanı sınırı, megabayt cinsinden: medya ve belge motorlarındaki ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc ve pdfcpu; ayrıca görseller için exiftool, HEIF, JPEG XL ve JPEG 2000 kod çözücüleri ve kodlayıcıları, RAW kod çözücüsü ve ffmpeg yedek kod çözücüsü. ImageMagick'in kendi bellek sınırları olduğu için sınırlanmaz; yapay zekâ sidecar'ı da sınırlanmaz. Sınırı aşan bir işlem, tüm konteyneri bellek yetersizliği (OOM) sonlandırıcısına sürüklemek yerine sonlandırılır. Bu, fiziksel belleği değil sanal belleği sınırlar; bu yüzden bir işlemin gerçekte kullandığının epey üzerinde bir değer verin. En çok belleği JPEG XL kodlayıcı ister: 24 MP'lik bir görsel yaklaşık 1,8 GB gerektirdi ve 1 GB'ta başarısız oldu; daha fazla iş parçacığı veya CPU bunu pek değiştirmez. Sınır ayarlıyken HEIF kodlayıcı iki worker thread ile sınırlanır; bu, 24 MP'lik bir kodlamayı daha yavaş kodlama pahasına yaklaşık 0,8 GB'a indirir. `2048` ile başlayın ve yalnızca en büyük dosyalarınızı test ettikten sonra düşürün. Kapatmak ve konteyner bellek sınırına güvenmek için 0 yapın. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Bir araç isteğinin taşıyabileceği en büyük `settings` alanı, kilobayt cinsinden ve UTF-8 bayt olarak sayılır. Sınırı aşan istekler `400` alır. Sınır olmaması için 0 yapın. Gerçek araç ayarları 64 KB'tan çok daha küçüktür; bu yüzden bunu yalnızca bir istemci alışılmadık derecede büyük ayarlar gönderiyorsa artırın. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Altyazı Yak ve Altyazı Göm araçlarının kabul ettiği en büyük altyazı dosyası (`.srt`, `.vtt`, `.ass`), megabayt cinsinden. Daha büyük dosyalar, dosya boyutunu ve sınırı belirten bir `400` alır. Sınır olmaması için 0 yapın. Uzun metrajlı bir film altyazı dosyası genellikle 1 MB'ın çok altındadır. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Meta Verileri Düzenle aracının tek bir etikete (sanatçı, açıklama, anahtar sözcükler vb.) yazdığı en uzun değer, karakter cinsinden. Daha uzun değerler, etiketi ve sınırı belirten bir `400` alır. Sınır olmaması için 0 yapın. Uzun başlıklar veya açıklamalar saklıyorsanız artırın. Bir etiket değerinin ayrıca `MAX_SETTINGS_PAYLOAD_KB` ve işletim sisteminin argüman başına sınırı (Linux'ta 128 KB) içine sığması gerekir. |
@@ -157,7 +157,12 @@ Yayımlanan Compose dosyaları bunların hepsini `.env` dosyasından aktarır, b
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Temizlik işinin ne sıklıkta çalıştığı. |
 | `JOBS_RETENTION_DAYS` | `30` | Tamamlanmış bir iş kaydının (tamamlanan, başarısız olan veya iptal edilen) her 6 saatte bir çalışan saklama taraması onu silmeden önce tutulduğu gün sayısı. Bir yönetici bunu Settings > System altında değiştirebilir. Yasal tutma altındaki kullanıcılar ve ekipler kayıtlarını korur. Sonsuza kadar saklamak için 0 yapın. |
 | `AUDIT_RETENTION_DAYS` | `0` (süresiz) | Denetim günlüğü girdilerinin tutulduğu gün sayısı. Aynı değiştirme ve yasal tutma kuralları geçerlidir. Kurcalamaya dayanıklı denetim günlüğü açıkken hiçbir şey silinmez. Sonsuza kadar saklamak için 0 yapın. |
-| `SNAPOTTER_LICENSE_KEY` | (boş) | SAML, SCIM ve S3 depolama gibi kurumsal özelliklerin kilidini açan lisans anahtarı. Başlangıçta okunur, bu yüzden değiştirdikten sonra yeniden başlatın. Geçersiz veya süresi dolmuş bir anahtar uyarı günlüğüne yazılır ve sunucu bu özellikler olmadan çalışır. Konteynerde bunun yerine `SNAPOTTER_LICENSE_KEY_FILE` ile bağlayabilirsiniz ([Docker secrets](/guide/security#docker-secrets) bölümüne bakın). |
+
+### Kurumsal lisans {#enterprise-license}
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (boş) | SAML, SCIM ve S3 depolama gibi kurumsal özelliklerin kilidini açan lisans anahtarı. Başlangıçta okunur, bu yüzden değiştirdikten sonra yeniden başlatın. Geçersiz veya süresi dolmuş bir anahtar uyarı günlüğüne yazılır ve sunucu bu özellikler olmadan çalışır. Konteynerde bunun yerine `SNAPOTTER_LICENSE_KEY_FILE` ile bağlayabilirsiniz ([Docker secrets](/tr/guide/security#docker-secrets) bölümüne bakın). |
 
 ### Görünüm {#appearance}
 
@@ -171,8 +176,8 @@ Yayımlanan Compose dosyaları bunların hepsini `.env` dosyasından aktarır, b
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `PUID` | `999` | Konteyner işlemini bu UID ile çalıştırır. Bind mount'lar için ana makinedeki kullanıcınızla eşleşecek şekilde ayarlayın (`id -u`). |
-| `PGID` | `999` | Konteyner işlemini bu GID ile çalıştırır. Bind mount'lar için ana makinedeki grubunuzla eşleşecek şekilde ayarlayın (`id -g`). |
+| `PUID` | `999` | Konteyner işlemini bu UID ile çalıştırır. Bind mount'lar için ana makinedeki kullanıcınızla eşleşecek şekilde ayarlayın (`id -u`). Yazılabilir bir kök dosya sistemi gerekir; [güvenlik rehberine](/tr/guide/security#why-read-only-is-not-set) bakın. |
+| `PGID` | `999` | Konteyner işlemini bu GID ile çalıştırır. Bind mount'lar için ana makinedeki grubunuzla eşleşecek şekilde ayarlayın (`id -g`). Yazılabilir bir kök dosya sistemi gerekir; [güvenlik rehberine](/tr/guide/security#why-read-only-is-not-set) bakın. |
 
 ## Docker örneği {#docker-example}
 
@@ -239,7 +244,7 @@ volumes:
 
 Docker Compose yığını dört birim kullanır:
 
-- `/data` (app) - AI modelleri, Python venv ve kullanıcı dosyaları. Yüklenen dosyaları ve kurulu AI paketlerini yeniden başlatmalar boyunca korumak için bunu bağlayın.
-- `/tmp/workspace` (app) - İşlenmekte olan dosyalar için geçici depolama. Geçici olabilir, ancak bağlamak konteynerin yazılabilir katmanının dolmasını önler.
-- `SnapOtter-pgdata` (postgres) - PostgreSQL veri dizini. Tüm ilişkisel veriler (kullanıcılar, ayarlar, pipeline'lar, işler, denetim günlüğü) burada tutulur. `pg_dump` veya birim anlık görüntüsü ile yedekleyin.
-- `SnapOtter-redisdata` (redis) - Kalıcı iş kuyrukları için Redis append-only dosyası.
+- `/data` (uygulama): AI modelleri, Python venv ve kullanıcı dosyaları. Yüklenen dosyaları ve kurulu AI paketlerini yeniden başlatmalar arasında korumak için bunu bağlayın.
+- `/tmp/workspace` (uygulama): İşlenen dosyalar için geçici depolama. Bu geçici olabilir, ancak bağlamak konteynerin yazılabilir katmanının dolmasını önler.
+- `SnapOtter-pgdata` (postgres): PostgreSQL veri dizini. Tüm ilişkisel verileri (kullanıcılar, ayarlar, pipeline'lar, işler, denetim günlüğü) tutar. `pg_dump` ile veya birim anlık görüntüsüyle yedekleyin.
+- `SnapOtter-redisdata` (redis): Dayanıklı iş kuyrukları için Redis append-only dosyası.

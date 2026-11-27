@@ -1,8 +1,8 @@
 ---
 description: "Toutes les variables d'environnement de SnapOtter avec leurs valeurs par défaut. Configurez l'authentification, le stockage, les modèles d'IA, l'analytique et plus encore."
-i18n_source_hash: 02edb8bd70e5
-i18n_provenance: human
-i18n_output_hash: 7d489cb62c1c
+i18n_source_hash: 8ff4e8d32091
+i18n_provenance: machine
+i18n_output_hash: e8189a77a370
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Toute la configuration se fait via des variables d'environnement. Chaque variabl
 | `HOST` | `0.0.0.0` | Adresse IP sur laquelle le serveur écoute. Sur un réseau bridge (le mode par défaut pour `docker run` et Compose), conservez `0.0.0.0` (ou `::`), sinon les ports publiés cessent de fonctionner. Sur une installation native ou dans un conteneur sur le réseau de l'hôte, `127.0.0.1` garde l'API hors du réseau ; placez un proxy inverse devant pour l'accès à distance. Le [mode intégré](#embedded-mode) ne fonctionne qu'avec `0.0.0.0`, `::` ou `127.0.0.1`, car sa vérification de démarrage appelle `127.0.0.1`. Avec toute autre adresse, `::1` compris, le conteneur n'est jamais considéré comme démarré, et un plantage ultérieur l'arrête au lieu de redémarrer le serveur. Tout ce qui n'est pas une adresse IP, `localhost` compris, arrête le serveur au démarrage. |
 | `BASE_PATH` | (vide) | Chemin de déploiement public, par ex. `/snapotter`. Vide ou `/` sert à la racine du domaine. Appliqué à l'exécution ; aucune reconstruction de l'image n'est nécessaire. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Nombre maximal de requêtes par minute par IP. Mettez 0 pour désactiver la limitation de débit. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Nombre maximal de requêtes par minute par IP vers les points de terminaison de gestion des clés d'API (lister, créer, révoquer). Les clés utilisées pour les appels d'outils ne sont pas concernées. Il n'existe pas de valeur illimitée : `0` refuse toutes les requêtes vers ces points de terminaison. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Nombre maximal de requêtes par minute par IP vers les points de terminaison de gestion des clés d'API (lister, créer, révoquer). Les clés utilisées pour les appels d'outils ne sont pas concernées. Mettez `0` pour aucune limite. |
 | `CORS_ORIGIN` | (vide) | Origines autorisées pour le CORS, séparées par des virgules, ou vide pour la même origine uniquement. |
 | `LOG_LEVEL` | `info` | Verbosité des journaux. L'une des valeurs : `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quels pairs peuvent définir l'IP du client via `X-Forwarded-For`. La valeur par défaut ne croit qu'un pair d'un réseau privé : un reverse proxy sur un réseau Docker ou sur un LAN est donc digne de confiance, alors que l'en-tête falsifié d'un client public ne l'est pas. Ne mettez `true` que lorsqu'un proxy que vous contrôlez se trouve devant, sur une adresse publique. |
@@ -38,7 +38,7 @@ Les deux booléens ci-dessous n'acceptent que `true` et `false`. Toute autre val
 | `MAX_USERS` | `0` (illimité) | Nombre maximal de comptes utilisateur enregistrés. Mettez 0 pour illimité. |
 | `SESSION_DURATION_HOURS` | `168` | Durée de vie de la session de connexion en heures (par défaut 7 jours). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Mettez `true` pour ignorer l'invite de changement de mot de passe forcé à la première connexion. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | Nombre maximal de requêtes de connexion par minute par IP. Les tentatives suivantes reçoivent un `429` jusqu'à la fin de la minute. Des échecs répétés pour un même nom d'utilisateur atteignent généralement `LOGIN_THROTTLE_MAX_FAILURES` en premier. Un admin peut le remplacer dans Paramètres > Système. Il n'existe pas de valeur illimitée : `0` refuse toutes les connexions. Une compilation depuis les sources démarre à 10. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Nombre maximal de requêtes de connexion par minute par IP. Les tentatives suivantes reçoivent un `429` jusqu'à la fin de la minute. Des échecs répétés pour un même nom d'utilisateur atteignent généralement `LOGIN_THROTTLE_MAX_FAILURES` en premier. Un admin peut le remplacer dans Paramètres > Système. Mettez `0` pour aucune limite. Une compilation depuis les sources démarre à 10. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Nombre de connexions par mot de passe échouées qu'un nom d'utilisateur peut avoir dans `LOGIN_THROTTLE_WINDOW_S` avant que les tentatives suivantes reçoivent un `429`, quelle que soit l'IP d'origine. Elles sont de nouveau acceptées à mesure que les échecs les plus anciens sortent de la fenêtre. Mettez 0 pour désactiver la limitation. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Durée de cette fenêtre, en secondes. Doit valoir au moins 1 ; le serveur refuse de démarrer avec 0. |
 
@@ -47,9 +47,9 @@ Les deux booléens ci-dessous n'acceptent que `true` et `false`. Toute autre val
 | Variable | Par défaut | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` ou `s3`. S3 et MinIO nécessitent une licence avec la fonctionnalité s3_storage, ainsi que les variables `S3_*` ci-dessous. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Chaîne de connexion PostgreSQL. C'est aussi la connexion sur laquelle chaque requête est servie. À partir de 2.3.0, définissez aussi `DATABASE_MIGRATION_URL` et celle-ci devient le rôle d'exécution à moindre privilège, qui ne détient que les droits DML sur les tables de l'application. La pile Compose la pointe vers son service `postgres` ; laissez-la non définie (avec `REDIS_URL`) pour obtenir le mode intégré. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Chaîne de connexion PostgreSQL. C'est aussi la connexion sur laquelle chaque requête est servie. À partir de 2.3.0, définissez aussi `DATABASE_MIGRATION_URL` et celle-ci devient le rôle d'exécution à moindre privilège, qui ne détient que les droits DML sur les tables de l'application. La pile Compose la pointe vers son service `postgres` ; laissez-la non définie (avec `REDIS_URL`) pour obtenir le mode intégré. Pour vous connecter via un socket unix, indiquez le répertoire du socket dans `host`, comme dans `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, et montez ce répertoire dans le conteneur. |
 | `DATABASE_MIGRATION_URL` | (vide) | Connexion privilégiée, utilisée uniquement au démarrage pour exécuter les migrations et accorder le rôle d'exécution, puis fermée avant la première requête. Laissez-la vide et SnapOtter fonctionne en rôle unique, `DATABASE_URL` assurant les deux tâches. Voir [Rôles à moindre privilège](/fr/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Chaîne de connexion Redis (utilisée pour les files d'attente de tâches BullMQ). Compose la pointe vers son service `redis`. |
+| `REDIS_URL` | `redis://localhost:6379` | Chaîne de connexion Redis (utilisée pour les files d'attente de tâches BullMQ). Compose la pointe vers son service `redis`. Pour un socket unix, utilisez `unix:///run/redis/redis.sock?db=5` (ajoutez `&password=...` si Redis en exige un) et montez le socket dans le conteneur. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Répertoire des fichiers temporaires pendant le traitement. Nettoyé automatiquement. L'image définit `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Répertoire des fichiers utilisateur persistants (images téléversées, résultats enregistrés). L'image définit `/data/files`. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Plafond en mégaoctets de ce que chaque utilisateur conserve dans la bibliothèque Fichiers. Un enregistrement qui le dépasserait est refusé, avec la quantité utilisée et la limite. Un quota défini sur l'utilisateur le remplace. Mettez 0 pour illimité. |
@@ -100,7 +100,7 @@ Note sur la télémétrie : le mode intégré hérite de la valeur d'analytique 
 | `MAX_UPLOAD_SIZE_MB` | `0` (illimité) | Taille maximale de fichier par téléversement en mégaoctets. Mettez 0 pour illimité. L'image publiée est livrée avec `0` ; une compilation depuis les sources démarre à 100. |
 | `MAX_BATCH_SIZE` | `0` (illimité) | Nombre maximal de fichiers dans une seule requête par lots. Mettez 0 pour illimité. L'image publiée est livrée avec `0` ; une compilation depuis les sources démarre à 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Nombre de tâches par lots exécutées en parallèle. Mettez 0 pour détecter automatiquement selon les cœurs CPU disponibles. |
-| `MAX_MEGAPIXELS` | `0` (illimité) | Résolution d'image maximale autorisée en mégapixels. Mettez 0 pour illimité. |
+| `MAX_MEGAPIXELS` | `0` (aucune limite de l'application) | Résolution d'image maximale autorisée en mégapixels. Mettez 0 pour supprimer la limite propre à SnapOtter. Le décodeur d'images refuse toujours tout ce qui dépasse environ 268 MP (16383 x 16383 pixels) : une valeur supérieure à 268 n'a donc aucun effet supplémentaire. |
 | `MAX_CPU_UPSCALE_MP` | `4` | Plus grande entrée, en mégapixels, que l'agrandissement par IA accepte sur un hôte sans GPU. La sortie agrandie est également plafonnée à 16 fois cette valeur (64 MP par défaut), si bien qu'un facteur d'échelle élevé abaisse encore la limite d'entrée. Une image plus grande est réduite pour tenir avant l'agrandissement ; si le résultat n'était alors pas plus grand que l'original, la requête est refusée. Lanczos ignore la limite d'entrée mais pas le plafond de sortie. Mettez 0 pour aucune limite, ce qui demande beaucoup de RAM : RealESRGAN construit toujours en interne un tampon 4x. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (illimité) | Plafond en Go de la taille cumulée des téléversements et des résultats stockés dans l'espace de travail. Une fois dépassé, les téléversements et les requêtes d'outils reçoivent un 503 jusqu'à l'expiration des fichiers après `FILE_MAX_AGE_HOURS`. Mettez 0 pour illimité ; le stockage local refuse toujours les écritures avec un 503 lorsqu'il reste moins de 0,5 Go libre sur le disque. L'image publiée est livrée avec `0` ; une compilation depuis les sources démarre à 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Nombre maximal de threads de travail pour le traitement d'images. Mettez 0 pour détecter automatiquement selon les cœurs CPU disponibles. |
@@ -121,9 +121,9 @@ Note sur la télémétrie : le mode intégré hérite de la valeur d'analytique 
 | `MAX_AUDIO_DURATION_S` | `0` (illimité) | Idem, pour les outils audio. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (illimité) | Débit global le plus élevé accepté par les outils vidéo, en kilobits par seconde. Mettez 0 pour illimité. |
 | `PREVIEW_TIMEOUT_S` | `300` | Délai maximal pour encoder un clip d'aperçu dans le navigateur d'un fichier vidéo ou audio, en secondes. Les aperçus de documents utilisent plutôt `LIBREOFFICE_TIMEOUT_S`. Mettez 0 pour aucune limite. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Délai maximal pour une conversion LibreOffice (Word, Excel et PowerPoint vers PDF, les convertisseurs de documents et les aperçus de documents), en secondes. `0` ne signifie pas illimité ici ; la valeur retombe à 120. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Délai maximal pour une conversion LibreOffice (Word, Excel et PowerPoint vers PDF, les convertisseurs de documents et les aperçus de documents), en secondes. Mettez `0` pour aucune limite. |
 | `GIF_BG_MAX_FRAMES` | `150` | Nombre maximal d'images que Supprimer l'arrière-plan d'un GIF accepte dans une animation. Les animations plus longues reçoivent un `400` qui indique le nombre d'images. Mettez 0 pour aucune limite d'images ; un budget de pixels distinct s'applique toujours. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (désactivé) | Plafond d'espace d'adressage, en mégaoctets, pour chaque processus ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc et pdfcpu lancé par les moteurs média et document. Les décodeurs qui lisent les images téléversées (ImageMagick, exiftool et leur repli sur ffmpeg) ne sont pas plafonnés. Un processus qui le dépasse est tué au lieu d'entraîner tout le conteneur vers le tueur de mémoire insuffisante. Il plafonne la mémoire virtuelle, pas la mémoire résidente, laissez donc de la marge. Le sidecar d'IA n'est jamais plafonné. Mettez 0 pour le désactiver et vous appuyer sur la limite de mémoire du conteneur. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (désactivé) | Plafond d'espace d'adressage, en mégaoctets, pour chacun de ces processus auxiliaires : ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc et pdfcpu dans les moteurs média et document, ainsi que, pour les images, exiftool, les décodeurs et encodeurs HEIF, JPEG XL et JPEG 2000, le décodeur RAW et le décodeur de repli ffmpeg. ImageMagick n'est pas plafonné, car il possède ses propres limites de mémoire, pas plus que le sidecar d'IA. Un processus qui dépasse le plafond est tué au lieu d'entraîner tout le conteneur vers le tueur de mémoire insuffisante. Il plafonne la mémoire virtuelle, pas la mémoire résidente : réglez-le donc bien au-dessus de ce qu'un processus utilise réellement. L'encodeur JPEG XL est le plus gourmand : une image de 24 MP a demandé environ 1,8 Go et a échoué à 1 Go, et augmenter le nombre de threads ou de CPU n'y change pas grand-chose. Tant que le plafond est défini, l'encodeur HEIF est limité à deux threads de travail, ce qui ramène un encodage de 24 MP à environ 0,8 Go au prix d'un encodage plus lent. Commencez à `2048` et ne l'abaissez qu'après avoir testé vos plus gros fichiers. Mettez 0 pour le désactiver et vous appuyer sur la limite de mémoire du conteneur. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Taille maximale du champ `settings` qu'une requête d'outil peut transporter, en kilo-octets, comptée en octets UTF-8. Les requêtes au-delà de la limite reçoivent une `400`. Définissez 0 pour aucune limite. Les paramètres réels des outils sont bien inférieurs à 64 KB, n'augmentez donc cette valeur que si un client envoie des paramètres inhabituellement volumineux. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Plus gros fichier de sous-titres (`.srt`, `.vtt`, `.ass`) accepté par Incruster des sous-titres et Intégrer des sous-titres, en mégaoctets. Les fichiers plus gros reçoivent un `400` qui indique la taille du fichier et la limite. Mettez 0 pour aucune limite. Un fichier de sous-titres de long métrage reste en général bien en dessous de 1 Mo. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Valeur la plus longue que Modifier les métadonnées écrit dans une seule balise (artiste, description, mots-clés, etc.), en caractères. Les valeurs plus longues reçoivent un `400` qui indique la balise et la limite. Mettez 0 pour aucune limite. Augmentez-la si vous stockez de longues légendes ou descriptions. La valeur d'une balise doit aussi tenir dans `MAX_SETTINGS_PAYLOAD_KB` et dans la limite par argument du système d'exploitation (128 Ko sous Linux). |
@@ -157,7 +157,12 @@ Les fichiers Compose publiés les transmettent toutes depuis `.env`, il suffit d
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Fréquence d'exécution de la tâche de nettoyage. |
 | `JOBS_RETENTION_DAYS` | `30` | Nombre de jours pendant lesquels l'enregistrement d'une tâche terminée (réussie, échouée ou annulée) est conservé avant que le nettoyage de rétention, exécuté toutes les 6 heures, le supprime. Un admin peut le remplacer dans Paramètres > Système. Les utilisateurs et équipes sous conservation légale gardent les leurs. Mettez 0 pour les conserver indéfiniment. |
 | `AUDIT_RETENTION_DAYS` | `0` (indéfiniment) | Nombre de jours pendant lesquels les entrées du journal d'audit sont conservées. Mêmes règles de remplacement et de conservation légale. Rien n'est supprimé tant que la journalisation d'audit inviolable est activée. Mettez 0 pour les conserver indéfiniment. |
-| `SNAPOTTER_LICENSE_KEY` | (vide) | Clé de licence qui déverrouille les fonctionnalités entreprise, comme SAML, SCIM et le stockage S3. Lue au démarrage, redémarrez donc après l'avoir modifiée. Une clé invalide ou expirée consigne un avertissement et le serveur fonctionne sans ces fonctionnalités. Dans le conteneur, vous pouvez plutôt la monter via `SNAPOTTER_LICENSE_KEY_FILE` (voir [Secrets Docker](/guide/security#docker-secrets)). |
+
+### Licence entreprise {#enterprise-license}
+
+| Variable | Par défaut | Description |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (vide) | Clé de licence qui déverrouille les fonctionnalités entreprise, comme SAML, SCIM et le stockage S3. Lue au démarrage, redémarrez donc après l'avoir modifiée. Une clé invalide ou expirée consigne un avertissement et le serveur fonctionne sans ces fonctionnalités. Dans le conteneur, vous pouvez plutôt la monter via `SNAPOTTER_LICENSE_KEY_FILE` (voir [Secrets Docker](/fr/guide/security#docker-secrets)). |
 
 ### Apparence {#appearance}
 
@@ -171,8 +176,8 @@ Les fichiers Compose publiés les transmettent toutes depuis `.env`, il suffit d
 
 | Variable | Par défaut | Description |
 |---|---|---|
-| `PUID` | `999` | Exécuter le processus du conteneur sous cet UID. Réglez-le pour correspondre à votre utilisateur hôte pour les bind mounts (`id -u`). |
-| `PGID` | `999` | Exécuter le processus du conteneur sous ce GID. Réglez-le pour correspondre à votre groupe hôte pour les bind mounts (`id -g`). |
+| `PUID` | `999` | Exécuter le processus du conteneur sous cet UID. Réglez-le pour correspondre à votre utilisateur hôte pour les bind mounts (`id -u`). Nécessite un système de fichiers racine accessible en écriture ; consultez le [guide de sécurité](/fr/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Exécuter le processus du conteneur sous ce GID. Réglez-le pour correspondre à votre groupe hôte pour les bind mounts (`id -g`). Nécessite un système de fichiers racine accessible en écriture ; consultez le [guide de sécurité](/fr/guide/security#why-read-only-is-not-set). |
 
 ## Exemple Docker {#docker-example}
 
@@ -205,7 +210,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: snapotter
-      POSTGRES_PASSWORD: snapotter     # Changez ceci pour les déploiements non locaux
+      POSTGRES_PASSWORD: snapotter     # Change this for non-local deployments
       POSTGRES_DB: snapotter
     volumes:
       - SnapOtter-pgdata:/var/lib/postgresql/data

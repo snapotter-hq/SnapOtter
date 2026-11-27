@@ -1,14 +1,14 @@
 ---
 description: "Beveiligingsgids voor SnapOtter. Containerbeveiliging, netwerkisolatie, Docker secrets, Kubernetes-implementatie en compliance-artefacten."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 6a892a631798
+i18n_output_hash: c48ccce13205
 i18n_hash_version: 2
 ---
 
 # Beveiliging en hardening {#security-hardening}
 
-SnapOtter verwerkt bestanden volledig op uw eigen infrastructuur. Standaard verstuurt het anonieme, inhoudsvrije productanalyses en crashrapporten om het project te helpen verbeteren. Het verstuurt nooit uw bestanden, bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Optionele feedback wordt alleen verzonden nadat een gebruiker die heeft ingediend, alleen wanneer analyse is ingeschakeld, en contactgegevens worden alleen meegestuurd met expliciete toestemming voor contact. Een beheerder kan analyse en het vastleggen van feedback met één klik uitschakelen onder Settings > System > Privacy, zonder opnieuw te bouwen. Bestandsverwerking blijft altijd binnen uw container.
+SnapOtter verwerkt bestanden volledig op uw eigen infrastructuur. Het kan anonieme, inhoudsvrije productanalyses en crashrapporten versturen om het project te helpen verbeteren, maar een nieuwe instantie vraagt dat eerst aan de beheerder en verstuurt niets totdat die heeft geantwoord. Het verstuurt nooit uw bestanden, bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Optionele feedback wordt alleen verzonden nadat een gebruiker die heeft ingediend, alleen wanneer analyse is ingeschakeld, en contactgegevens worden alleen meegestuurd met expliciete toestemming voor contact. Een beheerder kan analyse en het vastleggen van feedback met één klik uitschakelen onder Settings > System > Privacy, zonder opnieuw te bouwen. Bestandsverwerking blijft altijd binnen uw container.
 
 De container draait als een speciale niet-rootgebruiker (`snapotter`) waarbij alle Linux-capabilities zijn weggelaten behalve de minimaal vereiste set. Voor het volledige beleid voor het melden van kwetsbaarheden en de beveiligingsarchitectuur, zie [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) op GitHub.
 
@@ -28,7 +28,7 @@ Koppel voor een implementatie die aan internet is blootgesteld poort 1349 aan lo
 
 ### Waarom `read_only` niet is ingesteld {#why-read-only-is-not-set}
 
-`read_only: true` is niet ingesteld omdat [PUID](/nl/guide/configuration#env-puid)/[PGID](/nl/guide/configuration#env-pgid)-remapping bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u in plaats van PUID/PGID de Docker-vlag `--user` of Kubernetes `runAsUser` gebruikt, kunt u veilig een alleen-lezen root-bestandssysteem inschakelen.
+`read_only: true` is niet ingesteld omdat [PUID](/nl/guide/configuration#env-puid)/[PGID](/nl/guide/configuration#env-pgid)-remapping bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u in plaats van PUID/PGID de Docker-vlag `--user` of Kubernetes `runAsUser` gebruikt, kunt u veilig een alleen-lezen root-bestandssysteem inschakelen. Als u PUID of PGID op een andere waarde dan 999 instelt bij een alleen-lezen root, stopt de container bij het opstarten met een melding daarover, voordat het eigenaarschap van iets in /data wordt gewijzigd. De all-in-one-image draait ook met een alleen-lezen root wanneer PUID en PGID niet zijn ingesteld, zolang /run en /tmp tmpfs-mounts zijn en /run uitvoeren toestaat, omdat s6-overlay zijn supervisor vanaf daar start.
 
 ## Netwerkisolatie {#network-isolation}
 

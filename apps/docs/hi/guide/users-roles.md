@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter में उपयोगकर्ता, बिल्ट-इन और कस्टम roles, permissions, API keys, teams, sessions, और ऑडिट लॉग प्रबंधित करें।"
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 3ce20dd0d46b
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 369cb323e356
 i18n_hash_version: 2
 ---
 
@@ -147,7 +147,16 @@ Role नाम 2-30 अक्षरों के होने चाहिए, �
 
 ### कस्टम role हटाना {#deleting-a-custom-role}
 
-जब कोई कस्टम role हटाया जाता है, तो इसे सौंपे गए सभी उपयोगकर्ता स्वचालित रूप से `user` role में पुनः-असाइन कर दिए जाते हैं।
+जब कोई कस्टम role हटाया जाता है, तो इसे सौंपे गए सभी उपयोगकर्ता स्वचालित रूप से अंतर्निहित `user` role में पुनः-असाइन कर दिए जाते हैं। अक्षम सदस्य `disabled:user` के रूप में अक्षम रहते हैं। सेटिंग्स डायलॉग अपनी delete पुष्टि में यह बताता है, साथ ही यह भी कि कितने उपयोगकर्ता स्थानांतरित होंगे।
+
+`DELETE /api/v1/roles/{id}` response उन उपयोगकर्ताओं को सूचीबद्ध करता है जिन्हें स्थानांतरित किया गया, और `ROLE_DELETED` audit प्रविष्टि वही सूची `details.reassignedUsers` के अंतर्गत दर्ज करती है:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Teams {#teams}
 

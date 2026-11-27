@@ -1,8 +1,8 @@
 ---
 description: "Gerencie usuários, papéis integrados e personalizados, permissões, chaves de API, times, sessões e o log de auditoria no SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 8397291a318d
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 0191667b277e
 i18n_hash_version: 2
 ---
 
@@ -113,15 +113,15 @@ Os nomes de papéis devem ter de 2 a 30 caracteres, alfanuméricos em minúscula
 
 ### Limites de administração delegada {#delegated-administration-boundaries}
 
-Todas as 17 permissões podem ser delegadas por meio de funções personalizadas, mas uma permissão administrativa não torna essa função equivalente à função `admin` integrada. Mutações de usuário autorizadas por `users:manage`, operações destrutivas autorizadas por `compliance:manage` e gerenciamento de função personalizada autorizada por `security:manage` são limitadas pela autoridade atual do ator:
+Todas as 17 permissões podem ser delegadas por meio de papéis personalizados, mas uma permissão administrativa não torna esse papel equivalente ao papel `admin` integrado. Mutações de usuário autorizadas por `users:manage`, operações destrutivas autorizadas por `compliance:manage` e gerenciamento de papéis personalizados autorizado por `security:manage` são limitados pela autoridade atual do ator:
 
-- As funções integradas seguem `admin` > `editor` > `user`; as funções personalizadas estão abaixo das funções integradas.
+- Os papéis integrados seguem `admin` > `editor` > `user`; os papéis personalizados estão abaixo dos papéis integrados.
 - As permissões do alvo devem estar contidas nas permissões **efetivas** do ator. Uma chave de API com escopo definido, portanto, não pode exercer permissões omitidas de seu escopo.
-- O acesso à ferramenta de uma função alvo deve ser contido pelo acesso à ferramenta do próprio ator.
-- Uma conta desativada é verificada em relação à sua função original quando essa função é registrada como `disabled:<original-role>`.
-- A exclusão de uma função personalizada também requer autoridade para atribuir o substituto `user` integrado; membros desabilitados permanecem desabilitados como `disabled:user`.
+- O acesso à ferramenta de um papel alvo deve ser contido pelo acesso à ferramenta do próprio ator.
+- Uma conta desativada é verificada em relação ao seu papel original quando esse papel é registrado como `disabled:<original-role>`.
+- A exclusão de um papel personalizado também requer autoridade para atribuir o substituto `user` integrado; membros desativados permanecem desativados como `disabled:user`.
 
-As credenciais e a configuração globais são mais rigorosas: a emissão ou revogação do token SCIM e a importação da configuração da instância exigem a função `admin` integrada com autoridade administrativa completa e efetiva.
+As credenciais e a configuração globais são mais rigorosas: a emissão ou revogação do token SCIM e a importação da configuração da instância exigem o papel `admin` integrado com autoridade administrativa completa e efetiva.
 
 ### Permissões no nível de ferramenta {#tool-level-permissions}
 
@@ -147,7 +147,16 @@ Quando o modo `tool` está definido mas o recurso enterprise não está disponí
 
 ### Excluindo um papel personalizado {#deleting-a-custom-role}
 
-Quando um papel personalizado é excluído, todos os usuários atribuídos a ele são automaticamente reatribuídos ao papel `user`.
+Quando um papel personalizado é excluído, todos os usuários atribuídos a ele são automaticamente reatribuídos ao papel `user` integrado. Membros desativados permanecem desativados como `disabled:user`. A caixa de diálogo de configurações informa isso na confirmação de exclusão, junto com quantos usuários serão movidos.
+
+A resposta de `DELETE /api/v1/roles/{id}` lista os usuários que foram movidos, e a entrada de auditoria `ROLE_DELETED` registra a mesma lista em `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Times {#teams}
 

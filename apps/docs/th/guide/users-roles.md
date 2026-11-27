@@ -1,8 +1,8 @@
 ---
 description: "จัดการผู้ใช้ บทบาทในตัวและบทบาทกำหนดเอง สิทธิ์ API key ทีม เซสชัน และบันทึกการตรวจสอบใน SnapOtter"
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: ca6bbe7b7d38
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 9bd5be283da8
 i18n_hash_version: 2
 ---
 
@@ -26,8 +26,8 @@ SnapOtter มาพร้อมบทบาทในตัวสามบทบ�
 
 | ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |
 |---|---|---|
-| `DEFAULT_USERNAME` | `admin` | ชื่อผู้ใช้สำหรับบัญชีผู้ดูแลระบบเริ่มแรก |
-| `DEFAULT_PASSWORD` | `admin` | รหัสผ่านสำหรับบัญชีผู้ดูแลระบบเริ่มแรก |
+| `DEFAULT_USERNAME` | `admin` | ชื่อผู้ใช้สำหรับบัญชีผู้ดูแลระบบเริ่มต้น |
+| `DEFAULT_PASSWORD` | `admin` | รหัสผ่านสำหรับบัญชีผู้ดูแลระบบเริ่มต้น |
 
 ผู้ดูแลระบบเริ่มต้นจำเป็นต้องเปลี่ยนรหัสผ่านในการเข้าสู่ระบบครั้งแรก
 
@@ -83,7 +83,7 @@ SnapOtter มีบทบาทในตัวสามบทบาท ไม่
 | `pipelines:all` | ดูและจัดการไปป์ไลน์ของผู้ใช้ทั้งหมด |
 | `settings:read` | ดูการตั้งค่าอินสแตนซ์ |
 | `settings:write` | แก้ไขการตั้งค่าอินสแตนซ์ |
-| `users:manage` | สร้างและจัดการบัญชีผู้ใช้ภายในขอบเขตอำนาจของนักแสดง |
+| `users:manage` | สร้างและจัดการบัญชีผู้ใช้ภายในขอบเขตอำนาจของผู้ดำเนินการ |
 | `teams:manage` | สร้าง อัปเดต และลบทีม |
 | `features:manage` | ติดตั้งและจัดการบันเดิลฟีเจอร์ AI |
 | `system:health` | เข้าถึงเอ็นด์พอยต์ health และ readiness |
@@ -113,15 +113,15 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### ขอบเขตการบริหารที่ได้รับมอบหมาย {#delegated-administration-boundaries}
 
-สิทธิ์ทั้ง 17 รายการสามารถมอบหมายผ่านบทบาทที่กำหนดเองได้ แต่สิทธิ์ผู้ดูแลระบบไม่ได้ทำให้บทบาทนั้นเทียบเท่ากับบทบาท `admin` ในตัว การกลายพันธุ์ของผู้ใช้ที่ได้รับอนุญาตโดย `users:manage` การดำเนินการทำลายล้างที่ได้รับอนุญาตโดย `compliance:manage` และการจัดการบทบาทแบบกำหนดเองที่ได้รับอนุญาตโดย `security:manage` อยู่ภายใต้ขอบเขตอำนาจปัจจุบันของนักแสดง:
+สิทธิ์ทั้ง 17 รายการสามารถมอบหมายผ่านบทบาทกำหนดเองได้ แต่สิทธิ์ด้านการบริหารไม่ได้ทำให้บทบาทนั้นเทียบเท่ากับบทบาท `admin` ในตัว การแก้ไขผู้ใช้ที่ได้รับอนุญาตโดย `users:manage` การดำเนินการแบบทำลายล้างที่ได้รับอนุญาตโดย `compliance:manage` และการจัดการบทบาทกำหนดเองที่ได้รับอนุญาตโดย `security:manage` อยู่ภายใต้ขอบเขตอำนาจปัจจุบันของผู้ดำเนินการ:
 
-- บทบาทในตัวเป็นไปตาม `admin` > `editor` > `user`; บทบาทที่กำหนดเองอยู่ใต้บทบาทในตัว
-- การอนุญาตของเป้าหมายจะต้องอยู่ภายใต้การอนุญาต **มีผล** ของนักแสดง คีย์ API ที่กำหนดขอบเขตจึงไม่สามารถใช้สิทธิ์ที่ละเว้นจากขอบเขตได้
-- การเข้าถึงเครื่องมือของบทบาทเป้าหมายจะต้องอยู่ในการเข้าถึงเครื่องมือของนักแสดงเอง
+- บทบาทในตัวเป็นไปตาม `admin` > `editor` > `user` ส่วนบทบาทกำหนดเองอยู่ต่ำกว่าบทบาทในตัว
+- สิทธิ์ของเป้าหมายต้องอยู่ภายในสิทธิ์ที่ **มีผลจริง** ของผู้ดำเนินการ ดังนั้น API key ที่จำกัดขอบเขตจึงไม่สามารถใช้สิทธิ์ที่ถูกละไว้นอกขอบเขตได้
+- การเข้าถึงเครื่องมือของบทบาทเป้าหมายต้องอยู่ภายในการเข้าถึงเครื่องมือของผู้ดำเนินการเอง
 - บัญชีที่ถูกปิดใช้งานจะถูกตรวจสอบกับบทบาทเดิมเมื่อบทบาทนั้นถูกบันทึกเป็น `disabled:<original-role>`
-- การลบบทบาทที่กำหนดเองยังต้องได้รับสิทธิ์ในการกำหนดทางเลือกสำรอง `user` ในตัว สมาชิกที่พิการยังคงปิดการใช้งานเป็น `disabled:user`
+- การลบบทบาทกำหนดเองยังต้องมีสิทธิ์ในการกำหนดบทบาทสำรอง `user` ในตัวด้วย สมาชิกที่ถูกปิดใช้งานจะยังคงปิดใช้งานต่อไปเป็น `disabled:user`
 
-ข้อมูลประจำตัวและการกำหนดค่าส่วนกลางมีความเข้มงวดมากขึ้น: การออกหรือเพิกถอนโทเค็น SCIM และการนำเข้าการกำหนดค่าอินสแตนซ์จำเป็นต้องมีบทบาท `admin` ในตัวที่มีสิทธิ์ผู้ดูแลระบบที่มีประสิทธิภาพโดยสมบูรณ์
+ข้อมูลประจำตัวและการกำหนดค่าส่วนกลางเข้มงวดกว่านั้น: การออกหรือเพิกถอนโทเค็น SCIM และการนำเข้าการกำหนดค่าอินสแตนซ์ต้องใช้บทบาท `admin` ในตัวที่มีสิทธิ์ผู้ดูแลระบบที่มีผลจริงครบถ้วน
 
 ### สิทธิ์ระดับเครื่องมือ {#tool-level-permissions}
 
@@ -147,7 +147,16 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### การลบบทบาทกำหนดเอง {#deleting-a-custom-role}
 
-เมื่อลบบทบาทกำหนดเอง ผู้ใช้ทั้งหมดที่ได้รับมอบหมายบทบาทนั้นจะถูกกำหนดใหม่ไปยังบทบาท `user` โดยอัตโนมัติ
+เมื่อลบบทบาทกำหนดเอง ผู้ใช้ทั้งหมดที่ได้รับมอบหมายบทบาทนั้นจะถูกกำหนดใหม่ไปยังบทบาท `user` ในตัวโดยอัตโนมัติ สมาชิกที่ถูกปิดใช้งานจะยังคงปิดใช้งานต่อไปเป็น `disabled:user` กล่องโต้ตอบการตั้งค่าจะแจ้งเรื่องนี้ในการยืนยันการลบ พร้อมจำนวนผู้ใช้ที่จะถูกย้าย
+
+การตอบกลับ `DELETE /api/v1/roles/{id}` จะแสดงรายชื่อผู้ใช้ที่ถูกย้าย และรายการตรวจสอบ `ROLE_DELETED` จะบันทึกรายชื่อเดียวกันไว้ใต้ `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## ทีม {#teams}
 
@@ -234,24 +243,24 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 | เหตุการณ์ | หมวดหมู่ |
 |---|---|
-| `LOGIN_SUCCESS`, `LOGIN_FAILED` | Authentication |
-| `OIDC_LOGIN_SUCCESS`, `OIDC_LOGIN_FAILED` | Authentication |
-| `SAML_LOGIN_SUCCESS`, `SAML_LOGIN_FAILED` | Authentication |
-| `LOGOUT` | Authentication |
-| `USER_CREATED`, `USER_UPDATED`, `USER_DELETED` | User management |
-| `PASSWORD_CHANGED`, `PASSWORD_RESET` | User management |
+| `LOGIN_SUCCESS`, `LOGIN_FAILED` | การยืนยันตัวตน |
+| `OIDC_LOGIN_SUCCESS`, `OIDC_LOGIN_FAILED` | การยืนยันตัวตน |
+| `SAML_LOGIN_SUCCESS`, `SAML_LOGIN_FAILED` | การยืนยันตัวตน |
+| `LOGOUT` | การยืนยันตัวตน |
+| `USER_CREATED`, `USER_UPDATED`, `USER_DELETED` | การจัดการผู้ใช้ |
+| `PASSWORD_CHANGED`, `PASSWORD_RESET` | การจัดการผู้ใช้ |
 | `MFA_ENROLLED`, `MFA_DISABLED`, `MFA_VERIFIED`, `MFA_VERIFY_FAILED` | MFA |
 | `MFA_CHALLENGE_ISSUED`, `MFA_RECOVERY_USED`, `MFA_RESET` | MFA |
-| `ROLE_CREATED`, `ROLE_UPDATED`, `ROLE_DELETED` | Roles |
-| `API_KEY_CREATED`, `API_KEY_DELETED` | API keys |
-| `SETTINGS_UPDATED`, `IP_ALLOWLIST_UPDATED` | Settings |
-| `FILE_UPLOADED`, `FILE_DELETED` | Files |
-| `TOOL_EXECUTED` | Tools (เลือกเข้าร่วม) |
+| `ROLE_CREATED`, `ROLE_UPDATED`, `ROLE_DELETED` | บทบาท |
+| `API_KEY_CREATED`, `API_KEY_DELETED` | API key |
+| `SETTINGS_UPDATED`, `IP_ALLOWLIST_UPDATED` | การตั้งค่า |
+| `FILE_UPLOADED`, `FILE_DELETED` | ไฟล์ |
+| `TOOL_EXECUTED` | เครื่องมือ (เลือกเข้าร่วม) |
 | `SCIM_USER_PROVISIONED`, `SCIM_USER_UPDATED`, `SCIM_USER_DEPROVISIONED` | SCIM |
 | `SCIM_GROUP_SYNCED` | SCIM |
-| `LEGAL_HOLD_APPLIED`, `LEGAL_HOLD_RELEASED` | Compliance |
-| `GDPR_EXPORT_INITIATED`, `GDPR_USER_PURGED`, `GDPR_TEAM_PURGED` | Compliance |
-| `CONFIG_EXPORTED`, `CONFIG_IMPORTED` | Configuration |
+| `LEGAL_HOLD_APPLIED`, `LEGAL_HOLD_RELEASED` | การปฏิบัติตามข้อกำหนด |
+| `GDPR_EXPORT_INITIATED`, `GDPR_USER_PURGED`, `GDPR_TEAM_PURGED` | การปฏิบัติตามข้อกำหนด |
+| `CONFIG_EXPORTED`, `CONFIG_IMPORTED` | การกำหนดค่า |
 
 ## การจัดการเซสชัน {#session-management}
 

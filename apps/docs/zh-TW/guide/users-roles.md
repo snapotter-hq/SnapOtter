@@ -1,8 +1,8 @@
 ---
 description: "在 SnapOtter 中管理使用者、內建與自訂角色、權限、API 金鑰、團隊、工作階段以及稽核日誌。"
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 45268aefb571
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 87839b71694e
 i18n_hash_version: 2
 ---
 
@@ -113,15 +113,15 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### 委派管理邊界 {#delegated-administration-boundaries}
 
-所有 17 個權限都可以透過自訂角色委派，但管理權限並不會使該角色等同於內建 `admin` 角色。 `users:manage`授權的使用者突變、`compliance:manage`授權的破壞性操作以及`security:manage`授權的自訂角色管理均受參與者目前權限的約束：
+所有 17 個權限都可以透過自訂角色委派，但管理權限並不會使該角色等同於內建 `admin` 角色。由 `users:manage` 授權的使用者變更、由 `compliance:manage` 授權的破壞性操作，以及由 `security:manage` 授權的自訂角色管理，均受參與者目前權限的約束：
 
-- 內建角色遵循`admin` > `editor` > `user`；自訂角色位於內建角色下方。
+- 內建角色遵循 `admin` > `editor` > `user`；自訂角色位於內建角色下方。
 - 目標的權限必須包含在參與者的**有效**權限中。因此，限定範圍的 API 金鑰無法行使其範圍中省略的權限。
 - 目標角色的工具存取權限必須包含在參與者自己的工具存取權限中。
 - 當角色記錄為 `disabled:<original-role>` 時，已停用的帳戶將根據其原始角色進行檢查。
-- 刪除自訂角色也需要指派內建`user`後備的權限；已停用的成員仍停用為 `disabled:user`。
+- 刪除自訂角色也需要具備指派內建 `user` 後備角色的權限；已停用的成員仍維持停用，記錄為 `disabled:user`。
 
-全域憑證和設定更加嚴格：頒發或撤銷 SCIM 令牌以及匯入實例配置需要具有完整有效管理權限的內建 `admin` 角色。
+全域憑證和設定更加嚴格：頒發或撤銷 SCIM 令牌以及匯入執行個體設定，需要具有完整有效管理權限的內建 `admin` 角色。
 
 ### 工具層級權限 {#tool-level-permissions}
 
@@ -147,7 +147,16 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### 刪除自訂角色 {#deleting-a-custom-role}
 
-當自訂角色被刪除時，所有指派給它的使用者會自動重新指派到 `user` 角色。
+當自訂角色被刪除時，所有指派給它的使用者會自動重新指派到內建的 `user` 角色。已停用的成員仍維持停用，記錄為 `disabled:user`。設定對話方塊的刪除確認訊息會說明這一點，並顯示將被移動的使用者人數。
+
+`DELETE /api/v1/roles/{id}` 回應會列出被移動的使用者，`ROLE_DELETED` 稽核項目也會將同一份清單記錄在 `details.reassignedUsers` 之下：
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## 團隊 {#teams}
 
@@ -222,7 +231,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 啟用後，每筆稽核日誌項目都會以從 `DATA_ENCRYPTION_KEY` 衍生的 HMAC 簽章。這需要：
 
-1. 在你的環境中設定 `DATA_ENCRYPTION_KEY`。
+1. 在您的環境中設定 `DATA_ENCRYPTION_KEY`。
 2. 啟用 `tamperResistantAudit` 管理設定。
 3. 具備 `tamper_resistant_audit` 功能的企業版授權。
 
@@ -263,5 +272,5 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### 安全防護 {#safety-guards}
 
-- **最後管理員保護**：最後剩下的一位管理員無法被降級為較低角色。若你嘗試這麼做，API 會回傳錯誤。
+- **最後管理員保護**：最後剩下的一位管理員無法被降級為較低角色。若您嘗試這麼做，API 會回傳錯誤。
 - **防止自我刪除**：管理員無法透過 API 刪除自己的帳號。

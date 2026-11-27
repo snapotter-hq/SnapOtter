@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 3c80d1c555ca
+i18n_output_hash: 702c8d573432
 i18n_hash_version: 2
 ---
 # Setup Sumber Daya Rendah {#low-resource-setups}
@@ -88,11 +88,12 @@ Semua batas adalah variabel lingkungan, yang didokumentasikan lengkap di [Konfig
 |---|---|---|
 | [`CONCURRENT_JOBS`](/id/guide/configuration#env-concurrent-jobs) | `1` | Berapa banyak job yang berjalan secara paralel. Deteksi otomatis menggunakan jumlah core CPU dikurangi satu, yang cocok untuk mesin besar tetapi terlalu agresif pada mesin 2 core di bawah tekanan memori. |
 | [`MAX_WORKER_THREADS`](/id/guide/configuration#env-max-worker-threads) | `2` | Thread pool pemrosesan gambar. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/id/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Berapa lama proses Python AI dan runtime OCR tetap dimuat setelah permintaan terakhir. Keduanya menahan 1-2 GB saat hangat, sehingga jendela yang lebih pendek mengembalikan memori lebih cepat dengan konsekuensi beberapa detik pada panggilan AI berikutnya. Turunkan juga [`AI_SESSION_IDLE_TIMEOUT`](/id/guide/configuration#env-ai-session-idle-timeout), karena proses yang keluar membuang model yang di-cache. |
 | [`MAX_BATCH_SIZE`](/id/guide/configuration#env-max-batch-size) | `5` | Batch adalah tempat mesin 1-2 GB pertama kali kehabisan memori. |
 | [`MAX_UPLOAD_SIZE_MB`](/id/guide/configuration#env-max-upload-size-mb) | `100` | Mencegah satu file raksasa menempati seluruh workspace. |
-| [`MAX_MEGAPIXELS`](/id/guide/configuration#env-max-megapixels) | `50` | Men-decode gambar 100+ MP memakan RAM terlepas dari ukuran file. |
+| [`MAX_MEGAPIXELS`](/id/guide/configuration#env-max-megapixels) | `50` | Men-decode gambar 100+ MP memakan RAM terlepas dari ukuran file. Gambar di atas sekitar 268 MP ditolak bahkan pada `0`. |
 | [`MAX_VIDEO_DURATION_S`](/id/guide/configuration#env-max-video-duration-s) | `300` | Transcode yang panjang memonopoli CPU kecil selama menit hingga jam. |
-| [`PROCESSING_TIMEOUT_S`](/id/guide/configuration#env-processing-timeout-s) | `600` | Batas keras agar job yang lepas kendali pada akhirnya membebaskan mesin. |
+| [`JOB_TIMEOUT_LONG_S`](/id/guide/configuration#env-job-timeout-long-s) | `3600` | Batas keras untuk job AI dan media, agar job yang lepas kendali pada akhirnya membebaskan mesin. Defaultnya dua jam. Job gambar dan dokumen sudah berhenti pada [`JOB_TIMEOUT_FAST_S`](/id/guide/configuration#env-job-timeout-fast-s) (120 detik secara default). |
 
 Batas-batas ini berlaku untuk apa yang diterima server, jadi atur agar sesuai dengan yang benar-benar Anda gunakan, bukan sekecil mungkin. Jika Anda tidak pernah menyentuh video, batas `MAX_VIDEO_DURATION_S` tidak merugikan apa pun; jika Anda memindai dokumen setiap hari, jangan batasi [`MAX_PDF_PAGES`](/id/guide/configuration#env-max-pdf-pages).
 

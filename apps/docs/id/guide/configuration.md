@@ -1,8 +1,8 @@
 ---
 description: "Semua environment variable SnapOtter beserta nilai defaultnya. Atur auth, storage, model AI, analytics, dan lainnya."
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 1a900d4a9620
+i18n_output_hash: 3aec95c9e59f
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Semua konfigurasi dilakukan melalui environment variable. Setiap variabel punya 
 | `HOST` | `0.0.0.0` | Alamat IP tempat server mendengarkan. Pada jaringan bridge (default untuk `docker run` dan Compose) pertahankan `0.0.0.0` (atau `::`), jika tidak, port yang dipublikasikan berhenti berfungsi. Pada instalasi native atau container di jaringan host, `127.0.0.1` menjauhkan API dari jaringan; pasang reverse proxy di depannya untuk akses jarak jauh. [Embedded mode](#embedded-mode) hanya berfungsi dengan `0.0.0.0`, `::` atau `127.0.0.1`, karena pemeriksaan startup-nya memanggil `127.0.0.1`. Dengan alamat lain apa pun, termasuk `::1`, container tidak pernah dianggap sudah berjalan, dan crash berikutnya menghentikannya alih-alih me-restart server. Apa pun yang bukan alamat IP, termasuk `localhost`, menghentikan server saat startup. |
 | `BASE_PATH` | (kosong) | Path deployment publik, mis. `/snapotter`. Kosong atau `/` melayani di root domain. Diterapkan saat runtime; tidak perlu membangun ulang image. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Jumlah maksimum permintaan per menit per IP. Atur ke 0 untuk menonaktifkan rate limiting. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Jumlah maksimum permintaan per menit per IP ke endpoint pengelolaan API key (daftar, buat, cabut). Key yang dipakai untuk panggilan tool tidak terpengaruh. Tidak ada nilai tanpa batas: `0` menolak setiap permintaan ke endpoint tersebut. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Jumlah maksimum permintaan per menit per IP ke endpoint pengelolaan API key (daftar, buat, cabut). Key yang dipakai untuk panggilan tool tidak terpengaruh. Atur ke `0` untuk tanpa batas. |
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan untuk CORS, dipisahkan koma, atau kosong untuk same-origin saja. |
 | `LOG_LEVEL` | `info` | Tingkat detail log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh mengatur IP klien lewat `X-Forwarded-For`. Defaultnya hanya memercayai peer jaringan privat, sehingga reverse proxy di jaringan Docker atau LAN dipercaya dan header palsu dari klien publik tidak. Atur `true` hanya jika proxy yang Anda kendalikan berada di depan pada alamat publik. |
@@ -38,7 +38,7 @@ Kedua boolean di bawah hanya menerima `true` dan `false`. Nilai lain apa pun, `1
 | `MAX_USERS` | `0` (tanpa batas) | Jumlah maksimum akun pengguna terdaftar. Atur ke 0 untuk tanpa batas. |
 | `SESSION_DURATION_HOURS` | `168` | Masa berlaku sesi login dalam jam (defaultnya 7 hari). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Atur ke `true` untuk melewati permintaan ganti password paksa saat login pertama. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | Jumlah maksimum permintaan login per menit per IP. Percobaan berikutnya mendapat `429` sampai menit itu berakhir. Kegagalan berulang pada satu username biasanya mencapai `LOGIN_THROTTLE_MAX_FAILURES` lebih dulu. Admin dapat menimpanya di Settings > System. Tidak ada nilai tanpa batas: `0` menolak setiap login. Build dari source dimulai di 10. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Jumlah maksimum permintaan login per menit per IP. Percobaan berikutnya mendapat `429` sampai menit itu berakhir. Kegagalan berulang pada satu username biasanya mencapai `LOGIN_THROTTLE_MAX_FAILURES` lebih dulu. Admin dapat menimpanya di Settings > System. Atur ke `0` untuk tanpa batas. Build dari source dimulai di 10. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Jumlah login password yang gagal untuk satu username dalam `LOGIN_THROTTLE_WINDOW_S` sebelum percobaan berikutnya untuknya mendapat `429`, dari IP mana pun asalnya. Percobaan diizinkan lagi saat kegagalan tertua keluar dari jendela waktu. Atur ke 0 untuk menonaktifkan throttle. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Panjang jendela waktu tersebut, dalam detik. Minimal 1; server menolak untuk mulai jika nilainya 0. |
 
@@ -47,9 +47,9 @@ Kedua boolean di bawah hanya menerima `true` dan `false`. Nilai lain apa pun, `1
 | Variable | Default | Description |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` atau `s3`. S3 dan MinIO memerlukan lisensi dengan fitur s3_storage plus variabel `S3_*` di bawah. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Connection string PostgreSQL, dan koneksi yang melayani setiap permintaan. Pada 2.3.0 dan yang lebih baru, atur `DATABASE_MIGRATION_URL` juga dan ini menjadi role runtime dengan hak istimewa minimum, yang memegang DML pada tabel aplikasi dan tidak ada yang lain. Stack Compose mengarahkannya ke service `postgres`-nya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode embedded. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Connection string PostgreSQL, dan koneksi yang melayani setiap permintaan. Pada 2.3.0 dan yang lebih baru, atur `DATABASE_MIGRATION_URL` juga dan ini menjadi role runtime dengan hak istimewa minimum, yang memegang DML pada tabel aplikasi dan tidak ada yang lain. Stack Compose mengarahkannya ke service `postgres`-nya; biarkan tidak diatur (bersama `REDIS_URL`) untuk mendapatkan mode embedded. Untuk terhubung lewat unix socket, sebutkan direktori socket di `host`, seperti pada `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, lalu mount direktori itu ke dalam container. |
 | `DATABASE_MIGRATION_URL` | (kosong) | Koneksi istimewa, hanya dipakai saat boot untuk menjalankan migrasi dan memberi grant ke role runtime, lalu ditutup sebelum permintaan pertama. Biarkan kosong dan SnapOtter berjalan dengan satu role, dengan `DATABASE_URL` mengerjakan kedua tugas. Lihat [Least-privilege roles](/id/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Connection string Redis (dipakai untuk antrean job BullMQ). Compose mengarahkannya ke service `redis`-nya. |
+| `REDIS_URL` | `redis://localhost:6379` | Connection string Redis (dipakai untuk antrean job BullMQ). Compose mengarahkannya ke service `redis`-nya. Untuk unix socket, gunakan `unix:///run/redis/redis.sock?db=5` (tambahkan `&password=...` jika Redis memerlukannya) dan mount socket ke dalam container. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Direktori untuk file sementara selama pemrosesan. Dibersihkan otomatis. Image mengatur `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Direktori untuk file pengguna yang persisten (gambar yang diunggah, hasil yang disimpan). Image mengatur `/data/files`. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Batas dalam megabyte untuk file yang disimpan setiap pengguna di library Files. Penyimpanan yang melampauinya ditolak dengan menyebutkan jumlah terpakai dan batasnya. Kuota yang diatur pada pengguna menimpanya. Atur ke 0 untuk tanpa batas. |
@@ -100,7 +100,7 @@ Catatan telemetri: embedded mode mewarisi default analytics dari image seperti k
 | `MAX_UPLOAD_SIZE_MB` | `0` (tanpa batas) | Ukuran file maksimum per unggahan dalam megabyte. Atur ke 0 untuk tanpa batas. Image yang dipublikasikan dikirim dengan `0`; build dari source dimulai di 100. |
 | `MAX_BATCH_SIZE` | `0` (tanpa batas) | Jumlah file maksimum dalam satu permintaan batch. Atur ke 0 untuk tanpa batas. Image yang dipublikasikan dikirim dengan `0`; build dari source dimulai di 100. |
 | `CONCURRENT_JOBS` | `0` (otomatis) | Jumlah job batch yang berjalan paralel. Atur ke 0 untuk mendeteksi otomatis berdasarkan core CPU yang tersedia. |
-| `MAX_MEGAPIXELS` | `0` (tanpa batas) | Resolusi gambar maksimum yang diizinkan dalam megapiksel. Atur ke 0 untuk tanpa batas. |
+| `MAX_MEGAPIXELS` | `0` (tanpa batas aplikasi) | Resolusi gambar maksimum yang diizinkan dalam megapiksel. Atur ke 0 untuk menghapus batas milik SnapOtter sendiri. Decoder gambar tetap menolak apa pun di atas sekitar 268 MP (16383 x 16383 piksel), sehingga nilai di atas 268 tidak berpengaruh tambahan. |
 | `MAX_CPU_UPSCALE_MP` | `4` | Input terbesar, dalam megapiksel, yang diterima upscaling AI pada host tanpa GPU. Output hasil upscale juga dibatasi 16 kali nilai ini (64 MP secara default), sehingga faktor skala yang tinggi menurunkan batas input lebih jauh. Gambar yang lebih besar diperkecil agar muat sebelum upscaling; jika itu membuat hasilnya tidak lebih besar dari aslinya, permintaan ditolak. Lanczos melewati batas input tetapi tidak batas output. Atur ke 0 untuk tanpa batas, yang membutuhkan banyak RAM: RealESRGAN selalu membuat buffer 4x secara internal. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (tanpa batas) | Batas dalam GB untuk gabungan ukuran unggahan dan hasil tersimpan di workspace. Setelah terlampaui, unggahan dan permintaan tool mendapat 503 sampai file kedaluwarsa setelah `FILE_MAX_AGE_HOURS`. Atur ke 0 untuk tanpa batas; penyimpanan lokal tetap menolak penulisan dengan 503 saat disk memiliki ruang kosong kurang dari 0,5 GB. Image yang dipublikasikan dikirim dengan `0`; build dari source dimulai di 10. |
 | `MAX_WORKER_THREADS` | `0` (otomatis) | Worker thread maksimum untuk pemrosesan gambar. Atur ke 0 untuk mendeteksi otomatis berdasarkan core CPU yang tersedia. |
@@ -121,9 +121,9 @@ Catatan telemetri: embedded mode mewarisi default analytics dari image seperti k
 | `MAX_AUDIO_DURATION_S` | `0` (tanpa batas) | Sama, untuk tool audio. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (tanpa batas) | Bitrate keseluruhan tertinggi yang diterima tool video, dalam kilobit per detik. Atur ke 0 untuk tanpa batas. |
 | `PREVIEW_TIMEOUT_S` | `300` | Batas waktu untuk meng-encode satu klip pratinjau di browser dari file video atau audio, dalam detik. Pratinjau dokumen memakai `LIBREOFFICE_TIMEOUT_S`. Atur ke 0 untuk tanpa batas. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Batas waktu untuk satu konversi LibreOffice (Word, Excel, dan PowerPoint ke PDF, konverter dokumen, dan pratinjau dokumen), dalam detik. `0` di sini tidak berarti tanpa batas; nilainya kembali ke 120. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Batas waktu untuk satu konversi LibreOffice (Word, Excel, dan PowerPoint ke PDF, konverter dokumen, dan pratinjau dokumen), dalam detik. Atur ke `0` untuk tanpa batas. |
 | `GIF_BG_MAX_FRAMES` | `150` | Jumlah frame terbanyak yang diterima Remove GIF Background dalam satu animasi. Animasi yang lebih panjang mendapat `400` yang menyebutkan jumlah frame. Atur ke 0 untuk tanpa batas frame; anggaran piksel terpisah tetap berlaku. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (nonaktif) | Batas address space, dalam megabyte, untuk setiap proses ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc, dan pdfcpu yang dijalankan engine media dan dokumen. Decoder yang membaca gambar unggahan (ImageMagick, exiftool, dan fallback ffmpeg-nya) tidak dibatasi. Proses yang melampauinya dihentikan, alih-alih mendorong seluruh container ke out-of-memory killer. Ini membatasi memori virtual, bukan memori resident, jadi sisakan ruang cadangan. Sidecar AI tidak pernah dibatasi. Atur ke 0 untuk menonaktifkannya dan mengandalkan batas memori container. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (nonaktif) | Batas address space, dalam megabyte, untuk setiap proses pembantu berikut: ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc, dan pdfcpu di engine media dan dokumen, ditambah, untuk gambar, exiftool, decoder dan encoder HEIF, JPEG XL, dan JPEG 2000, decoder RAW, dan decoder fallback ffmpeg. ImageMagick tidak dibatasi, karena sudah punya batas memorinya sendiri, begitu pula sidecar AI. Proses yang melampaui batas dihentikan, alih-alih mendorong seluruh container ke out-of-memory killer. Ini membatasi memori virtual, bukan memori resident, jadi atur jauh di atas yang sebenarnya dipakai sebuah proses. Encoder JPEG XL membutuhkan paling banyak: gambar 24 MP membutuhkan sekitar 1,8 GB dan gagal pada 1 GB, dan menambah thread atau CPU tidak banyak mengubahnya. Selama batas ini diatur, encoder HEIF dibatasi pada dua worker thread, yang menurunkan encode 24 MP menjadi sekitar 0,8 GB dengan konsekuensi encode yang lebih lambat. Mulailah dari `2048` dan turunkan hanya setelah menguji file terbesar Anda. Atur ke 0 untuk menonaktifkannya dan mengandalkan batas memori container. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Field `settings` terbesar yang boleh dibawa permintaan tool, dalam kilobyte, dihitung dalam byte UTF-8. Permintaan yang melebihi batas mendapat `400`. Atur ke 0 untuk tanpa batas. Setting tool yang sebenarnya jauh lebih kecil dari 64 KB, jadi naikkan ini hanya jika klien mengirim setting yang luar biasa besar. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | File subtitle terbesar (`.srt`, `.vtt`, `.ass`) yang diterima Burn Subtitles dan Embed Subtitles, dalam megabyte. File yang lebih besar mendapat `400` yang menyebutkan ukuran file dan batasnya. Atur ke 0 untuk tanpa batas. File subtitle film berdurasi penuh biasanya jauh di bawah 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Nilai terpanjang yang ditulis Edit Metadata ke satu tag (artist, description, keywords, dan seterusnya), dalam karakter. Nilai yang lebih panjang mendapat `400` yang menyebutkan tag dan batasnya. Atur ke 0 untuk tanpa batas. Naikkan jika Anda menyimpan caption atau deskripsi panjang. Nilai tag juga harus muat dalam `MAX_SETTINGS_PAYLOAD_KB` dan batas per argumen sistem operasi (128 KB di Linux). |
@@ -157,7 +157,12 @@ File Compose yang dipublikasikan meneruskan semuanya dari `.env`, jadi mengaturn
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Seberapa sering job pembersihan berjalan. |
 | `JOBS_RETENTION_DAYS` | `30` | Jumlah hari catatan job yang selesai (completed, failed, atau canceled) disimpan sebelum penyapuan retensi, yang berjalan setiap 6 jam, menghapusnya. Admin dapat menimpanya di Settings > System. Pengguna dan tim dengan legal hold tetap menyimpannya. Atur ke 0 untuk menyimpannya selamanya. |
 | `AUDIT_RETENTION_DAYS` | `0` (selamanya) | Jumlah hari entri audit log disimpan. Aturan override dan legal hold sama. Tidak ada yang dihapus selama audit logging tahan manipulasi aktif. Atur ke 0 untuk menyimpannya selamanya. |
-| `SNAPOTTER_LICENSE_KEY` | (kosong) | License key yang membuka fitur enterprise, seperti SAML, SCIM, dan penyimpanan S3. Dibaca saat startup, jadi restart setelah mengubahnya. Key yang tidak valid atau kedaluwarsa mencatat peringatan dan server berjalan tanpa fitur tersebut. Di container Anda dapat me-mount-nya, lewat `SNAPOTTER_LICENSE_KEY_FILE` (lihat [Docker secrets](/guide/security#docker-secrets)). |
+
+### Enterprise license {#enterprise-license}
+
+| Variable | Default | Description |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (kosong) | License key yang membuka fitur enterprise, seperti SAML, SCIM, dan penyimpanan S3. Dibaca saat startup, jadi restart setelah mengubahnya. Key yang tidak valid atau kedaluwarsa mencatat peringatan dan server berjalan tanpa fitur tersebut. Di container Anda dapat me-mount-nya, lewat `SNAPOTTER_LICENSE_KEY_FILE` (lihat [Docker secrets](/id/guide/security#docker-secrets)). |
 
 ### Appearance {#appearance}
 
@@ -171,8 +176,8 @@ File Compose yang dipublikasikan meneruskan semuanya dari `.env`, jadi mengaturn
 
 | Variable | Default | Description |
 |---|---|---|
-| `PUID` | `999` | Jalankan proses container sebagai UID ini. Atur agar sesuai dengan user host Anda untuk bind mount (`id -u`). |
-| `PGID` | `999` | Jalankan proses container sebagai GID ini. Atur agar sesuai dengan grup host Anda untuk bind mount (`id -g`). |
+| `PUID` | `999` | Jalankan proses container sebagai UID ini. Atur agar sesuai dengan user host Anda untuk bind mount (`id -u`). Memerlukan root filesystem yang dapat ditulis; lihat [panduan keamanan](/id/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Jalankan proses container sebagai GID ini. Atur agar sesuai dengan grup host Anda untuk bind mount (`id -g`). Memerlukan root filesystem yang dapat ditulis; lihat [panduan keamanan](/id/guide/security#why-read-only-is-not-set). |
 
 ## Docker example {#docker-example}
 

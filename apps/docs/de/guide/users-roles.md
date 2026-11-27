@@ -1,8 +1,8 @@
 ---
 description: "Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 0d77c98d2ac9
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: cffc1fc124c1
 i18n_hash_version: 2
 ---
 
@@ -83,12 +83,12 @@ Alle 17 Berechtigungen. Volle Kontrolle über die Instanz.
 | `pipelines:all` | Pipelines aller Benutzer ansehen und verwalten |
 | `settings:read` | Instanzeinstellungen ansehen |
 | `settings:write` | Instanzeinstellungen ändern |
-| `users:manage` | Erstellen und verwalten Sie Benutzerkonten innerhalb der Autoritätsgrenzen des Akteurs |
+| `users:manage` | Benutzerkonten innerhalb der Autoritätsgrenzen des Akteurs erstellen und verwalten |
 | `teams:manage` | Teams erstellen, aktualisieren und löschen |
 | `features:manage` | KI-Feature-Bundles installieren und verwalten |
 | `system:health` | Auf Health- und Readiness-Endpunkte zugreifen |
 | `audit:read` | Das Audit-Log ansehen und Rollen auflisten |
-| `compliance:manage` | Verwalten Sie den DSGVO-Lebenszyklus und die Compliance-Funktionen. Zerstörerische Benutzeroperationen bleiben autoritätsgebunden |
+| `compliance:manage` | DSGVO-Lebenszyklus und Compliance-Funktionen verwalten; zerstörerische Benutzeroperationen bleiben autoritätsgebunden |
 | `webhooks:manage` | Ausgehende Webhooks konfigurieren |
 | `security:manage` | Sicherheitseinstellungen verwalten (IP-Zulassungsliste, SSO-Erzwingung) |
 
@@ -115,11 +115,11 @@ Rollennamen müssen 2 bis 30 Zeichen lang sein, kleingeschrieben alphanumerisch 
 
 Alle 17 Berechtigungen können über benutzerdefinierte Rollen delegiert werden, aber eine Administratorberechtigung macht diese Rolle nicht gleichwertig mit der integrierten `admin`-Rolle. Von `users:manage` autorisierte Benutzermutationen, von `compliance:manage` autorisierte destruktive Operationen und von `security:manage` autorisierte benutzerdefinierte Rollenverwaltung unterliegen den aktuellen Berechtigungen des Akteurs:
 
-- Integrierte Rollen folgen `admin` > `editor` > `user`; Benutzerdefinierte Rollen sind unterhalb der integrierten Rollen aufgeführt.
+- Integrierte Rollen folgen `admin` > `editor` > `user`; benutzerdefinierte Rollen stehen unterhalb der integrierten Rollen.
 - Die Berechtigungen des Ziels müssen in den **wirksamen** Berechtigungen des Akteurs enthalten sein. Ein bereichsbezogener API-Schlüssel kann daher keine Berechtigungen ausüben, die in seinem Bereich fehlen.
 - Der Tool-Zugriff einer Zielrolle muss durch den eigenen Tool-Zugriff des Akteurs begrenzt sein.
 - Ein deaktiviertes Konto wird mit seiner ursprünglichen Rolle verglichen, wenn diese Rolle als `disabled:<original-role>` aufgezeichnet ist.
-- Zum Löschen einer benutzerdefinierten Rolle ist außerdem die Berechtigung zum Zuweisen des integrierten `user`-Fallbacks erforderlich. deaktivierte Mitglieder bleiben als `disabled:user` deaktiviert.
+- Zum Löschen einer benutzerdefinierten Rolle ist außerdem die Berechtigung zum Zuweisen des integrierten `user`-Fallbacks erforderlich; deaktivierte Mitglieder bleiben als `disabled:user` deaktiviert.
 
 Globale Anmeldeinformationen und Konfiguration sind strenger: Das Ausstellen oder Widerrufen des SCIM-Tokens und das Importieren der Instanzkonfiguration erfordern die integrierte `admin`-Rolle mit vollständiger effektiver Administratorberechtigung.
 
@@ -147,11 +147,20 @@ Wenn der Modus `tool` gesetzt ist, das Enterprise-Feature aber nicht verfügbar 
 
 ### Eine benutzerdefinierte Rolle löschen {#deleting-a-custom-role}
 
-Wenn eine benutzerdefinierte Rolle gelöscht wird, werden alle ihr zugewiesenen Benutzer automatisch der Rolle `user` neu zugewiesen.
+Wenn eine benutzerdefinierte Rolle gelöscht wird, werden alle ihr zugewiesenen Benutzer automatisch der integrierten Rolle `user` neu zugewiesen. Deaktivierte Mitglieder bleiben als `disabled:user` deaktiviert. Der Einstellungsdialog weist in seiner Löschbestätigung darauf hin und nennt, wie viele Benutzer verschoben werden.
+
+Die Antwort von `DELETE /api/v1/roles/{id}` listet die verschobenen Benutzer auf, und der Audit-Eintrag `ROLE_DELETED` erfasst dieselbe Liste unter `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Teams {#teams}
 
-Teams gruppieren Benutzer für die Speicher- und Aufbewahrungsverwaltung. Ein `Default`-Team wird beim ersten Start erstellt.
+Teams gruppieren Benutzer für die Speicher- und Aufbewahrungsverwaltung. Ein Team `Default` wird beim ersten Start erstellt.
 
 | Feld | Typ | Beschreibung |
 |---|---|---|
@@ -161,7 +170,7 @@ Teams gruppieren Benutzer für die Speicher- und Aufbewahrungsverwaltung. Ein `D
 | `legalHold` | boolean | Automatisches Löschen der Dateien von Teammitgliedern verhindern (erfordert `legal_hold`, Enterprise) |
 
 ::: info 
-Das `Default`-Team kann nicht gelöscht werden. Teams, die noch Mitglieder haben, können nicht gelöscht werden. Weise die Mitglieder zuerst neu zu.
+Das Team `Default` kann nicht gelöscht werden. Teams, die noch Mitglieder haben, können nicht gelöscht werden. Weise die Mitglieder zuerst neu zu.
 :::
 
 ## API-Schlüssel {#api-keys}
@@ -187,7 +196,7 @@ curl -X POST http://localhost:1349/api/v1/api-keys \
 
 Schlüssel akzeptieren einen optionalen `expiresAt`-Zeitstempel. Abgelaufene Schlüssel werden bei der Authentifizierung abgewiesen.
 
-## Audit-Log {#audit-log}
+## Audit log {#audit-log}
 
 SnapOtter zeichnet sicherheitsrelevante Ereignisse in einem strukturierten Audit-Log auf, das in der Datenbanktabelle `audit_log` gespeichert wird.
 
@@ -228,7 +237,7 @@ Wenn aktiviert, wird jeder Audit-Log-Eintrag mit einem HMAC signiert, der aus `D
 
 ### Aufbewahrung {#retention}
 
-Setze [`AUDIT_RETENTION_DAYS`](/de/guide/configuration#env-audit-retention-days), um alte Einträge automatisch zu bereinigen. Der Standard ist `0`, was bedeutet, dass Einträge unbegrenzt aufbewahrt werden.
+Setzen Sie [`AUDIT_RETENTION_DAYS`](/de/guide/configuration#env-audit-retention-days), um alte Einträge automatisch zu bereinigen. Der Standard ist `0`, was bedeutet, dass Einträge unbegrenzt aufbewahrt werden.
 
 ### Ereignisreferenz {#event-reference}
 

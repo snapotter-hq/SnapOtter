@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 6ddd0a333ee2
+i18n_output_hash: 0c16400779db
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Alle configuratie verloopt via omgevingsvariabelen. Elke variabele heeft een zin
 | `HOST` | `0.0.0.0` | IP-adres waarop de server luistert. Houd op een bridge-netwerk (de standaard voor `docker run` en Compose) `0.0.0.0` (of `::`) aan, anders werken gepubliceerde poorten niet meer. Bij een native installatie of een container op het hostnetwerk houdt `127.0.0.1` de API van het netwerk af; zet er een reverse proxy voor voor toegang op afstand. De [embedded-modus](#embedded-mode) werkt alleen met `0.0.0.0`, `::` of `127.0.0.1`, omdat de opstartcontrole ervan `127.0.0.1` aanroept. Met elk ander adres, `::1` inbegrepen, geldt de container nooit als gestart, en een latere crash stopt hem in plaats van de server opnieuw te starten. Alles wat geen IP-adres is, `localhost` inbegrepen, stopt de server bij het opstarten. |
 | `BASE_PATH` | (leeg) | Openbaar implementatiepad, bijvoorbeeld `/snapotter`. Leeg of `/` serveert op de hoofdmap van het domein. Wordt tijdens runtime toegepast; er is geen nieuwe image-build nodig. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximaal aantal verzoeken per minuut per IP. Stel in op 0 om rate limiting uit te schakelen. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maximaal aantal verzoeken per minuut per IP naar de beheerendpoints voor API-sleutels (weergeven, aanmaken, intrekken). Sleutels die voor toolaanroepen worden gebruikt, worden niet beïnvloed. Er is geen onbeperkte waarde: `0` weigert elk verzoek naar die endpoints. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maximaal aantal verzoeken per minuut per IP naar de beheerendpoints voor API-sleutels (weergeven, aanmaken, intrekken). Sleutels die voor toolaanroepen worden gebruikt, worden niet beïnvloed. Stel in op `0` voor geen limiet. |
 | `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins voor CORS, of leeg voor alleen dezelfde origin. |
 | `LOG_LEVEL` | `info` | Uitgebreidheid van de logging. Een van: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. De standaardinstelling vertrouwt alleen een peer in een privénetwerk, zodat een reverse proxy op een Docker-netwerk of LAN wordt vertrouwd en een vervalste header van een publieke client niet. Stel `true` alleen in als er een proxy onder uw beheer op een openbaar adres voor staat. |
@@ -38,7 +38,7 @@ De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `
 | `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal geregistreerde gebruikersaccounts. Stel in op 0 voor onbeperkt. |
 | `SESSION_DURATION_HOURS` | `168` | Levensduur van een loginsessie in uren (standaard 7 dagen). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Stel in op `true` om de verplichte wachtwoordwijziging bij de eerste login over te slaan. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | Maximaal aantal loginverzoeken per minuut per IP. Verdere pogingen krijgen een `429` tot de minuut voorbij is. Herhaalde mislukkingen voor één gebruikersnaam bereiken meestal eerst `LOGIN_THROTTLE_MAX_FAILURES`. Een beheerder kan dit overschrijven onder Settings > System. Er is geen onbeperkte waarde: `0` weigert elke login. Een build vanuit de broncode begint op 10. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Maximaal aantal loginverzoeken per minuut per IP. Verdere pogingen krijgen een `429` tot de minuut voorbij is. Herhaalde mislukkingen voor één gebruikersnaam bereiken meestal eerst `LOGIN_THROTTLE_MAX_FAILURES`. Een beheerder kan dit overschrijven onder Settings > System. Stel in op `0` voor geen limiet. Een build vanuit de broncode begint op 10. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Aantal mislukte wachtwoordlogins dat één gebruikersnaam mag hebben binnen `LOGIN_THROTTLE_WINDOW_S` voordat verdere pogingen voor die naam een `429` krijgen, vanaf welk IP ook. Ze worden weer doorgelaten naarmate de oudste mislukkingen uit het venster verdwijnen. Stel in op 0 om de beperking uit te schakelen. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Lengte van dat venster, in seconden. Moet minimaal 1 zijn; de server weigert te starten bij 0. |
 
@@ -47,9 +47,9 @@ De twee booleans hieronder accepteren alleen `true` en `false`. Al het andere, `
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` of `s3`. S3 en MinIO vereisen een licentie met de functie s3_storage plus de onderstaande `S3_*`-variabelen. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-verbindingsreeks, en de verbinding waarop elk verzoek wordt afgehandeld. Vanaf 2.3.0 geldt: stel ook `DATABASE_MIGRATION_URL` in en dit wordt de runtimerol met minimale rechten, die alleen DML heeft op de tabellen van de app en niets anders. De Compose-stack wijst het naar de service `postgres`; laat het (samen met `REDIS_URL`) ongedefinieerd om de embedded-modus te krijgen. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL-verbindingsreeks, en de verbinding waarop elk verzoek wordt afgehandeld. Vanaf 2.3.0 geldt: stel ook `DATABASE_MIGRATION_URL` in en dit wordt de runtimerol met minimale rechten, die alleen DML heeft op de tabellen van de app en niets anders. De Compose-stack wijst het naar de service `postgres`; laat het (samen met `REDIS_URL`) ongedefinieerd om de embedded-modus te krijgen. Om via een unix-socket te verbinden, noemt u de socketmap in `host`, zoals in `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, en mount u die map in de container. |
 | `DATABASE_MIGRATION_URL` | (leeg) | Bevoorrechte verbinding, alleen tijdens het opstarten gebruikt om migraties uit te voeren en de runtimerol rechten te geven, en gesloten vóór het eerste verzoek. Laat u dit leeg, dan draait SnapOtter met één rol, waarbij `DATABASE_URL` beide taken uitvoert. Zie [Rollen met minimale rechten](/nl/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Redis-verbindingsreeks (gebruikt voor BullMQ-jobwachtrijen). Compose wijst dit naar de service `redis`. |
+| `REDIS_URL` | `redis://localhost:6379` | Redis-verbindingsreeks (gebruikt voor BullMQ-jobwachtrijen). Compose wijst dit naar de service `redis`. Gebruik voor een unix-socket `unix:///run/redis/redis.sock?db=5` (voeg `&password=...` toe als Redis er een nodig heeft) en mount de socket in de container. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Map voor tijdelijke bestanden tijdens de verwerking. Wordt automatisch opgeruimd. De image stelt `/tmp/workspace` in. |
 | `FILES_STORAGE_PATH` | `./data/files` | Map voor permanente gebruikersbestanden (geüploade afbeeldingen, opgeslagen resultaten). De image stelt `/data/files` in. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Limiet in megabytes voor wat elke gebruiker in de bestandenbibliotheek bewaart. Een opslagactie die de limiet zou overschrijden, wordt geweigerd met het gebruikte aantal en de limiet. Een quotum dat op de gebruiker is ingesteld, heeft voorrang. Stel in op 0 voor onbeperkt. |
@@ -100,7 +100,7 @@ Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de 
 | `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Maximale bestandsgrootte per upload in megabytes. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
 | `MAX_BATCH_SIZE` | `0` (onbeperkt) | Maximaal aantal bestanden in één batchverzoek. Stel in op 0 voor onbeperkt. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 100. |
 | `CONCURRENT_JOBS` | `0` (automatisch) | Aantal batchjobs dat parallel draait. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
-| `MAX_MEGAPIXELS` | `0` (onbeperkt) | Maximaal toegestane afbeeldingsresolutie in megapixels. Stel in op 0 voor onbeperkt. |
+| `MAX_MEGAPIXELS` | `0` (geen limiet van de app) | Maximaal toegestane afbeeldingsresolutie in megapixels. Stel in op 0 om de eigen limiet van SnapOtter te verwijderen. De afbeeldingsdecoder weigert nog steeds alles boven ongeveer 268 MP (16383 x 16383 pixels), dus een waarde boven 268 heeft geen extra effect. |
 | `MAX_CPU_UPSCALE_MP` | `4` | Grootste invoer, in megapixels, die AI-upscaling accepteert op een host zonder GPU. De opgeschaalde uitvoer is ook beperkt tot 16 keer deze waarde (standaard 64 MP), dus een hoge schaalfactor verlaagt de invoerlimiet nog verder. Een grotere afbeelding wordt vóór het upscalen verkleind tot die past; als het resultaat dan niet groter zou zijn dan het origineel, wordt het verzoek in plaats daarvan geweigerd. Lanczos slaat de invoerlimiet over, maar niet de uitvoerlimiet. Stel in op 0 voor geen limiet, wat veel RAM vraagt: RealESRGAN bouwt intern altijd een 4x-buffer op. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (onbeperkt) | Limiet in GB op de gezamenlijke grootte van uploads en opgeslagen resultaten in de werkruimte. Zodra die is overschreden, krijgen uploads en toolverzoeken een 503 totdat bestanden verlopen na `FILE_MAX_AGE_HOURS`. Stel in op 0 voor onbeperkt; lokale opslag weigert schrijfacties nog steeds met een 503 zodra de schijf minder dan 0,5 GB vrij heeft. De gepubliceerde image levert `0`; een build vanuit de broncode begint op 10. |
 | `MAX_WORKER_THREADS` | `0` (automatisch) | Maximaal aantal workerthreads voor beeldverwerking. Stel in op 0 om automatisch te bepalen op basis van de beschikbare CPU-kernen. |
@@ -121,9 +121,9 @@ Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de 
 | `MAX_AUDIO_DURATION_S` | `0` (onbeperkt) | Hetzelfde, voor de audiotools. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (onbeperkt) | Hoogste totale bitrate die de videotools accepteren, in kilobits per seconde. Stel in op 0 voor onbeperkt. |
 | `PREVIEW_TIMEOUT_S` | `300` | Tijdslimiet voor het coderen van één voorbeeldclip in de browser van een video- of audiobestand, in seconden. Documentvoorbeelden gebruiken in plaats daarvan `LIBREOFFICE_TIMEOUT_S`. Stel in op 0 voor geen limiet. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Tijdslimiet voor één LibreOffice-conversie (Word, Excel en PowerPoint naar PDF, de documentconverters en documentvoorbeelden), in seconden. `0` betekent hier niet onbeperkt; het valt terug op 120. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Tijdslimiet voor één LibreOffice-conversie (Word, Excel en PowerPoint naar PDF, de documentconverters en documentvoorbeelden), in seconden. Stel in op `0` voor geen limiet. |
 | `GIF_BG_MAX_FRAMES` | `150` | Maximaal aantal frames dat Remove GIF Background accepteert in één animatie. Langere animaties krijgen een `400` met het aantal frames. Stel in op 0 voor geen framelimiet; een apart pixelbudget blijft gelden. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (uit) | Limiet op de adresruimte, in megabytes, voor elk ffmpeg-, Ghostscript-, qpdf-, LibreOffice-, pandoc- en pdfcpu-proces dat de media- en documentengines starten. De decoders die geüploade afbeeldingen lezen (ImageMagick, exiftool en hun ffmpeg-terugval) worden niet beperkt. Een proces dat de limiet overschrijdt, wordt beëindigd in plaats van de hele container naar de out-of-memory killer te duwen. Het beperkt virtueel geheugen, niet resident geheugen, dus laat ruimte over. De AI-sidecar wordt nooit beperkt. Stel in op 0 om het uit te schakelen en te vertrouwen op de geheugenlimiet van de container. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (uit) | Limiet op de adresruimte, in megabytes, voor elk van deze hulpprocessen: ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc en pdfcpu in de media- en documentengines, plus, voor afbeeldingen, exiftool, de HEIF-, JPEG XL- en JPEG 2000-decoders en -encoders, de RAW-decoder en de ffmpeg-terugvaldecoder. ImageMagick wordt niet beperkt, omdat het eigen geheugenlimieten heeft, en de AI-sidecar evenmin. Een proces dat de limiet overschrijdt, wordt beëindigd in plaats van de hele container naar de out-of-memory killer te duwen. Het beperkt virtueel geheugen, niet resident geheugen, dus stel het ruim boven wat een proces werkelijk gebruikt in. De JPEG XL-encoder heeft het meeste nodig: een afbeelding van 24 MP had ongeveer 1,8 GB nodig en mislukte bij 1 GB, en meer threads of CPU's veranderen daar weinig aan. Zolang de limiet is ingesteld, wordt de HEIF-encoder beperkt tot twee workerthreads, waardoor een encodering van 24 MP terugkomt op ongeveer 0,8 GB, ten koste van een tragere encodering. Begin bij `2048` en verlaag het pas nadat u uw grootste bestanden hebt getest. Stel in op 0 om het uit te schakelen en te vertrouwen op de geheugenlimiet van de container. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Grootste `settings`-veld dat een toolverzoek mag bevatten, in kilobytes, geteld in UTF-8-bytes. Verzoeken boven de limiet krijgen een `400`. Stel in op 0 voor geen limiet. Echte toolinstellingen zijn veel kleiner dan 64 KB, dus verhoog dit alleen als een client ongebruikelijk grote instellingen verstuurt. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Grootste ondertitelbestand (`.srt`, `.vtt`, `.ass`) dat Burn Subtitles en Embed Subtitles accepteren, in megabytes. Grotere bestanden krijgen een `400` met de bestandsgrootte en de limiet. Stel in op 0 voor geen limiet. Een ondertitelbestand voor een speelfilm is meestal ruim onder 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Langste waarde die Edit Metadata in één tag schrijft (artiest, beschrijving, trefwoorden enzovoort), in tekens. Langere waarden krijgen een `400` met de tag en de limiet. Stel in op 0 voor geen limiet. Verhoog dit als u lange bijschriften of beschrijvingen opslaat. Een tagwaarde moet ook passen binnen `MAX_SETTINGS_PAYLOAD_KB` en de limiet per argument van het besturingssysteem (128 KB op Linux). |
@@ -157,7 +157,12 @@ De gepubliceerde Compose-bestanden geven ze allemaal door vanuit `.env`, dus ins
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Hoe vaak de opschoontaak draait. |
 | `JOBS_RETENTION_DAYS` | `30` | Aantal dagen dat een afgerond jobrecord (voltooid, mislukt of geannuleerd) wordt bewaard voordat de bewaaropruiming, die elke 6 uur draait, het verwijdert. Een beheerder kan dit overschrijven onder Settings > System. Gebruikers en teams met een juridische bewaarplicht houden hun records. Stel in op 0 om ze voor altijd te bewaren. |
 | `AUDIT_RETENTION_DAYS` | `0` (voor altijd) | Aantal dagen dat auditlogvermeldingen worden bewaard. Dezelfde regels voor overschrijven en juridische bewaarplicht. Er wordt niets verwijderd zolang manipulatiebestendige auditlogging aan staat. Stel in op 0 om ze voor altijd te bewaren. |
-| `SNAPOTTER_LICENSE_KEY` | (leeg) | Licentiesleutel die de enterprise-functies ontgrendelt, zoals SAML, SCIM en S3-opslag. Gelezen bij het opstarten, dus herstart na het wijzigen. Een ongeldige of verlopen sleutel logt een waarschuwing en de server draait zonder die functies. In de container kunt u de sleutel in plaats daarvan mounten, via `SNAPOTTER_LICENSE_KEY_FILE` (zie [Docker secrets](/guide/security#docker-secrets)). |
+
+### Enterprise-licentie {#enterprise-license}
+
+| Variabele | Standaard | Beschrijving |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (leeg) | Licentiesleutel die de enterprise-functies ontgrendelt, zoals SAML, SCIM en S3-opslag. Gelezen bij het opstarten, dus herstart na het wijzigen. Een ongeldige of verlopen sleutel logt een waarschuwing en de server draait zonder die functies. In de container kunt u de sleutel in plaats daarvan mounten, via `SNAPOTTER_LICENSE_KEY_FILE` (zie [Docker secrets](/nl/guide/security#docker-secrets)). |
 
 ### Uiterlijk {#appearance}
 
@@ -171,8 +176,8 @@ De gepubliceerde Compose-bestanden geven ze allemaal door vanuit `.env`, dus ins
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `PUID` | `999` | Draai het containerproces onder deze UID. Stel in op die van uw hostgebruiker voor bind mounts (`id -u`). |
-| `PGID` | `999` | Draai het containerproces onder deze GID. Stel in op die van uw hostgroep voor bind mounts (`id -g`). |
+| `PUID` | `999` | Draai het containerproces onder deze UID. Stel in op die van uw hostgebruiker voor bind mounts (`id -u`). Vereist een beschrijfbaar root-bestandssysteem; zie de [beveiligingsgids](/nl/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Draai het containerproces onder deze GID. Stel in op die van uw hostgroep voor bind mounts (`id -g`). Vereist een beschrijfbaar root-bestandssysteem; zie de [beveiligingsgids](/nl/guide/security#why-read-only-is-not-set). |
 
 ## Docker-voorbeeld {#docker-example}
 

@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 7c74d8fe848e
+i18n_output_hash: fe42dfa6f676
 i18n_hash_version: 2
 ---
 # कम-संसाधन वाले सेटअप {#low-resource-setups}
@@ -88,11 +88,12 @@ Pi-स्तर की मशीनों के लिए नोट्स:
 |---|---|---|
 | [`CONCURRENT_JOBS`](/hi/guide/configuration#env-concurrent-jobs) | `1` | कितने jobs समानांतर चलते हैं। Auto-detect CPU cores में से एक घटाकर चुनता है, जो बड़ी मशीनों पर ठीक है और मेमोरी दबाव में 2-core बॉक्स पर ज़रूरत से ज़्यादा उतावला। |
 | [`MAX_WORKER_THREADS`](/hi/guide/configuration#env-max-worker-threads) | `2` | Image-processing thread pool। |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/hi/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | AI Python process और OCR runtime आख़िरी अनुरोध के बाद कितनी देर लोड रहते हैं। गर्म रहते हुए वे 1-2 GB रखते हैं, इसलिए छोटी विंडो मेमोरी जल्दी लौटा देती है, कीमत यह कि अगली AI कॉल में कुछ सेकंड ज़्यादा लगते हैं। [`AI_SESSION_IDLE_TIMEOUT`](/hi/guide/configuration#env-ai-session-idle-timeout) भी घटाएँ, क्योंकि process के बंद होने पर कैश किए मॉडल हट जाते हैं। |
 | [`MAX_BATCH_SIZE`](/hi/guide/configuration#env-max-batch-size) | `5` | 1-2 GB की मशीनों में सबसे पहले batches में ही मेमोरी खत्म होती है। |
 | [`MAX_UPLOAD_SIZE_MB`](/hi/guide/configuration#env-max-upload-size-mb) | `100` | एक अकेली विशाल फ़ाइल को पूरे workspace पर कब्ज़ा करने से रोकता है। |
-| [`MAX_MEGAPIXELS`](/hi/guide/configuration#env-max-megapixels) | `50` | 100+ MP की image decode करने में फ़ाइल के आकार से स्वतंत्र रूप से RAM लगती है। |
+| [`MAX_MEGAPIXELS`](/hi/guide/configuration#env-max-megapixels) | `50` | 100+ MP की image decode करने में फ़ाइल के आकार से स्वतंत्र रूप से RAM लगती है। लगभग 268 MP से बड़ी images `0` पर भी अस्वीकार हो जाती हैं। |
 | [`MAX_VIDEO_DURATION_S`](/hi/guide/configuration#env-max-video-duration-s) | `300` | लंबे transcodes छोटे CPU को मिनटों से घंटों तक घेरे रखते हैं। |
-| [`PROCESSING_TIMEOUT_S`](/hi/guide/configuration#env-processing-timeout-s) | `600` | कठोर सीमा, ताकि भागा हुआ job अंततः बॉक्स को मुक्त कर दे। |
+| [`JOB_TIMEOUT_LONG_S`](/hi/guide/configuration#env-job-timeout-long-s) | `3600` | AI और media jobs पर कठोर सीमा, ताकि भागा हुआ job अंततः बॉक्स को मुक्त कर दे। डिफ़ॉल्ट दो घंटे है। Image और document jobs पहले से ही [`JOB_TIMEOUT_FAST_S`](/hi/guide/configuration#env-job-timeout-fast-s) पर रुक जाते हैं (डिफ़ॉल्ट रूप से 120 सेकंड)। |
 
 ये सीमाएँ उस पर लागू होती हैं जो server स्वीकार करता है, इसलिए इन्हें जितना हो सके उतना छोटा रखने के बजाय अपने वास्तविक उपयोग के अनुसार सेट करें। यदि आप कभी video नहीं छूते, तो `MAX_VIDEO_DURATION_S` की सीमा कुछ नहीं बिगाड़ती; यदि आप रोज़ documents स्कैन करते हैं, तो [`MAX_PDF_PAGES`](/hi/guide/configuration#env-max-pdf-pages) को सीमित न करें।
 

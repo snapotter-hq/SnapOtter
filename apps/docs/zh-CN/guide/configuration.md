@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的所有环境变量及其默认值。可配置认证、存储、AI 模型、分析等。"
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 59a0b9e5fbd9
+i18n_output_hash: bcc15f66d00b
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ i18n_hash_version: 2
 | `HOST` | `0.0.0.0` | 服务器监听的 IP 地址。在桥接网络上（`docker run` 和 Compose 的默认网络），请保持 `0.0.0.0`（或 `::`），否则发布的端口将无法工作。在原生安装或使用主机网络的容器中，`127.0.0.1` 可让 API 不暴露在网络上；如需远程访问，请在前面放置反向代理。[内置模式](#embedded-mode)仅适用于 `0.0.0.0`、`::` 或 `127.0.0.1`，因为它的启动检查会调用 `127.0.0.1`。使用任何其他地址（包括 `::1`）时，容器永远不会被视为已启动，之后发生的崩溃会停止容器，而不是重启服务器。任何不是 IP 地址的值（包括 `localhost`）都会使服务器在启动时停止。 |
 | `BASE_PATH` | （空） | 公开的部署路径，例如 `/snapotter`。留空或设为 `/` 时在域名根路径提供服务。在运行时生效，无需重新构建镜像。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每个 IP 每分钟的最大请求数。设为 0 可禁用速率限制。 |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟对 API 密钥管理端点（列出、创建、吊销）的最大请求数。用于工具调用的密钥不受影响。没有无限制的取值：`0` 会拒绝对这些端点的所有请求。 |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟对 API 密钥管理端点（列出、创建、吊销）的最大请求数。用于工具调用的密钥不受影响。设为 `0` 表示不限制。 |
 | `CORS_ORIGIN` | （空） | 以逗号分隔的 CORS 允许来源，留空则仅允许同源。 |
 | `LOG_LEVEL` | `info` | 日志详细程度。可选值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认值只信任私有网络中的对端，因此 Docker 网络或局域网上的反向代理会被信任，而公网客户端伪造的请求头不会。仅当你控制的代理位于公网地址之前时，才设置 `true`。 |
@@ -38,7 +38,7 @@ i18n_hash_version: 2
 | `MAX_USERS` | `0`（无限制） | 已注册用户账户的最大数量。设为 0 表示无限制。 |
 | `SESSION_DURATION_HOURS` | `168` | 登录会话的有效期，单位为小时（默认 7 天）。 |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | 设为 `true` 可跳过首次登录时强制修改密码的提示。 |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | 每个 IP 每分钟的最大登录请求数。超出后的尝试会收到 `429`，直到这一分钟结束。同一用户名的反复失败通常会先触发 `LOGIN_THROTTLE_MAX_FAILURES`。管理员可以在 Settings > System 中覆盖它。没有无限制的取值：`0` 会拒绝所有登录。从源码构建则从 10 开始。 |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | 每个 IP 每分钟的最大登录请求数。超出后的尝试会收到 `429`，直到这一分钟结束。同一用户名的反复失败通常会先触发 `LOGIN_THROTTLE_MAX_FAILURES`。管理员可以在 设置 > 系统 中覆盖它。设为 `0` 表示不限制。从源码构建则从 10 开始。 |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | 一个用户名在 `LOGIN_THROTTLE_WINDOW_S` 内允许的密码登录失败次数，超过后该用户名的后续尝试会收到 `429`，无论来自哪个 IP。随着最早的失败记录移出窗口，它们会重新被放行。设为 0 可关闭该限制。 |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | 该窗口的长度，单位为秒。必须至少为 1；设为 0 时服务器拒绝启动。 |
 
@@ -47,9 +47,9 @@ i18n_hash_version: 2
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` 或 `s3`。S3 和 MinIO 需要包含 s3_storage 功能的许可证，以及下面的 `S3_*` 变量。 |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 连接字符串，也是处理每个请求所用的连接。在 2.3.0 及更高版本中，同时设置 `DATABASE_MIGRATION_URL` 后，它会成为最小权限的运行时角色，只拥有应用数据表上的 DML 权限，别无其他。Compose 栈将它指向其 `postgres` 服务；将它（连同 `REDIS_URL`）保持未设置即可进入内置模式。 |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | PostgreSQL 连接字符串，也是处理每个请求所用的连接。在 2.3.0 及更高版本中，同时设置 `DATABASE_MIGRATION_URL` 后，它会成为最小权限的运行时角色，只拥有应用数据表上的 DML 权限，别无其他。Compose 栈将它指向其 `postgres` 服务；将它（连同 `REDIS_URL`）保持未设置即可进入内置模式。要通过 unix 套接字连接，请在 `host` 中指明套接字目录，如 `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`，并将该目录挂载到容器中。 |
 | `DATABASE_MIGRATION_URL` | （空） | 特权连接，仅在启动期间用于运行迁移并授权给运行时角色，然后在第一个请求之前关闭。留空时，SnapOtter 以单一角色运行，由 `DATABASE_URL` 承担这两项工作。参见[最小权限角色](/zh-CN/guide/database#least-privilege-roles)。 |
-| `REDIS_URL` | `redis://localhost:6379` | Redis 连接字符串（用于 BullMQ 作业队列）。Compose 将其指向其 `redis` 服务。 |
+| `REDIS_URL` | `redis://localhost:6379` | Redis 连接字符串（用于 BullMQ 作业队列）。Compose 将其指向其 `redis` 服务。对于 unix 套接字，请使用 `unix:///run/redis/redis.sock?db=5`（如果 Redis 需要密码，请添加 `&password=...`），并将套接字挂载到容器中。 |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 处理期间用于存放临时文件的目录。会自动清理。镜像将其设置为 `/tmp/workspace`。 |
 | `FILES_STORAGE_PATH` | `./data/files` | 用于存放持久用户文件（上传的图片、保存的结果）的目录。镜像将其设置为 `/data/files`。 |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | 每个用户在文件库中可保留内容的上限，单位为 MB。超过上限的保存会被拒绝，并提示已用量和上限。为用户设置的配额会覆盖该值。设为 0 表示无限制。 |
@@ -65,7 +65,7 @@ i18n_hash_version: 2
 | `S3_SECRET_ACCESS_KEY` | （空） | 秘密密钥。必填。遵循相同的文件约定：`S3_SECRET_ACCESS_KEY_FILE`。 |
 | `S3_REGION` | `us-east-1` | 存储桶所在区域。 |
 | `S3_ENDPOINT` | （空） | MinIO、R2、Backblaze 及其他兼容 S3 的存储的自定义端点。留空表示 AWS。 |
-| `S3_FORCE_PATH_STYLE` | `false` | 对于 MinIO 以及其他需要 `endpoint/bucket/key` 而不是虚拟主机寻址的服务，请设为 `true`。 |
+| `S3_FORCE_PATH_STYLE` | `false` | 设为 `true`，适用于 MinIO 以及其他需要 `endpoint/bucket/key` 而不是虚拟主机寻址的服务。 |
 | `S3_PREFIX` | （空） | 键前缀，使一个存储桶可以容纳多个实例。 |
 
 ### 静态加密 {#encryption-at-rest}
@@ -100,7 +100,7 @@ i18n_hash_version: 2
 | `MAX_UPLOAD_SIZE_MB` | `0`（无限制） | 每次上传的最大文件大小，单位为 MB。设为 0 表示无限制。发布的镜像默认为 `0`；从源码构建则从 100 开始。 |
 | `MAX_BATCH_SIZE` | `0`（无限制） | 单个批处理请求中的最大文件数。设为 0 表示无限制。发布的镜像默认为 `0`；从源码构建则从 100 开始。 |
 | `CONCURRENT_JOBS` | `0`（自动） | 并行运行的批处理作业数。设为 0 则根据可用 CPU 核心数自动检测。 |
-| `MAX_MEGAPIXELS` | `0`（无限制） | 允许的最大图像分辨率，单位为百万像素。设为 0 表示无限制。 |
+| `MAX_MEGAPIXELS` | `0`（应用不设限制） | 允许的最大图像分辨率，单位为百万像素。设为 0 可移除 SnapOtter 自身的限制。图像解码器仍会拒绝约 268 MP（16383 x 16383 像素）以上的任何图像，因此大于 268 的值不会带来额外效果。 |
 | `MAX_CPU_UPSCALE_MP` | `4` | 在没有 GPU 的主机上，AI 放大接受的最大输入，单位为百万像素。放大后的输出也被限制在该值的 16 倍以内（默认 64 MP），因此较高的放大倍数会进一步降低输入上限。更大的图像会先缩小到合适尺寸再放大；如果缩小后结果不会比原图更大，则该请求会被拒绝。Lanczos 会跳过输入上限，但不会跳过输出上限。设为 0 表示不设上限，这需要大量内存：RealESRGAN 内部始终会构建一个 4x 缓冲区。 |
 | `MAX_WORKSPACE_SIZE_GB` | `0`（无限制） | 工作区中上传文件和已存储结果的总大小上限，单位为 GB。超过后，上传和工具请求会收到 503，直到文件在 `FILE_MAX_AGE_HOURS` 之后过期。设为 0 表示无限制；当磁盘可用空间不足 0.5 GB 时，本地存储仍会以 503 拒绝写入。发布的镜像默认为 `0`；从源码构建则从 10 开始。 |
 | `MAX_WORKER_THREADS` | `0`（自动） | 图像处理的最大工作线程数。设为 0 则根据可用 CPU 核心数自动检测。 |
@@ -121,9 +121,9 @@ i18n_hash_version: 2
 | `MAX_AUDIO_DURATION_S` | `0`（无限制） | 同上，针对音频工具。 |
 | `MAX_VIDEO_BITRATE_KBPS` | `0`（无限制） | 视频工具接受的最高总比特率，单位为千比特每秒。设为 0 表示无限制。 |
 | `PREVIEW_TIMEOUT_S` | `300` | 为视频或音频文件编码一个浏览器内预览片段的时间上限，单位为秒。文档预览改用 `LIBREOFFICE_TIMEOUT_S`。设为 0 表示不设上限。 |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | 一次 LibreOffice 转换（Word、Excel 和 PowerPoint 转 PDF、文档转换器以及文档预览）的时间上限，单位为秒。这里的 `0` 并不表示无限制；它会回退到 120。 |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | 一次 LibreOffice 转换（Word、Excel 和 PowerPoint 转 PDF、文档转换器以及文档预览）的时间上限，单位为秒。设为 `0` 表示不设上限。 |
 | `GIF_BG_MAX_FRAMES` | `150` | 移除 GIF 背景在一个动画中接受的最大帧数。更长的动画会收到 `400`，其中包含帧数。设为 0 表示不限制帧数；另有独立的像素预算仍然适用。 |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0`（关闭） | 媒体和文档引擎启动的每个 ffmpeg、Ghostscript、qpdf、LibreOffice、pandoc 和 pdfcpu 进程的地址空间上限，单位为 MB。读取上传图像的解码器（ImageMagick、exiftool 及其 ffmpeg 回退）不受限制。超出上限的进程会被终止，而不是把整个容器推向内存不足（OOM）终止器。它限制的是虚拟内存而不是常驻内存，所以请留出余量。AI sidecar 从不受限。设为 0 可关闭该限制，转而依靠容器内存上限。 |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0`（关闭） | 以下每个辅助进程的地址空间上限，单位为 MB：媒体和文档引擎中的 ffmpeg、ffprobe、Ghostscript、qpdf、LibreOffice、pandoc 和 pdfcpu，以及图像处理中的 exiftool、HEIF、JPEG XL 和 JPEG 2000 的解码器和编码器、RAW 解码器和 ffmpeg 回退解码器。ImageMagick 不受限制，因为它有自己的内存限制，AI sidecar 同样不受限制。超出上限的进程会被终止，而不是把整个容器推向内存不足（OOM）终止器。它限制的是虚拟内存而不是常驻内存，所以请设置得远高于进程的实际用量。JPEG XL 编码器需要的最多：一张 24 MP 的图像需要约 1.8 GB，在 1 GB 时失败，而且增加线程或 CPU 对此影响不大。设置该上限期间，HEIF 编码器被限制为两个工作线程，这会让 24 MP 的编码降到约 0.8 GB，代价是编码更慢。请从 `2048` 开始，只有在测试过你最大的文件之后才调低它。设为 0 可关闭该限制，转而依靠容器内存上限。 |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | 工具请求可携带的 `settings` 字段的最大大小，单位为 KB，按 UTF-8 字节计算。超过限制的请求会收到 `400`。设为 0 表示不设限制。实际的工具设置远小于 64 KB，因此仅当客户端发送异常大的设置时才需要调高此值。 |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | 烧录字幕和嵌入字幕接受的最大字幕文件（`.srt`、`.vtt`、`.ass`），单位为 MB。更大的文件会收到 `400`，其中包含文件大小和上限。设为 0 表示不设上限。一部长片的字幕文件通常远小于 1 MB。 |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | 编辑元数据写入单个标签（艺术家、描述、关键词等）的最长值，单位为字符。更长的值会收到 `400`，其中包含标签和上限。设为 0 表示不设上限。如果你存储较长的说明或描述，请调高它。标签值还必须能放入 `MAX_SETTINGS_PAYLOAD_KB` 和操作系统的单个参数上限（Linux 上为 128 KB）。 |
@@ -155,9 +155,14 @@ SnapOtter 会在容器内的 `$PATH` 上查找每个处理用的二进制文件�
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | 未保存的处理结果（原始上传文件和工具输出）在被自动删除之前保留多长时间。你明确保存到文件库的文件不受影响，会一直保留到你删除为止。 |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | 清理作业的运行频率。 |
-| `JOBS_RETENTION_DAYS` | `30` | 已完成的作业记录（完成、失败或取消）在每 6 小时运行一次的保留清理将其删除之前保留的天数。管理员可以在 Settings > System 中覆盖它。处于法律保留状态的用户和团队会保留其记录。设为 0 可永久保留。 |
+| `JOBS_RETENTION_DAYS` | `30` | 已完成的作业记录（完成、失败或取消）在每 6 小时运行一次的保留清理将其删除之前保留的天数。管理员可以在 设置 > 系统 中覆盖它。处于法律保留状态的用户和团队会保留其记录。设为 0 可永久保留。 |
 | `AUDIT_RETENTION_DAYS` | `0`（永久） | 审计日志条目的保留天数。覆盖和法律保留规则相同。开启防篡改审计日志时不会删除任何内容。设为 0 可永久保留。 |
-| `SNAPOTTER_LICENSE_KEY` | （空） | 用于解锁企业功能（如 SAML、SCIM 和 S3 存储）的许可证密钥。在启动时读取，因此更改后请重启。无效或已过期的密钥会记录一条警告，服务器将在没有这些功能的情况下运行。在容器中，你也可以改为通过 `SNAPOTTER_LICENSE_KEY_FILE` 挂载它（参见 [Docker secrets](/guide/security#docker-secrets)）。 |
+
+### 企业许可证 {#enterprise-license}
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | （空） | 用于解锁企业功能（如 SAML、SCIM 和 S3 存储）的许可证密钥。在启动时读取，因此更改后请重启。无效或已过期的密钥会记录一条警告，服务器将在没有这些功能的情况下运行。在容器中，你也可以改为通过 `SNAPOTTER_LICENSE_KEY_FILE` 挂载它（参见 [Docker secrets](/zh-CN/guide/security#docker-secrets)）。 |
 
 ### 外观 {#appearance}
 
@@ -171,8 +176,8 @@ SnapOtter 会在容器内的 `$PATH` 上查找每个处理用的二进制文件�
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `PUID` | `999` | 以此 UID 运行容器进程。为绑定挂载设置得与宿主机用户一致（`id -u`）。 |
-| `PGID` | `999` | 以此 GID 运行容器进程。为绑定挂载设置得与宿主机组一致（`id -g`）。 |
+| `PUID` | `999` | 以此 UID 运行容器进程。为绑定挂载设置得与宿主机用户一致（`id -u`）。需要可写的根文件系统；参见[安全指南](/zh-CN/guide/security#why-read-only-is-not-set)。 |
+| `PGID` | `999` | 以此 GID 运行容器进程。为绑定挂载设置得与宿主机组一致（`id -g`）。需要可写的根文件系统；参见[安全指南](/zh-CN/guide/security#why-read-only-is-not-set)。 |
 
 ## Docker 示例 {#docker-example}
 

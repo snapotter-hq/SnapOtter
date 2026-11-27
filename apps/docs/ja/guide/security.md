@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter のセキュリティハードニングガイドです。コンテナのセキュリティ、ネットワーク分離、Docker シークレット、Kubernetes へのデプロイ、コンプライアンス関連の成果物を説明します。"
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: ce191e867cd4
+i18n_output_hash: 7a1c0db75b73
 i18n_hash_version: 2
 ---
 
 # セキュリティとハードニング {#security-hardening}
 
-SnapOtter は、ファイルの処理をすべてお客様のインフラ内で行います。プロジェクトの改善に役立てるため、デフォルトでは、内容を含まない匿名のプロダクト分析とクラッシュレポートを送信します。ファイル、ファイル名、ファイルの内容、OCR の出力、画像のメタデータ、ドキュメントのテキストが送信されることはありません。任意のフィードバックは、ユーザーが送信した後で、かつ分析が有効な場合にのみ送信され、連絡先の項目は明示的な連絡の同意がある場合にのみ含まれます。管理者は Settings > System > Privacy で、分析とフィードバックの収集をワンクリックでオフにでき、再ビルドは不要です。ファイル処理は常にコンテナの内部で完結します。
+SnapOtter は、ファイルの処理をすべてお客様のインフラ内で行います。プロジェクトの改善に役立てるため、内容を含まない匿名のプロダクト分析とクラッシュレポートを送信することがありますが、新しいインスタンスではまず管理者に確認し、回答があるまで何も送信しません。ファイル、ファイル名、ファイルの内容、OCR の出力、画像のメタデータ、ドキュメントのテキストが送信されることはありません。任意のフィードバックは、ユーザーが送信した後で、かつ分析が有効な場合にのみ送信され、連絡先の項目は明示的な連絡の同意がある場合にのみ含まれます。管理者は Settings > System > Privacy で、分析とフィードバックの収集をワンクリックでオフにでき、再ビルドは不要です。ファイル処理は常にコンテナの内部で完結します。
 
 コンテナは専用の非 root ユーザー（`snapotter`）として動作し、必要最小限のものを除くすべての Linux ケーパビリティが削除されています。脆弱性の開示ポリシー全文とセキュリティアーキテクチャについては、GitHub 上の [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) を参照してください。
 
@@ -19,7 +19,7 @@ SnapOtter は、ファイルの処理をすべてお客様のインフラ内で�
 どちらのスタックにも、次の制御が適用されます。
 
 - メモリ、スワップ、CPU、PID の制限により、ネイティブ処理の暴走を封じ込めます。
-- すべてのサービスで、Linux ケーパビリティをすべて削除します。アプリケーションが追加し直すのは、ボリュームの所有権設定、一方向の `gosu` によるアイデンティティの切り替え、シグナルの適切な転送のための `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` のみです。PostgreSQL と Redis には、それぞれ公式のエントリポイントに必要なサブセットだけを付与します。
+- すべてのサービスで、Linux ケーパビリティをすべて削除します。アプリケーションが追加し直すのは `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` のみで、ボリュームの所有権設定、一方向の `gosu` によるアイデンティティの切り替え、シグナルの適切な転送に使います。PostgreSQL と Redis には、それぞれ公式のエントリポイントに必要なサブセットだけを付与します。
 - `security_opt: [no-new-privileges:true]` により、アプリケーション、PostgreSQL、Redis の各コンテナ内のプロセスが追加の権限を取得することを防ぎます。これは `gosu` と両立します。エントリポイントは root で開始してボリュームを準備し、その後で専用の `snapotter` ユーザーに切り替えるだけだからです。
 - PostgreSQL と Redis のイメージはダイジェストで固定されています。アプリケーションも同様に、`latest` ではなく、検証済みのリリースタグまたはダイジェストに固定してください。
 - ヘルスチェック、サイズ制限付きの JSON ログローテーション、永続的な Redis AOF、再起動ポリシーは、標準のファイルで一元的に定義されています。
@@ -28,7 +28,7 @@ SnapOtter は、ファイルの処理をすべてお客様のインフラ内で�
 
 ### `read_only` を設定していない理由 {#why-read-only-is-not-set}
 
-[PUID](/ja/guide/configuration#env-puid)/[PGID](/ja/guide/configuration#env-pgid) の再マッピングは起動時に `/etc/passwd` と `/etc/group` に書き込むため、`read_only: true` は設定されていません。PUID/PGID の代わりに Docker の `--user` フラグや Kubernetes の `runAsUser` を使う場合は、読み取り専用のルートファイルシステムを安全に有効にできます。
+`read_only: true` は、[PUID](/ja/guide/configuration#env-puid)/[PGID](/ja/guide/configuration#env-pgid) の再マッピングが起動時に `/etc/passwd` と `/etc/group` に書き込むため、設定されていません。PUID/PGID の代わりに Docker の `--user` フラグや Kubernetes の `runAsUser` を使う場合は、読み取り専用のルートファイルシステムを安全に有効にできます。読み取り専用のルートで PUID または PGID に 999 以外を設定すると、コンテナは起動時にその旨のメッセージを表示して停止します。このとき、/data にすでにあるものの所有者は一切変更されません。オールインワンイメージも、PUID と PGID が未設定で、/run と /tmp が tmpfs としてマウントされ、/run で exec が許可されていれば、読み取り専用のルートで動作します。s6-overlay がスーパーバイザーをそこから起動するためです。
 
 ## ネットワーク分離 {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose のシークレット（Swarm を使わない場合）には、Co
 
 ## Kubernetes へのデプロイ {#kubernetes-deployment}
 
-エントリポイントは、コンテナがすでに非 root で実行されていること（たとえば Kubernetes の `runAsUser` による場合）を検出し、gosu による権限の切り替えを自動的にスキップします。この場合、マウントされたボリュームを自身で chown できないため、ボリュームが書き込み可能かを確認し、そうでなければ対処方法を示して早期に終了します。`fsGroup` や他の UID の構成（TrueNAS、OpenShift）については、[ストレージの権限](/ja/guide/deployment#storage-permissions)を参照してください。
+エントリポイントは、コンテナがすでに非 root で実行されていること（たとえば Kubernetes の `runAsUser` による場合）を検出し、gosu による権限の切り替えを自動的にスキップします。この場合、マウントされたボリュームを自身で chown できないため、ボリュームが書き込み可能かを確認し、そうでなければ対処方法を示して早期に終了します。[ストレージの権限](/ja/guide/deployment#storage-permissions)で、`fsGroup` や他の UID の構成（TrueNAS、OpenShift）について説明しています。
 
 **推奨される Pod の SecurityContext:**
 

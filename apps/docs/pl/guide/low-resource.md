@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 5cfb6ddc1616
+i18n_output_hash: 1fd069ef3210
 i18n_hash_version: 2
 ---
 # Konfiguracje o ograniczonych zasobach {#low-resource-setups}
@@ -88,11 +88,12 @@ Wszystkie limity to zmienne środowiskowe, w pełni opisane w [Konfiguracja](/pl
 |---|---|---|
 | [`CONCURRENT_JOBS`](/pl/guide/configuration#env-concurrent-jobs) | `1` | Ile zadań działa równolegle. Automatyczne wykrywanie przyjmuje liczbę rdzeni CPU minus jeden, co jest w porządku na dużych maszynach, a zbyt ambitne na maszynie z 2 rdzeniami pod presją pamięci. |
 | [`MAX_WORKER_THREADS`](/pl/guide/configuration#env-max-worker-threads) | `2` | Pula wątków przetwarzania obrazów. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/pl/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Jak długo proces Python AI i środowisko OCR pozostają załadowane po ostatnim żądaniu. W stanie rozgrzanym zajmują 1-2 GB, więc krótsze okno szybciej oddaje pamięć, kosztem kilku sekund przy następnym wywołaniu AI. Warto też obniżyć [`AI_SESSION_IDLE_TIMEOUT`](/pl/guide/configuration#env-ai-session-idle-timeout), ponieważ zakończenie procesu usuwa modele z pamięci podręcznej. |
 | [`MAX_BATCH_SIZE`](/pl/guide/configuration#env-max-batch-size) | `5` | Partie to miejsce, w którym maszynom z 1-2 GB najpierw kończy się pamięć. |
 | [`MAX_UPLOAD_SIZE_MB`](/pl/guide/configuration#env-max-upload-size-mb) | `100` | Chroni przed zajęciem całej przestrzeni roboczej przez jeden ogromny plik. |
-| [`MAX_MEGAPIXELS`](/pl/guide/configuration#env-max-megapixels) | `50` | Dekodowanie obrazu powyżej 100 MP kosztuje pamięć RAM niezależnie od rozmiaru pliku. |
+| [`MAX_MEGAPIXELS`](/pl/guide/configuration#env-max-megapixels) | `50` | Dekodowanie obrazu powyżej 100 MP kosztuje pamięć RAM niezależnie od rozmiaru pliku. Obrazy powyżej ok. 268 MP są odrzucane nawet przy `0`. |
 | [`MAX_VIDEO_DURATION_S`](/pl/guide/configuration#env-max-video-duration-s) | `300` | Długie transkodowania blokują mały CPU na minuty lub godziny. |
-| [`PROCESSING_TIMEOUT_S`](/pl/guide/configuration#env-processing-timeout-s) | `600` | Twardy limit, dzięki któremu zbiegłe zadanie w końcu zwolni maszynę. |
+| [`JOB_TIMEOUT_LONG_S`](/pl/guide/configuration#env-job-timeout-long-s) | `3600` | Twardy limit dla zadań AI i multimedialnych, dzięki któremu zbiegłe zadanie w końcu zwolni maszynę. Domyślnie są to dwie godziny. Zadania obrazów i dokumentów zatrzymują się już po [`JOB_TIMEOUT_FAST_S`](/pl/guide/configuration#env-job-timeout-fast-s) (domyślnie 120 sekund). |
 
 Te limity dotyczą tego, co serwer przyjmuje, więc należy ustawić je zgodnie z faktycznym użyciem, a nie jak najmniejsze. Jeśli wideo nie jest używane, limit `MAX_VIDEO_DURATION_S` nic nie kosztuje. Jeśli dokumenty są skanowane codziennie, nie należy ograniczać [`MAX_PDF_PAGES`](/pl/guide/configuration#env-max-pdf-pages).
 
