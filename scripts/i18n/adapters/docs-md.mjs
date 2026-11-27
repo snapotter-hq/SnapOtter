@@ -309,6 +309,8 @@ export function createDocsAdapter({ root = DEFAULT_ROOT } = {}) {
 
   return {
     name: "docs",
+    // Version 1 files load with outputHash = hash(text), so they never trip it.
+    verifiesOutputHash: true,
 
     // Read-only: builds the anchored, masked units in memory without touching
     // the English sources. A parity check must never mutate the tree (#870); the
