@@ -510,3 +510,81 @@ print("TORCH_ARCH_1163_OK")
     expect(res.stdout).toContain("TORCH_ARCH_1163_OK");
   });
 });
+
+describe.skipIf(!hasPython)("gpu nvidia wheel CUDA libraries (issue #4924)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pyDir = resolve(here, "../../../packages/ai/python");
+
+  it("loads wheel cuDNN by path only when the loader cannot resolve it", () => {
+    const res = spawnSync(
+      pythonBin as string,
+      [
+        "-c",
+        `
+import ctypes, importlib.util, os, sys, tempfile, types
+
+sys.path.insert(0, ${JSON.stringify(pyDir)})
+import gpu
+
+root = tempfile.mkdtemp()
+for rel in (
+    "cudnn/lib/libcudnn.so.9",
+    "cudnn/lib/libcudnn_adv.so.9",
+    "cublas/lib/libcublas.so.12",
+    "cublas/lib/libcublasLt.so.12",
+    "cuda_runtime/lib/libcudart.so.12",
+    "cuda_nvrtc/lib/libnvrtc.so.12",
+):
+    path = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, "wb").close()
+
+spec = types.SimpleNamespace(submodule_search_locations=[root])
+importlib.util.find_spec = lambda name: spec
+
+names = [os.path.basename(p) for p in gpu._wheel_cuda_library_paths()]
+assert names == [
+    "libcudart.so.12",
+    "libcublasLt.so.12",
+    "libcublas.so.12",
+    "libcudnn_adv.so.9",
+    "libcudnn.so.9",
+], names
+
+calls = []
+
+def fake_cdll(name, mode=ctypes.DEFAULT_MODE):
+    calls.append((name, mode))
+    # System CUDA resolves cudart and cublas by name; cuDNN is wheel-only.
+    if name in ("libcudart.so.12", "libcublasLt.so.12", "libcublas.so.12") or os.path.isabs(name):
+        return object()
+    raise OSError(name + ": cannot open shared object file")
+
+ctypes.CDLL = fake_cdll
+gpu.preload_wheel_cuda_libraries.cache_clear()
+loaded = gpu.preload_wheel_cuda_libraries()
+assert loaded == ("libcudnn_adv.so.9", "libcudnn.so.9"), loaded
+abs_calls = [c for c in calls if os.path.isabs(c[0])]
+assert [os.path.basename(c[0]) for c in abs_calls] == ["libcudnn_adv.so.9", "libcudnn.so.9"], calls
+assert all(mode == ctypes.RTLD_GLOBAL for _, mode in abs_calls), abs_calls
+
+# gpu_available() can be answered by torch alone, so onnx_providers() has to
+# preload on its own.
+sys.modules["onnxruntime"] = types.SimpleNamespace(
+    get_available_providers=lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+)
+gpu.gpu_available = lambda: True
+seen = []
+gpu.preload_wheel_cuda_libraries = lambda: seen.append(1)
+providers, device = gpu.onnx_providers()
+assert device == "cuda" and seen == [1], (device, seen)
+
+print("WHEEL_CUDA_4924_OK")
+`,
+      ],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+    expect(res.status, res.stderr).toBe(0);
+    expect(res.stdout).toContain("WHEEL_CUDA_4924_OK");
+  });
+});

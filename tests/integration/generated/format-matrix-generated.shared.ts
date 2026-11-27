@@ -22,7 +22,11 @@ import {
   pairwiseSettingsFor,
   TOOL_SETTINGS_OVERRIDES,
 } from "../../helpers/tool-default-settings.js";
-import { settledJobRow, waitForGeneratedJobArtifact } from "../settle-job.js";
+import {
+  AcceptedJobTimeoutError,
+  settledJobRow,
+  waitForGeneratedJobArtifact,
+} from "../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -309,7 +313,10 @@ export function registerToolFormatMatrix(part: number): void {
               if (
                 !isRecordedRejection(await settledJobRow(payload.jobId as string), ALLOWED_STATUSES)
               ) {
-                throw error;
+                // One test loops over every fixture, so name the one that stalled.
+                throw error instanceof AcceptedJobTimeoutError
+                  ? new Error(`${toolId} x ${fixture}: ${error.message}`, { cause: error })
+                  : error;
               }
               accounting.reject();
               continue;
