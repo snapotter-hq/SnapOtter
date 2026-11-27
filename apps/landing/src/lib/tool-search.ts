@@ -246,6 +246,9 @@ const RESULT_SCORE_THRESHOLD = 12;
 const RELATED_SCORE_THRESHOLD = 6;
 const CONFIDENT_SCORE_THRESHOLD = 40;
 const ACTION_VERB_TOKENS = new Set(["add", "apply", "insert"]);
+// Below the id's 18-point metadata phrase match, so a tool whose id the query
+// spells in order still outranks one it only names out of order (#5190).
+const ID_WORDS_SCORE = 15;
 const PARTIAL_PHRASE_STOP_TOKENS = new Set([
   "a",
   "an",
@@ -841,6 +844,25 @@ export function matchTool(rawQuery: string, haystack: string): boolean {
   });
 }
 
+/**
+ * The query has every word of a multi-word id, in any order, so "pdf merge"
+ * and "merge pdf files" name merge-pdf. A plural id word also matches its
+ * singular, since query tokens arrive as "video" even when typed "videos".
+ * Ids with "to" never qualify, because query tokens drop it, which is right:
+ * there the order is the conversion direction.
+ */
+function queryHasIdWords(queryTokens: string[], id: string): boolean {
+  const idTokens = tokenize(plainNormalize(id));
+  return (
+    idTokens.length > 1 &&
+    idTokens.every(
+      (token) =>
+        queryTokens.includes(token) ||
+        (token.endsWith("s") && queryTokens.includes(token.slice(0, -1))),
+    )
+  );
+}
+
 export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchResult {
   const query = buildQuery(rawQuery);
 
@@ -1020,6 +1042,10 @@ export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchRes
   if (matchedActionTokens.length > 0) {
     score += matchedActionTokens.length * 12;
     reasons.add("action match");
+  }
+  if (queryHasIdWords(query.tokens, item.id)) {
+    score += ID_WORDS_SCORE;
+    reasons.add("id words match");
   }
   if (
     query.hasConversionIntent &&

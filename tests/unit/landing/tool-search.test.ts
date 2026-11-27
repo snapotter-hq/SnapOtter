@@ -786,6 +786,35 @@ describe("landing searchTools with real catalog metadata", () => {
       expect(ids(search(query).results)).toContain(id);
     });
 
+    // #5190: "files" was a required word no tool has, and a reordered query
+    // ("pdf merge") only earned token points.
+    it.each([
+      ["merge pdf", "merge-pdf"],
+      ["merge pdf files", "merge-pdf"],
+      ["merge pdfs", "merge-pdf"],
+      ["pdf merge", "merge-pdf"],
+      ["pdf files merge", "merge-pdf"],
+      ["pdf compress", "compress-pdf"],
+      ["videos merge", "merge-videos"],
+      ["csv merge", "merge-csvs"],
+    ])("ranks the named tool first in any word order: %j leads with %s", (query, id) => {
+      const result = search(query);
+      expect(ids(result.results)[0]).toBe(id);
+      expect(result.hasConfidentMatch).toBe(true);
+    });
+
+    it("scores a tool's id in typed order above the same words reordered", () => {
+      const mergePdf = realTools.find((tool) => tool.id === "merge-pdf");
+      if (!mergePdf) throw new Error("Missing merge-pdf");
+      expect(scoreTool("merge pdf", mergePdf).score).toBeGreaterThan(
+        scoreTool("pdf merge", mergePdf).score,
+      );
+    });
+
+    it("does not lift a conversion preset for the reverse direction", () => {
+      expect(ids(search("png to jpg").results)).not.toContain("jpg-to-png");
+    });
+
     it("keeps a converter that names the format only in acceptedInputs", () => {
       expect(ids(search("orf to gif").results)).toContain("convert");
     });
