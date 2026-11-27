@@ -4,6 +4,7 @@ import {
   blockCentre,
   clampCentre,
   estimateBlockPercent,
+  placementVariesByFile,
   pointerToPlacement,
   type TextOverlayLayout,
 } from "../../../apps/web/src/lib/text-overlay-placement.js";
@@ -79,5 +80,20 @@ describe("text-overlay placement", () => {
     );
     expect(long.width).toBeCloseTo(30);
     expect(long.height).toBeGreaterThan(short.height * 2);
+  });
+});
+
+// #5302
+describe("placementVariesByFile", () => {
+  it("is true only for the pixel-margin presets on more than one file", () => {
+    expect(placementVariesByFile("top", 2)).toBe(true);
+    expect(placementVariesByFile("bottom", 3)).toBe(true);
+    expect(placementVariesByFile("center", 2)).toBe(false);
+    expect(placementVariesByFile("custom", 2)).toBe(false);
+  });
+
+  it("is false for a single file at any position", () => {
+    expect(placementVariesByFile("top", 1)).toBe(false);
+    expect(placementVariesByFile("bottom", 1)).toBe(false);
   });
 });

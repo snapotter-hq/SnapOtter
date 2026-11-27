@@ -52,6 +52,14 @@ export function clampCentre(
   return { x: clampCentreAxis(point.x, block.width), y: clampCentreAxis(point.y, block.height) };
 }
 
+/**
+ * Top and Bottom sit a pixel margin from the edge on the server, so the same settings land at a
+ * different percentage on each file in a batch. Custom is a percentage and Center is always 50%.
+ */
+export function placementVariesByFile(position: TextPosition, fileCount: number): boolean {
+  return fileCount > 1 && (position === "top" || position === "bottom");
+}
+
 /** Centre of the block, in percent, where the server puts it for the current settings. */
 export function blockCentre(
   layout: TextOverlayLayout,
