@@ -2283,6 +2283,60 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     }
   });
 
+  it.each([
+    { steps: 1, stored: "<svg" },
+    { steps: 2, stored: "PNG" },
+  ])(
+    "keeps SVG source for a keepSvgVector first step only when it is the sole step on /api/v1/pipeline/batch ($steps steps)",
+    async ({ steps, stored }) => {
+      vi.clearAllMocks();
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "svg",
+        width: 0,
+        height: 0,
+      });
+      const baseConfig = getToolConfig(batchTestToolId);
+      getToolConfigSpy.mockImplementation((toolId: string) =>
+        toolId === batchTestToolId ? { ...baseConfig, keepSvgVector: true } : baseConfig,
+      );
+      try {
+        const reply = await invokePipelineBatchRoute([
+          {
+            type: "file",
+            filename: "icon.svg",
+            content: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+              "utf-8",
+            ),
+          },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: Array.from({ length: steps }, () => ({
+                toolId: batchTestToolId,
+                settings: {},
+              })),
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: `pipeline-batch-keep-svg-${steps}` },
+        ]);
+
+        expect(reply.statusCode).toBe(202);
+        const call = putObjectMock.mock.calls[0] as unknown[] | undefined;
+        const body = (call ? (call[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
+        expect(stored === "PNG" ? body.slice(1, 4) : body).toContain(stored);
+        expect(body).not.toContain("<script");
+        expect(String(call?.[0])).toBe(
+          `uploads/${lastBatchParentId()}-f0-s0/${stored === "PNG" ? "icon.png" : "icon.svg"}`,
+        );
+      } finally {
+        getToolConfigSpy.mockReset();
+      }
+    },
+  );
+
   it("rethrows unexpected faults from decompressSvgz or sanitizeSvg and settles failBatchJob on /api/v1/pipeline/batch (#3580)", async () => {
     vi.clearAllMocks();
     const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");

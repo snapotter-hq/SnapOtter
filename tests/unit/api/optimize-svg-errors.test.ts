@@ -67,6 +67,34 @@ describe("optimizeOnWorker error mapping", () => {
   });
 });
 
+describe("optimizeSvgBuffer deadline overrun (#5321)", () => {
+  // A kept SVG never goes through the render child, so the svgo worker's own
+  // deadline is the only thing that bounds it.
+  const svgOfSize = (bytes: number) =>
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg"><!-- ${"x".repeat(bytes)} --><rect width="1" height="1"/></svg>`,
+    );
+
+  it("answers a worker deadline overrun on a large SVG as a too-complex client error", async () => {
+    runInWorker.mockRejectedValueOnce(new WorkerTimeoutError(30_000));
+    const err = await optimizeSvgBuffer(
+      svgOfSize(SLOW_HOST_TIMEOUT_MAX_BYTES + 1),
+      {} as never,
+      "big.svg",
+    ).catch((e: unknown) => e);
+    expect(toolInputErrorCode(err)).toBe("SVG_TOO_LARGE");
+  });
+
+  it("answers a worker deadline overrun on a small SVG as a retryable 503", async () => {
+    runInWorker.mockRejectedValueOnce(new WorkerTimeoutError(30_000));
+    const err = (await optimizeSvgBuffer(svgOfSize(10), {} as never, "small.svg").catch(
+      (e: unknown) => e,
+    )) as { statusCode?: number; code?: string };
+    expect(err.statusCode).toBe(503);
+    expect(err.code).toBe("ENGINE_UNAVAILABLE");
+  });
+});
+
 describe("optimizeSvgBuffer sanitizer refusals", () => {
   it("keeps the sanitizer's own code instead of calling every refusal too large", async () => {
     const svg = Buffer.from(

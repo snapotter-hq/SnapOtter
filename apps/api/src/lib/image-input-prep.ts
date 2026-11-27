@@ -46,6 +46,8 @@ export interface PrepareRouteImageOptions {
    * plugins).
    */
   rasterizeToPng?: boolean;
+  /** Cancels an SVG render when the client disconnects. */
+  signal?: AbortSignal;
 }
 
 export interface PreparedRouteImage {
@@ -183,9 +185,10 @@ export async function prepareRouteImage(
       throw asDecoderOutOfMemory(err);
     }
     try {
-      buf = await renderSvgToPng(buf);
+      buf = await renderSvgToPng(buf, { signal: opts.signal });
       convertedToPng = true;
     } catch (err) {
+      opts.signal?.throwIfAborted();
       throw svgRenderFailure(err);
     }
   } else {
