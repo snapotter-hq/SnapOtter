@@ -1,8 +1,8 @@
 ---
 description: "AI 引擎参考，涵盖所有本地 ML 工具。抠图、放大、OCR、人脸检测、照片修复等。"
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 56e946a56785
+i18n_output_hash: cf2f5abeeeb5
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ done
 | `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
 | `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
 
-返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告，以及适用时的精确运行时/模型版本。显式指定的质量层级绝不会回退到其他层级。如果 `balanced` 或 `best` 不可用，API 会返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。显式指定 Fast 或旧版 `tesseract` 并搭配韩语或阿拉伯语时，会在作业入队前返回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"` 以及精确包的指引。
+返回提取的文本以及来源元数据：引擎、请求的和实际的质量、设备、提供商、降级状态、警告，以及适用时的精确运行时/模型版本。显式指定的质量层级绝不会回退到其他层级。如果 `balanced` 或 `best` 不可用，API 会返回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是静默运行 `fast`。显式指定 Fast 或旧版 `tesseract` 并搭配韩语或阿拉伯语时，会在作业入队前返回 `FEATURE_INCOMPATIBLE`、`compatibilityReason`: `fast-korean-unsupported` 以及精确包的指引。
 
 ## PDF OCR {#pdf-ocr}
 

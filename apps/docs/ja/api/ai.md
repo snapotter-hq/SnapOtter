@@ -1,8 +1,8 @@
 ---
 description: "すべてのローカル ML ツールを網羅した AI エンジンリファレンス。背景除去、アップスケーリング、OCR、顔検出、写真復元など。"
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: ddeaf4ef6701
+i18n_output_hash: 671875e1ac87
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ done
 | `enhance` | boolean | ティアに依存 | 局所的なコントラストを改善します。Fast では直接適用し、高精度ティアでは調整済みスコアリングによって OCR が改善する場合にのみバリアントを採用します。Best ではデフォルトで有効です。 |
 | `engine` | string | - | 非推奨の互換性エイリアス。`tesseract` を `fast` に、従来の `paddleocr` 値を `balanced` にマッピングします。PaddlePaddle は読み込みません。 |
 
-抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォールバックすることはありません。 `balanced` または `best` が使用できない場合、API は `FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返し、`fast` をサイレントに実行することはありません。韓国語で明示的に Fast または旧 `tesseract` を指定した場合は、ジョブがキューに投入される前に `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`、高精度パックの案内を返します。
+抽出されたテキストと来歴メタデータを返します: エンジン、要求された品質と実際の品質、デバイス、プロバイダー、劣化状態、警告、および該当する場合は正確なランタイム/モデルのバージョン。 明示的な品質要求が別の層にフォールバックすることはありません。 `balanced` または `best` が使用できない場合、API は `FEATURE_NOT_INSTALLED` または `FEATURE_INCOMPATIBLE` を返し、`fast` をサイレントに実行することはありません。韓国語で明示的に Fast または旧 `tesseract` を指定した場合は、ジョブがキューに投入される前に `FEATURE_INCOMPATIBLE`、`compatibilityReason`: `fast-korean-unsupported`、高精度パックの案内を返します。
 
 ## PDF OCR {#pdf-ocr}
 

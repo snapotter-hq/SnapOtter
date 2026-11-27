@@ -1,8 +1,8 @@
 ---
 description: "Tüm yerel ML araçlarını içeren AI motoru referansı. Arka plan kaldırma, büyütme, OCR, yüz algılama, fotoğraf onarımı ve daha fazlası."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: bca97efb521e
+i18n_output_hash: 7e073f38be3b
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
 | `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Fast doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. Best için varsayılan olarak açıktır |
 | `engine` | string | - | Kullanımdan kaldırılmış uyumluluk takma adı. `tesseract` değerini `fast` değerine ve eski `paddleocr` değerini `balanced` değerine eşler; PaddlePaddle yüklemez |
 
-Çıkarılan metni ve kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `FEATURE_NOT_INSTALLED` değerini sessizce çalıştırmak yerine `FEATURE_INCOMPATIBLE` ya da `fast` döndürür. Korece ile açıkça Fast veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` ve doğru pakete yönlendirme döndürülür.
+Çıkarılan metni ve kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `FEATURE_NOT_INSTALLED` değerini sessizce çalıştırmak yerine `FEATURE_INCOMPATIBLE` ya da `fast` döndürür. Korece ile açıkça Fast veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` ve doğru pakete yönlendirme döndürülür.
 
 ## PDF OCR {#pdf-ocr}
 

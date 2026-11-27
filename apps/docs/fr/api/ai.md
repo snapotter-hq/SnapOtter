@@ -1,8 +1,8 @@
 ---
 description: "Référence du moteur d'IA avec tous les outils de ML locaux. Suppression d'arrière-plan, agrandissement, OCR, détection de visages, restauration de photos, et plus encore."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 8a49bc00be1e
+i18n_output_hash: 0fe223855224
 i18n_hash_version: 2
 ---
 
@@ -194,7 +194,7 @@ Applique un flou à l'arrière-plan tout en gardant le sujet net.
 | `enhance` | booléen | Dépend du niveau | Améliorer le contraste local. Fast l'applique directement ; les niveaux précis conservent la variante uniquement lorsque la notation calibrée améliore OCR. Activé par défaut pour le meilleur |
 | `engine` | chaîne | - | Alias ​​de compatibilité obsolète. Mappe `tesseract` à `fast` et la valeur `paddleocr` héritée à `balanced` ; il ne charge pas PaddlePaddle |
 
-Renvoie le texte extrait ainsi que les métadonnées de provenance : moteur, qualité demandée et réelle, appareil, fournisseur, état de dégradation, avertissements et versions d'exécution/modèle précises, le cas échéant. Les demandes de qualité explicites ne retombent jamais sur un autre niveau. Si `balanced` ou `best` n'est pas disponible, API renvoie `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` au lieu d'exécuter silencieusement `fast`. Un Fast explicite, ou l'alias historique `tesseract`, avec le coréen renvoie `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` et des instructions sur le pack précis avant la mise en file de la tâche.
+Renvoie le texte extrait ainsi que les métadonnées de provenance : moteur, qualité demandée et réelle, appareil, fournisseur, état de dégradation, avertissements et versions d'exécution/modèle précises, le cas échéant. Les demandes de qualité explicites ne retombent jamais sur un autre niveau. Si `balanced` ou `best` n'est pas disponible, API renvoie `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` au lieu d'exécuter silencieusement `fast`. Un Fast explicite, ou l'alias historique `tesseract`, avec le coréen renvoie `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` et des instructions sur le pack précis avant la mise en file de la tâche.
 
 ## OCR de PDF {#pdf-ocr}
 

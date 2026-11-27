@@ -1,8 +1,8 @@
 ---
 description: "Riferimento del motore AI con tutti gli strumenti ML locali. Rimozione dello sfondo, upscaling, OCR, rilevamento dei volti, restauro fotografico e altro ancora."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 8112bfbd0ca3
+i18n_output_hash: d1f1ccd8caab
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Sfoca lo sfondo mantenendo nitido il soggetto.
 | `enhance` | boolean | Dipendente dal livello | Migliora il contrasto locale. Fast lo applica direttamente; i livelli accurati mantengono la variante solo quando il punteggio calibrato migliora OCR. L'impostazione predefinita è Migliore |
 | `engine` | string | - | Alias di compatibilità deprecato. Mappa `tesseract` su `fast` e il valore `paddleocr` legacy su `balanced`; non carica PaddlePaddle |
 
-Restituisce il testo estratto più i metadati di provenienza: motore, qualità richiesta ed effettiva, dispositivo, provider, stato di degrado, avvisi e versioni runtime/modello accurate, ove applicabile. Le richieste esplicite di qualità non ricadono mai su un altro livello. Se `balanced` o `best` non è disponibile, l'API restituisce `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` invece di eseguire silenziosamente `fast`. Fast esplicito o `tesseract` legacy con il coreano restituisce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` e le indicazioni sul pacchetto accurato prima che un job venga messo in coda.
+Restituisce il testo estratto più i metadati di provenienza: motore, qualità richiesta ed effettiva, dispositivo, provider, stato di degrado, avvisi e versioni runtime/modello accurate, ove applicabile. Le richieste esplicite di qualità non ricadono mai su un altro livello. Se `balanced` o `best` non è disponibile, l'API restituisce `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` invece di eseguire silenziosamente `fast`. Fast esplicito o `tesseract` legacy con il coreano restituisce `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` e le indicazioni sul pacchetto accurato prima che un job venga messo in coda.
 
 ## OCR di PDF {#pdf-ocr}
 

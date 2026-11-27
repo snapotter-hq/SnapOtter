@@ -1,8 +1,8 @@
 ---
 description: "AI-engine-referentie met alle lokale ML-tools. Achtergrondverwijdering, upscaling, OCR, gezichtsdetectie, fotorestauratie en meer."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 7123bcf34b3e
+i18n_output_hash: 38e666c08d8c
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Vervaagt de achtergrond terwijl het onderwerp scherp blijft.
 | `enhance` | boolean | Niveau-afhankelijk | Verbeter het lokale contrast. Fast past het direct toe; nauwkeurige niveaus behouden de variant alleen als de gekalibreerde score OCR verbetert. Standaard ingeschakeld voor best |
 | `engine` | string | - | Verouderde compatibiliteitsalias. Wijst `tesseract` toe aan `fast` en de oude `paddleocr`-waarde aan `balanced`; PaddlePaddle wordt niet geladen |
 
-Retourneert geëxtraheerde tekst plus metagegevens over de herkomst: engine, gevraagde en werkelijke kwaliteit, apparaat, provider, degradatiestatus, waarschuwingen en nauwkeurige runtime-/modelversies, indien van toepassing. Expliciete kwaliteitsverzoeken vallen nooit terug naar een ander niveau. Als `balanced` of `best` niet beschikbaar is, retourneert de API `FEATURE_NOT_INSTALLED` of `FEATURE_INCOMPATIBLE` in plaats van `fast` stil uit te voeren. Een expliciete keuze voor Fast of de oude `tesseract` met Koreaans retourneert `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` en richtlijnen voor het nauwkeurige pakket voordat er een taak in de wachtrij wordt geplaatst.
+Retourneert geëxtraheerde tekst plus metagegevens over de herkomst: engine, gevraagde en werkelijke kwaliteit, apparaat, provider, degradatiestatus, waarschuwingen en nauwkeurige runtime-/modelversies, indien van toepassing. Expliciete kwaliteitsverzoeken vallen nooit terug naar een ander niveau. Als `balanced` of `best` niet beschikbaar is, retourneert de API `FEATURE_NOT_INSTALLED` of `FEATURE_INCOMPATIBLE` in plaats van `fast` stil uit te voeren. Een expliciete keuze voor Fast of de oude `tesseract` met Koreaans retourneert `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` en richtlijnen voor het nauwkeurige pakket voordat er een taak in de wachtrij wordt geplaatst.
 
 ## PDF-OCR {#pdf-ocr}
 

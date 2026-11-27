@@ -1,8 +1,8 @@
 ---
 description: "Referens för AI-motorn med alla lokala ML-verktyg. Bakgrundsborttagning, uppskalning, OCR, ansiktsdetektering, fotorestaurering och mer."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: d591e4edc56d
+i18n_output_hash: 843bf2184efd
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Gör bakgrunden oskarp samtidigt som motivet hålls skarpt.
 | `enhance` | boolean | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
 | `engine` | string | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och körtid/modellversioner för exakt OCR när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
+Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och körtid/modellversioner för exakt OCR när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` och hänvisning till det exakta paketet innan ett jobb köas.
 
 ## PDF-OCR {#pdf-ocr}
 

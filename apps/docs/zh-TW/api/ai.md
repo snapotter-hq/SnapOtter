@@ -1,8 +1,8 @@
 ---
 description: "AI 引擎參考，涵蓋所有本機 ML 工具。去背、放大、OCR、人臉偵測、相片修復等。"
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 5998018bd552
+i18n_output_hash: 2bc806ca0a9e
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ done
 | `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
 | `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 搭配韓語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
+傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 搭配韓語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason`: `fast-korean-unsupported`，以及精確套件的指引。
 
 ## PDF OCR {#pdf-ocr}
 

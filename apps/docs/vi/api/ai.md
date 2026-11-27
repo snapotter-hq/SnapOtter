@@ -1,8 +1,8 @@
 ---
 description: "Tài liệu tham khảo engine AI với tất cả công cụ ML chạy cục bộ. Xóa nền, upscale, OCR, phát hiện khuôn mặt, phục chế ảnh và nhiều tính năng khác."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 5c8358e9788e
+i18n_output_hash: 0b5b55bad844
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Làm mờ nền trong khi giữ chủ thể sắc nét.
 | `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
 | `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
+Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
 
 ## OCR PDF {#pdf-ocr}
 

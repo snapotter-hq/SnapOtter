@@ -1,8 +1,8 @@
 ---
 description: "Referencia del motor de IA con todas las herramientas de ML locales. Eliminación de fondo, escalado, OCR, detección de rostros, restauración de fotos y más."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 5509d49535a4
+i18n_output_hash: 3bcea9dbba02
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Desenfoca el fondo mientras mantiene nítido al sujeto.
 | `enhance` | booleano | Dependiente del nivel | Mejorar el contraste local. Fast lo aplica directamente; los niveles precisos mantienen la variante solo cuando la puntuación calibrada mejora OCR. Valor predeterminado activado para Mejor |
 | `engine` | cadena | - | Alias de compatibilidad obsoleto. Asigna `tesseract` a `fast` y el valor heredado de `paddleocr` a `balanced`; no carga PaddlePaddle |
 
-Devuelve el texto extraído más metadatos de procedencia: motor, calidad solicitada y real, dispositivo, proveedor, estado de degradación, advertencias y versiones de modelo/tiempo de ejecución preciso cuando corresponda. Las solicitudes de calidad explícitas nunca recaen en otro nivel. Si `balanced` o `best` no están disponibles, API devuelve `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` en lugar de ejecutar `fast` de forma silenciosa. Un `tesseract` explícito o el alias heredado con coreano devuelve `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` y la guía del paquete preciso antes de encolar la tarea.
+Devuelve el texto extraído más metadatos de procedencia: motor, calidad solicitada y real, dispositivo, proveedor, estado de degradación, advertencias y versiones de modelo/tiempo de ejecución preciso cuando corresponda. Las solicitudes de calidad explícitas nunca recaen en otro nivel. Si `balanced` o `best` no están disponibles, API devuelve `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` en lugar de ejecutar `fast` de forma silenciosa. Un `tesseract` explícito o el alias heredado con coreano devuelve `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` y la guía del paquete preciso antes de encolar la tarea.
 
 ## OCR de PDF {#pdf-ocr}
 
