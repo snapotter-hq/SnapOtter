@@ -1,9 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getRequiredBundlesForTool, TOOL_OPTIONAL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getOptionalBundleForTool,
+  getRequiredBundlesForTool,
+  TOOL_OPTIONAL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
+import { PER_REQUEST_AI_GATED_TOOLS } from "../../helpers/generated-case-accounting.js";
 
 const GENERATED = join(process.cwd(), "tests/integration/generated");
 const source = (filename: string): string => readFileSync(join(GENERATED, filename), "utf8");
@@ -67,6 +72,25 @@ describe("generated QA harness contract", () => {
   it("image format matrix gates optional-bundle-only tools per request, not per tool", () => {
     const text = source("format-matrix-generated.shared.ts");
     expect(text).toContain("PER_REQUEST_AI_GATED_TOOLS");
+    expect(text).toMatch(/!PER_REQUEST_AI_GATED_TOOLS\.has\(toolId\)/);
+  });
+
+  // #5196: smart-crop's face-detection bundle is optional, so a whole-tool skip
+  // hid its subject and trim cases from every CI run. A tool that bypasses the
+  // gate must stay AI-gated so its bundle-needing cases still meet the
+  // per-request 501 handling.
+  it("settings matrix gates optional-bundle-only tools per request, not per tool", () => {
+    const text = source("settings-matrix.test.ts");
+    const body = text.match(/const AI_GATED_TOOLS = new Set\(\[([^\]]*)\]\)/)?.[1];
+    expect(body, "AI_GATED_TOOLS not found in settings-matrix.test.ts").toBeDefined();
+    const aiGated = [...(body ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1] as string);
+
+    expect(PER_REQUEST_AI_GATED_TOOLS).toContain("smart-crop");
+    for (const toolId of PER_REQUEST_AI_GATED_TOOLS) {
+      expect(aiGated, `${toolId} must stay AI-gated`).toContain(toolId);
+      expect(getRequiredBundlesForTool(toolId), `${toolId} has a required bundle`).toEqual([]);
+      expect(getOptionalBundleForTool(toolId), `${toolId} has no optional bundle`).not.toBeNull();
+    }
     expect(text).toMatch(/!PER_REQUEST_AI_GATED_TOOLS\.has\(toolId\)/);
   });
 
