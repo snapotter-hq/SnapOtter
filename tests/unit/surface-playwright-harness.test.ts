@@ -281,7 +281,10 @@ describe("surface Playwright harness isolation", () => {
       const baseUrl = `http://127.0.0.1:${port}`;
       let ready = false;
       let lastFailure = "no attempt made";
-      for (let attempt = 0; attempt < 50; attempt += 1) {
+      // A deadline, not an attempt count: a full unit run saturates every core on slow hosts
+      // and a spawned Node child can take well over 5 s to start listening.
+      const readyDeadline = Date.now() + 20_000;
+      while (Date.now() < readyDeadline) {
         if (liveChild.exitCode !== null || liveChild.signalCode !== null) {
           throw new Error(
             `docs preview exited early with ${liveChild.exitCode ?? liveChild.signalCode}: ${liveStderr}`,
@@ -352,7 +355,7 @@ describe("surface Playwright harness isolation", () => {
       }
       fs.rmSync(tmpRoot, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 
   test("docs preview helper validates CLI arguments, restores net.Server.prototype.listen, and binds both loopbacks under localhost", async () => {
     const { parseDocsPreviewArgs, startDocsPreviewServer } = await import(
