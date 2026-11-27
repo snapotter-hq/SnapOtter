@@ -51,21 +51,23 @@ const links: NavItem[] = [
     <div class="hidden items-center gap-6 lg:flex">
       <!-- Product dropdown: hover opens it, and a click toggles data-open (see the
            script below). It used to open on :focus-within instead, but Safari
-           doesn't focus a button on mouse click, so clicks did nothing there (#5080). -->
+           doesn't focus a button on mouse click, so clicks did nothing there (#5080).
+           Escape sets data-dismissed to hide a hover-opened panel until the pointer
+           leaves or a click reopens it (WCAG 1.4.13). The panel is a list of links, so the button is a
+           disclosure with no aria-haspopup (#5183). -->
       <div class="group relative" data-product-menu>
         <button
           type="button"
           class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-muted transition-colors hover:text-foreground group-data-[open]:text-foreground"
-          aria-haspopup="menu"
           aria-expanded="false"
           aria-controls="product-menu"
         >
           {t(locale, "nav.product")}
-          <svg class="h-4 w-4 transition-transform group-hover:rotate-180 group-data-[open]:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg class="h-4 w-4 transition-transform group-hover:group-not-data-[dismissed]:rotate-180 group-data-[open]:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <!-- pt clears the button-to-navbar-bottom gap so the panel opens below the
              navbar's bottom border line instead of overlapping up through it. -->
-        <div id="product-menu" class="absolute left-0 top-full hidden pt-8 group-hover:block group-data-[open]:block">
+        <div id="product-menu" class="absolute left-0 top-full hidden pt-8 group-hover:group-not-data-[dismissed]:block group-data-[open]:block">
           <div class="w-64 rounded-xl border border-border bg-surface p-2 shadow-lg">
             {productLinks.map((item) => (
               <a
@@ -206,6 +208,7 @@ const links: NavItem[] = [
     const setOpen = (open: boolean) => {
       productButton.setAttribute("aria-expanded", String(open));
       productMenu.toggleAttribute("data-open", open);
+      if (open) productMenu.removeAttribute("data-dismissed");
     };
     productButton.addEventListener("click", () => {
       setOpen(productButton.getAttribute("aria-expanded") !== "true");
@@ -219,9 +222,15 @@ const links: NavItem[] = [
       const next = event.relatedTarget as Node | null;
       if (next && !productMenu.contains(next)) setOpen(false);
     });
+    productMenu.addEventListener("mouseleave", () => {
+      productMenu.removeAttribute("data-dismissed");
+    });
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || productButton.getAttribute("aria-expanded") !== "true") return;
+      if (event.key !== "Escape") return;
+      const hovered = productMenu.matches(":hover");
+      if (!hovered && productButton.getAttribute("aria-expanded") !== "true") return;
       setOpen(false);
+      if (hovered) productMenu.setAttribute("data-dismissed", "");
       if (productMenu.contains(document.activeElement)) productButton.focus();
     });
   }

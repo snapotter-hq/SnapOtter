@@ -102,6 +102,42 @@ test.describe("Product Menu", () => {
     await expect(productButton(page)).toHaveAttribute("aria-expanded", "false");
   });
 
+  // WCAG 1.4.13: hover content must be dismissible without moving the pointer (#5183).
+  test("Escape hides a hover-opened menu until the pointer leaves", async ({ page }) => {
+    await productButton(page).hover();
+    await expect(developersLink(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(developersLink(page)).toBeHidden();
+    await page.mouse.move(0, 400);
+    await productButton(page).hover();
+    await expect(developersLink(page)).toBeVisible();
+  });
+
+  test("a click reopens a menu dismissed with Escape while hovered", async ({ page }) => {
+    await productButton(page).hover();
+    await page.keyboard.press("Escape");
+    await expect(developersLink(page)).toBeHidden();
+    await productButton(page).click();
+    await expect(productButton(page)).toHaveAttribute("aria-expanded", "true");
+    await expect(developersLink(page)).toBeVisible();
+  });
+
+  test("tabbing away keeps a hover-opened menu dismissed", async ({ page }) => {
+    await productButton(page).hover();
+    await productButton(page).focus();
+    await page.keyboard.press("Escape");
+    await expect(developersLink(page)).toBeHidden();
+    await page.keyboard.press("Tab");
+    await expect(productButton(page)).not.toBeFocused();
+    await expect(developersLink(page)).toBeHidden();
+  });
+
+  // The panel is a list of links, so the button is a disclosure, not a menu button (#5183).
+  test("the button announces as a disclosure", async ({ page }) => {
+    await expect(productButton(page)).not.toHaveAttribute("aria-haspopup");
+    await expect(productButton(page)).toHaveAttribute("aria-controls", "product-menu");
+  });
+
   test("keyboard users can open it and tab into the links", async ({ page }) => {
     await productButton(page).focus();
     await page.keyboard.press("Enter");
