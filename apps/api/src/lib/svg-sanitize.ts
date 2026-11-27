@@ -244,13 +244,20 @@ function matchAt(pattern: RegExp, input: string, pos: number): string {
  */
 function stripTagHandlers(seg: string): string | null {
   let pos = matchAt(TAG_NAME, seg, 0).length;
-  let out = seg.slice(0, pos);
-  let marked = false;
+  const parts = [seg.slice(0, pos)];
+  let markerSlot = -1;
+  let markerSep = "";
+  let nameTaken = false;
   for (;;) {
     const sep = matchAt(TAG_SEPARATORS, seg, pos);
     pos += sep.length;
     if (pos >= seg.length) return null;
-    if (seg[pos] === ">") return out + sep + seg.slice(pos);
+    if (seg[pos] === ">") {
+      // A tag that already has a data-removed attribute gets no marker: a
+      // repeated attribute is not well-formed XML (#5326).
+      if (markerSlot !== -1 && !nameTaken) parts[markerSlot] = markerSep + 'data-removed=""';
+      return parts.join("") + sep + seg.slice(pos);
+    }
 
     const start = pos;
     const name = matchAt(ATTR_NAME, seg, pos);
@@ -270,11 +277,13 @@ function stripTagHandlers(seg: string): string | null {
     if (equals && HANDLER_NAME.test(name)) {
       // One marker per tag: a repeated attribute is not well-formed XML (#5162).
       // A handler after the first goes with the separator in front of it.
-      if (marked) continue;
-      marked = true;
-      out += sep + 'data-removed=""';
+      if (markerSlot !== -1) continue;
+      markerSlot = parts.length;
+      markerSep = sep;
+      parts.push("");
     } else {
-      out += sep + seg.slice(start, pos);
+      if (name.toLowerCase() === "data-removed") nameTaken = true;
+      parts.push(sep + seg.slice(start, pos));
     }
   }
 }
