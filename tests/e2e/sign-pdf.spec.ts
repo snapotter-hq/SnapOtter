@@ -59,6 +59,47 @@ async function placeUploadedSignature(page: Page): Promise<void> {
   await expect(dialog).toBeHidden();
 }
 
+// Where "Save & place" drops the signature: x 36% and y 45% of the page, 28% of
+// the page wide, with the PNG's 200x150 aspect (sign-canvas.tsx addSignature).
+// The page can be taller than the 390px landscape viewport, so the page's centre
+// may sit below the fold, where a mouse press hits nothing. Scroll the
+// signature into the preview area, then aim at its own centre. Right after a
+// rotation the page re-centres and the Konva stage is rebuilt, so the point is
+// only used once two reads agree and the stage is the element under it (#5347).
+async function signatureCenter(page: Page): Promise<{ x: number; y: number }> {
+  const canvas = page.getByTestId("sign-pdf-canvas");
+  await canvas.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const sigCenterY = box.top + box.height * 0.45 + (box.width * 0.28 * (150 / 200)) / 2;
+    let scroller: HTMLElement | null = el.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
+      scroller = scroller.parentElement;
+    }
+    scroller?.scrollBy({ top: sigCenterY - window.innerHeight / 2, behavior: "instant" });
+  });
+  let previous = "";
+  let center = { x: 0, y: 0 };
+  await expect
+    .poll(async () => {
+      const box = await canvas.boundingBox();
+      if (!box) return false;
+      center = {
+        x: box.x + box.width * 0.5,
+        y: box.y + box.height * 0.45 + (box.width * 0.28 * (150 / 200)) / 2,
+      };
+      const key = JSON.stringify(center);
+      const settled = key === previous;
+      previous = key;
+      const onStage = await page.evaluate(
+        ([px, py]) => document.elementFromPoint(px, py)?.closest("#sign-konva-container") != null,
+        [center.x, center.y],
+      );
+      return settled && onStage;
+    })
+    .toBe(true);
+  return center;
+}
+
 test.describe("Sign PDF tool", () => {
   test("places a signature on a PDF (interactive flow)", async ({ loggedInPage: page }) => {
     await page.goto("/pdf/sign-pdf");
@@ -132,16 +173,11 @@ test.describe("Sign PDF tool", () => {
 
     // #2535: dragging the placed signature on the Konva stage invalidates the
     // prior download link and swaps the panel back to Apply & Download.
-    const canvasBox = await page.getByTestId("sign-pdf-canvas").boundingBox();
-    expect(canvasBox).not.toBeNull();
-    if (canvasBox) {
-      const startX = canvasBox.x + canvasBox.width * 0.5;
-      const startY = canvasBox.y + canvasBox.height * 0.5;
-      await page.mouse.move(startX, startY);
-      await page.mouse.down();
-      await page.mouse.move(startX + 40, startY + 20, { steps: 5 });
-      await page.mouse.up();
-    }
+    const signature = await signatureCenter(page);
+    await page.mouse.move(signature.x, signature.y);
+    await page.mouse.down();
+    await page.mouse.move(signature.x + 40, signature.y + 20, { steps: 5 });
+    await page.mouse.up();
     await expect(page.getByRole("link", { name: /Download signed PDF/ })).toHaveCount(0);
     await expect(apply).toBeEnabled();
 
