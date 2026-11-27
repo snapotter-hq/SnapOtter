@@ -19,9 +19,11 @@ function row(doc: string, name: string): string {
 describe("SUBPROCESS_MEMORY_LIMIT_MB docs give a sizing figure", () => {
   const cell = () => row("apps/docs/guide/configuration.md", "SUBPROCESS_MEMORY_LIMIT_MB");
 
-  test("names the image encoders and the 2 GB figure for 24 MP", () => {
-    expect(cell()).toMatch(/HEIF and JPEG XL encoders/);
+  test("names the image encoders and the sizing figures for 24 MP", () => {
+    expect(cell()).toMatch(/JPEG XL encoder needs the most/);
+    expect(cell()).toMatch(/HEIF encoder is held to two worker threads/);
     expect(cell()).toContain("24 MP");
+    expect(cell()).toContain("1.8 GB");
     expect(cell()).toContain("`2048`");
   });
 
