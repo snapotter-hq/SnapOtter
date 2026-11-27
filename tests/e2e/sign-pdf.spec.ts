@@ -2,6 +2,9 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./helpers";
 
+// Copy for a failed answer that carries no error code (t.errors.failedWithStatus).
+const FAILED_COPY = "We couldn't complete that request";
+
 const PDF_FIXTURE = path.join(
   process.cwd(),
   "tests",
@@ -177,11 +180,11 @@ test.describe("Sign PDF tool", () => {
     await expect(apply).toBeEnabled();
     await apply.click();
 
-    // The panel's own error line. The page's live region announces the same
-    // text for screen readers, so match the visible paragraph only.
-    await expect(
-      page.locator("p.text-destructive").filter({ hasText: "Processing failed" }),
-    ).toBeVisible();
+    // The panel's own error line, in the app's copy for a failed answer with no
+    // error code: the server's English text is never shown (#1445). The page's
+    // live region announces the same text for screen readers, so match the
+    // visible paragraph only.
+    await expect(page.locator("p.text-destructive").filter({ hasText: FAILED_COPY })).toBeVisible();
     await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
     await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
     await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(0);
@@ -192,9 +195,7 @@ test.describe("Sign PDF tool", () => {
     // the error message must stay visible alongside Report issue.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Process", exact: true }).click();
-    await expect(
-      page.locator("p.text-destructive").filter({ hasText: "Processing failed" }),
-    ).toBeVisible();
+    await expect(page.locator("p.text-destructive").filter({ hasText: FAILED_COPY })).toBeVisible();
     await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
   });
 

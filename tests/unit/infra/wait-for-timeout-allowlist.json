@@ -54,7 +54,7 @@
   "tests/e2e/gui-navigation.spec.ts": 19,
   "tests/e2e/gui-performance.spec.ts": 12,
   "tests/e2e/gui-pipeline.spec.ts": 7,
-  "tests/e2e/gui-resilience.spec.ts": 27,
+  "tests/e2e/gui-resilience.spec.ts": 26,
   "tests/e2e/gui-settings-apikeys.spec.ts": 2,
   "tests/e2e/gui-settings-expanded.spec.ts": 16,
   "tests/e2e/gui-settings-general.spec.ts": 9,
