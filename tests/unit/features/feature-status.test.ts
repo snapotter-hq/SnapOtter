@@ -2641,6 +2641,11 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     options: {
       pipBehavior?: "ok" | "fail-stderr" | "fail-stdout" | "fail-empty";
       failImport?: string;
+      // The fake interpreter kills itself with this signal, silently, at this step.
+      killAt?: {
+        step: "sysconfig" | "pip-install" | "pip-uninstall" | "import";
+        signal: "KILL" | "TERM";
+      };
     } = {},
   ): { venvPath: string; sitePackagesDir: string } {
     const venvPath = join(aiDir, "venv");
@@ -2651,14 +2656,18 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
 
     const pipMode = options.pipBehavior ?? "ok";
     const failMod = options.failImport ?? "";
+    const killLine = (step: NonNullable<typeof options.killAt>["step"]) =>
+      options.killAt?.step === step ? [`    kill -${options.killAt.signal} $$`] : [];
     const script = [
       "#!/bin/sh",
       'case "$*" in',
       "  *sysconfig*)",
+      ...killLine("sysconfig"),
       `    echo ${JSON.stringify(sitePackagesDir)}`,
       "    exit 0",
       "    ;;",
       "  *-m\\ pip\\ install*)",
+      ...killLine("pip-install"),
       pipMode === "ok"
         ? `    mkdir -p ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}; printf '# installed by pip\\n' > ${JSON.stringify(join(sitePackagesDir, "nccl_fixup", "__init__.py"))}; exit 0`
         : pipMode === "fail-stderr"
@@ -2668,10 +2677,12 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
             : "    exit 2",
       "    ;;",
       "  *-m\\ pip\\ uninstall*)",
+      ...killLine("pip-uninstall"),
       `    rm -rf ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}`,
       "    exit 0",
       "    ;;",
       "  *import*)",
+      ...killLine("import"),
       failMod
         ? `    case "$*" in *"import ${failMod}"*) echo "ImportError: libnccl.so.2: cannot open shared object file for ${failMod}" >&2; exit 1 ;; esac`
         : "    :",
@@ -3008,6 +3019,74 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     await expect(mod.importBundleArchive(createReadStream(tarEmpty))).rejects.toThrow(
       /pip exited with status 2/,
     );
+  });
+
+  describe("a silently signal-killed child (#4975)", () => {
+    const fixupArchive = () =>
+      createTestArchive({
+        fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+      });
+
+    function writeSmokeManifest(): void {
+      writeFileSync(
+        process.env.FEATURE_MANIFEST_PATH ?? "",
+        JSON.stringify({
+          bundles: {
+            "face-detection": {
+              models: [{ id: "face", path: "mediapipe/face.tflite" }],
+              smokeImports: ["mediapipe"],
+            },
+          },
+        }),
+      );
+    }
+
+    async function importError(tarPath: string): Promise<Error> {
+      const { createReadStream } = await import("node:fs");
+      const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      return err as Error;
+    }
+
+    it("gives the memory hint when a fixup wheel pip install is SIGKILLed", async () => {
+      setupFakeVenv({ killAt: { step: "pip-install", signal: "KILL" } });
+      writeSmokeManifest();
+      const err = await importError(await fixupArchive());
+      expect(err.message).toMatch(/pip was killed by SIGKILL/);
+      expect(err.message).toMatch(/memory limit/);
+      expect(err.message).not.toMatch(/status null/);
+    });
+
+    it("names the signal when a smoke import is stopped by a non-KILL signal", async () => {
+      setupFakeVenv({ killAt: { step: "import", signal: "TERM" } });
+      writeSmokeManifest();
+      const err = await importError(await fixupArchive());
+      expect(err.message).toMatch(/python3 was stopped by signal SIGTERM/);
+      expect(err.message).not.toMatch(/memory limit/);
+      expect(err.message).not.toMatch(/status null/);
+    });
+
+    it("names the signal when the site-packages query is killed", async () => {
+      setupFakeVenv({ killAt: { step: "sysconfig", signal: "KILL" } });
+      writeSmokeManifest();
+      const err = await importError(await fixupArchive());
+      expect(err).toBeInstanceOf(mod.ImportValidationError);
+      expect(err.message).toMatch(/python3 was killed by SIGKILL/);
+      expect(err.message).not.toMatch(/status null/);
+    });
+
+    it("names the signal when the fixup wheel rollback uninstall is killed", async () => {
+      setupFakeVenv({
+        failImport: "mediapipe",
+        killAt: { step: "pip-uninstall", signal: "KILL" },
+      });
+      writeSmokeManifest();
+      const err = await importError(await fixupArchive());
+      expect(err.message).toMatch(
+        /fixup wheel rollback failed \(pip uninstall was killed by SIGKILL/,
+      );
+      expect(err.message).not.toMatch(/status null/);
+    });
   });
 
   it("rejects malformed fixup wheel filenames and invalid smokeImport module names", async () => {

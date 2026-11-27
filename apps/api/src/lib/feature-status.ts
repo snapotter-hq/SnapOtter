@@ -1994,7 +1994,7 @@ export async function importBundleArchive(
               uninst.stderr?.trim() ||
               uninst.stdout?.trim() ||
               uninst.error?.message ||
-              `pip uninstall exited with status ${String(uninst.status)}`;
+              describeSpawnExit("pip uninstall", uninst);
             logger.error(
               {
                 err: uninst.error,
@@ -2084,6 +2084,24 @@ export async function importBundleArchive(
 }
 
 /**
+ * Last-resort text for a spawnSync child that failed without printing
+ * anything. A killed child reports `status: null` with the signal set, and an
+ * OOM kill arrives as SIGKILL, so name the signal instead of "status null"
+ * (#4975). Returns a clause with no final period because callers embed it in
+ * parentheses. Timeouts set `result.error`, which callers check first.
+ */
+function describeSpawnExit(
+  label: string,
+  result: { status: number | null; signal: NodeJS.Signals | null },
+): string {
+  if (result.signal === "SIGKILL") {
+    return `${label} was killed by SIGKILL, most likely out of memory; raise the container's memory limit (mem_limit in docker-compose.yml)`;
+  }
+  if (result.signal) return `${label} was stopped by signal ${result.signal}`;
+  return `${label} exited with status ${String(result.status)}`;
+}
+
+/**
  * Resolve a venv's site-packages directory through its own interpreter
  * (mirrors the `sysconfig.get_paths()["purelib"]` resolution docker/Dockerfile
  * uses to build the base venv), rather than guessing from directory layout.
@@ -2112,9 +2130,7 @@ function resolveVenvSitePackages(venvPath: string): string {
   );
   if (result.error || result.status !== 0 || !result.stdout?.trim()) {
     const detail =
-      result.error?.message ||
-      result.stderr?.trim() ||
-      `python3 exited with status ${String(result.status)}`;
+      result.error?.message || result.stderr?.trim() || describeSpawnExit("python3", result);
     throw new ImportValidationError(
       `The AI environment's Python interpreter at ${venvPath} could not be queried (${detail}). Recreate the AI environment and retry.`,
     );
@@ -2220,7 +2236,7 @@ function installFixupWheel(
       result.stderr?.trim() ||
       result.stdout?.trim() ||
       result.error?.message ||
-      `pip exited with status ${String(result.status)}`;
+      describeSpawnExit("pip", result);
     const message = timedOut
       ? `Timed out while installing fixup wheel "${wheel}" (${pkgName}): ${detail}`
       : `Failed to install fixup wheel "${wheel}" (${pkgName}): ${detail}`;
@@ -2263,7 +2279,7 @@ function verifyBundleSmokeImports(
         result.stderr?.trim() ||
         result.stdout?.trim() ||
         result.error?.message ||
-        `python3 exited with status ${String(result.status)}`;
+        describeSpawnExit("python3", result);
       const message = timedOut
         ? `Bundle "${bundleId}" timed out during post-import verification while importing "${mod}" (${detail}).`
         : `Bundle "${bundleId}" failed post-import verification while importing "${mod}" (${detail}).`;
