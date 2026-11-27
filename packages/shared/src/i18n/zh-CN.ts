@@ -3989,6 +3989,9 @@ export const zhCN: TranslationKeys = {
       stripAll: "清除文档元数据",
       stripAllHint:
         "在写入下方字段之前，清除日期、Creator、Producer、自定义字段和 XMP。PDF/A 文件将不再符合规范。",
+      removeAttachments: "同时移除附件",
+      removeAttachmentsHint:
+        "删除嵌入文件和文件附件注释。电子发票（ZUGFeRD、Factur-X）和 PDF/A-3 文件将丢失其附加数据。",
       title: "标题",
       author: "作者",
       subject: "主题",

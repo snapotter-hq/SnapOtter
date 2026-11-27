@@ -4324,6 +4324,9 @@ export const id: TranslationKeys = {
       stripAll: "Hapus metadata dokumen",
       stripAllHint:
         "Menghapus tanggal, Creator, Producer, kolom khusus, dan XMP sebelum menulis kolom di bawah. File PDF/A kehilangan kesesuaiannya.",
+      removeAttachments: "Hapus juga file lampiran",
+      removeAttachmentsHint:
+        "Menghapus file tersemat dan anotasi lampiran file. E-faktur (ZUGFeRD, Factur-X) dan file PDF/A-3 kehilangan data lampirannya.",
       title: "Judul",
       author: "Penulis",
       subject: "Subjek",

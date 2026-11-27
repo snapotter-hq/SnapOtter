@@ -1,6 +1,6 @@
 // Runs doc_metadata.py's "strip" mode against PDFs built with pikepdf, then
 // reads the output back with pikepdf. Gated on pikepdf because the script
-// needs it to open the file at all (#4837, #4972).
+// needs it to open the file at all (#4837, #4972, #5182).
 
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -154,6 +154,98 @@ function inspectDeep(path: string): {
   );
 }
 
+/**
+ * Write a PDF with attachments in all three places a reader finds them: the
+ * catalog EmbeddedFiles name tree, a FileAttachment annotation (with its
+ * popup) and /AF associated-file arrays on the catalog and the page, as
+ * ZUGFeRD invoices do. A link annotation stands in for content that must
+ * survive (#5182).
+ */
+function makeAttachmentPdf(name: string): string {
+  const path = join(dir, name);
+  python(
+    [
+      "import sys, pikepdf",
+      "pdf = pikepdf.new()",
+      "pdf.add_blank_page()",
+      "spec = pikepdf.AttachedFileSpec(pdf, b'internal', description='Draft by Alice',",
+      "    creation_date='D:20200101000000Z', mod_date='D:20200102000000Z')",
+      "pdf.attachments['notes.txt'] = spec",
+      "named = pdf.Root.Names.EmbeddedFiles.Names[1]",
+      "pdf.Root.AF = pikepdf.Array([named])",
+      "annot_spec = pikepdf.AttachedFileSpec(pdf, b'annotated', filename='review.docx').obj",
+      "page = pdf.pages[0]",
+      "attach = pdf.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.Annot,",
+      "    Subtype=pikepdf.Name.FileAttachment, Rect=[0, 0, 10, 10], FS=annot_spec))",
+      "popup = pdf.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.Annot,",
+      "    Subtype=pikepdf.Name.Popup, Rect=[10, 10, 50, 50], Parent=attach))",
+      "attach.Popup = popup",
+      "link = pikepdf.Dictionary(Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Link, Rect=[0, 20, 10, 30])",
+      "page.Annots = pikepdf.Array([attach, popup, link])",
+      "page.AF = pikepdf.Array([annot_spec])",
+      "pdf.save(sys.argv[1])",
+    ].join("\n"),
+    path,
+  );
+  return path;
+}
+
+/**
+ * Write a portfolio whose name tree holds a direct filespec, plus a Launch
+ * action whose filespec embeds its own file outside the name tree (#5182).
+ */
+function makePortfolioPdf(name: string): string {
+  const path = join(dir, name);
+  python(
+    [
+      "import sys, pikepdf",
+      "pdf = pikepdf.new()",
+      "pdf.add_blank_page()",
+      "embedded = lambda data: pdf.make_stream(data, Type=pikepdf.Name.EmbeddedFile)",
+      "spec = pikepdf.Dictionary(Type=pikepdf.Name.Filespec, F=pikepdf.String('a.txt'),",
+      "    EF=pikepdf.Dictionary(F=embedded(b'portfolio')))",
+      "pdf.Root.Names = pikepdf.Dictionary(EmbeddedFiles=pikepdf.Dictionary(",
+      "    Names=pikepdf.Array([pikepdf.String('a.txt'), spec])))",
+      "pdf.Root.Collection = pikepdf.Dictionary(Type=pikepdf.Name.Collection)",
+      "pdf.Root.OpenAction = pikepdf.Dictionary(S=pikepdf.Name.Launch, F=pikepdf.Dictionary(",
+      "    Type=pikepdf.Name.Filespec, F=pikepdf.String('run.bin'),",
+      "    EF=pikepdf.Dictionary(F=embedded(b'payload'))))",
+      "pdf.save(sys.argv[1])",
+    ].join("\n"),
+    path,
+  );
+  return path;
+}
+
+/** What a reader could still find of the attachments, and the link that must survive. */
+function inspectAttachments(path: string): {
+  named: string[];
+  annots: string[];
+  af: number;
+  embeddedStreams: number;
+  collection: boolean;
+} {
+  return JSON.parse(
+    python(
+      [
+        "import sys, json, pikepdf",
+        "pdf = pikepdf.open(sys.argv[1])",
+        "page = pdf.pages[0]",
+        "objs = list(pdf.objects)",
+        "dicts = [o for o in objs if isinstance(o, (pikepdf.Dictionary, pikepdf.Stream))]",
+        "print(json.dumps({",
+        "    'named': sorted(pdf.attachments.keys()),",
+        "    'annots': [str(a.Subtype) for a in page.obj.get('/Annots', [])],",
+        "    'af': sum('/AF' in o for o in dicts),",
+        "    'embeddedStreams': sum(o.get('/Type') == pikepdf.Name.EmbeddedFile for o in dicts),",
+        "    'collection': '/Collection' in pdf.Root,",
+        "}))",
+      ].join("\n"),
+      path,
+    ),
+  );
+}
+
 describe.skipIf(!hasPikepdf)("doc_metadata.py strip mode (requires pikepdf)", () => {
   it("removes the whole Info dictionary and the XMP stream", () => {
     const input = makePdf("full.pdf", { xmp: true });
@@ -250,5 +342,57 @@ describe.skipIf(!hasPikepdf)("doc_metadata.py strip mode (requires pikepdf)", ()
 
     expect(result.objectXmpRemoved).toBe(0);
     expect(result.pieceInfoRemoved).toBe(0);
+  });
+
+  it("keeps attachments unless removeAttachments is set", () => {
+    const input = makeAttachmentPdf("attach-kept.pdf");
+    const out = join(dir, "attach-kept-out.pdf");
+
+    const result = runScript({ path: input, out, mode: "strip" });
+
+    expect(inspectAttachments(out)).toEqual(inspectAttachments(input));
+    expect(result.attachmentsRemoved).toBe(0);
+  });
+
+  it("removes named, annotation and associated-file attachments with removeAttachments", () => {
+    const input = makeAttachmentPdf("attach.pdf");
+    expect(inspectAttachments(input)).toEqual({
+      named: ["notes.txt"],
+      annots: ["/FileAttachment", "/Popup", "/Link"],
+      af: 2,
+      embeddedStreams: 2,
+      collection: false,
+    });
+    const out = join(dir, "attach-out.pdf");
+
+    const result = runScript({ path: input, out, mode: "strip", removeAttachments: true });
+
+    expect(inspectAttachments(out)).toEqual({
+      named: [],
+      annots: ["/Link"],
+      af: 0,
+      embeddedStreams: 0,
+      collection: false,
+    });
+    expect(result.attachmentsRemoved).toBe(2);
+  });
+
+  it("counts and removes direct filespecs, the portfolio and files embedded outside the name tree", () => {
+    const input = makePortfolioPdf("portfolio.pdf");
+    expect(inspectAttachments(input)).toMatchObject({
+      named: ["a.txt"],
+      embeddedStreams: 2,
+      collection: true,
+    });
+    const out = join(dir, "portfolio-out.pdf");
+
+    const result = runScript({ path: input, out, mode: "strip", removeAttachments: true });
+
+    expect(inspectAttachments(out)).toMatchObject({
+      named: [],
+      embeddedStreams: 0,
+      collection: false,
+    });
+    expect(result.attachmentsRemoved).toBe(2);
   });
 });

@@ -12329,11 +12329,20 @@
       {
         "key": "stripAll",
         "values": [true, false, null]
+      },
+      {
+        "key": "removeAttachments",
+        "values": [true, false, null]
       }
     ],
     "invalidProbes": [
       {
         "key": "stripAll",
+        "value": "yes-please",
+        "why": "wrong type"
+      },
+      {
+        "key": "removeAttachments",
         "value": "yes-please",
         "why": "wrong type"
       }

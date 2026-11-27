@@ -67,6 +67,7 @@ describe.skipIf(!hasPikepdf)("pdf-metadata (requires pikepdf)", () => {
       pdfa: null,
       objectXmpRemoved: 0,
       pieceInfoRemoved: 0,
+      attachmentsRemoved: 0,
     });
 
     const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
@@ -83,6 +84,11 @@ describe("pdf-metadata validation (ungated)", () => {
 
   it("rejects a non-boolean stripAll with 400", async () => {
     const res = await runTool({ stripAll: "yes" });
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
+  it("rejects removeAttachments without stripAll with 400", async () => {
+    const res = await runTool({ removeAttachments: true });
     expect(res.statusCode).toBe(400);
   }, 30_000);
 });

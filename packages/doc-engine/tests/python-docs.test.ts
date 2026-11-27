@@ -581,7 +581,7 @@ describe("pdfMetadataSetPy", () => {
 describe("pdfMetadataStripPy", () => {
   it("calls doc_metadata mode:strip and returns what was removed", async () => {
     runDocsScript.mockResolvedValueOnce(
-      '{"ok": true, "removed": ["Author", "Creator"], "xmpRemoved": true, "pdfa": "2B", "objectXmpRemoved": 3, "pieceInfoRemoved": 1}',
+      '{"ok": true, "removed": ["Author", "Creator"], "xmpRemoved": true, "pdfa": "2B", "objectXmpRemoved": 3, "pieceInfoRemoved": 1, "attachmentsRemoved": 2}',
     );
     const result = await import("../src/python-docs.js").then((m) =>
       m.pdfMetadataStripPy("/in.pdf", "/out.pdf", { Title: "Public" }),
@@ -592,6 +592,7 @@ describe("pdfMetadataStripPy", () => {
       pdfa: "2B",
       objectXmpRemoved: 3,
       pieceInfoRemoved: 1,
+      attachmentsRemoved: 2,
     });
     expect(firstCall()).toEqual([
       "doc_metadata",
@@ -600,7 +601,7 @@ describe("pdfMetadataStripPy", () => {
     ]);
   });
 
-  it("normalizes a missing PDF/A level, XMP flag and object counts", async () => {
+  it("normalizes a missing PDF/A level, XMP flag and object and attachment counts", async () => {
     runDocsScript.mockResolvedValueOnce('{"ok": true, "removed": [], "pdfa": ""}');
     const result = await import("../src/python-docs.js").then((m) =>
       m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {}),
@@ -611,6 +612,7 @@ describe("pdfMetadataStripPy", () => {
       pdfa: null,
       objectXmpRemoved: 0,
       pieceInfoRemoved: 0,
+      attachmentsRemoved: 0,
     });
   });
 
@@ -626,6 +628,18 @@ describe("pdfMetadataStripPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {})),
     ).rejects.toThrow("doc_metadata strip failed:");
+  });
+
+  it("passes removeAttachments to the script only when set", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true, "removed": []}');
+    await import("../src/python-docs.js").then((m) =>
+      m.pdfMetadataStripPy("/in.pdf", "/out.pdf", {}, { removeAttachments: true }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_metadata",
+      { path: "/in.pdf", out: "/out.pdf", mode: "strip", metadata: {}, removeAttachments: true },
+      undefined,
+    ]);
   });
 
   it("forwards signal and timeoutMs to runDocsScript when provided", async () => {

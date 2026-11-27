@@ -21,6 +21,7 @@ Accepts multipart form data with a PDF file and an optional JSON `settings` fiel
 | subject | string | No | - | Document subject (max 500 characters) |
 | keywords | string | No | - | Document keywords (max 500 characters) |
 | stripAll | boolean | No | false | Remove the whole Info dictionary (dates, Creator, Producer, custom keys), every XMP stream (document, pages, images) and all PieceInfo application data, then write any fields given above |
+| removeAttachments | boolean | No | false | Also remove embedded files: the document's attachment list, file attachment annotations and associated files (`/AF`). Needs `stripAll` |
 
 All parameters are optional. Omitted fields are left unchanged unless `stripAll` is set.
 
@@ -57,5 +58,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - The `metadata` field in the response contains the resulting metadata after any updates.
 - To read metadata without modifying it, omit the `settings` field or send an empty object.
 - Each metadata field is limited to 500 characters.
-- With `stripAll`, the response also carries `stripped`: the Info keys that were removed (`removed`), whether the document XMP stream was removed (`xmpRemoved`), the PDF/A level the input declared (`pdfa`, or `null`), how many XMP streams came off pages, images and other objects (`objectXmpRemoved`), and how many PieceInfo dictionaries were removed (`pieceInfoRemoved`). Removing XMP breaks PDF/A conformance.
-- `stripAll` doesn't touch embedded file attachments.
+- With `stripAll`, the response also carries `stripped`: the Info keys that were removed (`removed`), whether the document XMP stream was removed (`xmpRemoved`), the PDF/A level the input declared (`pdfa`, or `null`), how many XMP streams came off pages, images and other objects (`objectXmpRemoved`), how many PieceInfo dictionaries were removed (`pieceInfoRemoved`), and how many embedded files were removed (`attachmentsRemoved`, always `0` without `removeAttachments`). Removing XMP breaks PDF/A conformance.
+- `stripAll` on its own keeps embedded file attachments, since removing them changes the document's content. Add `removeAttachments` to drop them too. That removes the attached XML from ZUGFeRD and Factur-X e-invoices and breaks PDF/A-3 conformance.
+- Sending `removeAttachments` without `stripAll` returns 400.

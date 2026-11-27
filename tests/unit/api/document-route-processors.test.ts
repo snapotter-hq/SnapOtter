@@ -59,6 +59,7 @@ vi.mock("@snapotter/doc-engine", () => ({
     pdfa: null,
     objectXmpRemoved: 2,
     pieceInfoRemoved: 1,
+    attachmentsRemoved: 0,
   })),
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfScrubProducerPy: vi.fn(),
@@ -822,8 +823,44 @@ describe("document route processors", () => {
           pdfa: null,
           objectXmpRemoved: 2,
           pieceInfoRemoved: 1,
+          attachmentsRemoved: 0,
         },
       });
+    });
+  });
+
+  it("asks pdfMetadataStripPy to remove attachments when removeAttachments is set", async () => {
+    registerPdfMetadata(createMockApp());
+    const config = getToolConfig("pdf-metadata");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = {
+        ...createCtx(scratchDir, "whitepaper.pdf"),
+        settings: { stripAll: true, removeAttachments: true },
+      };
+      await config?.processV2?.(ctx);
+
+      expect(pdfMetadataStripPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-whitepaper.pdf"),
+        join(scratchDir, "whitepaper_metadata.pdf"),
+        {},
+        { signal: ctx.signal, removeAttachments: true },
+      );
+    });
+  });
+
+  it("rejects removeAttachments without stripAll", async () => {
+    registerPdfMetadata(createMockApp());
+    const config = getToolConfig("pdf-metadata");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = {
+        ...createCtx(scratchDir, "whitepaper.pdf"),
+        settings: { removeAttachments: true, title: "Updated" },
+      };
+      await expect(config?.processV2?.(ctx)).rejects.toThrow("removeAttachments requires stripAll");
+      expect(pdfMetadataStripPy).not.toHaveBeenCalled();
+      expect(pdfMetadataSetPy).not.toHaveBeenCalled();
     });
   });
 

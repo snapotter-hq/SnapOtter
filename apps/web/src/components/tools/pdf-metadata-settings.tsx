@@ -13,6 +13,12 @@ export function PdfMetadataSettings() {
     useToolProcessor("pdf-metadata");
 
   const [stripAll, setStripAll] = useState(false);
+  const [removeAttachments, setRemoveAttachments] = useState(false);
+
+  const toggleStripAll = (checked: boolean) => {
+    setStripAll(checked);
+    if (!checked) setRemoveAttachments(false);
+  };
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [subject, setSubject] = useState("");
@@ -24,6 +30,7 @@ export function PdfMetadataSettings() {
   const handleProcess = () => {
     const settings: Record<string, unknown> = {};
     if (stripAll) settings.stripAll = true;
+    if (removeAttachments) settings.removeAttachments = true;
     if (title) settings.title = title;
     if (author) settings.author = author;
     if (subject) settings.subject = subject;
@@ -43,12 +50,29 @@ export function PdfMetadataSettings() {
             type="checkbox"
             data-testid="pdf-metadata-strip-all"
             checked={stripAll}
-            onChange={(e) => setStripAll(e.target.checked)}
+            onChange={(e) => toggleStripAll(e.target.checked)}
             className="rounded"
           />
           {s.stripAll}
         </label>
         <p className="mt-0.5 text-xs text-muted-foreground">{s.stripAllHint}</p>
+      </div>
+
+      <div className="ms-6">
+        <label
+          className={`flex items-center gap-2 text-sm ${stripAll ? "text-foreground" : "text-muted-foreground"}`}
+        >
+          <input
+            type="checkbox"
+            data-testid="pdf-metadata-remove-attachments"
+            checked={removeAttachments}
+            onChange={(e) => setRemoveAttachments(e.target.checked)}
+            disabled={!stripAll}
+            className="rounded"
+          />
+          {s.removeAttachments}
+        </label>
+        <p className="mt-0.5 text-xs text-muted-foreground">{s.removeAttachmentsHint}</p>
       </div>
 
       <div>
@@ -142,6 +166,12 @@ export function PdfMetadataControls({ settings: initial, onChange }: PdfMetadata
   const { t } = useTranslation();
   const s = t.toolSettings["pdf-metadata"];
   const [stripAll, setStripAll] = useState(false);
+  const [removeAttachments, setRemoveAttachments] = useState(false);
+
+  const toggleStripAll = (checked: boolean) => {
+    setStripAll(checked);
+    if (!checked) setRemoveAttachments(false);
+  };
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [subject, setSubject] = useState("");
@@ -152,6 +182,7 @@ export function PdfMetadataControls({ settings: initial, onChange }: PdfMetadata
     if (!initial || initializedRef.current) return;
     initializedRef.current = true;
     if (initial.stripAll != null) setStripAll(Boolean(initial.stripAll));
+    if (initial.removeAttachments != null) setRemoveAttachments(Boolean(initial.removeAttachments));
     if (initial.title != null) setTitle(String(initial.title));
     if (initial.author != null) setAuthor(String(initial.author));
     if (initial.subject != null) setSubject(String(initial.subject));
@@ -165,12 +196,13 @@ export function PdfMetadataControls({ settings: initial, onChange }: PdfMetadata
   useEffect(() => {
     const out: Record<string, unknown> = {};
     if (stripAll) out.stripAll = true;
+    if (removeAttachments) out.removeAttachments = true;
     if (title) out.title = title;
     if (author) out.author = author;
     if (subject) out.subject = subject;
     if (keywords) out.keywords = keywords;
     onChangeRef.current?.(out);
-  }, [stripAll, title, author, subject, keywords]);
+  }, [stripAll, removeAttachments, title, author, subject, keywords]);
 
   return (
     <div className="space-y-4">
@@ -180,12 +212,29 @@ export function PdfMetadataControls({ settings: initial, onChange }: PdfMetadata
             type="checkbox"
             data-testid="pdf-metadata-controls-strip-all"
             checked={stripAll}
-            onChange={(e) => setStripAll(e.target.checked)}
+            onChange={(e) => toggleStripAll(e.target.checked)}
             className="rounded"
           />
           {s.stripAll}
         </label>
         <p className="mt-0.5 text-xs text-muted-foreground">{s.stripAllHint}</p>
+      </div>
+
+      <div className="ms-6">
+        <label
+          className={`flex items-center gap-2 text-sm ${stripAll ? "text-foreground" : "text-muted-foreground"}`}
+        >
+          <input
+            type="checkbox"
+            data-testid="pdf-metadata-controls-remove-attachments"
+            checked={removeAttachments}
+            onChange={(e) => setRemoveAttachments(e.target.checked)}
+            disabled={!stripAll}
+            className="rounded"
+          />
+          {s.removeAttachments}
+        </label>
+        <p className="mt-0.5 text-xs text-muted-foreground">{s.removeAttachmentsHint}</p>
       </div>
 
       <div>

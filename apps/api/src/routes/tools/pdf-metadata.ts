@@ -10,14 +10,21 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  title: z.string().max(500).optional(),
-  author: z.string().max(500).optional(),
-  subject: z.string().max(500).optional(),
-  keywords: z.string().max(500).optional(),
-  // Clear the whole Info dictionary and the XMP stream before writing the fields above.
-  stripAll: z.boolean().optional(),
-});
+const settingsSchema = z
+  .object({
+    title: z.string().max(500).optional(),
+    author: z.string().max(500).optional(),
+    subject: z.string().max(500).optional(),
+    keywords: z.string().max(500).optional(),
+    // Clear the whole Info dictionary and the XMP stream before writing the fields above.
+    stripAll: z.boolean().optional(),
+    // Also drop embedded files. Opt-in because it changes the document's content.
+    removeAttachments: z.boolean().optional(),
+  })
+  .refine((s) => !s.removeAttachments || s.stripAll, {
+    message: "removeAttachments requires stripAll",
+    path: ["removeAttachments"],
+  });
 
 export function registerPdfMetadata(app: FastifyInstance) {
   createToolRoute(app, {
@@ -45,7 +52,10 @@ export function registerPdfMetadata(app: FastifyInstance) {
       let stripped: PdfMetadataStripResult | undefined;
       if (settings.stripAll) {
         ctx.report(10, "Removing metadata");
-        stripped = await pdfMetadataStripPy(inPath, outPath, meta, { signal: ctx.signal });
+        stripped = await pdfMetadataStripPy(inPath, outPath, meta, {
+          signal: ctx.signal,
+          removeAttachments: settings.removeAttachments,
+        });
       } else {
         ctx.report(10, "Setting metadata");
         await pdfMetadataSetPy(inPath, outPath, meta, { signal: ctx.signal });

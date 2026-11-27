@@ -4344,6 +4344,9 @@ export const fr: TranslationKeys = {
       stripAll: "Supprimer les métadonnées du document",
       stripAllHint:
         "Efface les dates, Creator, Producer, les champs personnalisés et le XMP avant d'écrire les champs ci-dessous. Les fichiers PDF/A perdent leur conformité.",
+      removeAttachments: "Supprimer aussi les fichiers joints",
+      removeAttachmentsHint:
+        "Supprime les fichiers incorporés et les annotations de pièce jointe. Les factures électroniques (ZUGFeRD, Factur-X) et les fichiers PDF/A-3 perdent leurs données jointes.",
       title: "Titre",
       author: "Auteur",
       subject: "Sujet",

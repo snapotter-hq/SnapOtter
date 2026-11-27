@@ -4330,6 +4330,9 @@ export const ru: TranslationKeys = {
       stripAll: "Удалить метаданные документа",
       stripAllHint:
         "Удаляет даты, Creator, Producer, пользовательские поля и XMP перед записью полей ниже. Файлы PDF/A теряют соответствие стандарту.",
+      removeAttachments: "Также удалить вложенные файлы",
+      removeAttachmentsHint:
+        "Удаляет встроенные файлы и аннотации с вложениями. Электронные счета (ZUGFeRD, Factur-X) и файлы PDF/A-3 теряют вложенные данные.",
       title: "Название",
       author: "Автор",
       subject: "Тема",

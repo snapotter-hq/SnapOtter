@@ -3990,6 +3990,9 @@ export const zhTW: TranslationKeys = {
       stripAll: "移除文件中繼資料",
       stripAllHint:
         "在寫入下方欄位之前，清除日期、Creator、Producer、自訂欄位和 XMP。PDF/A 檔案將不再符合規範。",
+      removeAttachments: "同時移除附件",
+      removeAttachmentsHint:
+        "刪除內嵌檔案和檔案附件註解。電子發票（ZUGFeRD、Factur-X）和 PDF/A-3 檔案將遺失其附加資料。",
       title: "標題",
       author: "作者",
       subject: "主旨",

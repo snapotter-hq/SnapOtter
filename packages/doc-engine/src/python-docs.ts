@@ -359,23 +359,31 @@ export interface PdfMetadataStripResult {
   objectXmpRemoved: number;
   /** PieceInfo (Illustrator, Acrobat private data) dictionaries removed. */
   pieceInfoRemoved: number;
+  /** Embedded files removed; always 0 unless `removeAttachments` was set. */
+  attachmentsRemoved: number;
 }
 
 /**
  * Drop the whole Info dictionary, every XMP stream and every PieceInfo
  * dictionary, then write `metadata` onto the clean document (pikepdf).
- * Embedded files are kept.
+ * Embedded files are kept unless `removeAttachments` is set.
  */
 export async function pdfMetadataStripPy(
   inPath: string,
   outPath: string,
   metadata: Record<string, string>,
-  opts?: DocsScriptOptions,
+  opts?: DocsScriptOptions & { removeAttachments?: boolean },
 ): Promise<PdfMetadataStripResult> {
   const runOpts = buildDocsRunOpts(opts);
   const stdout = await runDocsScript(
     "doc_metadata",
-    { path: inPath, out: outPath, mode: "strip", metadata },
+    {
+      path: inPath,
+      out: outPath,
+      mode: "strip",
+      metadata,
+      ...(opts?.removeAttachments ? { removeAttachments: true } : {}),
+    },
     ...(runOpts ? [runOpts] : []),
   ).catch(withDamageClassification);
   const parsed = parseDocsJson<{
@@ -384,6 +392,7 @@ export async function pdfMetadataStripPy(
     pdfa?: unknown;
     objectXmpRemoved?: unknown;
     pieceInfoRemoved?: unknown;
+    attachmentsRemoved?: unknown;
     error?: string;
   }>("doc_metadata", stdout);
   if ("error" in parsed) {
@@ -398,6 +407,8 @@ export async function pdfMetadataStripPy(
     pdfa: typeof parsed.pdfa === "string" && parsed.pdfa ? parsed.pdfa : null,
     objectXmpRemoved: typeof parsed.objectXmpRemoved === "number" ? parsed.objectXmpRemoved : 0,
     pieceInfoRemoved: typeof parsed.pieceInfoRemoved === "number" ? parsed.pieceInfoRemoved : 0,
+    attachmentsRemoved:
+      typeof parsed.attachmentsRemoved === "number" ? parsed.attachmentsRemoved : 0,
   };
 }
 

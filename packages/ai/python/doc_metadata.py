@@ -1,14 +1,14 @@
 """Read or write PDF document metadata via pikepdf docinfo.
 Args: {"path": in, "mode": "get"} -> {"metadata": {...}}
       {"path": in, "out": o, "mode": "set", "metadata": {"Title": "..", ...}} -> {"ok": true}
-      {"path": in, "out": o, "mode": "strip", "metadata": {...}?}
+      {"path": in, "out": o, "mode": "strip", "metadata": {...}?, "removeAttachments": bool?}
         -> {"ok": true, "removed": [keys], "xmpRemoved": bool, "pdfa": "2B" | null,
-            "objectXmpRemoved": int, "pieceInfoRemoved": int}
+            "objectXmpRemoved": int, "pieceInfoRemoved": int, "attachmentsRemoved": int}
 Settable keys: Title, Author, Subject, Keywords, Creator, Producer.
 Strip drops the whole Info dictionary, the catalog XMP stream, the XMP streams
 on pages, images and every other object, and all PieceInfo dictionaries, then
 writes any given metadata onto the clean document. Embedded files are left
-alone, since removing them changes content."""
+alone unless removeAttachments is set, since removing them changes content."""
 import json
 import sys
 
@@ -56,6 +56,21 @@ def strip_object_metadata(pdf):
 
     xmp_removed = 0
     piece_removed = 0
+    for obj in iter_dicts(pdf):
+        if "/Metadata" in obj:
+            del obj["/Metadata"]
+            xmp_removed += 1
+        if "/PieceInfo" in obj:
+            del obj["/PieceInfo"]
+            piece_removed += 1
+    return xmp_removed, piece_removed
+
+
+def iter_dicts(pdf):
+    """Yield every dictionary and stream in the file. The caller may delete
+    keys from the yielded object before the walk reads its children."""
+    import pikepdf
+
     # pdf.objects yields only indirect objects, so also descend into direct
     # children (an inline annotation dict can carry its own XMP). Indirect
     # children are skipped there because the outer loop visits them.
@@ -67,12 +82,7 @@ def strip_object_metadata(pdf):
             if isinstance(obj, pikepdf.Array):
                 children = list(obj)
             elif isinstance(obj, (pikepdf.Dictionary, pikepdf.Stream)):
-                if "/Metadata" in obj:
-                    del obj["/Metadata"]
-                    xmp_removed += 1
-                if "/PieceInfo" in obj:
-                    del obj["/PieceInfo"]
-                    piece_removed += 1
+                yield obj
                 children = [obj[key] for key in obj.keys()]
             else:
                 continue
@@ -81,7 +91,54 @@ def strip_object_metadata(pdf):
                 for c in children
                 if isinstance(c, (pikepdf.Array, pikepdf.Dictionary)) and not c.is_indirect
             )
-    return xmp_removed, piece_removed
+
+
+def strip_attachments(pdf):
+    """Remove embedded files from everywhere a reader finds them: the catalog
+    EmbeddedFiles name tree (and the portfolio /Collection built on it),
+    FileAttachment annotations with their popups, /AF associated-file arrays,
+    and the /EF entry of any other file specification (a GoToE action, say).
+    Dropping /AF breaks PDF/A-3 and ZUGFeRD/Factur-X invoices. Returns the
+    number of distinct embedded file streams removed."""
+    import pikepdf
+
+    # Sweep first, while direct filespecs inside the name tree and the
+    # annotations are still reachable, so the count includes them.
+    streams = set()
+    for obj in iter_dicts(pdf):
+        if "/AF" in obj:
+            del obj["/AF"]
+        ef = obj.get("/EF")
+        if isinstance(ef, pikepdf.Dictionary):
+            streams.update(v.objgen for v in ef.values() if isinstance(v, pikepdf.Stream))
+            del obj["/EF"]
+
+    names = pdf.Root.get("/Names")
+    if names is not None and "/EmbeddedFiles" in names:
+        del names["/EmbeddedFiles"]
+    if "/Collection" in pdf.Root:
+        del pdf.Root["/Collection"]
+
+    def subtype(annot):
+        return annot.get("/Subtype") if isinstance(annot, pikepdf.Dictionary) else None
+
+    for page in pdf.pages:
+        annots = page.obj.get("/Annots")
+        if not isinstance(annots, pikepdf.Array):
+            continue
+        attached = [a for a in annots if subtype(a) == pikepdf.Name.FileAttachment]
+        if not attached:
+            continue
+        # A popup points back at its parent, which would keep the parent reachable.
+        parents = {a.objgen for a in attached if a.is_indirect}
+        page.obj.Annots = pikepdf.Array(
+            a
+            for a in annots
+            if subtype(a) != pikepdf.Name.FileAttachment
+            and not (subtype(a) == pikepdf.Name.Popup and a.get("/Parent") is not None
+                     and a.Parent.objgen in parents)
+        )
+    return len(streams)
 
 
 def main():
@@ -113,6 +170,7 @@ def main():
             with pikepdf.open(path) as pdf:
                 removed, xmp_removed, pdfa = strip_metadata(pdf)
                 object_xmp, piece_info = strip_object_metadata(pdf)
+                attachments = strip_attachments(pdf) if args.get("removeAttachments") is True else 0
                 apply_metadata(pdf, meta)
                 # fix_metadata_version would recreate an XMP packet to record the version.
                 pdf.save(out, fix_metadata_version=False)
@@ -125,6 +183,7 @@ def main():
                         "pdfa": pdfa,
                         "objectXmpRemoved": object_xmp,
                         "pieceInfoRemoved": piece_info,
+                        "attachmentsRemoved": attachments,
                     }
                 )
             )

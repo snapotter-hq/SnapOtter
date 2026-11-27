@@ -4290,6 +4290,9 @@ export const ar: TranslationKeys = {
       stripAll: "إزالة البيانات الوصفية للمستند",
       stripAllHint:
         "يمسح التواريخ وCreator وProducer والحقول المخصصة وبيانات XMP قبل كتابة الحقول أدناه. تفقد ملفات PDF/A توافقها.",
+      removeAttachments: "إزالة الملفات المرفقة أيضًا",
+      removeAttachmentsHint:
+        "يحذف الملفات المضمّنة وتعليقات المرفقات. تفقد الفواتير الإلكترونية (ZUGFeRD وFactur-X) وملفات PDF/A-3 بياناتها المرفقة.",
       title: "العنوان",
       author: "المؤلف",
       subject: "الموضوع",

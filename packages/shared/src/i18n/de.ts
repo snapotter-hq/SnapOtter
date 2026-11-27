@@ -4351,6 +4351,9 @@ export const de: TranslationKeys = {
       stripAll: "Dokument-Metadaten entfernen",
       stripAllHint:
         "Entfernt Datumsangaben, Creator, Producer, benutzerdefinierte Felder und XMP, bevor die Felder unten geschrieben werden. PDF/A-Dateien verlieren ihre Konformität.",
+      removeAttachments: "Auch angehängte Dateien entfernen",
+      removeAttachmentsHint:
+        "Löscht eingebettete Dateien und Dateianhang-Anmerkungen. E-Rechnungen (ZUGFeRD, Factur-X) und PDF/A-3-Dateien verlieren ihre angehängten Daten.",
       title: "Titel",
       author: "Autor",
       subject: "Betreff",

@@ -4341,6 +4341,9 @@ export const nl: TranslationKeys = {
       stripAll: "Documentmetadata verwijderen",
       stripAllHint:
         "Wist datums, Creator, Producer, aangepaste velden en XMP voordat de velden hieronder worden geschreven. PDF/A-bestanden verliezen hun conformiteit.",
+      removeAttachments: "Ook bijgevoegde bestanden verwijderen",
+      removeAttachmentsHint:
+        "Verwijdert ingesloten bestanden en bestandsbijlage-annotaties. E-facturen (ZUGFeRD, Factur-X) en PDF/A-3-bestanden verliezen hun bijgevoegde gegevens.",
       title: "Titel",
       author: "Auteur",
       subject: "Onderwerp",
