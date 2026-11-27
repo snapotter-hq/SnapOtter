@@ -88,6 +88,7 @@ export function makeLandingSeoAdapter(opts = {}) {
   const dir = opts.dir ?? DEFAULT_OUT_DIR;
   return {
     name: "landing-seo",
+    verifiesOutputHash: true,
 
     async extract() {
       const alternatives =
