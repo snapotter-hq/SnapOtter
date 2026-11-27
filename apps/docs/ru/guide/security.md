@@ -2,7 +2,7 @@
 description: "Руководство по усилению безопасности SnapOtter. Безопасность контейнеров, сетевая изоляция, секреты Docker, развёртывание в Kubernetes и артефакты соответствия требованиям."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 1c397068ca81
+i18n_output_hash: e6e09fee0959
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ SnapOtter обрабатывает файлы полностью в вашей �
 
 ### Почему `read_only` не задан {#why-read-only-is-not-set}
 
-`read_only: true` не задан, потому что переназначение PUID/PGID при запуске записывает в `/etc/passwd` и `/etc/group`. Если вместо PUID/PGID вы используете флаг Docker `--user` или Kubernetes `runAsUser`, можно безопасно включить корневую файловую систему только для чтения.
+`read_only: true` не задан, потому что переназначение [PUID](/ru/guide/configuration#env-puid)/[PGID](/ru/guide/configuration#env-pgid) при запуске записывает в `/etc/passwd` и `/etc/group`. Если вместо PUID/PGID вы используете флаг Docker `--user` или Kubernetes `runAsUser`, можно безопасно включить корневую файловую систему только для чтения.
 
 ## Сетевая изоляция {#network-isolation}
 
@@ -62,7 +62,7 @@ SnapOtter обрабатывает файлы полностью в вашей �
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/ru/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Пример с секретами Docker Compose:**
 

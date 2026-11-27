@@ -2,7 +2,7 @@
 description: "Hantera användare, inbyggda och anpassade roller, behörigheter, API-nycklar, team, sessioner och granskningsloggen i SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 9af24cfc9c89
+i18n_output_hash: a3bdb0c3f9a1
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ När det är aktiverat signeras varje granskningsloggpost med en HMAC härledd f
 
 ### Lagring {#retention}
 
-Ange `AUDIT_RETENTION_DAYS` för att automatiskt rensa gamla poster. Standarden är `0`, vilket innebär att poster behålls på obestämd tid.
+Ange [`AUDIT_RETENTION_DAYS`](/sv/guide/configuration#env-audit-retention-days) för att automatiskt rensa gamla poster. Standarden är `0`, vilket innebär att poster behålls på obestämd tid.
 
 ### Händelsereferens {#event-reference}
 

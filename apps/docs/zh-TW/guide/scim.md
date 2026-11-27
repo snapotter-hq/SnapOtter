@@ -2,7 +2,7 @@
 description: "設定 SCIM 2.0 佈建，將使用者與群組從您的身分提供者同步至 SnapOtter。涵蓋 Okta、Azure AD / Entra ID 以及自訂整合。"
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: f7021938ee6c
+i18n_output_hash: 6621d23c47f4
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azure 會依固定的同步週期（通常每 40 分鐘）佈建使用者與群�
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-您的授權未包含 `scim` 功能，或未設定任何授權。SCIM 需要企業版方案授權。請確認 `SNAPOTTER_LICENSE_KEY` 已設定，且該授權包含 `scim` 功能。
+您的授權未包含 `scim` 功能，或未設定任何授權。SCIM 需要企業版方案授權。請確認 [`SNAPOTTER_LICENSE_KEY`](/zh-TW/guide/configuration#env-snapotter-license-key) 已設定，且該授權包含 `scim` 功能。
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

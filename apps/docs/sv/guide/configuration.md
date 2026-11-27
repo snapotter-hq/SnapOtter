@@ -2,7 +2,7 @@
 description: "Alla miljövariabler i SnapOtter med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: 7cc4e9e29d3b
+i18n_output_hash: 7ff1977146f5
 i18n_hash_version: 2
 ---
 
@@ -20,6 +20,7 @@ All konfiguration görs med miljövariabler. Varje variabel har ett rimligt stan
 | `HOST` | `0.0.0.0` | IP-adressen som servern lyssnar på. I ett bridge-nätverk (standard för `docker run` och Compose) behåller du `0.0.0.0` (eller `::`), annars slutar publicerade portar att fungera. Vid en native-installation eller en container i värdens nätverk håller `127.0.0.1` API:t borta från nätverket; placera en omvänd proxy framför för fjärråtkomst. [Inbäddat läge](#embedded-mode) fungerar bara med `0.0.0.0`, `::` eller `127.0.0.1`, eftersom dess startkontroll anropar `127.0.0.1`. Med någon annan adress, `::1` inräknad, räknas containern aldrig som startad, och en senare krasch stoppar den i stället för att starta om servern. Allt som inte är en IP-adress, `localhost` inräknat, stoppar servern vid uppstart. |
 | `BASE_PATH` | (tom) | Publik distributionssökväg, t.ex. `/snapotter`. Tom eller `/` serverar på domänens rot. Tillämpas vid körning; ingen ombyggnad av avbilden krävs. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Högsta antal förfrågningar per minut och IP. Ange 0 för att inaktivera hastighetsbegränsning. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Högsta antal förfrågningar per minut och IP till slutpunkterna för hantering av API-nycklar (lista, skapa, återkalla). Nycklar som används för verktygsanrop påverkas inte. Det finns inget obegränsat värde: `0` nekar alla förfrågningar till de slutpunkterna. |
 | `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung för CORS, eller tom för endast samma ursprung. |
 | `LOG_LEVEL` | `info` | Loggningsnivå. En av: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Standardvärdet litar bara på en peer i ett privat nätverk, så en omvänd proxy i ett Docker-nätverk eller ett LAN är betrodd medan en falsk rubrik från en publik klient inte är det. Ange `true` endast när en proxy som du kontrollerar står framför på en publik adress. |
@@ -37,6 +38,9 @@ De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, 
 | `MAX_USERS` | `0` (obegränsat) | Högsta antal registrerade användarkonton. Ange 0 för obegränsat. |
 | `SESSION_DURATION_HOURS` | `168` | Inloggningssessionens livslängd i timmar (standard är 7 dagar). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ange `true` för att hoppa över den tvingade uppmaningen om lösenordsbyte vid första inloggningen. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Högsta antal inloggningsförfrågningar per minut och IP. Ytterligare försök får `429` tills minuten är slut. Upprepade misslyckanden för ett användarnamn når oftast `LOGIN_THROTTLE_MAX_FAILURES` först. En administratör kan åsidosätta det under Inställningar > System. Det finns inget obegränsat värde: `0` nekar alla inloggningar. Ett källbygge startar på 10. |
+| `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Antal misslyckade lösenordsinloggningar ett användarnamn får ha inom `LOGIN_THROTTLE_WINDOW_S` innan fler försök för det får `429`, oavsett vilken IP de kommer från. De släpps igenom igen när de äldsta misslyckandena lämnar fönstret. Ange 0 för att stänga av begränsningen. |
+| `LOGIN_THROTTLE_WINDOW_S` | `900` | Längden på det fönstret, i sekunder. Måste vara minst 1; servern vägrar starta med 0. |
 
 ### Lagring {#storage}
 
@@ -48,6 +52,7 @@ De två booleska värdena nedan accepterar bara `true` och `false`. Allt annat, 
 | `REDIS_URL` | `redis://localhost:6379` | Anslutningssträng till Redis (används för BullMQ-jobbköer). Compose pekar den mot sin tjänst `redis`. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Katalog för temporära filer under bearbetning. Rensas automatiskt. Avbilden sätter `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Katalog för permanenta användarfiler (uppladdade bilder, sparade resultat). Avbilden sätter `/data/files`. |
+| `MAX_STORAGE_PER_USER_MB` | `5000` | Tak i megabyte för vad varje användare behåller i filbiblioteket. En sparning som skulle passera det nekas, med använd mängd och gräns angivna. En kvot som satts på användaren har företräde. Ange 0 för obegränsat. |
 
 ### S3-objektlagring {#s3-object-storage}
 
@@ -96,17 +101,32 @@ Notering om telemetri: inbäddat läge ärver avbildens standardinställning fö
 | `MAX_BATCH_SIZE` | `0` (obegränsat) | Högsta antal filer i en enskild batchförfrågan. Ange 0 för obegränsat. Den publicerade avbilden levereras med `0`; ett källbygge startar på 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Antal batchjobb som körs parallellt. Ange 0 för att automatiskt detektera utifrån tillgängliga CPU-kärnor. |
 | `MAX_MEGAPIXELS` | `0` (obegränsat) | Högsta tillåtna bildupplösning i megapixlar. Ange 0 för obegränsat. |
+| `MAX_CPU_UPSCALE_MP` | `4` | Största indata, i megapixlar, som AI-uppskalning tar emot på en värd utan GPU. Den uppskalade utdatan begränsas också till 16 gånger detta värde (64 MP som standard), så en hög skalfaktor sänker indatagränsen ytterligare. En större bild förminskas för att passa före uppskalning; om resultatet då inte skulle bli större än originalet nekas förfrågan i stället. Lanczos hoppar över indatagränsen men inte utdatataket. Ange 0 för ingen gräns, vilket kräver mycket RAM: RealESRGAN bygger alltid en 4x-buffert internt. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` (obegränsat) | Tak i GB för den sammanlagda storleken på uppladdningar och lagrade resultat i arbetsytan. När det passerats får uppladdningar och verktygsförfrågningar 503 tills filerna löper ut efter `FILE_MAX_AGE_HOURS`. Ange 0 för obegränsat; lokal lagring nekar fortfarande skrivningar med 503 när disken har mindre än 0,5 GB ledigt. Den publicerade avbilden levereras med `0`; ett källbygge startar på 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Högsta antal arbetstrådar för bildbearbetning. Ange 0 för att automatiskt detektera utifrån tillgängliga CPU-kärnor. |
 | `PROCESSING_TIMEOUT_S` | `0` (ingen gräns) | Tidsgräns för varje anrop till den Python sidecar som kör AI-verktygen, i sekunder. Ange 0 för ingen tidsgräns. Den begränsar inte bild-, PDF- eller mediejobb; det gör `JOB_TIMEOUT_FAST_S` och `JOB_TIMEOUT_LONG_S`. |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Sekunder som AI:ns Python sidecar och körmiljön för exakt OCR är inaktiva innan de avslutas och frigör sitt minne (cirka 1,3 GB och 0,7 GB när de är uppvärmda). Båda startar igen vid nästa förfrågan, så det första AI-anropet efter en avslutning vid inaktivitet får betala kostnaden för att starta biblioteken, några sekunder. Ange 0 för att hålla dem igång. Standardvärdet matchar `AI_SESSION_IDLE_TIMEOUT`, så att inlästa modeller inte släpps tidigare än den inställningen anger. Om du höjer `AI_SESSION_IDLE_TIMEOUT`, höj även detta värde så att de matchar. |
+| `AI_SESSION_IDLE_TIMEOUT` | `0` (auto) | Antal sekunder en inläst AI-modell ligger kvar i sidecarens cache efter sista användningen. Auto är 600. Läses av Python-sidecaren, som också släpper alla cachade modeller när den avslutas efter `AI_SIDECAR_IDLE_TIMEOUT`. |
+| `AI_SESSION_CACHE_BYTES` | `0` (auto) | Minnesbudget för cachade AI-modeller, i byte. Auto är 40 % av GPU-minnet, och ingen cachning alls på en värd med enbart CPU. Ange det på en CPU-värd för att cacha modeller i RAM; ange 1 för att stänga av cachning på en GPU-värd. Läses av Python-sidecaren. |
+| `MAX_AI_JOBS_PER_USER` | `5` | Antal AI-jobb för en enskild fil som en användare får ha köade eller pågående samtidigt. Fler får `429` tills ett är klart. AI-poolen kör ett jobb i taget, så detta hindrar en användare från att hålla den upptagen. AI-körningar i batch och pipeline räknas inte. Ange 0 för obegränsat. |
 | `JOB_TIMEOUT_FAST_S` | `120` | Tidsfrist för ett jobb i de snabba poolerna (bild- och dokumentverktyg), i sekunder. Ett jobb som pågår längre misslyckas med ett tidsgränsfel. Ange 0 för ingen gräns. |
 | `JOB_TIMEOUT_LONG_S` | `7200` | Tidsfrist för ett jobb i de långa poolerna (AI- och medieverktyg, plus alla verktyg som är markerade som långvariga), i sekunder. Ange 0 för ingen gräns. PDF-OCR i lägena Balanced och Best förlänger sin egen tidsfrist efter sidantal (2 och 5 minuter per sida), upp till 6 timmar, så en stor PDF kräver inte att detta höjs. |
 | `SYNC_WAIT_MS` | `8000` | Hur länge en verktygsförfrågan väntar på sitt jobb innan API:t slutar vänta och returnerar `202` med ett jobb-id att följa via SSE, i millisekunder. Det stoppar inte jobbet. Ange 0 för att vänta på jobbet hur länge det än tar. |
 | `MAX_PIPELINE_STEPS` | `20` | Högsta antal steg i en pipeline. Ange 0 för ingen gräns. |
+| `MAX_PIPELINE_STEP_PIXELS` | `67108864` | Största utdata ett pipelinesteg får begära, som bredd gånger höjd i pixlar (standard är 8192 x 8192). Ett steg vars inställningar begär mer nekas innan pipelinen körs. Ange 0 för ingen gräns. |
 | `MAX_CANVAS_PIXELS` | `0` (ingen gräns) | Största dukstorlek i pixlar för utdatabilder. Ange 0 för ingen gräns. |
 | `MAX_SVG_SIZE_MB` | `50` | Största SVG som accepteras före sanering, i megabyte. `0` beter sig annorlunda här än i raderna omkring. Det tar bort storleksgränsen före tolkning helt i stället för att höja den, så låt denna vara satt. |
 | `MAX_PDF_PAGES` | `0` (obegränsat) | Högsta antal PDF-sidor för konvertering från PDF till bild. Ange 0 för obegränsat. |
+| `MAX_VIDEO_DURATION_S` | `0` (obegränsat) | Längsta video som videoverktygen tar emot, i sekunder. Längre filer nekas före bearbetning, med längden och gränsen i felet. Ange 0 för obegränsat. |
+| `MAX_AUDIO_DURATION_S` | `0` (obegränsat) | Samma, för ljudverktygen. |
+| `MAX_VIDEO_BITRATE_KBPS` | `0` (obegränsat) | Högsta totala bitrate som videoverktygen tar emot, i kilobit per sekund. Ange 0 för obegränsat. |
+| `PREVIEW_TIMEOUT_S` | `300` | Tidsgräns för att koda ett förhandsvisningsklipp i webbläsaren av en video- eller ljudfil, i sekunder. Dokumentförhandsvisningar använder `LIBREOFFICE_TIMEOUT_S` i stället. Ange 0 för ingen gräns. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Tidsgräns för en LibreOffice-konvertering (Word, Excel och PowerPoint till PDF, dokumentkonverterarna och dokumentförhandsvisningar), i sekunder. `0` betyder inte obegränsat här; det faller tillbaka på 120. |
+| `GIF_BG_MAX_FRAMES` | `150` | Högsta antal bildrutor som Ta bort GIF-bakgrund tar emot i en animation. Längre animationer får `400` som anger antalet bildrutor. Ange 0 för ingen gräns för bildrutor; en separat pixelbudget gäller fortfarande. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (av) | Tak för adressutrymme, i megabyte, för varje ffmpeg-, Ghostscript-, qpdf-, LibreOffice-, pandoc- och pdfcpu-process som media- och dokumentmotorerna startar. Avkodarna som läser uppladdade bilder (ImageMagick, exiftool och deras ffmpeg-reserv) begränsas inte. En process som passerar det avslutas i stället för att driva hela containern in i out-of-memory-mekanismen. Det begränsar virtuellt minne, inte residentminne, så lämna marginal. AI-sidecaren begränsas aldrig. Ange 0 för att stänga av det och förlita dig på containerns minnesgräns. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Det största fältet `settings` som en verktygsförfrågan får innehålla, i kilobyte, räknat i UTF-8-byte. Förfrågningar över gränsen får `400`. Ange 0 för ingen gräns. Verkliga verktygsinställningar är mycket mindre än 64 KB, så höj detta bara om en klient skickar ovanligt stora inställningar. |
+| `MAX_SUBTITLE_SIZE_MB` | `1` | Största undertextfil (`.srt`, `.vtt`, `.ass`) som Bränn in undertexter och Bädda in undertexter tar emot, i megabyte. Större filer får `400` som anger filstorleken och gränsen. Ange 0 för ingen gräns. En undertextfil till en långfilm är oftast långt under 1 MB. |
+| `MAX_METADATA_TAG_LENGTH` | `10000` | Längsta värde som Redigera metadata skriver i en enskild tagg (artist, beskrivning, nyckelord och så vidare), i tecken. Längre värden får `400` som anger taggen och gränsen. Ange 0 för ingen gräns. Höj det om du lagrar långa bildtexter eller beskrivningar. Ett taggvärde måste också rymmas inom `MAX_SETTINGS_PAYLOAD_KB` och operativsystemets gräns per argument (128 KB på Linux). |
 
 ### Motorer {#engines}
 
@@ -135,6 +155,9 @@ De publicerade Compose-filerna skickar vidare alla dessa från `.env`, så det r
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | Hur länge osparade bearbetningsresultat (råa uppladdningar och verktygsutdata) behålls innan de raderas automatiskt. Filer som du uttryckligen sparar i filbiblioteket påverkas inte och finns kvar tills du raderar dem. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Hur ofta rensningsjobbet körs. |
+| `JOBS_RETENTION_DAYS` | `30` | Antal dagar en avslutad jobbpost (slutförd, misslyckad eller avbruten) behålls innan gallringen, som körs var 6:e timme, raderar den. En administratör kan åsidosätta det under Inställningar > System. Användare och team under juridisk spärr behåller sina. Ange 0 för att behålla dem för alltid. |
+| `AUDIT_RETENTION_DAYS` | `0` (för alltid) | Antal dagar granskningsloggposter behålls. Samma regler för åsidosättning och juridisk spärr. Inget raderas medan manipuleringsskyddad granskningsloggning är på. Ange 0 för att behålla dem för alltid. |
+| `SNAPOTTER_LICENSE_KEY` | (tom) | Licensnyckel som låser upp enterprise-funktionerna, till exempel SAML, SCIM och S3-lagring. Läses vid start, så starta om efter att du ändrat den. En ogiltig eller utgången nyckel loggar en varning och servern körs utan dem. I containern kan du i stället montera den via `SNAPOTTER_LICENSE_KEY_FILE` (se [Docker secrets](/guide/security#docker-secrets)). |
 
 ### Utseende {#appearance}
 

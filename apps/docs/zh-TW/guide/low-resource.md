@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 2d50caa50660
+i18n_output_hash: e634988a3304
 i18n_hash_version: 2
 ---
 # 低資源環境設定 {#low-resource-setups}
@@ -91,7 +91,7 @@ Pi 等級機器的注意事項：
 | [`MAX_BATCH_SIZE`](/zh-TW/guide/configuration#env-max-batch-size) | `5` | 批次是 1-2 GB 機器最先耗盡記憶體的地方。 |
 | [`MAX_UPLOAD_SIZE_MB`](/zh-TW/guide/configuration#env-max-upload-size-mb) | `100` | 避免單一巨大檔案佔滿整個工作區。 |
 | [`MAX_MEGAPIXELS`](/zh-TW/guide/configuration#env-max-megapixels) | `50` | 無論檔案大小，解碼 100+ MP 的圖片都會消耗 RAM。 |
-| `MAX_VIDEO_DURATION_S` | `300` | 長時間轉碼會讓小型 CPU 被獨佔數分鐘到數小時。 |
+| [`MAX_VIDEO_DURATION_S`](/zh-TW/guide/configuration#env-max-video-duration-s) | `300` | 長時間轉碼會讓小型 CPU 被獨佔數分鐘到數小時。 |
 | [`PROCESSING_TIMEOUT_S`](/zh-TW/guide/configuration#env-processing-timeout-s) | `600` | 硬性上限，讓失控的工作最終能釋放機器。 |
 
 這些上限作用於伺服器接受的內容，因此請依照您實際的使用情況設定，而不是越小越好。如果您從不處理影片，設定 `MAX_VIDEO_DURATION_S` 上限不會有任何代價；如果您每天掃描文件，就不要限制 [`MAX_PDF_PAGES`](/zh-TW/guide/configuration#env-max-pdf-pages)。

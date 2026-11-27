@@ -2,7 +2,7 @@
 description: "Quản lý người dùng, vai trò tích hợp sẵn và tùy chỉnh, quyền, khóa API, nhóm, phiên và nhật ký kiểm toán trong SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: efe6a520c09f
+i18n_output_hash: 2dab22860304
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Khi được bật, mỗi mục nhật ký kiểm toán được ký bằng mộ
 
 ### Lưu giữ {#retention}
 
-Đặt `AUDIT_RETENTION_DAYS` để tự động dọn sạch các mục cũ. Mặc định là `0`, nghĩa là các mục được giữ vô thời hạn.
+Đặt [`AUDIT_RETENTION_DAYS`](/vi/guide/configuration#env-audit-retention-days) để tự động dọn sạch các mục cũ. Mặc định là `0`, nghĩa là các mục được giữ vô thời hạn.
 
 ### Tham chiếu sự kiện {#event-reference}
 

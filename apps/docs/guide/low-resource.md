@@ -82,11 +82,11 @@ All caps are environment variables, documented fully in [Configuration](/guide/c
 |---|---|---|
 | [`CONCURRENT_JOBS`](/guide/configuration#env-concurrent-jobs) | `1` | How many jobs run in parallel. Auto-detect uses CPU cores minus one, which is fine on big machines and too eager on a 2-core box under memory pressure. |
 | [`MAX_WORKER_THREADS`](/guide/configuration#env-max-worker-threads) | `2` | Image-processing thread pool. |
-| [`AI_SIDECAR_IDLE_TIMEOUT`](/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower `AI_SESSION_IDLE_TIMEOUT` too, since the process exit discards cached models. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower [`AI_SESSION_IDLE_TIMEOUT`](/guide/configuration#env-ai-session-idle-timeout) too, since the process exit discards cached models. |
 | [`MAX_BATCH_SIZE`](/guide/configuration#env-max-batch-size) | `5` | Batches are where 1-2 GB machines run out of memory first. |
 | [`MAX_UPLOAD_SIZE_MB`](/guide/configuration#env-max-upload-size-mb) | `100` | Keeps a single huge file from occupying the whole workspace. |
 | [`MAX_MEGAPIXELS`](/guide/configuration#env-max-megapixels) | `50` | Decoding a 100+ MP image costs RAM regardless of file size. Images above about 268 MP are refused even at `0`. |
-| `MAX_VIDEO_DURATION_S` | `300` | Long transcodes monopolize a small CPU for minutes to hours. |
+| [`MAX_VIDEO_DURATION_S`](/guide/configuration#env-max-video-duration-s) | `300` | Long transcodes monopolize a small CPU for minutes to hours. |
 | [`JOB_TIMEOUT_LONG_S`](/guide/configuration#env-job-timeout-long-s) | `3600` | Hard ceiling on AI and media jobs, so a runaway job frees the box eventually. The default is two hours. Image and document jobs already stop at [`JOB_TIMEOUT_FAST_S`](/guide/configuration#env-job-timeout-fast-s) (120 seconds by default). |
 
 These caps apply to what the server accepts, so set them to match what you actually use rather than as small as possible. If you never touch video, a `MAX_VIDEO_DURATION_S` cap costs nothing; if you scan documents daily, do not cap [`MAX_PDF_PAGES`](/guide/configuration#env-max-pdf-pages).

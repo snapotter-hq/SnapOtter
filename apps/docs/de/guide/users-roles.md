@@ -2,7 +2,7 @@
 description: "Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: d773a75e3981
+i18n_output_hash: 0d77c98d2ac9
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Wenn aktiviert, wird jeder Audit-Log-Eintrag mit einem HMAC signiert, der aus `D
 
 ### Aufbewahrung {#retention}
 
-Setze `AUDIT_RETENTION_DAYS`, um alte Einträge automatisch zu bereinigen. Der Standard ist `0`, was bedeutet, dass Einträge unbegrenzt aufbewahrt werden.
+Setze [`AUDIT_RETENTION_DAYS`](/de/guide/configuration#env-audit-retention-days), um alte Einträge automatisch zu bereinigen. Der Standard ist `0`, was bedeutet, dass Einträge unbegrenzt aufbewahrt werden.
 
 ### Ereignisreferenz {#event-reference}
 

@@ -2,7 +2,7 @@
 description: "Керуйте користувачами, вбудованими та власними ролями, дозволами, ключами API, командами, сеансами й журналом аудиту в SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 802ed8983042
+i18n_output_hash: 366e7c8b9edd
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### Збереження {#retention}
 
-Задайте `AUDIT_RETENTION_DAYS`, щоб автоматично очищати старі записи. Типове значення - `0`, що означає, що записи зберігаються безстроково.
+Задайте [`AUDIT_RETENTION_DAYS`](/uk/guide/configuration#env-audit-retention-days), щоб автоматично очищати старі записи. Типове значення - `0`, що означає, що записи зберігаються безстроково.
 
 ### Довідник подій {#event-reference}
 

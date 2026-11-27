@@ -2,7 +2,7 @@
 description: "Zarządzaj użytkownikami, wbudowanymi i niestandardowymi rolami, uprawnieniami, kluczami API, zespołami, sesjami i dziennikiem audytu w SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 0757cfbfa40d
+i18n_output_hash: 4151b87bf65f
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Gdy jest włączone, każdy wpis dziennika audytu jest podpisywany kodem HMAC po
 
 ### Retencja {#retention}
 
-Ustaw `AUDIT_RETENTION_DAYS`, aby automatycznie usuwać stare wpisy. Wartość domyślna to `0`, co oznacza, że wpisy są przechowywane bezterminowo.
+Ustaw [`AUDIT_RETENTION_DAYS`](/pl/guide/configuration#env-audit-retention-days), aby automatycznie usuwać stare wpisy. Wartość domyślna to `0`, co oznacza, że wpisy są przechowywane bezterminowo.
 
 ### Wykaz zdarzeń {#event-reference}
 

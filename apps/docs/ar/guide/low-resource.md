@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 8c73b747d735
+i18n_output_hash: 106672a2f517
 i18n_hash_version: 2
 ---
 # الإعدادات منخفضة الموارد {#low-resource-setups}
@@ -91,7 +91,7 @@ services:
 | [`MAX_BATCH_SIZE`](/ar/guide/configuration#env-max-batch-size) | `5` | الدفعات هي أول ما يستنفد ذاكرة الأجهزة ذات 1-2 GB. |
 | [`MAX_UPLOAD_SIZE_MB`](/ar/guide/configuration#env-max-upload-size-mb) | `100` | يمنع ملفاً ضخماً واحداً من احتلال مساحة العمل كلها. |
 | [`MAX_MEGAPIXELS`](/ar/guide/configuration#env-max-megapixels) | `50` | فك ترميز صورة بأكثر من 100 ميغابكسل يستهلك ذاكرة RAM بغض النظر عن حجم الملف. |
-| `MAX_VIDEO_DURATION_S` | `300` | تحتكر عمليات الترميز الطويلة معالجاً صغيراً لدقائق إلى ساعات. |
+| [`MAX_VIDEO_DURATION_S`](/ar/guide/configuration#env-max-video-duration-s) | `300` | تحتكر عمليات الترميز الطويلة معالجاً صغيراً لدقائق إلى ساعات. |
 | [`PROCESSING_TIMEOUT_S`](/ar/guide/configuration#env-processing-timeout-s) | `600` | سقف صارم بحيث تحرر المهمة الجامحة الجهاز في النهاية. |
 
 تنطبق هذه الحدود على ما يقبله الخادم، لذا اضبطها بما يتناسب مع ما تستخدمه فعلاً بدلاً من جعلها أصغر ما يمكن. إذا كنت لا تلمس الفيديو أبداً، فإن سقف `MAX_VIDEO_DURATION_S` لا يكلّف شيئاً؛ وإذا كنت تمسح المستندات يومياً فلا تضع سقفاً على [`MAX_PDF_PAGES`](/ar/guide/configuration#env-max-pdf-pages).

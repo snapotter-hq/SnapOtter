@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: f14762715283
+i18n_output_hash: 4b5680392f16
 i18n_hash_version: 2
 ---
 # Налаштування для обмежених ресурсів {#low-resource-setups}
@@ -91,7 +91,7 @@ services:
 | [`MAX_BATCH_SIZE`](/uk/guide/configuration#env-max-batch-size) | `5` | Саме на пакетах машинам з 1-2 ГБ першими не вистачає пам'яті. |
 | [`MAX_UPLOAD_SIZE_MB`](/uk/guide/configuration#env-max-upload-size-mb) | `100` | Не дає одному величезному файлу зайняти весь робочий простір. |
 | [`MAX_MEGAPIXELS`](/uk/guide/configuration#env-max-megapixels) | `50` | Декодування зображення понад 100 МП потребує RAM незалежно від розміру файла. |
-| `MAX_VIDEO_DURATION_S` | `300` | Довгі транскодування монополізують слабкий CPU на хвилини чи години. |
+| [`MAX_VIDEO_DURATION_S`](/uk/guide/configuration#env-max-video-duration-s) | `300` | Довгі транскодування монополізують слабкий CPU на хвилини чи години. |
 | [`PROCESSING_TIMEOUT_S`](/uk/guide/configuration#env-processing-timeout-s) | `600` | Жорстка межа, щоб завдання, що вийшло з-під контролю, зрештою звільнило машину. |
 
 Ці ліміти стосуються того, що приймає сервер, тож задавайте їх відповідно до того, чим ви реально користуєтеся, а не якомога меншими. Якщо ви ніколи не працюєте з відео, ліміт `MAX_VIDEO_DURATION_S` нічого не коштує; якщо ви щодня скануєте документи, не обмежуйте [`MAX_PDF_PAGES`](/uk/guide/configuration#env-max-pdf-pages).

@@ -2,7 +2,7 @@
 description: "SnapOtter 보안 강화 가이드. 컨테이너 보안, 네트워크 격리, Docker 시크릿, Kubernetes 배포, 규정 준수 산출물."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: afbb3458e03d
+i18n_output_hash: f0d08afdb2d1
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ SnapOtter는 파일을 전적으로 사용자의 인프라 안에서 처리합�
 
 ### `read_only`를 설정하지 않는 이유 {#why-read-only-is-not-set}
 
-PUID/PGID 재매핑이 시작 시 `/etc/passwd`와 `/etc/group`에 쓰기 때문에 `read_only: true`는 설정되어 있지 않습니다. PUID/PGID 대신 Docker의 `--user` 플래그나 Kubernetes `runAsUser`를 사용한다면 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있습니다.
+[PUID](/ko/guide/configuration#env-puid)/[PGID](/ko/guide/configuration#env-pgid) 재매핑이 시작 시 `/etc/passwd`와 `/etc/group`에 쓰기 때문에 `read_only: true`는 설정되어 있지 않습니다. PUID/PGID 대신 Docker의 `--user` 플래그나 Kubernetes `runAsUser`를 사용한다면 읽기 전용 루트 파일 시스템을 안전하게 활성화할 수 있습니다.
 
 ## 네트워크 격리 {#network-isolation}
 
@@ -62,7 +62,7 @@ PUID/PGID 재매핑이 시작 시 `/etc/passwd`와 `/etc/group`에 쓰기 때문
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/ko/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Docker Compose 시크릿 예시:**
 

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 19e162964466
+i18n_output_hash: 0a95c6135c4b
 i18n_hash_version: 2
 ---
 # Configuraciones de bajos recursos {#low-resource-setups}
@@ -91,7 +91,7 @@ Todos los topes son variables de entorno, documentadas por completo en [Configur
 | [`MAX_BATCH_SIZE`](/es/guide/configuration#env-max-batch-size) | `5` | Los lotes son lo primero que agota la memoria en máquinas de 1 a 2 GB. |
 | [`MAX_UPLOAD_SIZE_MB`](/es/guide/configuration#env-max-upload-size-mb) | `100` | Evita que un único archivo enorme ocupe todo el espacio de trabajo. |
 | [`MAX_MEGAPIXELS`](/es/guide/configuration#env-max-megapixels) | `50` | Decodificar una imagen de más de 100 MP consume RAM sea cual sea el tamaño del archivo. |
-| `MAX_VIDEO_DURATION_S` | `300` | Las transcodificaciones largas monopolizan una CPU pequeña durante minutos u horas. |
+| [`MAX_VIDEO_DURATION_S`](/es/guide/configuration#env-max-video-duration-s) | `300` | Las transcodificaciones largas monopolizan una CPU pequeña durante minutos u horas. |
 | [`PROCESSING_TIMEOUT_S`](/es/guide/configuration#env-processing-timeout-s) | `600` | Límite máximo para que un trabajo descontrolado acabe liberando la máquina. |
 
 Estos topes se aplican a lo que acepta el servidor, así que ajústelos a lo que realmente utiliza en lugar de hacerlos lo más pequeños posible. Si nunca usa vídeo, un tope de `MAX_VIDEO_DURATION_S` no cuesta nada; si escanea documentos a diario, no limite [`MAX_PDF_PAGES`](/es/guide/configuration#env-max-pdf-pages).

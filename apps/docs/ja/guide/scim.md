@@ -2,7 +2,7 @@
 description: "アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。"
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 832077edd9ba
+i18n_output_hash: a24c0598fd8f
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azureは固定の同期サイクル(通常40分ごと)でユーザーとグル�
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-ライセンスに`scim`機能が含まれていないか、ライセンスが設定されていません。SCIMにはエンタープライズプランのライセンスが必要です。`SNAPOTTER_LICENSE_KEY`が設定されており、ライセンスに`scim`機能が含まれていることを確認してください。
+ライセンスに`scim`機能が含まれていないか、ライセンスが設定されていません。SCIMにはエンタープライズプランのライセンスが必要です。[`SNAPOTTER_LICENSE_KEY`](/ja/guide/configuration#env-snapotter-license-key)が設定されており、ライセンスに`scim`機能が含まれていることを確認してください。
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

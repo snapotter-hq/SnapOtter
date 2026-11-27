@@ -2,7 +2,7 @@
 description: "Налаштуйте провізіонінг SCIM 2.0 для синхронізації користувачів і груп з вашого постачальника ідентифікації до SnapOtter. Охоплює Okta, Azure AD / Entra ID та власні інтеграції."
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 623b58eae288
+i18n_output_hash: 629542051736
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azure провізіонує користувачів і групи за фік�
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-Ваша ліцензія не включає функцію `scim`, або ліцензію не налаштовано. SCIM потребує ліцензії плану enterprise. Переконайтеся, що `SNAPOTTER_LICENSE_KEY` встановлено, а ліцензія включає функцію `scim`.
+Ваша ліцензія не включає функцію `scim`, або ліцензію не налаштовано. SCIM потребує ліцензії плану enterprise. Переконайтеся, що [`SNAPOTTER_LICENSE_KEY`](/uk/guide/configuration#env-snapotter-license-key) встановлено, а ліцензія включає функцію `scim`.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

@@ -2,7 +2,7 @@
 description: "SnapOtter에서 사용자, 기본 및 커스텀 역할, 권한, API 키, 팀, 세션, 감사 로그를 관리합니다."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 387e5820c217
+i18n_output_hash: 11df59397aab
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### 보존 {#retention}
 
-오래된 항목을 자동으로 정리하려면 `AUDIT_RETENTION_DAYS`을 설정하세요. 기본값은 `0`이며, 이는 항목이 무기한 보관됨을 의미합니다.
+오래된 항목을 자동으로 정리하려면 [`AUDIT_RETENTION_DAYS`](/ko/guide/configuration#env-audit-retention-days)을 설정하세요. 기본값은 `0`이며, 이는 항목이 무기한 보관됨을 의미합니다.
 
 ### 이벤트 참조 {#event-reference}
 

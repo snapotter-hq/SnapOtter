@@ -2,7 +2,7 @@
 description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secrets, triển khai Kubernetes và các tài liệu tuân thủ."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: d2710e8434af
+i18n_output_hash: 647e9dfedaae
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Với triển khai hướng ra internet, hãy gắn cổng 1349 vào loopback v�
 
 ### Vì sao `read_only` không được đặt {#why-read-only-is-not-set}
 
-`read_only: true` không được đặt vì việc ánh xạ lại PUID/PGID ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể bật hệ thống tệp gốc chỉ đọc một cách an toàn.
+`read_only: true` không được đặt vì việc ánh xạ lại [PUID](/vi/guide/configuration#env-puid)/[PGID](/vi/guide/configuration#env-pgid) ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể bật hệ thống tệp gốc chỉ đọc một cách an toàn.
 
 ## Cô lập mạng {#network-isolation}
 
@@ -62,7 +62,7 @@ Với triển khai production, hãy tránh truyền secret dưới dạng biến
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/vi/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Ví dụ với Docker Compose secrets:**
 

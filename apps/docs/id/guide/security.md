@@ -2,7 +2,7 @@
 description: "Panduan hardening keamanan untuk SnapOtter. Keamanan container, isolasi jaringan, Docker secrets, deployment Kubernetes, dan artefak kepatuhan."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: a494793b6bd6
+i18n_output_hash: 4657aeec03b1
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Untuk deployment yang menghadap internet, bind port 1349 ke loopback dan akhiri 
 
 ### Mengapa `read_only` Tidak Diatur {#why-read-only-is-not-set}
 
-`read_only: true` tidak diatur karena pemetaan ulang PUID/PGID menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau `runAsUser` Kubernetes sebagai ganti PUID/PGID, Anda dapat dengan aman mengaktifkan filesystem root read-only.
+`read_only: true` tidak diatur karena pemetaan ulang [PUID](/id/guide/configuration#env-puid)/[PGID](/id/guide/configuration#env-pgid) menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau `runAsUser` Kubernetes sebagai ganti PUID/PGID, Anda dapat dengan aman mengaktifkan filesystem root read-only.
 
 ## Isolasi Jaringan {#network-isolation}
 
@@ -62,7 +62,7 @@ Untuk deployment produksi, hindari memberikan secret sebagai variabel lingkungan
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/id/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Contoh dengan secret Docker Compose:**
 

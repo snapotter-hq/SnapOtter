@@ -2,7 +2,7 @@
 description: "دليل تحصين الأمان لـ SnapOtter. أمان الحاويات، وعزل الشبكة، وأسرار Docker، والنشر على Kubernetes، وأدلة الامتثال."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: e43a10056ba6
+i18n_output_hash: ddc3af48b9d2
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ i18n_hash_version: 2
 
 ### لماذا لم يُضبط `read_only` {#why-read-only-is-not-set}
 
-لم يُضبط `read_only: true` لأن إعادة تعيين PUID/PGID تكتب إلى `/etc/passwd` و`/etc/group` عند بدء التشغيل. إذا استخدمت علَم Docker ‏`--user` أو `runAsUser` في Kubernetes بدلاً من PUID/PGID، فيمكنك تفعيل نظام ملفات جذر للقراءة فقط بأمان.
+لم يُضبط `read_only: true` لأن إعادة تعيين [PUID](/ar/guide/configuration#env-puid)/[PGID](/ar/guide/configuration#env-pgid) تكتب إلى `/etc/passwd` و`/etc/group` عند بدء التشغيل. إذا استخدمت علَم Docker ‏`--user` أو `runAsUser` في Kubernetes بدلاً من PUID/PGID، فيمكنك تفعيل نظام ملفات جذر للقراءة فقط بأمان.
 
 ## عزل الشبكة {#network-isolation}
 
@@ -62,7 +62,7 @@ i18n_hash_version: 2
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/ar/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **مثال باستخدام أسرار Docker Compose:**
 

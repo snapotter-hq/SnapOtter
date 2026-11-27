@@ -2,7 +2,7 @@
 description: "Beveiligingsgids voor SnapOtter. Containerbeveiliging, netwerkisolatie, Docker secrets, Kubernetes-implementatie en compliance-artefacten."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 481d83d8f81d
+i18n_output_hash: 6a892a631798
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Koppel voor een implementatie die aan internet is blootgesteld poort 1349 aan lo
 
 ### Waarom `read_only` niet is ingesteld {#why-read-only-is-not-set}
 
-`read_only: true` is niet ingesteld omdat PUID/PGID-remapping bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u in plaats van PUID/PGID de Docker-vlag `--user` of Kubernetes `runAsUser` gebruikt, kunt u veilig een alleen-lezen root-bestandssysteem inschakelen.
+`read_only: true` is niet ingesteld omdat [PUID](/nl/guide/configuration#env-puid)/[PGID](/nl/guide/configuration#env-pgid)-remapping bij het opstarten naar `/etc/passwd` en `/etc/group` schrijft. Als u in plaats van PUID/PGID de Docker-vlag `--user` of Kubernetes `runAsUser` gebruikt, kunt u veilig een alleen-lezen root-bestandssysteem inschakelen.
 
 ## Netwerkisolatie {#network-isolation}
 
@@ -62,7 +62,7 @@ Vermijd voor productie-implementaties het doorgeven van geheimen als omgevingsva
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/nl/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Voorbeeld met Docker Compose secrets:**
 

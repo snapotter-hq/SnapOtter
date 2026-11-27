@@ -84,12 +84,34 @@ describe("links to variable anchors", () => {
   const locales = readdirSync(docs, { withFileTypes: true })
     .filter((d) => d.isDirectory() && /^[a-z]{2}(-[A-Z]{2})?$/.test(d.name))
     .map((d) => d.name);
-  const guides = ["getting-started", "deployment", "low-resource"];
+  const guides = [
+    "getting-started",
+    "deployment",
+    "low-resource",
+    "security",
+    "scim",
+    "users-roles",
+  ];
 
   it("link the variables these guides mention to their definitions", () => {
     const link = /\]\(\/guide\/(configuration|oidc)#env-[a-z0-9-]+\)/;
     for (const guide of guides) {
       expect(link.test(readFileSync(resolve(docs, `guide/${guide}.md`), "utf8")), guide).toBe(true);
+    }
+  });
+
+  it("have every variable row English has, in every locale", () => {
+    const rows = (page: string) =>
+      [...readFileSync(resolve(docs, page), "utf8").matchAll(/^\| `([A-Z][A-Z0-9_]*)`/gm)].map(
+        (m) => m[1],
+      );
+    const english = rows("guide/configuration.md");
+    for (const locale of locales) {
+      const have = new Set(rows(`${locale}/guide/configuration.md`));
+      expect(
+        english.filter((name) => !have.has(name)),
+        locale,
+      ).toEqual([]);
     }
   });
 

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 7f364acbff8e
+i18n_output_hash: a53e884cb77f
 i18n_hash_version: 2
 ---
 # Miljöer med små resurser {#low-resource-setups}
@@ -91,7 +91,7 @@ Alla tak är miljövariabler och dokumenteras fullständigt i [Konfiguration](/s
 | [`MAX_BATCH_SIZE`](/sv/guide/configuration#env-max-batch-size) | `5` | Batcher är där maskiner med 1-2 GB först får slut på minne. |
 | [`MAX_UPLOAD_SIZE_MB`](/sv/guide/configuration#env-max-upload-size-mb) | `100` | Hindrar en enda enorm fil från att uppta hela arbetsytan. |
 | [`MAX_MEGAPIXELS`](/sv/guide/configuration#env-max-megapixels) | `50` | Avkodning av en bild på över 100 MP kostar RAM oavsett filstorlek. |
-| `MAX_VIDEO_DURATION_S` | `300` | Långa omkodningar monopoliserar en liten CPU i minuter till timmar. |
+| [`MAX_VIDEO_DURATION_S`](/sv/guide/configuration#env-max-video-duration-s) | `300` | Långa omkodningar monopoliserar en liten CPU i minuter till timmar. |
 | [`PROCESSING_TIMEOUT_S`](/sv/guide/configuration#env-processing-timeout-s) | `600` | Hård övre gräns så att ett skenande jobb så småningom frigör maskinen. |
 
 De här taken gäller vad servern accepterar, så ställ in dem efter vad du faktiskt använder i stället för så små som möjligt. Om du aldrig rör video kostar ett tak på `MAX_VIDEO_DURATION_S` ingenting. Om du skannar dokument dagligen, sätt inget tak på [`MAX_PDF_PAGES`](/sv/guide/configuration#env-max-pdf-pages).

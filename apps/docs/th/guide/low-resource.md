@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 4dff6b4199bd
+i18n_output_hash: 10ec88c10034
 i18n_hash_version: 2
 ---
 # การตั้งค่าสำหรับทรัพยากรจำกัด {#low-resource-setups}
@@ -91,7 +91,7 @@ services:
 | [`MAX_BATCH_SIZE`](/th/guide/configuration#env-max-batch-size) | `5` | การประมวลผลเป็นชุดคือจุดแรกที่เครื่อง 1-2 GB หน่วยความจำหมด |
 | [`MAX_UPLOAD_SIZE_MB`](/th/guide/configuration#env-max-upload-size-mb) | `100` | ป้องกันไม่ให้ไฟล์ขนาดใหญ่มากไฟล์เดียวครอบครองเวิร์กสเปซทั้งหมด |
 | [`MAX_MEGAPIXELS`](/th/guide/configuration#env-max-megapixels) | `50` | การถอดรหัสภาพกว่า 100 MP ใช้ RAM ไม่ว่าไฟล์จะใหญ่เพียงใด |
-| `MAX_VIDEO_DURATION_S` | `300` | การทรานส์โค้ดนาน ๆ ยึด CPU เล็ก ๆ ไว้เป็นเวลานานหลายนาทีถึงหลายชั่วโมง |
+| [`MAX_VIDEO_DURATION_S`](/th/guide/configuration#env-max-video-duration-s) | `300` | การทรานส์โค้ดนาน ๆ ยึด CPU เล็ก ๆ ไว้เป็นเวลานานหลายนาทีถึงหลายชั่วโมง |
 | [`PROCESSING_TIMEOUT_S`](/th/guide/configuration#env-processing-timeout-s) | `600` | เพดานเด็ดขาด เพื่อให้งานที่ทำงานเกินการควบคุมคืนทรัพยากรให้เครื่องในที่สุด |
 
 เพดานเหล่านี้ใช้กับสิ่งที่เซิร์ฟเวอร์ยอมรับ ดังนั้นควรตั้งให้ตรงกับที่คุณใช้จริง แทนที่จะตั้งให้เล็กที่สุดเท่าที่เป็นไปได้ หากคุณไม่เคยแตะวิดีโอ การจำกัด `MAX_VIDEO_DURATION_S` ก็ไม่มีต้นทุนอะไร แต่หากคุณสแกนเอกสารทุกวัน อย่าจำกัด [`MAX_PDF_PAGES`](/th/guide/configuration#env-max-pdf-pages)

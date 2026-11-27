@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: bd3201eed6ed
+i18n_output_hash: d091df7174bb
 i18n_hash_version: 2
 ---
 # 低资源配置 {#low-resource-setups}
@@ -91,7 +91,7 @@ services:
 | [`MAX_BATCH_SIZE`](/zh-CN/guide/configuration#env-max-batch-size) | `5` | 批处理是 1-2 GB 机器最先耗尽内存的地方。 |
 | [`MAX_UPLOAD_SIZE_MB`](/zh-CN/guide/configuration#env-max-upload-size-mb) | `100` | 避免单个超大文件占满整个工作区。 |
 | [`MAX_MEGAPIXELS`](/zh-CN/guide/configuration#env-max-megapixels) | `50` | 无论文件大小如何，解码 100 MP 以上的图像都会消耗内存。 |
-| `MAX_VIDEO_DURATION_S` | `300` | 长时间转码会让小型 CPU 被独占数分钟到数小时。 |
+| [`MAX_VIDEO_DURATION_S`](/zh-CN/guide/configuration#env-max-video-duration-s) | `300` | 长时间转码会让小型 CPU 被独占数分钟到数小时。 |
 | [`PROCESSING_TIMEOUT_S`](/zh-CN/guide/configuration#env-processing-timeout-s) | `600` | 硬性上限，使失控的任务最终能释放机器。 |
 
 这些上限作用于服务器接受的内容，因此请根据你实际的使用情况来设置，而不是越小越好。如果你从不处理视频，`MAX_VIDEO_DURATION_S` 的上限不会有任何代价；如果你每天扫描文档，则不要限制 [`MAX_PDF_PAGES`](/zh-CN/guide/configuration#env-max-pdf-pages)。

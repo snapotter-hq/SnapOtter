@@ -2,7 +2,7 @@
 description: "Kelola pengguna, peran bawaan dan kustom, izin, kunci API, tim, sesi, dan log audit di SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: a3c1ebf9d9e0
+i18n_output_hash: 1fe371a11f65
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Saat diaktifkan, setiap entri log audit ditandatangani dengan HMAC yang diturunk
 
 ### Retensi {#retention}
 
-Setel `AUDIT_RETENTION_DAYS` untuk secara otomatis membersihkan entri lama. Bawaannya adalah `0`, yang berarti entri disimpan tanpa batas waktu.
+Setel [`AUDIT_RETENTION_DAYS`](/id/guide/configuration#env-audit-retention-days) untuk secara otomatis membersihkan entri lama. Bawaannya adalah `0`, yang berarti entri disimpan tanpa batas waktu.
 
 ### Referensi peristiwa {#event-reference}
 

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: a3212bfaa0b8
+i18n_output_hash: ef65a6a914ad
 i18n_hash_version: 2
 ---
 # 저사양 환경 구성 {#low-resource-setups}
@@ -91,7 +91,7 @@ Pi급 장비를 위한 참고 사항입니다.
 | [`MAX_BATCH_SIZE`](/ko/guide/configuration#env-max-batch-size) | `5` | 1~2 GB 장비에서 가장 먼저 메모리가 부족해지는 곳이 배치입니다. |
 | [`MAX_UPLOAD_SIZE_MB`](/ko/guide/configuration#env-max-upload-size-mb) | `100` | 거대한 파일 하나가 작업 공간 전체를 차지하는 것을 막습니다. |
 | [`MAX_MEGAPIXELS`](/ko/guide/configuration#env-max-megapixels) | `50` | 100 MP 이상 이미지를 디코딩하면 파일 크기와 관계없이 RAM을 소모합니다. |
-| `MAX_VIDEO_DURATION_S` | `300` | 긴 트랜스코딩은 작은 CPU를 몇 분에서 몇 시간 동안 독점합니다. |
+| [`MAX_VIDEO_DURATION_S`](/ko/guide/configuration#env-max-video-duration-s) | `300` | 긴 트랜스코딩은 작은 CPU를 몇 분에서 몇 시간 동안 독점합니다. |
 | [`PROCESSING_TIMEOUT_S`](/ko/guide/configuration#env-processing-timeout-s) | `600` | 폭주한 작업이 결국 장비를 놓아 주도록 하는 하드 상한. |
 
 이 상한은 서버가 받아들이는 항목에 적용되므로, 가능한 한 작게 잡기보다 실제로 사용하는 항목에 맞춰 설정하세요. 비디오를 전혀 쓰지 않는다면 `MAX_VIDEO_DURATION_S` 상한은 손해가 없습니다. 문서를 매일 스캔한다면 [`MAX_PDF_PAGES`](/ko/guide/configuration#env-max-pdf-pages)은 제한하지 마세요.

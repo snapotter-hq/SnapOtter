@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 944777e013b8
+i18n_output_hash: 3c80d1c555ca
 i18n_hash_version: 2
 ---
 # Setup Sumber Daya Rendah {#low-resource-setups}
@@ -91,7 +91,7 @@ Semua batas adalah variabel lingkungan, yang didokumentasikan lengkap di [Konfig
 | [`MAX_BATCH_SIZE`](/id/guide/configuration#env-max-batch-size) | `5` | Batch adalah tempat mesin 1-2 GB pertama kali kehabisan memori. |
 | [`MAX_UPLOAD_SIZE_MB`](/id/guide/configuration#env-max-upload-size-mb) | `100` | Mencegah satu file raksasa menempati seluruh workspace. |
 | [`MAX_MEGAPIXELS`](/id/guide/configuration#env-max-megapixels) | `50` | Men-decode gambar 100+ MP memakan RAM terlepas dari ukuran file. |
-| `MAX_VIDEO_DURATION_S` | `300` | Transcode yang panjang memonopoli CPU kecil selama menit hingga jam. |
+| [`MAX_VIDEO_DURATION_S`](/id/guide/configuration#env-max-video-duration-s) | `300` | Transcode yang panjang memonopoli CPU kecil selama menit hingga jam. |
 | [`PROCESSING_TIMEOUT_S`](/id/guide/configuration#env-processing-timeout-s) | `600` | Batas keras agar job yang lepas kendali pada akhirnya membebaskan mesin. |
 
 Batas-batas ini berlaku untuk apa yang diterima server, jadi atur agar sesuai dengan yang benar-benar Anda gunakan, bukan sekecil mungkin. Jika Anda tidak pernah menyentuh video, batas `MAX_VIDEO_DURATION_S` tidak merugikan apa pun; jika Anda memindai dokumen setiap hari, jangan batasi [`MAX_PDF_PAGES`](/id/guide/configuration#env-max-pdf-pages).

@@ -272,7 +272,7 @@ The `ServiceProviderConfig` advertises these capabilities:
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-Your license does not include the `scim` feature, or no license is configured. SCIM requires an enterprise plan license. Verify `SNAPOTTER_LICENSE_KEY` is set and the license includes the `scim` feature.
+Your license does not include the `scim` feature, or no license is configured. SCIM requires an enterprise plan license. Verify [`SNAPOTTER_LICENSE_KEY`](/guide/configuration#env-snapotter-license-key) is set and the license includes the `scim` feature.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

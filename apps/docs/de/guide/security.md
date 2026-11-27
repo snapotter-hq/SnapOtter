@@ -2,7 +2,7 @@
 description: "Sicherheitshärtungsleitfaden für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker Secrets, Kubernetes-Bereitstellung und Compliance-Artefakte."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 754972374965
+i18n_output_hash: a879be887635
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Binden Sie bei einer aus dem Internet erreichbaren Bereitstellung Port 1349 an L
 
 ### Warum `read_only` nicht gesetzt ist {#why-read-only-is-not-set}
 
-`read_only: true` ist nicht gesetzt, weil die PUID/PGID-Umsetzung beim Start nach `/etc/passwd` und `/etc/group` schreibt. Wenn Sie anstelle von PUID/PGID das Docker-Flag `--user` oder Kubernetes `runAsUser` verwenden, können Sie bedenkenlos ein schreibgeschütztes Root-Dateisystem aktivieren.
+`read_only: true` ist nicht gesetzt, weil die [PUID](/de/guide/configuration#env-puid)/[PGID](/de/guide/configuration#env-pgid)-Umsetzung beim Start nach `/etc/passwd` und `/etc/group` schreibt. Wenn Sie anstelle von PUID/PGID das Docker-Flag `--user` oder Kubernetes `runAsUser` verwenden, können Sie bedenkenlos ein schreibgeschütztes Root-Dateisystem aktivieren.
 
 ## Netzwerkisolierung {#network-isolation}
 
@@ -62,7 +62,7 @@ Vermeiden Sie bei Produktivbereitstellungen, Secrets als Klartext-Umgebungsvaria
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/de/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Beispiel mit Docker-Compose-Secrets:**
 

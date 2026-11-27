@@ -2,7 +2,7 @@
 description: "Säkerhetshärdningsguide för SnapOtter. Containersäkerhet, nätverksisolering, Docker-hemligheter, Kubernetes-driftsättning och efterlevnadsartefakter."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 43ac1e1dfd6a
+i18n_output_hash: 6123ec629809
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ För en driftsättning mot internet, bind port 1349 till loopback och avsluta TL
 
 ### Varför `read_only` inte är angivet {#why-read-only-is-not-set}
 
-`read_only: true` är inte angivet eftersom omkartläggning av PUID/PGID skriver till `/etc/passwd` och `/etc/group` vid start. Om du använder Dockers flagga `--user` eller Kubernetes `runAsUser` i stället för PUID/PGID kan du säkert aktivera ett skrivskyddat rotfilsystem.
+`read_only: true` är inte angivet eftersom omkartläggning av [PUID](/sv/guide/configuration#env-puid)/[PGID](/sv/guide/configuration#env-pgid) skriver till `/etc/passwd` och `/etc/group` vid start. Om du använder Dockers flagga `--user` eller Kubernetes `runAsUser` i stället för PUID/PGID kan du säkert aktivera ett skrivskyddat rotfilsystem.
 
 ## Nätverksisolering {#network-isolation}
 
@@ -62,7 +62,7 @@ I produktionsdriftsättningar bör du undvika att skicka hemligheter som miljöv
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/sv/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Exempel med Docker Compose-hemligheter:**
 

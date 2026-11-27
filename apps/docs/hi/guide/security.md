@@ -2,7 +2,7 @@
 description: "SnapOtter के लिए सुरक्षा hardening गाइड। Container सुरक्षा, network isolation, Docker secrets, Kubernetes deployment, और compliance artifacts।"
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 558ff20c2ae9
+i18n_output_hash: 0af587aa158e
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/doc
 
 ### `read_only` सेट क्यों नहीं है {#why-read-only-is-not-set}
 
-`read_only: true` सेट नहीं है क्योंकि PUID/PGID remapping startup पर `/etc/passwd` और `/etc/group` में लिखता है। यदि आप PUID/PGID के बजाय Docker के `--user` flag या Kubernetes `runAsUser` का उपयोग करते हैं, तो आप read-only root filesystem सुरक्षित रूप से सक्षम कर सकते हैं।
+`read_only: true` सेट नहीं है क्योंकि [PUID](/hi/guide/configuration#env-puid)/[PGID](/hi/guide/configuration#env-pgid) remapping startup पर `/etc/passwd` और `/etc/group` में लिखता है। यदि आप PUID/PGID के बजाय Docker के `--user` flag या Kubernetes `runAsUser` का उपयोग करते हैं, तो आप read-only root filesystem सुरक्षित रूप से सक्षम कर सकते हैं।
 
 ## Network Isolation {#network-isolation}
 
@@ -62,7 +62,7 @@ Production deployments में secrets को plain-text environment variables
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/hi/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Docker Compose secrets के साथ उदाहरण:**
 

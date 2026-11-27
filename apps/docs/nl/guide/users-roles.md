@@ -2,7 +2,7 @@
 description: "Beheer gebruikers, ingebouwde en aangepaste rollen, permissies, API-sleutels, teams, sessies en het auditlogboek in SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: cfde44218e7c
+i18n_output_hash: 8e014bb6a26b
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Wanneer ingeschakeld, wordt elke auditlogboekvermelding ondertekend met een HMAC
 
 ### Bewaring {#retention}
 
-Stel `AUDIT_RETENTION_DAYS` in om oude vermeldingen automatisch op te schonen. De standaard is `0`, wat betekent dat vermeldingen onbeperkt worden bewaard.
+Stel [`AUDIT_RETENTION_DAYS`](/nl/guide/configuration#env-audit-retention-days) in om oude vermeldingen automatisch op te schonen. De standaard is `0`, wat betekent dat vermeldingen onbeperkt worden bewaard.
 
 ### Gebeurtenisreferentie {#event-reference}
 

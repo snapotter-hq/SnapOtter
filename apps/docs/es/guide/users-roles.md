@@ -2,7 +2,7 @@
 description: "Gestiona usuarios, roles integrados y personalizados, permisos, claves de API, equipos, sesiones y el registro de auditoría en SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: c5ce9d432c7d
+i18n_output_hash: 30d0b7dc598e
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Cuando está habilitado, cada entrada del registro de auditoría se firma con un
 
 ### Retención {#retention}
 
-Establece `AUDIT_RETENTION_DAYS` para purgar automáticamente las entradas antiguas. El valor predeterminado es `0`, lo que significa que las entradas se conservan indefinidamente.
+Establece [`AUDIT_RETENTION_DAYS`](/es/guide/configuration#env-audit-retention-days) para purgar automáticamente las entradas antiguas. El valor predeterminado es `0`, lo que significa que las entradas se conservan indefinidamente.
 
 ### Referencia de eventos {#event-reference}
 

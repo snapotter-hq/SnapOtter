@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 9c2808f92891
+i18n_output_hash: df19cc3cfa4b
 i18n_hash_version: 2
 ---
 # Düşük Kaynaklı Kurulumlar {#low-resource-setups}
@@ -91,7 +91,7 @@ Tüm sınırlar ortam değişkenleridir ve [Yapılandırma](/tr/guide/configurat
 | [`MAX_BATCH_SIZE`](/tr/guide/configuration#env-max-batch-size) | `5` | 1-2 GB'lık makinelerde belleğin ilk tükendiği yer toplu işlemlerdir. |
 | [`MAX_UPLOAD_SIZE_MB`](/tr/guide/configuration#env-max-upload-size-mb) | `100` | Tek bir dev dosyanın tüm çalışma alanını işgal etmesini önler. |
 | [`MAX_MEGAPIXELS`](/tr/guide/configuration#env-max-megapixels) | `50` | 100+ MP'lik bir görseli çözmek, dosya boyutundan bağımsız olarak RAM harcar. |
-| `MAX_VIDEO_DURATION_S` | `300` | Uzun kodlama işlemleri küçük bir CPU'yu dakikalarca ya da saatlerce meşgul eder. |
+| [`MAX_VIDEO_DURATION_S`](/tr/guide/configuration#env-max-video-duration-s) | `300` | Uzun kodlama işlemleri küçük bir CPU'yu dakikalarca ya da saatlerce meşgul eder. |
 | [`PROCESSING_TIMEOUT_S`](/tr/guide/configuration#env-processing-timeout-s) | `600` | Kontrolden çıkan bir işin makineyi eninde sonunda serbest bırakmasını sağlayan kesin üst sınır. |
 
 Bu sınırlar sunucunun kabul ettiklerine uygulanır; bu yüzden olabildiğince küçük yapmak yerine gerçekten kullandıklarınıza göre ayarlayın. Hiç video kullanmıyorsanız `MAX_VIDEO_DURATION_S` sınırının size maliyeti yoktur; her gün belge tarıyorsanız [`MAX_PDF_PAGES`](/tr/guide/configuration#env-max-pdf-pages) değerini sınırlamayın.
