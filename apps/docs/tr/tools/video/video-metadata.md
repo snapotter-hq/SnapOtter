@@ -1,8 +1,9 @@
 ---
 description: "Bir videodan meta verileri temizleyin ve neler bulunduğunu raporlayın."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 2fb96b378c62
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 0311b28d2909
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed`, kaldırılan konteyner etiketlerinin adlarını listeler. Değerler döndürülmez. Boş bir dizi, hiçbir şeyin kaldırılmadığı anlamına gelir.
 - Temizlenen meta veriler; oluşturma zaman damgalarını, GPS/konum verilerini, kamera/cihaz bilgilerini ve yazılım etiketlerini içerir.
 - Video ve ses akışları yeniden kodlanmadan kopyalanır, bu yüzden kalite kaybı olmaz.
 - Videoları herkese açık paylaşmadan önce gizlilik için kullanışlıdır.

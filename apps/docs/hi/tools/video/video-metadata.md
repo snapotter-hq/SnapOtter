@@ -1,8 +1,9 @@
 ---
 description: "किसी वीडियो से मेटाडेटा हटाएँ और जो मिला उसकी रिपोर्ट दें।"
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 7f1c6d1f6121
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: f8cd51c9cada
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` हटाए गए कंटेनर टैग के नाम सूचीबद्ध करता है। मान नहीं लौटाए जाते। खाली ऐरे का मतलब है कि कुछ भी नहीं हटाया गया।
 - हटाए गए मेटाडेटा में निर्माण टाइमस्टैम्प, GPS/स्थान डेटा, कैमरा/डिवाइस जानकारी, और सॉफ़्टवेयर टैग शामिल हैं।
 - वीडियो और ऑडियो स्ट्रीम को फिर से एन्कोड किए बिना कॉपी किया जाता है, इसलिए कोई गुणवत्ता हानि नहीं होती।
 - वीडियो सार्वजनिक रूप से साझा करने से पहले गोपनीयता के लिए उपयोगी।

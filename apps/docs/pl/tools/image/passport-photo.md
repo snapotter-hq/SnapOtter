@@ -1,8 +1,9 @@
 ---
 description: "Generator zdjęć paszportowych i do dokumentów wspomagany AI z wykrywaniem twarzy, usuwaniem tła i układaniem na arkuszu do druku."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: da25c55ba66f
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 1e57ef9bb279
+i18n_hash_version: 2
 ---
 
 # Zdjęcie paszportowe {#passport-photo}
@@ -82,6 +83,8 @@ Jeśli podano `clientJobId`, postęp jest strumieniowany (0-30% dla wykrywania t
 
 Kadruje, zmienia rozmiar i opcjonalnie układa zdjęcie na arkuszu do druku. Korzysta z obrazów zapisanych w pamięci podręcznej z Etapu 1 (bez ponownego uruchamiania AI).
 
+Kadrowanie działa jako zadanie w kolejce. Jeśli zakończy się w oknie synchronicznego oczekiwania, otrzymasz poniższy wynik z `200`. Wolniejsze zadanie zwraca `202` z `{"jobId":"...","async":true}`, a wynik trafia do strumienia postępu zadania; śledź go tak, jak opisano w [Progress Tracking](/pl/api/rest#progress-tracking). Zadanie można anulować przez `POST /api/v1/jobs/{jobId}/cancel`. Do wersji 2.3.0 ten punkt końcowy zawsze czekał i zwracał `200`, więc skrypty obsługujące tylko `200` powinny obsługiwać także `202`.
+
 #### Parametry (treść JSON) {#parameters-json-body}
 
 | Parametr | Typ | Wymagany | Domyślnie | Opis |
@@ -102,6 +105,7 @@ Kadruje, zmienia rozmiar i opcjonalnie układa zdjęcie na arkuszu do druku. Kor
 | landmarks | object | Tak | - | Obiekt punktów charakterystycznych z odpowiedzi Etapu 1 |
 | imageWidth | number | Tak | - | Szerokość obrazu z odpowiedzi Etapu 1 |
 | imageHeight | number | Tak | - | Wysokość obrazu z odpowiedzi Etapu 1 |
+| clientJobId | string | Nie | (generowany) | Własny identyfikator zadania, dzięki któremu możesz otworzyć strumień postępu przed nadejściem odpowiedzi |
 
 #### Przykładowe żądanie {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Zwraca wskazówki, aby użyć właściwego podrzędnego punktu końcowego.
 - Punkty charakterystyczne są zwracane jako współrzędne znormalizowane (zakres 0-1 względem wymiarów obrazu).
 - Pole `preview` w odpowiedzi analizy to zakodowany w base64 obraz PNG (maks. 800px szerokości) dla szybkiego wyświetlania.
 - Specyfikacje krajów obejmują wymiary dokumentu, proporcje wysokości głowy i pozycjonowanie linii oczu na podstawie oficjalnych wymagań dotyczących zdjęć paszportowych.
-- Opcja `printLayout` generuje arkusz z ułożonymi zdjęciami na papierze 4x6\" lub A4 z 2mm odstępami między zdjęciami.
+- Opcja `printLayout` generuje arkusz z ułożonymi zdjęciami na papierze 4x6" lub A4 z 2mm odstępami między zdjęciami.
 - Gdy ustawiono `maxFileSizeKb`, jakość JPEG wyniku jest obniżana krok po kroku, aż plik zmieści się w limicie. Rozmiar w pikselach jest ustalony przez specyfikację kraju, więc jeśli zdjęcie nadal się nie mieści przy najniższej jakości, `/generate` zwraca 422 z komunikatem, który to wyjaśnia, zamiast pliku przekraczającego limit.

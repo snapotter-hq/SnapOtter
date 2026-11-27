@@ -1,11 +1,12 @@
 ---
 layout: page
 title: "SnapOtter Docs"
-description: "ओपन-सोर्स, सेल्फ़-होस्टेड फ़ाइल-प्रोसेसिंग इन्फ़्रास्ट्रक्चर। UI, REST API, और पाइपलाइन के माध्यम से इमेज, वीडियो, ऑडियो, PDF, और दस्तावेज़ों में कन्वर्ट, कंप्रेस, OCR, ट्रांसक्राइब करें और स्थानीय AI चलाएँ। एक ही Docker कमांड से सेल्फ़-होस्ट करें। आपकी फ़ाइलें कभी आपके सर्वर से बाहर नहीं जातीं।"
+description: "PDF, इमेज, वीडियो और ऑडियो के लिए ओपन-सोर्स फ़ाइल टूलकिट। फ़ाइलें वेबसाइटों पर अपलोड करने के बजाय अपने ही सर्वर पर कंप्रेस, कन्वर्ट, OCR, बैकग्राउंड हटाएँ और ट्रांसक्राइब करें। वेब UI, REST API और पाइपलाइन के ज़रिए 200+ टूल और स्थानीय AI। एक ही Docker कमांड से सेल्फ़-होस्ट करें।"
 sidebar: false
-i18n_source_hash: 449a5b93eef1
-i18n_provenance: human
-i18n_output_hash: cb272afac251
+i18n_source_hash: 1998b76dbdcb
+i18n_provenance: machine
+i18n_output_hash: 7a2b30ab7125
+i18n_hash_version: 2
 ---
 
 <DocsHome />

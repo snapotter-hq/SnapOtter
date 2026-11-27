@@ -1,13 +1,14 @@
 ---
 description: "Lees en schrijf PDF-documentmetadata."
-i18n_source_hash: b2eaebf7467f
-i18n_provenance: human
-i18n_output_hash: 68b0b9e34a84
+i18n_source_hash: 11de4f7991e4
+i18n_provenance: machine
+i18n_output_hash: 0a6e114da79e
+i18n_hash_version: 2
 ---
 
 # PDF Metadata {#pdf-metadata}
 
-Lees en werk metadatavelden van een PDF-document bij, zoals titel, auteur, onderwerp en trefwoorden. Wanneer er geen instellingen worden opgegeven, wordt de bestaande metadata zonder wijziging teruggegeven.
+Lees en werk metadatavelden van een PDF-document bij, zoals titel, auteur, onderwerp en trefwoorden, of verwijder de metadata van het document helemaal. Wanneer er geen instellingen worden opgegeven, wordt de bestaande metadata zonder wijziging teruggegeven.
 
 ## API Endpoint {#api-endpoint}
 
@@ -23,8 +24,10 @@ Accepteert multipart-formuliergegevens met een PDF-bestand en een optioneel JSON
 | author | string | Nee | - | Documentauteur (max. 500 tekens) |
 | subject | string | Nee | - | Documentonderwerp (max. 500 tekens) |
 | keywords | string | Nee | - | Documenttrefwoorden (max. 500 tekens) |
+| stripAll | boolean | Nee | false | Verwijder het hele Info-dictionary (datums, Creator, Producer, aangepaste sleutels), elke XMP-stream (document, pagina's, afbeeldingen) en alle PieceInfo-applicatiegegevens, en schrijf daarna de hierboven opgegeven velden |
+| removeAttachments | boolean | Nee | false | Verwijder ook ingesloten bestanden: de bijlagenlijst van het document, bestandsbijlage-annotaties en bijbehorende bestanden (`/AF`). Vereist `stripAll` |
 
-Alle parameters zijn optioneel. Weggelaten velden blijven ongewijzigd.
+Alle parameters zijn optioneel. Weggelaten velden blijven ongewijzigd, tenzij `stripAll` is ingesteld.
 
 ## Example Request {#example-request}
 
@@ -59,3 +62,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - Het veld `metadata` in het antwoord bevat de resulterende metadata na eventuele updates.
 - Om metadata te lezen zonder deze te wijzigen, laat je het veld `settings` weg of stuur je een leeg object.
 - Elk metadataveld is beperkt tot 500 tekens.
+- Met `stripAll` bevat het antwoord ook `stripped`: de Info-sleutels die zijn verwijderd (`removed`), of de XMP-stream van het document is verwijderd (`xmpRemoved`), het PDF/A-niveau dat de invoer aangaf (`pdfa`, of `null`), hoeveel XMP-streams van pagina's, afbeeldingen en andere objecten zijn gehaald (`objectXmpRemoved`), hoeveel PieceInfo-dictionaries zijn verwijderd (`pieceInfoRemoved`) en hoeveel ingesloten bestanden zijn verwijderd (`attachmentsRemoved`, altijd `0` zonder `removeAttachments`). Het verwijderen van XMP breekt PDF/A-conformiteit.
+- `stripAll` alleen laat ingesloten bestandsbijlagen staan, omdat het verwijderen ervan de inhoud van het document wijzigt. Voeg `removeAttachments` toe om ze ook te verwijderen. Dat verwijdert de bijgevoegde XML van ZUGFeRD- en Factur-X-e-facturen en breekt PDF/A-3-conformiteit.
+- `removeAttachments` zonder `stripAll` versturen geeft 400 terug.

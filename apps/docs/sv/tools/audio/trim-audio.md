@@ -1,13 +1,16 @@
 ---
 description: "Klipp ut ett avsnitt ur en ljudfil genom att ange start- och sluttider."
-i18n_source_hash: 8b80c5c8a711
-i18n_provenance: human
-i18n_output_hash: 1770fa7c239a
+i18n_source_hash: f8d0b6a84592
+i18n_provenance: machine
+i18n_output_hash: 466c7be459b7
+i18n_hash_version: 2
 ---
 
 # Trim Audio {#trim-audio}
 
-Klipp ut ett avsnitt ur en ljudfil genom att ange start- och sluttider i sekunder.
+Klipp ut ett avsnitt ur en ljudfil. Behåll antingen delen mellan en start- och sluttid, eller klipp bort en fast tid i början och slutet.
+
+I appen tar tidsfälten vanliga sekunder (`90`), `MM:SS` (`1:30`) eller `HH:MM:SS` (`1:02:03.5`). API:et tar sekunder.
 
 ## API Endpoint {#api-endpoint}
 
@@ -19,8 +22,11 @@ Tar emot multipart-formulärdata med en ljudfil och ett JSON-fält `settings`.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| startS | number | No | `0` | Starttid i sekunder (minst 0) |
-| endS | number | Yes | - | Sluttid i sekunder (måste vara efter start) |
+| mode | string | No | `range` | `range` behåller `startS` till `endS`. `ends` tar bort `cutStartS` från början och `cutEndS` från slutet |
+| startS | number | No | `0` | Intervallläge: starttid i sekunder (minst 0) |
+| endS | number | Range mode | - | Intervallläge: sluttid i sekunder (måste vara efter start) |
+| cutStartS | number | No | `0` | Ändläge: sekunder att ta bort från början |
+| cutEndS | number | No | `0` | Ändläge: sekunder att ta bort från slutet |
 
 ## Example Request {#example-request}
 
@@ -29,6 +35,15 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@audio.mp3" \
   -F 'settings={"startS": 10, "endS": 45}'
+```
+
+Klipp bort de första 2 sekunderna och de sista 3 sekunderna, oavsett filens längd:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@audio.mp3" \
+  -F 'settings={"mode": "ends", "cutStartS": 2, "cutEndS": 3}'
 ```
 
 ## Example Response {#example-response}
@@ -45,6 +60,6 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
 ## Notes {#notes}
 
 - Tider anges i sekunder och kan innehålla decimaler (t.ex. `10.5`).
-- Värdet `endS` måste vara större än `startS`.
-- Om `endS` överstiger ljudets varaktighet trimmas filen till slutet.
+- I intervallläge måste `endS` vara större än `startS`. Om `endS` överstiger ljudets varaktighet trimmas filen till slutet.
+- I ändläge måste minst en av `cutStartS` och `cutEndS` vara större än noll, och tillsammans måste de lämna kvar minst 0,1 sekunder ljud. Eftersom klippet mäts från varje fils egen längd fungerar en inställning för en hel batch av filer med olika varaktighet.
 - Utdata behåller vanligtvis samma container som indata. AAC-indata skrivs som M4A, och indata som endast går att avkoda men inte stöds faller tillbaka till MP3.

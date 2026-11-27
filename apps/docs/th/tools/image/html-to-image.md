@@ -1,8 +1,9 @@
 ---
 description: "จับภาพหน้าเว็บหรือ HTML snippet เป็นภาพคุณภาพสูงพร้อมการจำลองอุปกรณ์"
-i18n_source_hash: 1e49d070ea2e
-i18n_provenance: human
-i18n_output_hash: 0b7e4980dd30
+i18n_source_hash: 307493f63631
+i18n_provenance: machine
+i18n_output_hash: 553414d269c1
+i18n_hash_version: 2
 ---
 
 # HTML to Image {#html-to-image}
@@ -27,6 +28,7 @@ i18n_output_hash: 0b7e4980dd30
 | devicePreset | string | No | `"desktop"` | การจำลองอุปกรณ์: `desktop`, `tablet`, `mobile`, `custom` |
 | viewportWidth | number | No | `1280` | ความกว้าง viewport แบบกำหนดเองเป็นพิกเซล (320 ถึง 3840 ใช้เมื่อ devicePreset เป็น `custom`) |
 | viewportHeight | number | No | `720` | ความสูง viewport แบบกำหนดเองเป็นพิกเซล (320 ถึง 2160 ใช้เมื่อ devicePreset เป็น `custom`) |
+| clientJobId | string | No | - | ID งานของคุณเอง เพื่อให้เปิดสตรีมความคืบหน้าได้ก่อนที่คำตอบจะมาถึง |
 
 ต้องระบุ `url` หรือ `html` อย่างใดอย่างหนึ่ง แต่ไม่ใช่ทั้งสองอย่าง
 
@@ -70,6 +72,25 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
+### Slow pages {#slow-pages}
+
+การจับภาพทำงานเป็นงานในคิว หากจับภาพเสร็จภายในช่วงรอแบบซิงโครนัส จะตอบ `200` พร้อมผลลัพธ์ข้างต้น ส่วนหน้าที่ช้ากว่านั้นจะตอบ `202` พร้อม ID งาน:
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true,
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress"
+}
+```
+
+ติดตาม `progressUrl` (Server-Sent Events) จนกว่างานจะเสร็จ อีเวนต์ที่เสร็จสมบูรณ์จะมีออบเจกต์ผลลัพธ์เดียวกับคำตอบ `200` คุณสามารถยกเลิกงานได้ด้วย `POST /api/v1/jobs/{jobId}/cancel`
+
+::: warning Changed after 2.3.0
+ก่อนหน้าและรวมถึง 2.3.0 endpoint นี้จะค้างคำขอไว้จนกว่าการจับภาพจะเสร็จและตอบ `200` เสมอ สคริปต์ที่จัดการเฉพาะ `200` ควรจัดการ `202` ด้วย
+:::
+
 ## Notes {#notes}
 
 - ต้องติดตั้ง Chromium บนเซิร์ฟเวอร์ คืนค่า HTTP 503 หากบริการเบราว์เซอร์ไม่พร้อมใช้งาน
@@ -77,5 +98,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 - endpoint นี้ถูกจำกัดอัตราไว้ที่ 120 คำขอต่อชั่วโมง
 - `originalSize` จะเป็น 0 เสมอ เนื่องจากเครื่องมือนี้สร้างภาพจาก URL/HTML
 - ชื่อไฟล์ผลลัพธ์คือ `screenshot.<format>`
-- หากหน้าใช้เวลาโหลดนานเกินไป คำขอจะคืนค่า HTTP 504 (gateway timeout)
-- หากบริการเบราว์เซอร์ล่มซ้ำๆ จะถูกปิดใช้งานชั่วคราวและคืนค่า HTTP 503 พร้อมโค้ด `BROWSER_CRASHED`
+- หากหน้าใช้เวลาโหลดนานเกินไป การจับภาพจะล้มเหลวพร้อม HTTP 504 (gateway timeout)
+- หากบริการเบราว์เซอร์ล่มซ้ำๆ จะถูกปิดใช้งานชั่วคราวและการจับภาพจะล้มเหลวพร้อม HTTP 503 และโค้ด `BROWSER_CRASHED`
+- เมื่อเบราว์เซอร์ล่ม (HTTP 503) ระบบจะลองใหม่หนึ่งครั้งก่อนรายงานความล้มเหลว เช่นเดียวกับงานรูปภาพอื่นๆ ในคิว ส่วนการหมดเวลาโหลดหน้าจะไม่ลองใหม่
+- การจับภาพที่ตอบ `202` ไปแล้วจะรายงานความล้มเหลวผ่านสตรีมความคืบหน้าแทนสถานะ HTTP

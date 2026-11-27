@@ -1,8 +1,9 @@
 ---
 description: "얼굴 감지, 배경 제거, 인쇄 시트 타일링을 갖춘 AI 기반 여권 및 신분증 사진 생성기."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 21bb1f9e0abf
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 8165707e775b
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 사진을 크롭, 크기 조정하고 선택적으로 인쇄 시트에 타일링합니다. Phase 1의 캐시된 이미지를 사용합니다(AI 재실행 없음).
 
+크롭은 대기열에 등록된 작업으로 실행됩니다. 동기 대기 시간 안에 끝나면 아래 결과를 `200`과 함께 받습니다. 더 오래 걸리면 `{"jobId":"...","async":true}`와 함께 `202`을 반환하고, 결과는 해당 작업의 진행 상황 스트림으로 전달됩니다. [Progress Tracking](/ko/api/rest#progress-tracking)에 설명된 대로 스트림을 따라가세요. 작업은 `POST /api/v1/jobs/{jobId}/cancel`으로 취소할 수 있습니다. 2.3.0까지 이 엔드포인트는 항상 끝까지 대기한 뒤 `200`을 반환했으므로, `200`만 처리하는 스크립트는 `202`도 처리해야 합니다.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | Yes | - | Phase 1 응답의 랜드마크 객체 |
 | imageWidth | number | Yes | - | Phase 1 응답의 이미지 너비 |
 | imageHeight | number | Yes | - | Phase 1 응답의 이미지 높이 |
+| clientJobId | string | No | (generated) | 응답이 도착하기 전에 진행 상황 스트림을 열 수 있도록 직접 지정하는 작업 ID |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

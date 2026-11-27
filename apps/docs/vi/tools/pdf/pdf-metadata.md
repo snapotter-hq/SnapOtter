@@ -1,13 +1,14 @@
 ---
 description: "Đọc và ghi metadata tài liệu PDF."
-i18n_source_hash: b2eaebf7467f
-i18n_provenance: human
-i18n_output_hash: c6d162cbd092
+i18n_source_hash: 11de4f7991e4
+i18n_provenance: machine
+i18n_output_hash: e00138b4c215
+i18n_hash_version: 2
 ---
 
 # PDF Metadata {#pdf-metadata}
 
-Đọc và cập nhật các trường metadata tài liệu PDF như tiêu đề, tác giả, chủ đề và từ khóa. Khi không cung cấp cài đặt nào, metadata hiện có được trả về mà không sửa đổi.
+Đọc và cập nhật các trường metadata tài liệu PDF như tiêu đề, tác giả, chủ đề và từ khóa, hoặc xóa hoàn toàn metadata của tài liệu. Khi không cung cấp cài đặt nào, metadata hiện có được trả về mà không sửa đổi.
 
 ## API Endpoint {#api-endpoint}
 
@@ -23,8 +24,10 @@ Chấp nhận dữ liệu biểu mẫu multipart với một tệp PDF và một
 | author | string | Không | - | Tác giả tài liệu (tối đa 500 ký tự) |
 | subject | string | Không | - | Chủ đề tài liệu (tối đa 500 ký tự) |
 | keywords | string | Không | - | Từ khóa tài liệu (tối đa 500 ký tự) |
+| stripAll | boolean | Không | false | Xóa toàn bộ từ điển Info (ngày tháng, Creator, Producer, khóa tùy chỉnh), mọi luồng XMP (tài liệu, trang, ảnh) và toàn bộ dữ liệu ứng dụng PieceInfo, rồi ghi các trường đã cho ở trên |
+| removeAttachments | boolean | Không | false | Xóa thêm cả tệp nhúng: danh sách tệp đính kèm của tài liệu, chú thích tệp đính kèm và các tệp liên kết (`/AF`). Cần `stripAll` |
 
-Tất cả các tham số đều tùy chọn. Các trường bị bỏ qua được giữ nguyên không thay đổi.
+Tất cả các tham số đều tùy chọn. Các trường bị bỏ qua được giữ nguyên không thay đổi, trừ khi đặt `stripAll`.
 
 ## Example Request {#example-request}
 
@@ -59,3 +62,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - Trường `metadata` trong phản hồi chứa metadata kết quả sau mọi cập nhật.
 - Để đọc metadata mà không sửa đổi nó, hãy bỏ qua trường `settings` hoặc gửi một đối tượng rỗng.
 - Mỗi trường metadata giới hạn ở 500 ký tự.
+- Với `stripAll`, phản hồi còn kèm `stripped`: các khóa Info đã bị xóa (`removed`), luồng XMP của tài liệu có bị xóa hay không (`xmpRemoved`), cấp PDF/A mà đầu vào khai báo (`pdfa`, hoặc `null`), số luồng XMP đã gỡ khỏi trang, ảnh và các đối tượng khác (`objectXmpRemoved`), số từ điển PieceInfo đã bị xóa (`pieceInfoRemoved`) và số tệp nhúng đã bị xóa (`attachmentsRemoved`, luôn là `0` nếu không có `removeAttachments`). Xóa XMP sẽ làm mất tính tuân thủ PDF/A.
+- Riêng `stripAll` vẫn giữ các tệp đính kèm nhúng, vì xóa chúng làm thay đổi nội dung tài liệu. Thêm `removeAttachments` để xóa cả chúng. Việc này gỡ tệp XML đính kèm khỏi hóa đơn điện tử ZUGFeRD và Factur-X, và làm mất tính tuân thủ PDF/A-3.
+- Gửi `removeAttachments` mà không có `stripAll` sẽ trả về 400.

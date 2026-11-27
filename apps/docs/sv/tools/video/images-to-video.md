@@ -1,13 +1,14 @@
 ---
-description: "Gör en uppsättning bilder till en bildspelsvideo."
-i18n_source_hash: 2c6f183feb6d
-i18n_provenance: human
-i18n_output_hash: b3230a3196e4
+description: "Gör en uppsättning bilder till en bildspelsvideo, en animerad GIF eller en animerad WebP."
+i18n_source_hash: 43a4e21c76c0
+i18n_provenance: machine
+i18n_output_hash: 462f372b16c8
+i18n_hash_version: 2
 ---
 
 # Bilder till video {#images-to-video}
 
-Gör en uppsättning bilder till en bildspelsvideo med konfigurerbar visningstid per bild, upplösning och bildhastighet.
+Gör en uppsättning bilder till en bildspelsvideo med konfigurerbar visningstid per bild, upplösning och bildhastighet, eller till en animerad GIF eller WebP med fast tid per bildruta och antal loopar.
 
 ## API-slutpunkt {#api-endpoint}
 
@@ -19,9 +20,12 @@ Tar emot multipart-formulärdata med två eller fler bildfiler och ett JSON-fäl
 
 | Parameter | Typ | Obligatorisk | Standard | Beskrivning |
 |-----------|------|----------|---------|-------------|
-| secondsPerImage | number | Nej | `2` | Visningstid per bild i sekunder (0.5-10) |
-| resolution | string | Nej | `"720p"` | Utdataupplösning: `1080p`, `720p`, `square` |
-| fps | integer | Nej | `30` | Utdatabildhastighet (10-60) |
+| outputFormat | string | Nej | `"mp4"` | Utdataformat: `mp4`, `gif`, `webp` |
+| secondsPerImage | number | Nej | `2` | Endast MP4. Visningstid per bild i sekunder (0.5-10) |
+| resolution | string | Nej | `"720p"` | Endast MP4. Utdataupplösning: `1080p`, `720p`, `square` |
+| fps | integer | Nej | `30` | Endast MP4. Utdatabildhastighet (10-60) |
+| frameDelayMs | integer | Nej | `500` | Endast GIF och WebP. Tid som varje bild visas, i millisekunder (20-10000) |
+| loop | integer | Nej | `0` | Endast GIF och WebP. Hur många gånger animationen spelas; `0` loopar för alltid (0-100) |
 
 ## Exempelbegäran {#example-request}
 
@@ -33,6 +37,17 @@ curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
   -F "file=@slide3.jpg" \
   -F "file=@slide4.jpg" \
   -F 'settings={"secondsPerImage": 3, "resolution": "1080p"}'
+```
+
+Så här bygger du en animerad GIF där varje bild visas i 200 ms:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@frame1.png" \
+  -F "file=@frame2.png" \
+  -F "file=@frame3.png" \
+  -F 'settings={"outputFormat": "gif", "frameDelayMs": 200}'
 ```
 
 ## Exempelsvar {#example-response}
@@ -49,6 +64,9 @@ curl -X POST http://localhost:1349/api/v1/tools/video/images-to-video \
 ## Anteckningar {#notes}
 
 - Tar emot 2-60 bildfiler per begäran. Bilderna visas i videon i uppladdningsordning.
-- Bilder storleksändras och fylls ut för att passa målupplösningen samtidigt som bildförhållandet bevaras.
+- För MP4 storleksändras och fylls bilderna ut för att passa målupplösningen samtidigt som bildförhållandet bevaras.
 - Upplösningsalternativet `square` ger en video på 1080x1080, användbart för sociala medier.
-- Utdataformatet är alltid MP4 (H.264).
+- MP4-utdata är H.264 och heter `slideshow.mp4`.
+- GIF- och WebP-utdata använder den första bildens storlek. Bilder med andra storlekar skalas så att de ryms inuti den, och den återstående ytan är transparent. Filen heter `slideshow.gif` eller `slideshow.webp`.
+- GIF lagrar bildrutetider i hundradelar av en sekund, så `frameDelayMs` avrundas till närmaste 10 ms i en GIF. WebP behåller det exakta värdet.
+- Stora animationer vägras i stället för att byggas: bildrutans storlek gånger antalet bilder måste hålla sig under samma pixelgräns som GIF-verktygen använder.

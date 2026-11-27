@@ -1,8 +1,9 @@
 ---
 description: "تحويل الصور النقطية إلى SVG بتحويل متجهي بالأبيض والأسود (potrace) وتحويل متجهي ملون كامل متعدد الطبقات."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 7dd931c76157
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 7baf438d5f4d
+i18n_hash_version: 2
 ---
 
 # الصورة إلى SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+قد يتجاوز التتبع الملون الكبير أو المفصّل نافذة الانتظار المتزامن. عندها يردّ المسار بالرمز `202` مع `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` بدلًا من ذلك. تابع `progressUrl` عبر SSE (أو استعلم عن `statusUrl` دوريًا) ونزّل ملف SVG عند اكتمال المهمة. راجع [تتبّع التقدّم](/ar/api/rest#progress-tracking).
 
 ## ملاحظات {#notes}
 

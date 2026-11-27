@@ -1,8 +1,9 @@
 ---
 description: "Xóa metadata khỏi video và báo cáo những gì đã tìm thấy."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: bfe8c73c659d
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: e6bcdc6e9c9f
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` liệt kê tên các thẻ container đã bị xóa. Giá trị không được trả về. Mảng rỗng nghĩa là không có gì bị xóa.
 - Metadata bị xóa bao gồm dấu thời gian tạo, dữ liệu GPS/vị trí, thông tin máy quay/thiết bị và thẻ phần mềm.
 - Các luồng video và âm thanh được sao chép mà không mã hóa lại, nên không có mất mát chất lượng.
 - Hữu ích cho quyền riêng tư trước khi chia sẻ video công khai.

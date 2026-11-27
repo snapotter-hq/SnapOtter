@@ -1,13 +1,14 @@
 ---
-description: "從影片中移除中繼資料，並回報找到的內容。"
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 977d877207fb
+description: "從影片中移除中繼資料,並回報找到的內容。"
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 18b8ff1afcdb
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
 
-從影片中移除中繼資料（建立日期、GPS 座標、相機型號、軟體標籤等），並回報移除了哪些內容。
+從影片中移除中繼資料(建立日期、GPS 座標、相機型號、軟體標籤等),並回報移除了哪些內容。
 
 ## API Endpoint {#api-endpoint}
 
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
-- 移除的中繼資料包括建立時間戳記、GPS／位置資料、相機／裝置資訊和軟體標籤。
-- 影片和音訊串流會直接複製而不重新編碼，因此不會有品質損失。
+- `metadata.removed` 列出被移除的容器標籤名稱。不會回傳其值。空陣列表示沒有移除任何內容。
+- 移除的中繼資料包括建立時間戳記、GPS/位置資料、相機/裝置資訊和軟體標籤。
+- 影片和音訊串流會直接複製而不重新編碼,因此不會有品質損失。
 - 適用於在公開分享影片前保護隱私。

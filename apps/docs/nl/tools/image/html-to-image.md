@@ -1,8 +1,9 @@
 ---
 description: "Leg webpagina's of HTML-fragmenten vast als hoogwaardige afbeeldingen met apparaatemulatie."
-i18n_source_hash: 1e49d070ea2e
-i18n_provenance: human
-i18n_output_hash: 503b8212e274
+i18n_source_hash: 307493f63631
+i18n_provenance: machine
+i18n_output_hash: 1c40c7c7346c
+i18n_hash_version: 2
 ---
 
 # HTML naar afbeelding {#html-to-image}
@@ -27,6 +28,7 @@ Accepteert een **JSON-body** (geen multipart). Er is geen bestandsupload nodig.
 | devicePreset | string | Nee | `"desktop"` | Apparaatemulatie: `desktop`, `tablet`, `mobile`, `custom` |
 | viewportWidth | number | Nee | `1280` | Aangepaste viewport-breedte in pixels (320 tot 3840, gebruikt wanneer devicePreset `custom` is) |
 | viewportHeight | number | Nee | `720` | Aangepaste viewport-hoogte in pixels (320 tot 2160, gebruikt wanneer devicePreset `custom` is) |
+| clientJobId | string | Nee | - | Je eigen job-ID, zodat je de voortgangsstream kunt openen voordat het antwoord binnenkomt |
 
 Ofwel `url` ofwel `html` moet worden opgegeven, maar niet beide.
 
@@ -70,6 +72,25 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
+### Trage pagina's {#slow-pages}
+
+De vastlegging draait als een job in de wachtrij. Een vastlegging die binnen het synchrone wachtvenster klaar is, antwoordt met `200` en het resultaat hierboven. Een tragere antwoordt met `202` en een job-ID:
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true,
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress"
+}
+```
+
+Volg `progressUrl` (Server-Sent Events) tot de job klaar is. Het voltooide event bevat hetzelfde resultaatobject als het `200`-antwoord. Je kunt de job annuleren met `POST /api/v1/jobs/{jobId}/cancel`.
+
+::: warning Gewijzigd na 2.3.0
+Tot en met 2.3.0 hield dit endpoint het verzoek altijd open tot de vastlegging klaar was en antwoordde `200`. Scripts die alleen `200` afhandelen, moeten ook `202` afhandelen.
+:::
+
 ## Opmerkingen {#notes}
 
 - Vereist dat Chromium op de server is geïnstalleerd. Retourneert HTTP 503 als de browserservice niet beschikbaar is.
@@ -77,5 +98,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 - Dit endpoint is beperkt tot 120 verzoeken per uur.
 - `originalSize` is altijd 0, aangezien dit hulpmiddel afbeeldingen genereert vanuit URL's/HTML.
 - De uitvoerbestandsnaam is `screenshot.<format>`.
-- Als de pagina te lang duurt om te laden, retourneert het verzoek HTTP 504 (gateway timeout).
-- Als de browserservice herhaaldelijk crasht, wordt deze tijdelijk uitgeschakeld en retourneert HTTP 503 met code `BROWSER_CRASHED`.
+- Als de pagina te lang duurt om te laden, mislukt de vastlegging met HTTP 504 (gateway timeout).
+- Als de browserservice herhaaldelijk crasht, wordt deze tijdelijk uitgeschakeld en mislukt de vastlegging met HTTP 503 en code `BROWSER_CRASHED`.
+- Een browsercrash (HTTP 503) wordt eenmaal opnieuw geprobeerd voordat de mislukking wordt gemeld, net als bij andere afbeeldingsjobs in de wachtrij. Een time-out bij het laden van de pagina wordt niet opnieuw geprobeerd.
+- Een vastlegging die al `202` heeft geantwoord, meldt een mislukking op de voortgangsstream in plaats van in de HTTP-status.

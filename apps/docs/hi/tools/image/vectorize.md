@@ -1,8 +1,9 @@
 ---
 description: "श्वेत-श्याम (potrace) और पूर्ण-रंगीन मल्टी-लेयर वेक्टराइज़ेशन के साथ रास्टर छवियों को SVG में बदलें।"
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 9d966cbf2872
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 2310505465c5
+i18n_hash_version: 2
 ---
 
 # Image to SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+कोई बड़ा या विस्तृत कलर ट्रेस सिंक्रोनस प्रतीक्षा अवधि से अधिक समय ले सकता है। तब रूट `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` के बजाय `202` लौटाता है। SSE पर `progressUrl` को फ़ॉलो करें (या `statusUrl` को पोल करें) और जॉब पूरा होने पर SVG डाउनलोड करें। [Progress Tracking](/hi/api/rest#progress-tracking) देखें।
 
 ## Notes {#notes}
 

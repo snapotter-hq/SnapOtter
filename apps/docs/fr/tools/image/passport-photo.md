@@ -1,8 +1,9 @@
 ---
 description: "Générateur de photos d'identité et de passeport assisté par IA avec détection des visages, suppression de l'arrière-plan et disposition en planche d'impression."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: b27e05936b42
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 510dbac4e751
+i18n_hash_version: 2
 ---
 
 # Photo de passeport {#passport-photo}
@@ -82,6 +83,8 @@ Si `clientJobId` est fourni, la progression est diffusée (0-30 % pour la détec
 
 Recadre, redimensionne et dispose éventuellement la photo sur une planche d'impression. Utilise les images mises en cache de la phase 1 (pas de nouvelle exécution de l'IA).
 
+Le recadrage s'exécute comme une tâche en file d'attente. S'il se termine dans la fenêtre d'attente synchrone, vous obtenez le résultat ci-dessous avec `200`. Un recadrage plus lent répond `202` avec `{"jobId":"...","async":true}`, et le résultat arrive sur le flux de progression de la tâche ; suivez-le comme décrit dans [Suivi de la progression](/fr/api/rest#progress-tracking). La tâche peut être annulée avec `POST /api/v1/jobs/{jobId}/cancel`. Jusqu'à la 2.3.0, ce point de terminaison attendait toujours et répondait `200`, donc les scripts qui ne gèrent que `200` doivent aussi gérer `202`.
+
 #### Paramètres (corps JSON) {#parameters-json-body}
 
 | Paramètre | Type | Requis | Défaut | Description |
@@ -92,7 +95,7 @@ Recadre, redimensionne et dispose éventuellement la photo sur une planche d'imp
 | documentType | string | Non | `"passport"` | Type de document (selon les spécifications du pays) |
 | bgColor | string | Non | `"#FFFFFF"` | Couleur d'arrière-plan en hexadécimal |
 | printLayout | string | Non | `"none"` | Disposition du papier d'impression : `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | Non | `0` | Contrainte de taille de fichier maximale en Ko, où 1 Ko = 1000 octets (0 = aucune limite) |
+| maxFileSizeKb | number | Non | `0` | Taille de fichier maximale en Ko, où 1 Ko = 1000 octets (0 = aucune limite) |
 | dpi | number | Non | `300` | DPI de sortie (72-1200) |
 | customWidthMm | number | Non | - | Largeur personnalisée de la photo en mm (remplace les spécifications du pays) |
 | customHeightMm | number | Non | - | Hauteur personnalisée de la photo en mm (remplace les spécifications du pays) |
@@ -102,6 +105,7 @@ Recadre, redimensionne et dispose éventuellement la photo sur une planche d'imp
 | landmarks | object | Oui | - | Objet de points caractéristiques issu de la réponse de la phase 1 |
 | imageWidth | number | Oui | - | Largeur de l'image issue de la réponse de la phase 1 |
 | imageHeight | number | Oui | - | Hauteur de l'image issue de la réponse de la phase 1 |
+| clientJobId | string | Non | (généré) | Votre propre ID de tâche, pour pouvoir ouvrir le flux de progression avant l'arrivée de la réponse |
 
 #### Exemple de requête {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Renvoie des indications pour utiliser le sous-point de terminaison approprié.
 - Les points caractéristiques sont renvoyés sous forme de coordonnées normalisées (plage 0-1 relative aux dimensions de l'image).
 - Le champ `preview` dans la réponse d'analyse est un PNG encodé en base64 (largeur maximale 800 px) pour un affichage rapide.
 - Les spécifications par pays incluent les dimensions du document, les ratios de hauteur de la tête et le positionnement de la ligne des yeux selon les exigences officielles des photos de passeport.
-- L'option `printLayout` génère une planche disposée sur du papier 4x6\" ou A4 avec des gouttières de 2 mm entre les photos.
-- Lorsque `maxFileSizeKb` est défini, la sortie est compressée de façon itérative pour respecter la limite de taille. Plus précisément, la qualité JPEG de la sortie est abaissée par paliers jusqu'à ce qu'elle tienne dans la limite. La taille en pixels est fixée par la spécification du pays ; si la photo ne tient toujours pas à la qualité la plus basse, `/generate` renvoie 422 avec un message l'indiquant, plutôt qu'un fichier dépassant la limite.
+- L'option `printLayout` génère une planche disposée sur du papier 4x6" ou A4 avec des gouttières de 2 mm entre les photos.
+- Lorsque `maxFileSizeKb` est défini, la qualité JPEG de la sortie est abaissée par paliers jusqu'à ce qu'elle tienne dans la limite. La taille en pixels est fixée par la spécification du pays ; si la photo ne tient toujours pas à la qualité la plus basse, `/generate` renvoie 422 avec un message l'indiquant, plutôt qu'un fichier dépassant la limite.

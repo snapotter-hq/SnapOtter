@@ -1,8 +1,9 @@
 ---
 description: "Convertit des images matricielles en SVG avec une vectorisation en noir et blanc (potrace) et une vectorisation multicalque en couleur."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: ccc108d8abc5
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 2a3196f5a3bb
+i18n_hash_version: 2
 ---
 
 # Image vers SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Un tracé couleur volumineux ou détaillé peut dépasser la fenêtre d'attente synchrone. La route répond alors `202` avec `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` à la place. Suivez `progressUrl` via SSE (ou interrogez `statusUrl`) et téléchargez le SVG une fois la tâche terminée. Voir [Suivi de la progression](/fr/api/rest#progress-tracking).
 
 ## Remarques {#notes}
 

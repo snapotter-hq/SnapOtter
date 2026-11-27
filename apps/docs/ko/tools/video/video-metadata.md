@@ -1,8 +1,9 @@
 ---
 description: "비디오에서 메타데이터를 제거하고 발견된 내용을 보고합니다."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 6675966d30e1
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 8067a08ebefb
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed`는 제거된 컨테이너 태그의 이름을 나열합니다. 값은 반환되지 않습니다. 빈 배열은 제거된 것이 없다는 뜻입니다.
 - 제거되는 메타데이터에는 생성 타임스탬프, GPS/위치 데이터, 카메라/기기 정보, 소프트웨어 태그가 포함됩니다.
 - 비디오와 오디오 스트림은 재인코딩 없이 복사되므로 품질 손실이 없습니다.
 - 비디오를 공개적으로 공유하기 전 개인정보 보호에 유용합니다.

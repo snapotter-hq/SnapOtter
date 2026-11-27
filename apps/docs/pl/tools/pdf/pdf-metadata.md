@@ -1,13 +1,14 @@
 ---
 description: "Odczytuj i zapisuj metadane dokumentu PDF."
-i18n_source_hash: b2eaebf7467f
-i18n_provenance: human
-i18n_output_hash: 3b8fa377ae31
+i18n_source_hash: 11de4f7991e4
+i18n_provenance: machine
+i18n_output_hash: bef4ccce16f2
+i18n_hash_version: 2
 ---
 
 # PDF Metadata {#pdf-metadata}
 
-Odczytuj i aktualizuj pola metadanych dokumentu PDF, takie jak tytuł, autor, temat i słowa kluczowe. Gdy nie podano żadnych ustawień, istniejące metadane są zwracane bez zmian.
+Odczytuj i aktualizuj pola metadanych dokumentu PDF, takie jak tytuł, autor, temat i słowa kluczowe, albo całkowicie usuń metadane dokumentu. Gdy nie podano żadnych ustawień, istniejące metadane są zwracane bez zmian.
 
 ## API Endpoint {#api-endpoint}
 
@@ -23,8 +24,10 @@ Przyjmuje dane formularza multipart z plikiem PDF oraz opcjonalnym polem JSON `s
 | author | string | No | - | Autor dokumentu (maks. 500 znaków) |
 | subject | string | No | - | Temat dokumentu (maks. 500 znaków) |
 | keywords | string | No | - | Słowa kluczowe dokumentu (maks. 500 znaków) |
+| stripAll | boolean | No | false | Usuwa cały słownik Info (daty, Creator, Producer, klucze niestandardowe), każdy strumień XMP (dokumentu, stron, obrazów) i wszystkie dane aplikacji PieceInfo, a następnie zapisuje podane powyżej pola |
+| removeAttachments | boolean | No | false | Usuwa też osadzone pliki: listę załączników dokumentu, adnotacje załączników plikowych i pliki powiązane (`/AF`). Wymaga `stripAll` |
 
-Wszystkie parametry są opcjonalne. Pominięte pola pozostają bez zmian.
+Wszystkie parametry są opcjonalne. Pominięte pola pozostają bez zmian, chyba że ustawiono `stripAll`.
 
 ## Example Request {#example-request}
 
@@ -59,3 +62,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - Pole `metadata` w odpowiedzi zawiera wynikowe metadane po wszystkich aktualizacjach.
 - Aby odczytać metadane bez ich modyfikowania, pomiń pole `settings` lub wyślij pusty obiekt.
 - Każde pole metadanych jest ograniczone do 500 znaków.
+- Przy `stripAll` odpowiedź zawiera także `stripped`: klucze Info, które usunięto (`removed`), czy usunięto strumień XMP dokumentu (`xmpRemoved`), poziom PDF/A zadeklarowany przez wejście (`pdfa` lub `null`), ile strumieni XMP zdjęto ze stron, obrazów i innych obiektów (`objectXmpRemoved`), ile słowników PieceInfo usunięto (`pieceInfoRemoved`) oraz ile osadzonych plików usunięto (`attachmentsRemoved`, zawsze `0` bez `removeAttachments`). Usunięcie XMP narusza zgodność z PDF/A.
+- `stripAll` samo w sobie zachowuje osadzone załączniki, ponieważ ich usunięcie zmienia treść dokumentu. Dodaj `removeAttachments`, aby je również usunąć. Usuwa to dołączony XML z e-faktur ZUGFeRD i Factur-X oraz narusza zgodność z PDF/A-3.
+- Wysłanie `removeAttachments` bez `stripAll` zwraca 400.

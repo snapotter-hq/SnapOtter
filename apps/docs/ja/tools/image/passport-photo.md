@@ -1,8 +1,9 @@
 ---
 description: "顔検出、背景除去、印刷シートの並べ配置を備えた AI パスポート・証明写真ジェネレーター。"
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 0c88ff3fa637
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 11e4c934e8e8
+i18n_hash_version: 2
 ---
 
 # パスポート写真 {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 写真を切り抜き、リサイズし、任意で印刷シート上に並べて配置します。フェーズ 1 のキャッシュ画像を使用します（AI の再実行なし）。
 
+切り抜きはキュー化されたジョブとして実行されます。同期待機ウィンドウ内に完了した場合は、下記の結果とともに `200` が返ります。それより時間がかかる場合は `{"jobId":"...","async":true}` とともに `202` が返り、結果はジョブの進捗ストリームで届きます。[Progress Tracking](/ja/api/rest#progress-tracking) の説明に従って購読してください。ジョブは `POST /api/v1/jobs/{jobId}/cancel` でキャンセルできます。2.3.0 までは、このエンドポイントは常に待機して `200` を返していたため、`200` だけを処理しているスクリプトは `202` も処理するようにしてください。
+
 #### パラメーター（JSON ボディ） {#parameters-json-body}
 
 | パラメーター | 型 | 必須 | デフォルト | 説明 |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | Yes | - | フェーズ 1 レスポンスのランドマークオブジェクト |
 | imageWidth | number | Yes | - | フェーズ 1 レスポンスの画像幅 |
 | imageHeight | number | Yes | - | フェーズ 1 レスポンスの画像高さ |
+| clientJobId | string | No | （自動生成） | 独自のジョブ ID。レスポンスが返る前に進捗ストリームを開けるようにします |
 
 #### リクエスト例 {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

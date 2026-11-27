@@ -1,8 +1,9 @@
 ---
 description: "ラスター画像をSVGに変換します。白黒（potrace）とフルカラーのマルチレイヤーベクター化に対応します。"
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 7284f323c58a
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: b8c7593df54c
+i18n_hash_version: 2
 ---
 
 # Image to SVG {#image-to-svg}
@@ -17,7 +18,7 @@ i18n_output_hash: 7284f323c58a
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| colorMode | string | No | `"bw"` | トレースモード: `bw`（白黒）または`color`（マルチカラーレイヤー） |
+| colorMode | string | No | `"bw"` | トレースモード: `bw`（白黒）または `color`（マルチカラーレイヤー） |
 | threshold | number | No | 128 | 白黒モードの明度しきい値（0〜255）。これを下回るピクセルは黒になります。 |
 | colorPrecision | number | No | 6 | カラーモードの色量子化精度（1〜16）。値が高いほど、より明確な色レイヤーが生成されます。 |
 | layerDifference | number | No | 6 | カラーモードにおけるレイヤー間の最小色差（1〜128） |
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+大きな画像や細部の多いカラートレースは、同期待機ウィンドウを超えることがあります。その場合、ルートは代わりに `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` とともに `202` を返します。SSE で `progressUrl` を購読し（または `statusUrl` をポーリングし）、ジョブの完了後に SVG をダウンロードしてください。[Progress Tracking](/ja/api/rest#progress-tracking) を参照してください。
 
 ## Notes {#notes}
 

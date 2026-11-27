@@ -1,8 +1,9 @@
 ---
 description: "مولّد صور جوازات السفر وبطاقات الهوية المدعوم بالذكاء الاصطناعي مع كشف الوجه وإزالة الخلفية وترتيب أوراق الطباعة."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: c82018ebf46d
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: c3bdd892affc
+i18n_hash_version: 2
 ---
 
 # صورة جواز السفر {#passport-photo}
@@ -11,7 +12,7 @@ i18n_output_hash: c82018ebf46d
 
 ## نقاط نهاية الـ API {#api-endpoints}
 
-يستخدم هذا الأداة تدفقًا من مرحلتين مع نقاط نهاية منفصلة للتحليل والتوليد.
+تستخدم هذه الأداة تدفقًا من مرحلتين مع نقاط نهاية منفصلة للتحليل والتوليد.
 
 **حزم النماذج:** `background-removal` و `face-detection`
 
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 يقص الصورة ويغيّر حجمها ويرتّبها اختياريًا على ورقة طباعة. يستخدم الصور المخزّنة مؤقتًا من المرحلة 1 (دون إعادة تشغيل الذكاء الاصطناعي).
 
+يعمل القص كمهمة في قائمة الانتظار. إذا انتهت ضمن نافذة الانتظار المتزامن، تحصل على النتيجة أدناه مع `200`. أما الأبطأ فيردّ بالرمز `202` مع `{"jobId":"...","async":true}`، وتصل النتيجة عبر تدفق التقدّم الخاص بالمهمة؛ تابعه كما هو موضح في [تتبّع التقدّم](/ar/api/rest#progress-tracking). يمكن إلغاء المهمة باستخدام `POST /api/v1/jobs/{jobId}/cancel`. حتى الإصدار 2.3.0 كانت نقطة النهاية هذه تنتظر دائمًا وتردّ بالرمز `200`، لذا فالسكربتات التي تعالج `200` فقط ينبغي أن تعالج `202` أيضًا.
+
 #### المعاملات (جسم JSON) {#parameters-json-body}
 
 | المعامل | النوع | مطلوب | القيمة الافتراضية | الوصف |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | نعم | - | كائن المعالم من استجابة المرحلة 1 |
 | imageWidth | number | نعم | - | عرض الصورة من استجابة المرحلة 1 |
 | imageHeight | number | نعم | - | ارتفاع الصورة من استجابة المرحلة 1 |
+| clientJobId | string | لا | (يُولَّد) | معرّف المهمة الخاص بك، ليتسنى لك فتح تدفق التقدّم قبل وصول الاستجابة |
 
 #### مثال على الطلب {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

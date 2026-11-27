@@ -1,8 +1,9 @@
 ---
 description: "AI-aangedreven generator voor pasfoto's en ID-foto's met gezichtsdetectie, achtergrondverwijdering en het tegelen van printvellen."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 738b1210bf5b
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: f0c82607f275
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ Als `clientJobId` is opgegeven, wordt de voortgang gestreamd (0-30% voor gezicht
 
 Snijdt de foto bij, verkleint deze en tegelt hem optioneel op een printvel. Gebruikt de in de cache opgeslagen afbeeldingen uit Fase 1 (geen herhaling van de AI).
 
+De bijsnijding draait als een job in de wachtrij. Als die binnen het synchrone wachtvenster klaar is, krijg je het onderstaande resultaat met `200`. Een tragere antwoordt met `202` en `{"jobId":"...","async":true}`, en het resultaat komt binnen op de voortgangsstream van de job; volg die zoals beschreven in [Progress Tracking](/nl/api/rest#progress-tracking). De job kan worden geannuleerd met `POST /api/v1/jobs/{jobId}/cancel`. Tot en met 2.3.0 wachtte dit endpoint altijd en antwoordde `200`, dus scripts die alleen `200` afhandelen, moeten ook `202` afhandelen.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Vereist | Standaard | Beschrijving |
@@ -102,6 +105,7 @@ Snijdt de foto bij, verkleint deze en tegelt hem optioneel op een printvel. Gebr
 | landmarks | object | Ja | - | Kenmerken-object uit de respons van Fase 1 |
 | imageWidth | number | Ja | - | Afbeeldingsbreedte uit de respons van Fase 1 |
 | imageHeight | number | Ja | - | Afbeeldingshoogte uit de respons van Fase 1 |
+| clientJobId | string | Nee | (gegenereerd) | Je eigen job-ID, zodat je de voortgangsstream kunt openen voordat het antwoord binnenkomt |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Geeft richtlijnen om het juiste sub-endpoint te gebruiken.
 - Kenmerken worden teruggegeven als genormaliseerde coördinaten (bereik 0-1 ten opzichte van de afbeeldingsafmetingen).
 - Het veld `preview` in de analyserespons is een base64-gecodeerde PNG (max. 800px breed) voor snelle weergave.
 - Landspecificaties bevatten documentafmetingen, verhoudingen voor de hoofdhoogte en de positionering van de ooglijn op basis van officiële eisen voor pasfoto's.
-- De optie `printLayout` genereert een getegeld vel op 4x6\"- of A4-papier met een tussenruimte van 2 mm tussen de foto's.
+- De optie `printLayout` genereert een getegeld vel op 4x6"- of A4-papier met een tussenruimte van 2 mm tussen de foto's.
 - Wanneer `maxFileSizeKb` is ingesteld, wordt de JPEG-kwaliteit van de uitvoer stapsgewijs verlaagd totdat de foto past. De pixelgrootte ligt vast door de landspecificatie, dus als de foto bij de laagste kwaliteit nog steeds niet past, retourneert `/generate` een 422 met een melding daarover, in plaats van een bestand dat groter is dan de limiet.

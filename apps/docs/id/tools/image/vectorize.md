@@ -1,8 +1,9 @@
 ---
 description: "Mengonversi gambar raster ke SVG dengan vektorisasi hitam-putih (potrace) dan multi-layer penuh warna."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: e0fdb2fea14e
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 690d9846fb68
+i18n_hash_version: 2
 ---
 
 # Image to SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Hasil penelusuran warna yang besar atau detail bisa melewati jendela tunggu sinkron. Route kemudian menjawab `202` dengan `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Ikuti `progressUrl` lewat SSE (atau poll `statusUrl`) dan unduh SVG saat job selesai. Lihat [Progress Tracking](/id/api/rest#progress-tracking).
 
 ## Notes {#notes}
 

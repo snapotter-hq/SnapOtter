@@ -1,8 +1,9 @@
 ---
 description: "ตัวสร้างรูปถ่ายพาสปอร์ตและบัตรประชาชนด้วย AI พร้อมการตรวจจับใบหน้า การลบพื้นหลัง และการเรียงต่อสำหรับพิมพ์"
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: cf90cdf1c56e
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 7281d68a2f99
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 ครอป ปรับขนาด และเรียงต่อรูปถ่ายลงบนแผ่นพิมพ์ตามต้องการ ใช้รูปภาพที่แคชไว้จาก Phase 1 (ไม่มีการรัน AI ซ้ำ)
 
+การครอปทำงานเป็นงานในคิว หากเสร็จภายในช่วงรอแบบซิงโครนัส คุณจะได้ผลลัพธ์ด้านล่างพร้อม `200` ส่วนงานที่ช้ากว่านั้นจะตอบ `202` พร้อม `{"jobId":"...","async":true}` และผลลัพธ์จะมาทางสตรีมความคืบหน้าของงาน ให้ติดตามตามที่อธิบายไว้ใน [Progress Tracking](/th/api/rest#progress-tracking) งานสามารถยกเลิกได้ด้วย `POST /api/v1/jobs/{jobId}/cancel` ก่อนหน้าและรวมถึง 2.3.0 endpoint นี้จะรอและตอบ `200` เสมอ ดังนั้นสคริปต์ที่จัดการเฉพาะ `200` ควรจัดการ `202` ด้วย
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | Yes | - | ออบเจกต์จุดสังเกตจากการตอบกลับของ Phase 1 |
 | imageWidth | number | Yes | - | ความกว้างรูปภาพจากการตอบกลับของ Phase 1 |
 | imageHeight | number | Yes | - | ความสูงรูปภาพจากการตอบกลับของ Phase 1 |
+| clientJobId | string | No | (generated) | ID งานของคุณเอง เพื่อให้เปิดสตรีมความคืบหน้าได้ก่อนที่คำตอบจะมาถึง |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Generate ทำงานจากภาพที่ลบพื้นหลั�
 - จุดสังเกตจะถูกคืนค่าเป็นพิกัดแบบ normalized (ช่วง 0-1 สัมพันธ์กับมิติของรูปภาพ)
 - ฟิลด์ `preview` ในการตอบกลับของ analyze เป็น PNG ที่เข้ารหัสแบบ base64 (กว้างสูงสุด 800px) เพื่อการแสดงผลที่รวดเร็ว
 - ข้อกำหนดของประเทศรวมมิติเอกสาร อัตราส่วนความสูงของศีรษะ และตำแหน่งเส้นระดับสายตาตามข้อกำหนดรูปถ่ายพาสปอร์ตอย่างเป็นทางการ
-- ตัวเลือก `printLayout` จะสร้างแผ่นที่เรียงต่อกันบนกระดาษ 4x6\" หรือ A4 พร้อมช่องว่าง 2มม. ระหว่างรูปถ่าย
+- ตัวเลือก `printLayout` จะสร้างแผ่นที่เรียงต่อกันบนกระดาษ 4x6" หรือ A4 พร้อมช่องว่าง 2มม. ระหว่างรูปถ่าย
 - เมื่อตั้งค่า `maxFileSizeKb` คุณภาพ JPEG ของเอาต์พุตจะถูกลดลงทีละขั้นจนกว่าจะพอดี ขนาดพิกเซลถูกกำหนดตายตัวโดยข้อกำหนดของประเทศ ดังนั้นหากรูปถ่ายยังไม่พอดีแม้ที่คุณภาพต่ำสุด `/generate` จะคืนค่า 422 พร้อมข้อความแจ้ง แทนที่จะคืนไฟล์ที่เกินขีดจำกัด

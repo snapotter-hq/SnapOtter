@@ -1,8 +1,9 @@
 ---
 description: "ลบเมทาดาทาออกจากวิดีโอและรายงานสิ่งที่พบ"
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 82fb16d4f68a
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: cfcf6fba1048
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` แสดงรายชื่อแท็กของคอนเทนเนอร์ที่ถูกลบ ค่าของแท็กจะไม่ถูกส่งกลับ อาร์เรย์ว่างหมายความว่าไม่มีอะไรถูกลบ
 - เมทาดาทาที่ถูกลบรวมถึงเวลาที่สร้าง ข้อมูล GPS/ตำแหน่ง ข้อมูลกล้อง/อุปกรณ์ และแท็กซอฟต์แวร์
 - สตรีมวิดีโอและเสียงจะถูกคัดลอกโดยไม่เข้ารหัสใหม่ จึงไม่มีการสูญเสียคุณภาพ
 - มีประโยชน์ต่อความเป็นส่วนตัวก่อนแชร์วิดีโอสู่สาธารณะ

@@ -1,8 +1,9 @@
 ---
 description: "흑백(potrace) 및 풀컬러 다중 레이어 벡터화로 래스터 이미지를 SVG로 변환합니다."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: f7908a58b9bc
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: e91b64d01e27
+i18n_hash_version: 2
 ---
 
 # Image to SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+크거나 세부 묘사가 많은 컬러 트레이싱은 동기 대기 시간을 넘길 수 있습니다. 이 경우 라우트는 `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` 대신 `202`을 반환합니다. SSE로 `progressUrl`를 따라가거나(또는 `statusUrl`를 폴링하여) 작업이 완료되면 SVG를 다운로드하세요. [Progress Tracking](/ko/api/rest#progress-tracking)을 참고하세요.
 
 ## Notes {#notes}
 

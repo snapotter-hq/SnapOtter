@@ -1,34 +1,35 @@
 ---
-description: "AI 驅動的護照與證件照產生器，具備臉部偵測、背景移除與列印排版拼貼功能。"
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 4e000b76a5a6
+description: "AI 驅動的護照與證件照產生器,具備臉部偵測、背景移除與列印排版拼貼功能。"
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 46d54457ba65
+i18n_hash_version: 2
 ---
 
 # 護照照片 {#passport-photo}
 
-AI 驅動的護照與證件照產生器。採用兩階段工作流程：分析（臉部偵測 + 背景移除），接著產生（裁切、調整大小並拼貼以供列印）。
+AI 驅動的護照與證件照產生器。採用兩階段工作流程:分析(臉部偵測 + 背景移除),接著產生(裁切、調整大小並拼貼以供列印)。
 
 ## API 端點 {#api-endpoints}
 
-此工具使用兩階段流程，分析與產生各自使用獨立的端點。
+此工具使用兩階段流程,分析與產生各自使用獨立的端點。
 
-**模型套件包：** `background-removal` 與 `face-detection`
+**模型套件包:** `background-removal` 與 `face-detection`
 
 ---
 
-### 階段 1：分析 {#phase-1-analyze}
+### 階段 1:分析 {#phase-1-analyze}
 
 `POST /api/v1/tools/image/passport-photo/analyze`
 
-偵測臉部特徵點並移除背景。傳回特徵點資料與預覽，供前端顯示裁切預覽。
+偵測臉部特徵點並移除背景。傳回特徵點資料與預覽,供前端顯示裁切預覽。
 
 #### 參數 {#parameters}
 
 | 參數 | 類型 | 必填 | 預設值 | 說明 |
 |-----------|------|----------|---------|-------------|
-| file | file | 是 | - | 圖片檔案（multipart） |
-| clientJobId | string | 否 | - | 選用的作業 ID，用於透過 SSE 追蹤進度 |
+| file | file | 是 | - | 圖片檔案(multipart) |
+| clientJobId | string | 否 | - | 選用的作業 ID,用於透過 SSE 追蹤進度 |
 
 #### 範例請求 {#example-request}
 
@@ -37,7 +38,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
   -F "file=@headshot.jpg"
 ```
 
-#### 回應（200 OK） {#response-200-ok}
+#### 回應(200 OK) {#response-200-ok}
 
 ```json
 {
@@ -61,11 +62,11 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 }
 ```
 
-#### 進度（SSE，選用） {#progress-sse-optional}
+#### 進度(SSE,選用) {#progress-sse-optional}
 
-若提供 `clientJobId`，則會串流傳送進度（臉部偵測為 0-30%，背景移除為 30-95%）。
+若提供 `clientJobId`,則會串流傳送進度(臉部偵測為 0-30%,背景移除為 30-95%)。
 
-#### 錯誤：未偵測到臉部（422） {#error-no-face-detected-422}
+#### 錯誤:未偵測到臉部(422) {#error-no-face-detected-422}
 
 ```json
 {
@@ -76,32 +77,35 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 ---
 
-### 階段 2：產生 {#phase-2-generate}
+### 階段 2:產生 {#phase-2-generate}
 
 `POST /api/v1/tools/image/passport-photo/generate`
 
-裁切、調整大小，並選擇性地將照片拼貼至列印版面上。使用階段 1 的快取圖片（不重新執行 AI）。
+裁切、調整大小,並選擇性地將照片拼貼至列印版面上。使用階段 1 的快取圖片(不重新執行 AI)。
 
-#### 參數（JSON 主體） {#parameters-json-body}
+裁切會以排入佇列的作業執行。若在同步等待時間內完成,你會收到下方的結果,狀態碼為 `200`。較慢的則會以 `202` 回應並附上 `{"jobId":"...","async":true}`,結果會送到該作業的進度串流上;請依照[進度追蹤](/zh-TW/api/rest#progress-tracking)中的說明追蹤。可以用 `POST /api/v1/jobs/{jobId}/cancel` 取消作業。在 2.3.0 以前,此端點一律會等待並回應 `200`,因此只處理 `200` 的指令碼也應該處理 `202`。
+
+#### 參數(JSON 主體) {#parameters-json-body}
 
 | 參數 | 類型 | 必填 | 預設值 | 說明 |
 |-----------|------|----------|---------|-------------|
 | jobId | string | 是 | - | 來自階段 1 的作業 ID |
 | filename | string | 是 | - | 來自階段 1 的原始檔名 |
-| countryCode | string | 是 | - | 護照規格的國家代碼（例如 `US`、`GB`、`IN`） |
-| documentType | string | 否 | `"passport"` | 文件類型（來自國家規格） |
+| countryCode | string | 是 | - | 護照規格的國家代碼(例如 `US`、`GB`、`IN`) |
+| documentType | string | 否 | `"passport"` | 文件類型(來自國家規格) |
 | bgColor | string | 否 | `"#FFFFFF"` | 背景顏色十六進位色碼 |
-| printLayout | string | 否 | `"none"` | 列印紙張版面：`none`、`4x6`、`a4` |
-| maxFileSizeKb | number | 否 | `0` | 檔案大小上限（KB，其中 1 KB = 1000 位元組；0 = 無限制） |
-| dpi | number | 否 | `300` | 輸出 DPI（72-1200） |
-| customWidthMm | number | 否 | - | 自訂照片寬度（mm，覆寫國家規格） |
-| customHeightMm | number | 否 | - | 自訂照片高度（mm，覆寫國家規格） |
-| zoom | number | 否 | `1` | 縮放倍率（0.5-3）。大於 1 的數值裁切得更緊 |
+| printLayout | string | 否 | `"none"` | 列印紙張版面:`none`、`4x6`、`a4` |
+| maxFileSizeKb | number | 否 | `0` | 檔案大小上限(KB,其中 1 KB = 1000 位元組;0 = 無限制) |
+| dpi | number | 否 | `300` | 輸出 DPI(72-1200) |
+| customWidthMm | number | 否 | - | 自訂照片寬度(mm,覆寫國家規格) |
+| customHeightMm | number | 否 | - | 自訂照片高度(mm,覆寫國家規格) |
+| zoom | number | 否 | `1` | 縮放倍率(0.5-3)。大於 1 的數值裁切得更緊 |
 | adjustX | number | 否 | `0` | 水平位置調整 |
 | adjustY | number | 否 | `0` | 垂直位置調整 |
 | landmarks | object | 是 | - | 來自階段 1 回應的特徵點物件 |
 | imageWidth | number | 是 | - | 來自階段 1 回應的圖片寬度 |
 | imageHeight | number | 是 | - | 來自階段 1 回應的圖片高度 |
+| clientJobId | string | 否 | (自動產生) | 你自己的作業 ID,讓你能在回應送達前先開啟進度串流 |
 
 #### 範例請求 {#example-request-1}
 
@@ -125,12 +129,14 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
   }'
 ```
 
-#### 回應（200 OK） {#response-200-ok-1}
+#### 回應(200 OK) {#response-200-ok-1}
 
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -148,9 +154,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
-#### 錯誤：分析已過期（410） {#error-analysis-expired-410}
+#### 錯誤:分析已過期(410) {#error-analysis-expired-410}
 
-產生階段會使用分析階段為 `jobId` 儲存的去背影像。已儲存的輸出會在經過一段時間後被清理，因此如果兩次呼叫之間相隔太久，該影像就不在了。請以同一張相片再次呼叫分析端點，並使用它傳回的 `jobId`。
+產生階段會使用分析階段為 `jobId` 儲存的去背影像。已儲存的輸出會在經過一段時間後被清理,因此如果兩次呼叫之間相隔太久,該影像就不在了。請以同一張相片再次呼叫分析端點,並使用它傳回的 `jobId`。
 
 ```json
 {
@@ -159,7 +165,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
-無法指向已儲存檔案的 `jobId` 或 `filename`（含有路徑分隔符、`..` 或空字串）會回應 400。
+無法指向已儲存檔案的 `jobId` 或 `filename`(含有路徑分隔符、`..` 或空字串)會回應 400。
 
 ---
 
@@ -178,9 +184,9 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 ## 注意事項 {#notes}
 
 - 需要安裝 `background-removal` 與 `face-detection` 模型套件包。
-- 階段 1 執行 AI（臉部特徵點 + 背景移除）並快取結果。階段 2 為純 Sharp 圖片處理（快速，不需 AI）。
-- 特徵點以正規化座標傳回（0-1 範圍，相對於圖片尺寸）。
-- 分析回應中的 `preview` 欄位為 base64 編碼的 PNG（最大寬度 800px），供快速顯示。
+- 階段 1 執行 AI(臉部特徵點 + 背景移除)並快取結果。階段 2 為純 Sharp 圖片處理(快速,不需 AI)。
+- 特徵點以正規化座標傳回(0-1 範圍,相對於圖片尺寸)。
+- 分析回應中的 `preview` 欄位為 base64 編碼的 PNG(最大寬度 800px),供快速顯示。
 - 國家規格包含依據官方護照照片要求的文件尺寸、頭部高度比例與眼線定位。
-- `printLayout` 選項會在 4x6" 或 A4 紙上產生拼貼版面，照片之間有 2mm 的間距。
-- 設定 `maxFileSizeKb` 時，輸出的 JPEG 品質會逐步調降，直到符合大小限制。像素尺寸由國家規格固定，因此若照片在最低品質下仍無法符合限制，`/generate` 會傳回 422 並附上說明，而不是傳回超過限制的檔案。
+- `printLayout` 選項會在 4x6" 或 A4 紙上產生拼貼版面,照片之間有 2mm 的間距。
+- 設定 `maxFileSizeKb` 時,輸出的 JPEG 品質會逐步調降,直到符合大小限制。像素尺寸由國家規格固定,因此若照片在最低品質下仍無法符合限制,`/generate` 會傳回 422 並附上說明,而不是傳回超過限制的檔案。

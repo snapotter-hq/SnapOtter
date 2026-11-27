@@ -1,8 +1,9 @@
 ---
-description: "Usunięcie metadanych z wideo i raport, co zostało znalezione."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 03fe2ffe1858
+description: "Usuń metadane z wideo i zgłoś, co zostało znalezione."
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 7e802cea1a0c
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` wymienia nazwy usuniętych znaczników kontenera. Wartości nie są zwracane. Pusta tablica oznacza, że nic nie usunięto.
 - Usuwane metadane obejmują znaczniki czasu utworzenia, dane GPS/lokalizacji, informacje o kamerze/urządzeniu oraz znaczniki oprogramowania.
 - Strumienie wideo i audio są kopiowane bez ponownego kodowania, więc nie ma utraty jakości.
 - Przydatne do ochrony prywatności przed publicznym udostępnianiem filmów.

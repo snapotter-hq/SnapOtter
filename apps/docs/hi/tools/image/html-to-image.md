@@ -1,8 +1,9 @@
 ---
 description: "device emulation के साथ वेबपेजों या HTML स्निपेट को उच्च-गुणवत्ता वाली छवियों के रूप में कैप्चर करें।"
-i18n_source_hash: 1e49d070ea2e
-i18n_provenance: human
-i18n_output_hash: 40115a0117ef
+i18n_source_hash: 307493f63631
+i18n_provenance: machine
+i18n_output_hash: 9d95c8ddd989
+i18n_hash_version: 2
 ---
 
 # HTML to Image {#html-to-image}
@@ -27,6 +28,7 @@ i18n_output_hash: 40115a0117ef
 | devicePreset | string | नहीं | `"desktop"` | device emulation: `desktop`, `tablet`, `mobile`, `custom` |
 | viewportWidth | number | नहीं | `1280` | कस्टम viewport चौड़ाई पिक्सेल में (320 से 3840, जब devicePreset `custom` हो तब उपयोग होती है) |
 | viewportHeight | number | नहीं | `720` | कस्टम viewport ऊँचाई पिक्सेल में (320 से 2160, जब devicePreset `custom` हो तब उपयोग होती है) |
+| clientJobId | string | नहीं | - | आपकी अपनी जॉब ID, ताकि उत्तर आने से पहले ही आप प्रगति स्ट्रीम खोल सकें |
 
 या तो `url` या `html` प्रदान किया जाना चाहिए, लेकिन दोनों नहीं।
 
@@ -70,6 +72,25 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
+### Slow pages {#slow-pages}
+
+कैप्चर एक कतारबद्ध जॉब के रूप में चलता है। जो कैप्चर सिंक्रोनस प्रतीक्षा अवधि के भीतर पूरा हो जाता है, वह ऊपर दिए परिणाम के साथ `200` लौटाता है। धीमा कैप्चर जॉब ID के साथ `202` लौटाता है:
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true,
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress"
+}
+```
+
+जॉब पूरा होने तक `progressUrl` (Server-Sent Events) को फ़ॉलो करें। completed इवेंट में वही परिणाम ऑब्जेक्ट होता है जो `200` उत्तर में होता है। आप जॉब को `POST /api/v1/jobs/{jobId}/cancel` से रद्द कर सकते हैं।
+
+::: warning 2.3.0 के बाद बदला गया
+2.3.0 तक यह endpoint हमेशा कैप्चर पूरा होने तक अनुरोध को खुला रखता था और `200` लौटाता था। जो स्क्रिप्ट केवल `200` को संभालती हैं, उन्हें `202` भी संभालना चाहिए।
+:::
+
 ## Notes {#notes}
 
 - सर्वर पर Chromium इंस्टॉल होना आवश्यक है। यदि browser सेवा उपलब्ध नहीं है तो HTTP 503 लौटाता है।
@@ -77,5 +98,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 - यह endpoint प्रति घंटे 120 अनुरोधों तक दर-सीमित है।
 - `originalSize` हमेशा 0 होता है क्योंकि यह टूल URLs/HTML से छवियाँ जनरेट करता है।
 - आउटपुट फ़ाइलनाम `screenshot.<format>` है।
-- यदि पृष्ठ लोड होने में बहुत अधिक समय लेता है, तो अनुरोध HTTP 504 (gateway timeout) लौटाता है।
-- यदि browser सेवा बार-बार क्रैश होती है, तो इसे अस्थायी रूप से अक्षम कर दिया जाता है और code `BROWSER_CRASHED` के साथ HTTP 503 लौटाया जाता है।
+- यदि पृष्ठ लोड होने में बहुत अधिक समय लेता है, तो कैप्चर HTTP 504 (gateway timeout) के साथ विफल हो जाता है।
+- यदि browser सेवा बार-बार क्रैश होती है, तो इसे अस्थायी रूप से अक्षम कर दिया जाता है और कैप्चर code `BROWSER_CRASHED` के साथ HTTP 503 पर विफल होता है।
+- browser क्रैश (HTTP 503) की विफलता बताने से पहले उसे एक बार फिर आज़माया जाता है, अन्य कतारबद्ध इमेज जॉब की तरह। पेज-लोड टाइमआउट को दोबारा नहीं आज़माया जाता।
+- जो कैप्चर पहले ही `202` लौटा चुका है, वह विफलता की सूचना HTTP स्टेटस में नहीं, बल्कि अपनी प्रगति स्ट्रीम पर देता है।
