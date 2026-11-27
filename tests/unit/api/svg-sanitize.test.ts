@@ -661,6 +661,30 @@ describe("sanitizeSvg: event handlers only where an attribute can start (#5122)"
   });
 
   it.each([
+    [
+      "a tag that runs past the next <",
+      '<svg><a x="<b y=" onload="a" onclick="b" z="">c</a></svg>',
+    ],
+    ["a comment", '<svg><!-- onload="a" onclick="b" --><rect onload="c" onclick="d"/></svg>'],
+    ["a tag the file never closes", "<svg><rect data-x=\"1\" onload=a onclick='b'"],
+  ])("leaves no repeated attribute when the legacy pass handles %s", (_label, input) => {
+    const out = clean(input);
+    expect(out).not.toMatch(/on(load|click)\s*=/i);
+    const markers = out.match(/data-removed/g) ?? [];
+    expect(markers.length).toBeLessThanOrEqual(1);
+  });
+
+  it.each([
+    ["a quoted handler", '<svg><rect x="<onx="a"script>alert(1)" y=""/></svg>'],
+    ["an unquoted handler", '<svg><rect a="1" <onx=q script>alert(1)</script>'],
+    ["two handlers", '<svg><rect x="<b y=" <onx="a"scr<onz="b"ipt>alert(1)" z=""/></svg>'],
+  ])("does not join text into a tag when the legacy pass drops %s", (_label, input) => {
+    const out = clean(input);
+    expect(out).not.toMatch(/<\/?script/i);
+    expect(out).not.toMatch(/<scr<ipt/i);
+  });
+
+  it.each([
     ["after a slash", "<svg/onload=alert(1)><rect/></svg>"],
     ["straight after a quoted value", '<svg><rect x="a"onclick="alert(1)"/></svg>'],
     ["after an = with no attribute name", '<svg><a ="x onload=alert(1)"><text>c</text></a></svg>'],
