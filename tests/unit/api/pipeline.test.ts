@@ -2265,6 +2265,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
                 {
                   filename: "too-many.svg",
                   error: "SVG exceeds maximum element count of 5000",
+                  code: "SVG_TOO_LARGE",
                 },
               ],
             }),
@@ -3768,6 +3769,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(execOverCapReply.statusCode).toBe(400);
       expect(execOverCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
       expect(putObjectMock).not.toHaveBeenCalled();
       expect(insertValuesMock).not.toHaveBeenCalled();
@@ -3856,6 +3858,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
       expect(putObjectMock).not.toHaveBeenCalled();
       expect(insertValuesMock).not.toHaveBeenCalled();

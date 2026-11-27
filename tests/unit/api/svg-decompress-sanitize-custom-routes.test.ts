@@ -341,6 +341,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
 
       const prevMaxSvgMb = env.MAX_SVG_SIZE_MB;
@@ -352,6 +353,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overSizeReply.statusCode).toBe(400);
         expect(overSizeReply.payload).toEqual({
           error: "SVG exceeds maximum size of 1MB",
+          code: "SVG_TOO_LARGE",
         });
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
@@ -442,6 +444,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overCapReply.statusCode).toBe(400);
         expect(overCapReply.payload).toEqual({
           error: "SVG exceeds maximum element count of 5000",
+          code: "SVG_TOO_LARGE",
         });
       }
 
@@ -595,6 +598,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
 
       const prevMaxSvgMb = env.MAX_SVG_SIZE_MB;
@@ -607,6 +611,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overSizeReply.statusCode).toBe(400);
         expect(overSizeReply.payload).toEqual({
           error: "SVG exceeds maximum size of 1MB",
+          code: "SVG_TOO_LARGE",
         });
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
@@ -865,6 +870,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
 
       const prevMaxSvgMb = env.MAX_SVG_SIZE_MB;
@@ -876,6 +882,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overSizeReply.statusCode).toBe(400);
         expect(overSizeReply.payload).toEqual({
           error: "SVG exceeds maximum size of 1MB",
+          code: "SVG_TOO_LARGE",
         });
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
@@ -1228,6 +1235,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overCapReply.statusCode).toBe(400);
         expect(overCapReply.payload).toEqual({
           error: "SVG exceeds maximum element count of 5000",
+          code: "SVG_TOO_LARGE",
         });
       }
 
@@ -1396,6 +1404,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
 
       const prevMaxSvgMb = env.MAX_SVG_SIZE_MB;
@@ -1407,6 +1416,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         expect(overSizeReply.statusCode).toBe(400);
         expect(overSizeReply.payload).toEqual({
           error: "SVG exceeds maximum size of 1MB",
+          code: "SVG_TOO_LARGE",
         });
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
@@ -1722,6 +1732,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           {
             filename: "too-many.svg",
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           },
         ],
       });
@@ -1876,6 +1887,7 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           {
             filename: "too-many.svg",
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           },
         ];
         expect(clientFailReply.payload).toEqual({
@@ -2133,10 +2145,12 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           {
             filename: "too-many.svg",
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           },
           {
             filename: "padded-too-many.apng",
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           },
         ],
       });

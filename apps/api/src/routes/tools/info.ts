@@ -28,6 +28,7 @@ import {
   isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../../lib/svg-sanitize.js";
 
 const execFileAsync = promisify(execFile);
@@ -84,6 +85,7 @@ export function registerInfo(app: FastifyInstance) {
         ) {
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
+            ...svgClientErrorFields(err),
           });
         }
         throw asDecoderOutOfMemory(err);
@@ -171,6 +173,7 @@ export function registerInfo(app: FastifyInstance) {
         if (isSvgClientError(err)) {
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
+            ...svgClientErrorFields(err),
           });
         }
         throw asDecoderOutOfMemory(err);

@@ -97,7 +97,12 @@ import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerForInput } from "../modality/input-handler.js";
@@ -616,6 +621,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   if (isSvgClientError(err)) {
                     return reply.status(400).send({
                       error: err instanceof Error ? err.message : "Invalid SVG",
+                      ...svgClientErrorFields(err),
                     });
                   }
                   const oom = asDecoderOutOfMemory(err);
@@ -1899,6 +1905,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         originalIndex: fi,
                         filename: file.filename,
                         error: err instanceof Error ? err.message : "Invalid SVG",
+                        ...svgClientErrorFields(err),
                       });
                       continue;
                     }

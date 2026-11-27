@@ -36,6 +36,7 @@ import {
   isSvgBuffer,
   isSvgClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../../lib/svg-sanitize.js";
 import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
 import { engineUnavailable } from "../../modality/image-input.js";
@@ -365,10 +366,11 @@ export function registerSvgToRasterRoute(
             });
           } else if (isSvgClientError(err)) {
             const error = err instanceof Error ? err.message : "Invalid SVG";
-            faults.push({ filename: file.filename, error });
+            faults.push({ filename: file.filename, error, ...svgClientErrorFields(err) });
             errors.push({
               filename: file.filename,
               error,
+              ...svgClientErrorFields(err),
             });
           } else {
             throw err;
@@ -706,6 +708,7 @@ export function registerSvgToRasterRoute(
       if (isSvgClientError(err)) {
         return reply.status(400).send({
           error: err instanceof Error ? err.message : "Invalid SVGZ file",
+          ...svgClientErrorFields(err),
         });
       }
       throw asDecoderOutOfMemory(err);
@@ -723,6 +726,7 @@ export function registerSvgToRasterRoute(
       if (isSvgClientError(err)) {
         return reply.status(400).send({
           error: err instanceof Error ? err.message : "Invalid SVG",
+          ...svgClientErrorFields(err),
         });
       }
       throw asDecoderOutOfMemory(err);

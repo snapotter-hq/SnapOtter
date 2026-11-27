@@ -176,6 +176,7 @@ describe("an SVG over the element cap is rejected, not stored", () => {
       expect(res.statusCode).toBe(400);
       const body = JSON.parse(res.body);
       expect(body.error).toMatch(/element count/i);
+      expect(body.code).toBe("SVG_TOO_LARGE");
       expect(body).not.toHaveProperty("jobId");
       expect(body).not.toHaveProperty("files");
     });

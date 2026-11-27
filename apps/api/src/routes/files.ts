@@ -39,6 +39,7 @@ import {
   isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { requireFileAccess, requirePermission } from "../permissions.js";
@@ -198,7 +199,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
               } else if (isSvgzClientError(err)) {
                 request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardUploads();
-                return reply.status(400).send({ error: (err as Error).message });
+                return reply
+                  .status(400)
+                  .send({ error: (err as Error).message, ...svgClientErrorFields(err) });
               } else {
                 const oom = asDecoderOutOfMemory(err);
                 if (oom instanceof DecoderOutOfMemoryError) throw oom;
@@ -236,7 +239,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
               if (isSvgClientError(err)) {
                 request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardUploads();
-                return reply.status(400).send({ error: (err as Error).message });
+                return reply
+                  .status(400)
+                  .send({ error: (err as Error).message, ...svgClientErrorFields(err) });
               }
               const oom = asDecoderOutOfMemory(err);
               if (oom instanceof DecoderOutOfMemoryError) throw oom;
@@ -532,6 +537,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         if (isSvgClientError(rawErr)) {
           return reply.status(400).send({
             error: rawErr instanceof Error ? rawErr.message : "Invalid SVG",
+            ...svgClientErrorFields(rawErr),
           });
         }
         const err = asDecoderOutOfMemory(rawErr);

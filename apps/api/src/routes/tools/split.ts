@@ -28,7 +28,12 @@ import {
 } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -233,6 +238,7 @@ export function registerSplit(app: FastifyInstance) {
         if (isSvgClientError(err)) {
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
+            ...svgClientErrorFields(err),
           });
         }
         throw asDecoderOutOfMemory(err);

@@ -1,7 +1,16 @@
 import { gunzipSync } from "node:zlib";
-import { MAX_RESIZE_OUTPUT_DIMENSION, MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/shared";
+import {
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  MAX_RESIZE_OUTPUT_PIXELS,
+  ToolInputError,
+  toolInputErrorCode,
+} from "@snapotter/shared";
 import { env } from "../config.js";
 import { type EmbeddedRasterType, readEmbeddedRasterSize } from "./embedded-raster.js";
+
+// Translated under errors.codes in every locale.
+const SVG_TOO_LARGE = "SVG_TOO_LARGE";
+const SVG_ENCODING_UNSUPPORTED = "SVG_ENCODING_UNSUPPORTED";
 
 /**
  * Characters that are XML syntax. A reference to one of them stays encoded:
@@ -51,7 +60,7 @@ function stripUntilStable(input: string, ...steps: Array<(s: string) => string>)
     for (const step of steps) out = step(out);
     if (out.length === before) return out;
   }
-  throw svgLimitError("SVG nesting is too deep to sanitize");
+  throw svgLimitError("SVG nesting is too deep to sanitize", SVG_TOO_LARGE);
 }
 
 /**
@@ -339,17 +348,20 @@ const DOCTYPE_PATTERN = new RegExp(DOCTYPE_SOURCE, "gi");
 const MAX_SVG_ELEMENTS = 5_000;
 
 /**
- * A rejection of an SVG that is too large or too complex to sanitize. It
- * carries statusCode 400 so the HTTP error handler returns the reason as a
- * 4xx (not a generic 500) and skips Sentry. The BullMQ worker classifies by
- * error name, not statusCode, so its handling of a rejected tool input is
- * unchanged. Callers therefore let sanitizeSvg throw and get a clean 400 with
- * a message the user can act on, rather than a swallowed generic error.
+ * A rejection of an SVG that is too large or too complex to sanitize. It is a
+ * ToolInputError (statusCode 400), so the HTTP error handler returns the reason
+ * as a 4xx (not a generic 500) and skips Sentry, and the BullMQ worker keeps
+ * its `code` on the failed job. The message stays English for API clients; the
+ * `code` is what the web app translates from `errors.codes`.
  */
-function svgLimitError(message: string): Error & { statusCode: number } {
-  const err = new Error(message) as Error & { statusCode: number };
-  err.statusCode = 400;
-  return err;
+function svgLimitError(message: string, code: string): ToolInputError {
+  return new ToolInputError(message, { code });
+}
+
+/** The `code` field of a client SVG rejection, or nothing for gzip faults that have none. */
+export function svgClientErrorFields(err: unknown): { code?: string } {
+  const code = toolInputErrorCode(err);
+  return code ? { code } : {};
 }
 
 const XML_DECLARATION = /<\?xml([^?>]*)/gi;
@@ -385,10 +397,11 @@ const ENCODING_MESSAGE = "SVG must be encoded as UTF-8. Save it as UTF-8 and try
 export function sanitizeSvg(buffer: Buffer): Buffer {
   const maxSvgSize = env.MAX_SVG_SIZE_MB > 0 ? env.MAX_SVG_SIZE_MB * 1024 * 1024 : Infinity;
   if (buffer.length > maxSvgSize) {
-    throw svgLimitError(`SVG exceeds maximum size of ${env.MAX_SVG_SIZE_MB}MB`);
+    throw svgLimitError(`SVG exceeds maximum size of ${env.MAX_SVG_SIZE_MB}MB`, SVG_TOO_LARGE);
   }
   let svg = buffer.toString("utf-8");
-  if (declaresOtherEncoding(buffer, svg)) throw svgLimitError(ENCODING_MESSAGE);
+  if (declaresOtherEncoding(buffer, svg))
+    throw svgLimitError(ENCODING_MESSAGE, SVG_ENCODING_UNSUPPORTED);
 
   // ── Pre-processing: strip CDATA sections and decode numeric entities ──
   // CDATA sections can hide script content from regex-based checks.
@@ -404,7 +417,7 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // An opening counts whether or not a `>` ever closes it: unterminated
   // openings are exactly what makes the later passes expensive.
   if (countMatches(svg, /<[A-Za-z_]/g, MAX_SVG_ELEMENTS) > MAX_SVG_ELEMENTS) {
-    throw svgLimitError(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`);
+    throw svgLimitError(`SVG exceeds maximum element count of ${MAX_SVG_ELEMENTS}`, SVG_TOO_LARGE);
   }
 
   // ── Pre-processing: normalize whitespace/null bytes inside href values ──
@@ -425,7 +438,7 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // the input), and repeating until stable stops a DOCTYPE that only forms once
   // an inner one is removed (`<!DOC<!DOCTYPE x>TYPE ...>`).
   if (countMatches(svg, /<!DOCTYPE\b/gi, 1) > 1) {
-    throw svgLimitError("SVG contains more than one DOCTYPE");
+    throw svgLimitError("SVG contains more than one DOCTYPE", SVG_TOO_LARGE);
   }
   svg = stripUntilStable(svg, (s) => s.replace(DOCTYPE_PATTERN, ""));
   // Remove XML processing instructions except <?xml version...?>
@@ -512,7 +525,8 @@ export function sanitizeSvg(buffer: Buffer): Buffer {
   // Removing markup can join a declaration together or move other bytes to
   // the front, so the output gets the same check as the input.
   const out = Buffer.from(svg, "utf-8");
-  if (declaresOtherEncoding(out, svg)) throw svgLimitError(ENCODING_MESSAGE);
+  if (declaresOtherEncoding(out, svg))
+    throw svgLimitError(ENCODING_MESSAGE, SVG_ENCODING_UNSUPPORTED);
   return out;
 }
 

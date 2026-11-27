@@ -30,6 +30,7 @@ import {
   isSvgBuffer,
   isSvgClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { engineUnavailable } from "../../modality/image-input.js";
@@ -184,6 +185,7 @@ export function registerEditMetadata(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);
@@ -205,6 +207,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             if (isSvgClientError(err)) {
               return reply.status(400).send({
                 error: err instanceof Error ? err.message : "Invalid SVG",
+                ...svgClientErrorFields(err),
               });
             }
             throw asDecoderOutOfMemory(err);
@@ -285,6 +288,7 @@ export function registerEditMetadata(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);

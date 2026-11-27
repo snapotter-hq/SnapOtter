@@ -1568,6 +1568,7 @@ describe("files route logic", () => {
       expect(overCapReply.statusCode).toBe(400);
       expect(overCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
       expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
 

@@ -24,7 +24,12 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 
 /**
  * Hand zxing-wasm the packaged binary. Also how the route resets a failed
@@ -282,6 +287,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);

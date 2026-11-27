@@ -36,7 +36,12 @@ import {
 } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -93,6 +98,9 @@ function sanitizeSvgInput(buf: Buffer): Buffer {
     if (isSvgClientError(err)) {
       const validationErr = new InputValidationError(
         err instanceof Error ? err.message : "Invalid SVG",
+        400,
+        undefined,
+        svgClientErrorFields(err).code,
       );
       validationErr.cause = err;
       throw validationErr;

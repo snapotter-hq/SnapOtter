@@ -22,7 +22,12 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
 import { normalizeOperationalWriteError } from "../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../lib/svg-sanitize.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 /**
@@ -176,7 +181,12 @@ export class ImageInputHandler implements InputHandler {
       } catch (err) {
         opts.signal?.throwIfAborted();
         if (isSvgClientError(err)) {
-          throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
+          throw new InputValidationError(
+            err instanceof Error ? err.message : "Invalid SVG",
+            400,
+            undefined,
+            svgClientErrorFields(err).code,
+          );
         }
         const oom = asDecoderOutOfMemory(err);
         if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);

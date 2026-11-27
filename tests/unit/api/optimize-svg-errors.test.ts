@@ -1,4 +1,4 @@
-import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 
 const runInWorker = vi.hoisted(() => vi.fn());
@@ -14,6 +14,7 @@ import {
 } from "../../../apps/api/src/lib/run-in-worker.js";
 import {
   optimizeOnWorker,
+  optimizeSvgBuffer,
   SLOW_HOST_TIMEOUT_MAX_BYTES,
 } from "../../../apps/api/src/routes/tools/optimize-svg.js";
 
@@ -63,5 +64,15 @@ describe("optimizeOnWorker error mapping", () => {
   it("rethrows other worker errors untouched", async () => {
     const boom = new Error("boom");
     expect(await failWith(boom, small)).toBe(boom);
+  });
+});
+
+describe("optimizeSvgBuffer sanitizer refusals", () => {
+  it("keeps the sanitizer's own code instead of calling every refusal too large", async () => {
+    const svg = Buffer.from(
+      '<?xml version="1.0" encoding="EUC-KR"?><svg xmlns="http://www.w3.org/2000/svg"/>',
+    );
+    const err = await optimizeSvgBuffer(svg, {} as never, "a.svg").catch((e: unknown) => e);
+    expect(toolInputErrorCode(err)).toBe("SVG_ENCODING_UNSUPPORTED");
   });
 });
