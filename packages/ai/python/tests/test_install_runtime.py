@@ -3065,3 +3065,36 @@ class InstallRuntimeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ChmodFallbackTests(unittest.TestCase):
+    """#5313: AT_SYMLINK_NOFOLLOW is rejected on QNAP QTS shared folders."""
+
+    def test_efault_from_no_follow_chmod_retries_plain_chmod(self) -> None:
+        path = Path("/data/ai/v3/staging/file")
+        calls: list[tuple[object, ...]] = []
+
+        def fake_chmod(target: object, mode: int, *, follow_symlinks: bool = True) -> None:
+            calls.append((target, mode, follow_symlinks))
+            if follow_symlinks is False:
+                raise OSError(errno.EFAULT, "Bad address")
+
+        with mock.patch.object(install_runtime.os, "chmod", side_effect=fake_chmod):
+            install_runtime._chmod_preserving_symlinks(path, 0o644)
+
+        self.assertEqual(
+            calls,
+            [(path, 0o644, False), (path, 0o644, True)],
+        )
+
+    def test_other_chmod_errors_are_not_swallowed(self) -> None:
+        path = Path("/data/ai/v3/staging/file")
+
+        def fake_chmod(target: object, mode: int, *, follow_symlinks: bool = True) -> None:
+            if follow_symlinks is False:
+                raise OSError(errno.EACCES, "Permission denied")
+
+        with mock.patch.object(install_runtime.os, "chmod", side_effect=fake_chmod):
+            with self.assertRaises(OSError) as caught:
+                install_runtime._chmod_preserving_symlinks(path, 0o644)
+        self.assertEqual(caught.exception.errno, errno.EACCES)

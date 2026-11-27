@@ -1036,6 +1036,26 @@ def _ensure_state_directory(root: Path, relative_parts: Sequence[str]) -> Path:
     return current
 
 
+def _chmod_preserving_symlinks(path: Path, mode: int) -> None:
+    """Set a mode without following a symlink, with a kernel-compat fallback.
+
+    Some ACL-enabled network filesystems (QNAP QTS shared folders among them)
+    reject ``fchmodat(..., AT_SYMLINK_NOFOLLOW)`` with ``EFAULT`` or
+    ``ENOTSUP`` even for regular files. The extraction path only calls this for
+    regular files it wrote itself, so a plain ``chmod`` is safe there.
+    """
+    try:
+        os.chmod(path, mode, follow_symlinks=False)
+    except OSError as error:
+        if error.errno not in {
+            getattr(errno, "EFAULT", 14),
+            getattr(errno, "ENOTSUP", 95),
+            getattr(errno, "EOPNOTSUPP", 122),
+        }:
+            raise
+        os.chmod(path, mode)
+
+
 def _safe_extract(
     archive_fd: int,
     destination: Path,
@@ -1095,12 +1115,12 @@ def _safe_extract(
                         raise IntegrityError(
                             f"archive member size mismatch for {name}: expected {member.size}, got {written}"
                         )
-                    os.chmod(output_path, member.mode & 0o777, follow_symlinks=False)
+                    _chmod_preserving_symlinks(output_path, member.mode & 0o777)
                 for directory, mode in sorted(
                     directory_modes, key=lambda item: len(item[0].parts), reverse=True
                 ):
-                    os.chmod(directory, mode, follow_symlinks=False)
-        os.chmod(destination, 0o755, follow_symlinks=False)
+                    _chmod_preserving_symlinks(directory, mode)
+        _chmod_preserving_symlinks(destination, 0o755)
         _sync_extracted_tree(destination)
     except (tarfile.TarError, OSError) as error:
         if isinstance(error, InstallError):
