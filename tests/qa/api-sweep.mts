@@ -33,7 +33,13 @@ import { pairwise } from "../helpers/pairwise.js";
 import type { PictAxis } from "../helpers/zod-pict.js";
 import { login, QaClient, type SubmitOutcome } from "./lib/container.js";
 import { fixturesFor, resolveFixture } from "./lib/fixture-index.js";
-import { describeFacts, inspectOutput, type OutputFacts, SEMANTIC_ORACLES } from "./lib/oracles.js";
+import {
+  describeFacts,
+  inspectOutput,
+  JSON_RESULT_ORACLES,
+  type OutputFacts,
+  SEMANTIC_ORACLES,
+} from "./lib/oracles.js";
 
 // ── Configuration ─────────────────────────────────────────────────
 
@@ -132,6 +138,9 @@ const GENERATOR_BODIES: Record<string, Record<string, unknown>> = {
     html: "<html><body><h1>SnapOtter QA</h1><p>generator oracle</p></body></html>",
     format: "png",
   },
+  // Takes a JSON body like the generators but answers with numbers, which
+  // JSON_RESULT_ORACLES checks: this body should come back as 16:9 and 720.
+  "aspect-ratio-calculator": { width: 1920, height: 1080, newWidth: 1280 },
 };
 
 interface SecondarySpec {
@@ -459,6 +468,11 @@ async function classify(
   // JSON-result tools legitimately return data instead of an artifact.
   if (!outcome.bytes) {
     if (outcome.json && Object.keys(outcome.json).length > 0 && !outcome.json.downloadUrl) {
+      const jsonOracle = JSON_RESULT_ORACLES[tool.id];
+      const violation = jsonOracle?.(outcome.json);
+      if (violation) {
+        return { verdict: "fail", oracle: `json:${tool.id}`, detail: violation };
+      }
       return {
         verdict: "pass",
         oracle: "json-result",
