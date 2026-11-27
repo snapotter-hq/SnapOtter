@@ -1,7 +1,10 @@
 // tests/unit/scripts/i18n/check-parity.test.ts
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { createDocsAdapter } from "../../../../scripts/i18n/adapters/docs-md.mjs";
 import { checkAdapter } from "../../../../scripts/i18n/check-parity.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
 import { makeFakeAdapter } from "./fake-adapter";
@@ -76,6 +79,91 @@ describe("checkAdapter", () => {
     // en is never seeded; it must be ignored even if passed in.
     const report = await checkAdapter(adapter, ["en", "de"]);
     expect(report.ok).toBe(true);
+  });
+});
+
+describe("checkAdapter output-hash check", () => {
+  // biome-ignore lint/suspicious/noExplicitAny: fake in-memory adapter, untyped by design
+  async function editedAdapter(verifiesOutputHash: boolean, provenance = "machine"): Promise<any> {
+    const adapter = { ...makeFakeAdapter([{ id: "a", sourceText: "hi" }]), verifiesOutputHash };
+    await seedComplete(adapter, "de");
+    // biome-ignore lint/suspicious/noExplicitAny: fake store is untyped by design
+    const entry = (adapter._store.get("de") as Map<string, any>).get("a");
+    entry.text = "hand edited";
+    entry.provenance = provenance;
+    return adapter;
+  }
+
+  it("flags a machine entry whose text was edited without restamping", async () => {
+    const report = await checkAdapter(await editedAdapter(true), ["de"]);
+    expect(report.ok).toBe(false);
+    expect(report.problems.join(" ")).toMatch(/de.*"a".*without restamping/);
+  });
+
+  it("accepts an edited entry that is stamped human", async () => {
+    const report = await checkAdapter(await editedAdapter(true, "human"), ["de"]);
+    expect(report.ok).toBe(true);
+  });
+
+  it("ignores output hashes for an adapter that has not opted in", async () => {
+    const report = await checkAdapter(await editedAdapter(false), ["de"]);
+    expect(report.ok).toBe(true);
+  });
+});
+
+describe("docs adapter output-hash check", () => {
+  const SOURCE = "---\ntitle: Users\n---\n# Users {#users}\n\nBody.\n";
+  const dirs: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+  });
+
+  async function importedDocs() {
+    const root = await mkdtemp(join(tmpdir(), "i5358-docs-"));
+    dirs.push(root);
+    await mkdir(join(root, "guide"), { recursive: true });
+    await writeFile(join(root, "guide/users.md"), SOURCE, "utf8");
+    const adapter = createDocsAdapter({ root });
+    const [unit] = await adapter.extract();
+    await adapter.write(
+      "de",
+      new Map([
+        [
+          unit.id,
+          {
+            text: "---\ntitle: Benutzer\n---\n# Benutzer {#users}\n\nText.\n",
+            sourceHash: hash(unit.sourceText),
+            provenance: "machine",
+            outputHash: "",
+            stale: false,
+          },
+        ],
+      ]),
+    );
+    return { root, adapter, file: join(root, "de/guide/users.md") };
+  }
+
+  it("passes a freshly imported page", async () => {
+    const { adapter } = await importedDocs();
+    expect((await checkAdapter(adapter, ["de"])).ok).toBe(true);
+  });
+
+  it("flags a body edited by hand after the import", async () => {
+    const { adapter, file } = await importedDocs();
+    await writeFile(file, (await readFile(file, "utf8")).replace("Text.", "Neuer Text."), "utf8");
+    const report = await checkAdapter(adapter, ["de"]);
+    expect(report.ok).toBe(false);
+    expect(report.problems.join(" ")).toContain("without restamping");
+  });
+
+  it("skips a legacy version 1 page, which load() trusts once", async () => {
+    const { adapter, file } = await importedDocs();
+    const edited = (await readFile(file, "utf8"))
+      .replace("Text.", "Neuer Text.")
+      .replace("i18n_hash_version: 2", "i18n_hash_version: 1");
+    await writeFile(file, edited, "utf8");
+    expect((await checkAdapter(adapter, ["de"])).ok).toBe(true);
   });
 });
 

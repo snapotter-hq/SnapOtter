@@ -18,7 +18,10 @@ import { localeCodes } from "./lib/shared-i18n.mjs";
  * count as stale here: staleness means "needs review", which is exactly what a
  * parity check should flag. `en` is always the source and never a target.
  *
- * @param {{ name: string, extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, any>> }} adapter
+ * An adapter opts into the edited-without-restamp check with
+ * `verifiesOutputHash: true`; the landing surfaces have not been audited yet.
+ *
+ * @param {{ name: string, verifiesOutputHash?: boolean, extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, any>> }} adapter
  * @param {string[]} locales
  * @returns {Promise<{ ok: boolean, problems: string[] }>}
  */
@@ -40,6 +43,19 @@ export async function checkAdapter(adapter, locales) {
         problems.push(
           `[${adapter.name}] ${locale}: stale translation for unit "${id}" ` +
             `(stored ${entry.sourceHash || "<none>"}, source ${srcHash})`,
+        );
+      }
+      // collectPending (core.mjs) reads a machine entry whose text no longer
+      // matches its output hash as a human edit, so the next import flips it to
+      // human. Surface that here, where the PR that edited the body can fix it.
+      if (
+        adapter.verifiesOutputHash &&
+        entry.provenance === "machine" &&
+        hash(entry.text) !== entry.outputHash
+      ) {
+        problems.push(
+          `[${adapter.name}] ${locale}: unit "${id}" is stamped machine but its text was edited ` +
+            "without restamping (set i18n_provenance: human if intentional, otherwise re-import)",
         );
       }
     }
