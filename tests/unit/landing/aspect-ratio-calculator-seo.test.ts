@@ -27,6 +27,6 @@ describe("aspect-ratio-calculator landing SEO copy (#5031)", () => {
       ...seo.features,
       ...seo.faqs.flatMap((f) => [f.q, f.a]),
     ];
-    for (const s of strings) expect(s).not.toMatch(/—|–| -- /);
+    for (const s of strings) expect(s).not.toMatch(/\u2014|\u2013| -- /);
   });
 });
