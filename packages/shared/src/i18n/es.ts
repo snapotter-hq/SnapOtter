@@ -2747,6 +2747,8 @@ export const es: TranslationKeys = {
       boxLabel: "Cuadro de texto. Arrástrelo para moverlo o use las teclas de flecha.",
       dragHint:
         "Arrastre el cuadro para colocar el texto. El cuadro es aproximado; la descarga se genera en el servidor.",
+      batchPositionHint:
+        "Arriba y Abajo se aplican a cada archivo por separado, por eso no hay un cuadro que arrastrar. Elija Personalizada para recuperarlo.",
     },
     compose: {
       screen: "Pantalla",

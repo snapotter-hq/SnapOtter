@@ -2758,6 +2758,8 @@ export const ptBR: TranslationKeys = {
       boxLabel: "Caixa de texto. Arraste para mover ou use as teclas de seta.",
       dragHint:
         "Arraste a caixa para posicionar o texto. A caixa é aproximada; o arquivo baixado é gerado no servidor.",
+      batchPositionHint:
+        "Topo e Baixo são aplicados a cada arquivo separadamente, então não há caixa para arrastar. Escolha Personalizada para trazê-la de volta.",
     },
     compose: {
       screen: "Tela",

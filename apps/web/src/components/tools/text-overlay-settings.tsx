@@ -4,7 +4,11 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
-import type { TextOverlayLayout, TextPosition } from "@/lib/text-overlay-placement";
+import {
+  placementVariesByFile,
+  type TextOverlayLayout,
+  type TextPosition,
+} from "@/lib/text-overlay-placement";
 import { useFileStore } from "@/stores/file-store";
 
 /** Links the controls to the draggable box on the tool page preview. */
@@ -19,12 +23,15 @@ export interface TextOverlayControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
   textOverlayProps?: TextOverlayProps;
+  /** Files loaded on the tool page; pipeline steps leave it out and never show the batch hint. */
+  fileCount?: number;
 }
 
 export function TextOverlayControls({
   settings: initialSettings,
   onChange,
   textOverlayProps,
+  fileCount = 0,
 }: TextOverlayControlsProps) {
   const { t } = useTranslation();
   const ts = t.toolSettings["text-overlay"];
@@ -170,6 +177,9 @@ export function TextOverlayControls({
           <option value="bottom">{ts.bottom}</option>
           <option value="custom">{ts.custom}</option>
         </select>
+        {placementVariesByFile(position, fileCount) && (
+          <p className="mt-1 text-xs text-muted-foreground">{ts.batchPositionHint}</p>
+        )}
       </div>
 
       {position === "custom" && (
@@ -308,7 +318,11 @@ export function TextOverlaySettings({ textOverlayProps }: { textOverlayProps?: T
 
   return (
     <div className="space-y-4">
-      <TextOverlayControls onChange={setSettings} textOverlayProps={textOverlayProps} />
+      <TextOverlayControls
+        onChange={setSettings}
+        textOverlayProps={textOverlayProps}
+        fileCount={files.length}
+      />
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 

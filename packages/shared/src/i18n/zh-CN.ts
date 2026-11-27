@@ -2434,6 +2434,8 @@ export const zhCN: TranslationKeys = {
       previewImage: "图片预览",
       boxLabel: "文本框。拖动即可移动，也可以使用方向键。",
       dragHint: "拖动方框来放置文字。方框只是大致位置，下载的文件由服务器渲染。",
+      batchPositionHint:
+        "“顶部”和“底部”会分别应用到每个文件，所以不会显示可拖动的方框。选择“自定义”即可让方框重新出现。",
     },
     compose: {
       screen: "屏幕",

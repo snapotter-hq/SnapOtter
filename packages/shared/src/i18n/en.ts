@@ -2694,6 +2694,8 @@ export const en = {
       boxLabel: "Text box. Drag to move it, or use the arrow keys.",
       dragHint:
         "Drag the box to place the text. The box is approximate; the download is rendered on the server.",
+      batchPositionHint:
+        "Top and Bottom are applied to each file, so there's no box to drag. Choose Custom to bring it back.",
     },
     compose: {
       processedKb: "Processed: {size} KB",

@@ -2776,6 +2776,8 @@ export const de: TranslationKeys = {
       boxLabel: "Textfeld. Zum Verschieben ziehen oder die Pfeiltasten verwenden.",
       dragHint:
         "Ziehen Sie das Feld, um den Text zu platzieren. Das Feld ist nur eine Annäherung; der Download wird auf dem Server gerendert.",
+      batchPositionHint:
+        "Oben und Unten werden auf jede Datei einzeln angewendet, daher gibt es kein Feld zum Ziehen. Wählen Sie Benutzerdefiniert, um es wieder einzublenden.",
     },
     compose: {
       screen: "Bildschirm",

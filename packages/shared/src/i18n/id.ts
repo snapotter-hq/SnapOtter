@@ -2755,6 +2755,8 @@ export const id: TranslationKeys = {
       boxLabel: "Kotak teks. Seret untuk memindahkan atau gunakan tombol panah.",
       dragHint:
         "Seret kotak untuk menempatkan teks. Kotak ini hanya perkiraan; file unduhan dibuat di server.",
+      batchPositionHint:
+        "Atas dan Bawah diterapkan ke setiap file secara terpisah, jadi tidak ada kotak untuk diseret. Pilih Kustom untuk menampilkannya lagi.",
     },
     compose: {
       screen: "Layar",

@@ -2772,6 +2772,8 @@ export const fr: TranslationKeys = {
         "Zone de texte. Faites-la glisser pour la déplacer, ou utilisez les touches fléchées.",
       dragHint:
         "Faites glisser la zone pour placer le texte. La zone est approximative ; le fichier téléchargé est généré sur le serveur.",
+      batchPositionHint:
+        "Haut et Bas s'appliquent à chaque fichier, il n'y a donc pas de zone à faire glisser. Choisissez Personnalisée pour la faire réapparaître.",
     },
     compose: {
       screen: "Écran",

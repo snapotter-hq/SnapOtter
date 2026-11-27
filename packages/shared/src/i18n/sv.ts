@@ -2750,6 +2750,8 @@ export const sv: TranslationKeys = {
       boxLabel: "Textruta. Dra för att flytta den eller använd piltangenterna.",
       dragHint:
         "Dra rutan för att placera texten. Rutan är ungefärlig; nedladdningen skapas på servern.",
+      batchPositionHint:
+        "Topp och Botten tillämpas på varje fil för sig, så det finns ingen ruta att dra. Välj Anpassad för att få tillbaka den.",
     },
     compose: {
       screen: "Skärm",

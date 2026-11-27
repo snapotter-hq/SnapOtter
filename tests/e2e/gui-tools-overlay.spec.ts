@@ -327,6 +327,18 @@ test.describe("GUI Watermark & Overlay Tools", () => {
       await expect(page.getByTestId("text-overlay-box")).toBeVisible();
     });
 
+    // #5319: the hidden box needs an explanation next to the Position select.
+    test("explains the hidden box only while it is hidden", async ({ loggedInPage: page }) => {
+      const hint = en.toolSettings["text-overlay"].batchPositionHint;
+      await uploadFixtures(page, 2);
+      await expect(page.getByText(hint)).toBeVisible();
+
+      await page.locator("#text-overlay-position").selectOption("custom");
+
+      await expect(page.getByText(hint)).toHaveCount(0);
+      await expect(page.getByTestId("text-overlay-box")).toBeVisible();
+    });
+
     test("keeps the draggable box for a Top position on a single file", async ({
       loggedInPage: page,
     }) => {

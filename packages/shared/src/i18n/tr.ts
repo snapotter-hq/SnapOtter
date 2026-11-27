@@ -2759,6 +2759,8 @@ export const tr: TranslationKeys = {
       boxLabel: "Metin kutusu. Taşımak için sürükleyin veya ok tuşlarını kullanın.",
       dragHint:
         "Metni yerleştirmek için kutuyu sürükleyin. Kutu yaklaşıktır; indirilen dosya sunucuda oluşturulur.",
+      batchPositionHint:
+        "Üst ve Alt her dosyaya ayrı ayrı uygulanır, bu yüzden sürüklenecek kutu görünmez. Kutuyu geri getirmek için Özel'i seçin.",
     },
     compose: {
       screen: "Ekran",
