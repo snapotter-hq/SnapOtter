@@ -1,6 +1,7 @@
 import { TOOLS, toolSection } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { LEGACY_TOOL_ALIASES } from "../lib/pool.js";
+import { enterSvgRenderRequest } from "../lib/svg-render.js";
 import {
   emitInlineRequestAuditIfNeeded,
   enterToolRequestAuditContext,
@@ -65,6 +66,9 @@ export function toolIdFromRoute(
  */
 export async function toolAccessMiddleware(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", async (request, reply) => {
+    // Every request starts a fresh render budget, so none inherits one from an
+    // earlier request on the same keep-alive connection.
+    enterSvgRenderRequest();
     const toolId = toolIdFromRoute(
       request.routeOptions?.url,
       request.params as { section?: string; toolId?: string } | undefined,

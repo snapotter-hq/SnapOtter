@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
@@ -61,6 +62,20 @@ export interface RenderSvgOptions {
   /** Override the deadline; defaults to most of JOB_TIMEOUT_FAST_S, where 0 means none. */
   deadlineMs?: number;
   signal?: AbortSignal;
+}
+
+// A request that uploads several distinct slow SVGs would otherwise pay one
+// deadline per file, since the memory above is keyed by content (#5354). The
+// first timeout trips the request, so its remaining renders answer at once.
+const requestRenders = new AsyncLocalStorage<{ timedOut: boolean }>();
+
+/**
+ * Start a render budget for the current request. Call it synchronously in a
+ * hook so the store reaches the route handler; later renders in the same
+ * request then stop after the first one that times out.
+ */
+export function enterSvgRenderRequest(): void {
+  requestRenders.enterWith({ timedOut: false });
 }
 
 // Insertion order doubles as age order: entries are only ever added or evicted.
@@ -143,6 +158,10 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
     selfDeadlineMs: deadlineMs > 0 ? deadlineMs + CHILD_DEADLINE_GRACE_MS : 0,
   };
   opts.signal?.throwIfAborted();
+  const request = requestRenders.getStore();
+  if (deadlineMs > 0 && request?.timedOut) {
+    return Promise.reject(svgTooComplexError(deadlineMs));
+  }
   // Hashing is skipped while nothing is remembered, the common case.
   if (deadlineMs > 0 && timedOutRenders.size > 0) {
     if (hasTimedOut(timedOutKey(baked.buffer, childOptions))) {
@@ -213,6 +232,7 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
       // A deadline that fires after the child finished still leaves a complete result.
       if (timedOut && code !== 0) {
         rememberTimeout(timedOutKey(baked.buffer, childOptions));
+        if (request) request.timedOut = true;
         return finish(svgTooComplexError(deadlineMs));
       }
       if (opts.signal?.aborted) return finish(opts.signal.reason);
