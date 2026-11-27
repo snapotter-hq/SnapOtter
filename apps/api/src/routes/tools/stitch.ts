@@ -20,6 +20,7 @@ import {
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { renderSanitizedSvgOrReply } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import {
@@ -161,6 +162,9 @@ export function registerStitch(app: FastifyInstance) {
           }
           throw asDecoderOutOfMemory(err);
         }
+        const rendered = await renderSanitizedSvgOrReply(file.buffer, reply);
+        if (!rendered) return reply;
+        file.buffer = rendered;
       } else {
         file.buffer = await autoOrient(file.buffer);
       }

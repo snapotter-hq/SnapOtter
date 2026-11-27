@@ -18,6 +18,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, imageSizeLimitError } from "../../lib/image-error.js";
+import { rasterizeSanitizedSvg } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
@@ -264,6 +265,20 @@ export function registerFindDuplicates(app: FastifyInstance) {
             "find-duplicates: skipping file, SVG sanitize failed",
           );
           skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
+          continue;
+        }
+        try {
+          file.buffer = await rasterizeSanitizedSvg(file.buffer);
+        } catch (err) {
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          logger.warn(
+            { err, filename: file.filename, format: validation.format },
+            "find-duplicates: skipping file, SVG render failed",
+          );
+          skippedFiles.push({
+            filename: file.filename,
+            reason: isToolInputError(err) ? err.message : "Failed to render SVG",
+          });
           continue;
         }
       } else {

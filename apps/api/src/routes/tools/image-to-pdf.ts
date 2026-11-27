@@ -20,6 +20,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { renderSanitizedSvgOrReply } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
@@ -304,6 +305,9 @@ export function registerImageToPdfRoute(
           }
           throw asDecoderOutOfMemory(err);
         }
+        const rendered = await renderSanitizedSvgOrReply(buf, reply);
+        if (!rendered) return reply;
+        buf = rendered;
         preparedBuffers.push(buf);
       } else {
         preparedBuffers.push(await autoOrient(buf));

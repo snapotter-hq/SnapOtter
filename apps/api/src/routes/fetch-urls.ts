@@ -29,6 +29,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { rasterizeSanitizedSvg } from "../lib/image-input-prep.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix, normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
 import {
@@ -572,7 +573,11 @@ async function fetchSingleUrl(
     let previewUrl: string | null = null;
     if (decodedBuffer && isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
-        const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
+        // An SVG stored under a CLI-decoded type reaches here sanitized but
+        // undecoded; render it in the deadline-bound child, not in sharp.
+        const previewSource =
+          fallbackFormat === "svg" ? await rasterizeSanitizedSvg(decodedBuffer) : decodedBuffer;
+        const previewBuffer = await sharp(previewSource).webp({ quality: 80 }).toBuffer();
         if (!hooks?.isAborted?.()) {
           const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
           await putObject(`outputs/${jobId}/${previewFilename}`, previewBuffer);

@@ -20,6 +20,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { renderSanitizedSvgOrReply } from "../lib/image-input-prep.js";
 import { readFilePart } from "../lib/multipart-parts.js";
 import {
   deletePrefix,
@@ -572,7 +573,16 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      const webp = await sharp(buffer)
+      // origWidth/origHeight above came from the SVG header; only the pixels
+      // go through the deadline-bound render.
+      let pixelSource = buffer;
+      if (validation.format === "svg" || fallbackFormat === "svg") {
+        const rendered = await renderSanitizedSvgOrReply(buffer, reply);
+        if (!rendered) return reply;
+        pixelSource = rendered;
+      }
+
+      const webp = await sharp(pixelSource)
         .rotate()
         .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 80 })

@@ -22,6 +22,7 @@ import {
 import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { rasterizeSanitizedSvg } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -51,6 +52,15 @@ const FAVICON_SIZES = [
   { name: "android-chrome-192x192.png", size: 192, format: "png" as const },
   { name: "android-chrome-512x512.png", size: 512, format: "png" as const },
 ];
+
+const LARGEST_ICON_SIZE = Math.max(...FAVICON_SIZES.map((icon) => icon.size));
+
+/** Density that rasterizes an SVG's short side to the largest icon, never below the 72 default. */
+async function largestIconDensity(svg: Buffer): Promise<number> {
+  const { width, height } = await sharp(svg).metadata();
+  const shortSide = Math.min(width ?? 0, height ?? 0);
+  return shortSide > 0 ? Math.max(72, Math.ceil((72 * LARGEST_ICON_SIZE) / shortSide)) : 72;
+}
 
 /** Build a single icon at the given pixel size with styling applied. */
 async function buildIcon(source: Buffer, size: number, settings: FaviconSettings): Promise<Buffer> {
@@ -197,6 +207,21 @@ export function registerFavicon(app: FastifyInstance) {
           request.log?.warn(
             { err, filename: file.filename, toolId: "favicon" },
             "Favicon SVG sanitize failed",
+          );
+          const reason = stripInternalPaths(
+            err instanceof Error ? err.message : "Unknown decode error",
+          );
+          skippedFiles.push({ filename: file.filename, reason });
+          continue;
+        }
+        try {
+          // One render at the largest icon size; the smaller icons downscale it.
+          buf = await rasterizeSanitizedSvg(buf, { density: await largestIconDensity(buf) });
+        } catch (err) {
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          request.log?.warn(
+            { err, filename: file.filename, toolId: "favicon" },
+            "Favicon SVG render failed",
           );
           const reason = stripInternalPaths(
             err instanceof Error ? err.message : "Unknown decode error",
