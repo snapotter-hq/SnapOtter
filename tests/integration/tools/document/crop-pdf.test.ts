@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfcpuAvailable } from "@snapotter/doc-engine";
@@ -63,9 +63,9 @@ afterAll(async () => {
   await testApp.cleanup();
 });
 
-async function runTool(settings: Record<string, unknown>) {
+async function runTool(settings: Record<string, unknown>, pdf: Buffer = PDF) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", filename: "test-3page.pdf", contentType: "application/pdf", content: PDF },
+    { name: "file", filename: "test-3page.pdf", contentType: "application/pdf", content: pdf },
     { name: "settings", content: JSON.stringify(settings) },
   ]);
   return testApp.app.inject({
@@ -135,8 +135,8 @@ describe.skipIf(!pdfcpuAvailable())("crop-pdf (requires pdfcpu)", () => {
     }
   }, 60_000);
 
-  async function croppedBoxes(settings: Record<string, unknown>) {
-    const res = await runTool(settings);
+  async function croppedBoxes(settings: Record<string, unknown>, pdf?: Buffer) {
+    const res = await runTool(settings, pdf);
     expect(res.statusCode).toBe(200);
     const envelope = JSON.parse(res.body);
     const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
@@ -165,6 +165,30 @@ describe.skipIf(!pdfcpuAvailable())("crop-pdf (requires pdfcpu)", () => {
       expect(y0).toBeCloseTo(30, 1);
       expect(x1).toBeCloseTo(399.53, 1);
       expect(y1).toBeCloseTo(585.28, 1);
+    }
+  }, 60_000);
+
+  // Page 1 displays rotated 90 degrees, so the region is measured on the
+  // 595.28 x 419.53 page as shown: its top-left is the unrotated bottom-left
+  // corner and the box swaps width and height. The other pages are untouched (#5134).
+  it("measures a region on a rotated page as displayed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "crop-pdf-rot-"));
+    try {
+      const inPath = join(dir, "in.pdf");
+      const rotatedPath = join(dir, "rotated.pdf");
+      writeFileSync(inPath, PDF);
+      execFileSync("qpdf", ["--rotate=+90:1", inPath, rotatedPath]);
+      const rotated = readFileSync(rotatedPath);
+      const output = await croppedBoxes(
+        { mode: "region", x: 10, y: 20, width: 200, height: 300 },
+        rotated,
+      );
+      expect(output.crop.length).toBe(3);
+      const boxes = output.crop.map((b) => b.map((n) => Math.round(n * 100) / 100));
+      expect(boxes).toContainEqual([20, 10, 320, 210]);
+      expect(boxes.filter((b) => b[0] === 10 && b[2] === 210)).toHaveLength(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   }, 60_000);
 

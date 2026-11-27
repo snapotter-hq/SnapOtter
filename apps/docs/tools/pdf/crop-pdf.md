@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
 - All values are in PDF points (1 point = 1/72 inch). A US Letter page is 612 x 792 points.
 - Each mode reads only its own fields, so a request that sends only `margin` keeps working.
 - A region is measured from each page's top-left corner and must fit inside every page. Margins must leave some of every page. Otherwise the request fails with `400`.
-- On a page that's set to display rotated, positions and edges refer to the page before rotation.
+- On a page that's set to display rotated, positions and edges refer to the page as it's displayed, so a region's top-left corner is the top-left of the rotated page.
 - Every mode measures from the full media box, so cropping a page that's already cropped starts over from the full page. A uniform margin of `0` shows the whole media box.

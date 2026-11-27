@@ -283,6 +283,16 @@ describe("pdfcpuCropMargin", () => {
   });
 });
 
+function pagesInfo(rots: number[]): string {
+  const pageBoundaries = Object.fromEntries(
+    rots.map((rot, i) => [
+      String(i + 1),
+      { rot, mediaBox: { rect: { ll: { x: 0, y: 0 }, ur: { x: 612, y: 792 } } } },
+    ]),
+  );
+  return JSON.stringify({ header: {}, infos: [{ pageCount: rots.length, pageBoundaries }] });
+}
+
 describe("pdfcpuCrop (#4988)", () => {
   it("passes a uniform margin as a single number", async () => {
     h.nextClose({ code: 0 });
@@ -292,6 +302,7 @@ describe("pdfcpuCrop (#4988)", () => {
   });
 
   it("passes per-side margins in pdfcpu's top right bottom left order", async () => {
+    h.nextClose({ stdout: pagesInfo([0]), code: 0 });
     h.nextClose({ code: 0 });
     const m = await import("../src/pdfcpu.js");
     await m.pdfcpuCrop(
@@ -305,6 +316,7 @@ describe("pdfcpuCrop (#4988)", () => {
   // pdfcpu's top-left anchor offset is in PDF user space, where y grows
   // upward, so moving the region down the page needs a negative y offset.
   it("anchors a region to each page's top-left corner", async () => {
+    h.nextClose({ stdout: pagesInfo([0]), code: 0 });
     h.nextClose({ code: 0 });
     const m = await import("../src/pdfcpu.js");
     await m.pdfcpuCrop(
@@ -323,10 +335,69 @@ describe("pdfcpuCrop (#4988)", () => {
   });
 
   it("writes a zero offset without a minus sign", async () => {
+    h.nextClose({ stdout: pagesInfo([0]), code: 0 });
     h.nextClose({ code: 0 });
     const m = await import("../src/pdfcpu.js");
     await m.pdfcpuCrop("/in.pdf", { mode: "region", x: 0, y: 0, width: 306, height: 396 }, "/o");
     expect(h.lastArgs()[3]).toBe("pos:tl, off:0 0, dim: 306 396 abs");
+  });
+
+  // The box is given as displayed. pdfcpu measures the unrotated page, so a
+  // rotated page anchors to the corner that shows as top-left (#5134).
+  it.each([
+    [90, "pos:bl, off:20 10, dim: 432 288 abs"],
+    [180, "pos:br, off:-10 20, dim: 288 432 abs"],
+    [270, "pos:tr, off:-20 -10, dim: 432 288 abs"],
+  ])("maps a region onto a page rotated %i degrees", async (rot, description) => {
+    h.nextClose({ stdout: pagesInfo([rot]), code: 0 });
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop(
+      "/in.pdf",
+      { mode: "region", x: 10, y: 20, width: 288, height: 432 },
+      "/out.pdf",
+    );
+    expect(h.lastArgs()).toEqual(["-c", "disable", "crop", description, "/in.pdf", "/out.pdf"]);
+  });
+
+  it.each([
+    [90, "20 30 40 10"],
+    [180, "30 40 10 20"],
+    [270, "40 10 20 30"],
+  ])("rotates per-side margins onto a page rotated %i degrees", async (rot, margins) => {
+    h.nextClose({ stdout: pagesInfo([rot]), code: 0 });
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop(
+      "/in.pdf",
+      { mode: "sides", top: 10, right: 20, bottom: 30, left: 40 },
+      "/out.pdf",
+    );
+    expect(h.lastArgs()[3]).toBe(margins);
+  });
+
+  it("crops pages with different rotations in one pass each, chaining the output", async () => {
+    h.nextClose({ stdout: pagesInfo([0, 90, 0, 90]), code: 0 });
+    h.nextClose({ code: 0 });
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop(
+      "/in.pdf",
+      { mode: "region", x: 0, y: 0, width: 288, height: 432 },
+      "/out.pdf",
+    );
+    const crops = mockSpawn.mock.calls.slice(-2).map((c) => (c[1] as string[]).slice(2));
+    expect(crops).toEqual([
+      ["crop", "-p", "1,3", "pos:tl, off:0 0, dim: 288 432 abs", "/in.pdf", "/out.pdf"],
+      ["crop", "-p", "2,4", "pos:bl, off:0 0, dim: 432 288 abs", "/out.pdf"],
+    ]);
+  });
+
+  it("leaves a uniform margin alone on rotated pages, with no info call", async () => {
+    h.nextClose({ code: 0 });
+    const m = await import("../src/pdfcpu.js");
+    await m.pdfcpuCrop("/in.pdf", { mode: "uniform", margin: 20 }, "/out.pdf");
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 
   it("rejects out-of-range values before spawning", async () => {
@@ -442,12 +513,15 @@ describe("pdfcpuPageSizes", () => {
     ]);
   });
 
-  // pdfcpu's pageSizes swap width and height for a /Rotate 90 page, but crop
-  // works on the unrotated MediaBox, so a fit check must see 612 x 792 (#4988).
-  it("reports a rotated page's unrotated MediaBox size, offset from the origin", async () => {
-    h.nextClose({ stdout: info({ "1": box(100, 200, 712, 992, 90) }), code: 0 });
+  // A crop box is given as displayed, so a /Rotate 90 page counts as 792 x 612
+  // for the fit check even though its unrotated MediaBox is 612 x 792 (#5134).
+  it("reports a rotated page's displayed size, offset from the origin", async () => {
+    h.nextClose({
+      stdout: info({ "1": box(100, 200, 712, 992, 90), "2": box(0, 0, 612, 792, -90) }),
+      code: 0,
+    });
     const sizes = await import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf"));
-    expect(sizes).toEqual([{ width: 612, height: 792 }]);
+    expect(sizes).toEqual([{ width: 792, height: 612 }]);
   });
 
   it("rejects output with no usable page sizes", async () => {
@@ -471,6 +545,31 @@ describe("pdfcpuPageSizes", () => {
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuPageSizes("/in.pdf")),
     ).rejects.toThrow("pdfcpu exited 1: pdfcpu: cannot read file");
+  });
+});
+
+describe("pdfcpuPages (#5134)", () => {
+  it("returns each page's unrotated size and normalised rotation in page order", async () => {
+    h.nextClose({
+      stdout: JSON.stringify({
+        infos: [
+          {
+            pageBoundaries: {
+              "10": { rot: 450, mediaBox: { rect: { ll: { x: 0, y: 0 }, ur: { x: 10, y: 20 } } } },
+              "2": { rot: -90, mediaBox: { rect: { ll: { x: 0, y: 0 }, ur: { x: 30, y: 40 } } } },
+              "1": { mediaBox: { rect: { ll: { x: 0, y: 0 }, ur: { x: 50, y: 60 } } } },
+            },
+          },
+        ],
+      }),
+      code: 0,
+    });
+    const pages = await import("../src/pdfcpu.js").then((m) => m.pdfcpuPages("/in.pdf"));
+    expect(pages).toEqual([
+      { page: 1, width: 50, height: 60, rotation: 0 },
+      { page: 2, width: 30, height: 40, rotation: 270 },
+      { page: 10, width: 10, height: 20, rotation: 90 },
+    ]);
   });
 });
 

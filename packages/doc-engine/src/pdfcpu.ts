@@ -106,9 +106,11 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
 }
 
 /**
- * How to crop every page, in points. `sides` margins are measured inward from
- * each edge. A `region` is measured from each page's top-left corner, so the
- * same box lands on the same spot of every page whatever its size (#4988).
+ * How to crop every page, in points, as the page is displayed. `sides` margins
+ * are measured inward from each edge. A `region` is measured from each page's
+ * top-left corner, so the same box lands on the same spot of every page
+ * whatever its size (#4988). A page with a `/Rotate` entry is measured in its
+ * rotated orientation (#5134).
  */
 export type PdfCropBox =
   | { mode: "uniform"; margin: number }
@@ -122,23 +124,41 @@ function isMargin(n: number): boolean {
   return Number.isFinite(n) && n >= 0 && n <= 2000;
 }
 
+/** A page's `/Rotate` value, normalised to 0, 90, 180 or 270 degrees clockwise. */
+export type PageRotation = 0 | 90 | 180 | 270;
+
 /**
- * The `pdfcpu crop` description for a crop box. Verified CLI shapes
- * (pdfcpu v0.13.0), all relative to each page's MediaBox:
+ * The `pdfcpu crop` description for a crop box on a page with the given
+ * rotation. Verified CLI shapes (pdfcpu v0.13.0), all relative to the page's
+ * unrotated MediaBox:
  *   '20'                                 uniform margin
  *   '10 20 30 40'                        top right bottom left margins
- *   'pos:tl, off:x -y, dim: w h abs'     region anchored to the top-left corner
- * The anchor offset is in PDF user space, where y grows upward, hence -y.
+ *   'pos:tl, off:x -y, dim: w h abs'     region anchored to a corner
+ * The anchor offset is in PDF user space, where y grows upward, hence the
+ * sign flips. The box is given as displayed, so a rotated page anchors to the
+ * user-space corner that shows as top-left and swaps width and height (#5134):
+ *   90:  bl corner, off (y, x),    dim h w
+ *   180: br corner, off (-x, y),   dim w h
+ *   270: tr corner, off (-y, -x),  dim h w
  */
-function cropDescription(box: PdfCropBox): string {
+function cropDescription(box: PdfCropBox, rotation: PageRotation = 0): string {
   switch (box.mode) {
     case "uniform":
       if (!isMargin(box.margin)) throw new Error("Crop margin must be 0-2000 points");
       return String(box.margin);
     case "sides": {
-      const sides = [box.top, box.right, box.bottom, box.left];
-      if (!sides.every(isMargin)) throw new Error("Crop margins must be 0-2000 points");
-      return sides.join(" ");
+      const { top, right, bottom, left } = box;
+      if (![top, right, bottom, left].every(isMargin)) {
+        throw new Error("Crop margins must be 0-2000 points");
+      }
+      // pdfcpu wants user-space top right bottom left; rotate the displayed edges into it.
+      const bySide: Record<PageRotation, number[]> = {
+        0: [top, right, bottom, left],
+        90: [right, bottom, left, top],
+        180: [bottom, left, top, right],
+        270: [left, top, right, bottom],
+      };
+      return bySide[rotation].join(" ");
     }
     case "region": {
       const { x, y, width, height } = box;
@@ -151,20 +171,48 @@ function cropDescription(box: PdfCropBox): string {
       if (!valid) {
         throw new Error("Crop region must start inside the page and have a positive size");
       }
-      return `pos:tl, off:${x} ${y === 0 ? 0 : -y}, dim: ${width} ${height} abs`;
+      const neg = (n: number) => (n === 0 ? 0 : -n);
+      switch (rotation) {
+        case 0:
+          return `pos:tl, off:${x} ${neg(y)}, dim: ${width} ${height} abs`;
+        case 90:
+          return `pos:bl, off:${y} ${x}, dim: ${height} ${width} abs`;
+        case 180:
+          return `pos:br, off:${neg(x)} ${y}, dim: ${width} ${height} abs`;
+        case 270:
+          return `pos:tr, off:${neg(y)} ${neg(x)}, dim: ${height} ${width} abs`;
+      }
     }
   }
 }
 
-/** Crop all pages to a crop box. Check it with assertCropFits first. */
+/**
+ * Crop all pages to a crop box. Check it with assertCropFits first. pdfcpu
+ * takes one description per run, so a document whose pages carry different
+ * rotations is cropped in one pass per rotation (#5134).
+ */
 export async function pdfcpuCrop(
   inputPath: string,
   box: PdfCropBox,
   outPath: string,
   opts?: PdfcpuOptions,
 ): Promise<void> {
-  const description = cropDescription(box);
-  await runPdfcpu(["crop", description, inputPath, outPath], opts);
+  if (box.mode === "uniform") {
+    await runPdfcpu(["crop", cropDescription(box), inputPath, outPath], opts);
+    return;
+  }
+  cropDescription(box); // validate before spawning anything
+  const byRotation = new Map<PageRotation, number[]>();
+  for (const { page, rotation } of await pdfcpuPages(inputPath, opts)) {
+    byRotation.set(rotation, [...(byRotation.get(rotation) ?? []), page]);
+  }
+  const passes = [...byRotation];
+  for (const [i, [rotation, pages]] of passes.entries()) {
+    const selection = passes.length > 1 ? ["-p", pages.join(",")] : [];
+    // Later passes edit the first pass's output in place.
+    const files = i === 0 ? [inputPath, outPath] : [outPath];
+    await runPdfcpu(["crop", ...selection, cropDescription(box, rotation), ...files], opts);
+  }
 }
 
 /** Crop all pages using a uniform margin in points. */
@@ -191,18 +239,29 @@ function coord(v: unknown): number {
   return typeof v === "number" ? v : Number.NaN;
 }
 
+export interface PdfPage {
+  /** 1-based page number. */
+  page: number;
+  /** Unrotated MediaBox size, which is what `pdfcpu crop` measures from. */
+  width: number;
+  height: number;
+  rotation: PageRotation;
+}
+
+function normalizeRotation(rot: unknown): PageRotation {
+  const n = typeof rot === "number" && Number.isFinite(rot) ? ((rot % 360) + 360) % 360 : 0;
+  return (n === 90 || n === 180 || n === 270 ? n : 0) as PageRotation;
+}
+
 /**
- * The distinct MediaBox sizes of a PDF's pages in points, from
+ * Every page's unrotated MediaBox size and rotation, from
  * `pdfcpu info -j -p 1-`. `pdfcpu crop` measures from the MediaBox (a page
- * that already has a CropBox is re-cropped from its MediaBox), so these are
- * the sizes a crop has to fit inside. They come from the per-page boundaries
- * rather than `pageSizes`, which swaps width and height on a rotated page
- * while crop still works on the unrotated box (#4988).
+ * that already has a CropBox is re-cropped from its MediaBox). The size comes
+ * from the per-page boundaries rather than `pageSizes`, which swaps width and
+ * height on a rotated page while crop still works on the unrotated box
+ * (#4988).
  */
-export async function pdfcpuPageSizes(
-  inputPath: string,
-  opts?: PdfcpuOptions,
-): Promise<PdfPageSize[]> {
+export async function pdfcpuPages(inputPath: string, opts?: PdfcpuOptions): Promise<PdfPage[]> {
   const out = await runPdfcpu(["info", "-j", "-p", "1-", inputPath], opts);
   let boundaries: unknown;
   try {
@@ -211,17 +270,43 @@ export async function pdfcpuPageSizes(
   } catch {
     boundaries = undefined;
   }
-  const sizes = new Map<string, PdfPageSize>();
-  for (const page of Object.values(boundaries ?? {})) {
-    const rect = (page as { mediaBox?: { rect?: { ll?: Point; ur?: Point } } })?.mediaBox?.rect;
+  const pages: PdfPage[] = [];
+  for (const [key, entry] of Object.entries(boundaries ?? {})) {
+    const info = entry as {
+      rot?: unknown;
+      mediaBox?: { rect?: { ll?: Point; ur?: Point } };
+    } | null;
+    const rect = info?.mediaBox?.rect;
     const width = coord(rect?.ur?.x) - coord(rect?.ll?.x);
     const height = coord(rect?.ur?.y) - coord(rect?.ll?.y);
-    if (!(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height))) {
+    const page = Number(key);
+    if (
+      !(width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height)) ||
+      !Number.isInteger(page)
+    ) {
       throw new Error("pdfcpu info reported no page sizes");
     }
-    sizes.set(`${width}x${height}`, { width, height });
+    pages.push({ page, width, height, rotation: normalizeRotation(info?.rot) });
   }
-  if (sizes.size === 0) throw new Error("pdfcpu info reported no page sizes");
+  if (pages.length === 0) throw new Error("pdfcpu info reported no page sizes");
+  return pages.sort((a, b) => a.page - b.page);
+}
+
+/**
+ * The distinct page sizes of a PDF in points as displayed, so a 90 or 270
+ * degree page has its width and height swapped. These are the sizes a crop
+ * box, which is given as displayed, has to fit inside (#5134).
+ */
+export async function pdfcpuPageSizes(
+  inputPath: string,
+  opts?: PdfcpuOptions,
+): Promise<PdfPageSize[]> {
+  const sizes = new Map<string, PdfPageSize>();
+  for (const { width, height, rotation } of await pdfcpuPages(inputPath, opts)) {
+    const sideways = rotation === 90 || rotation === 270;
+    const size = sideways ? { width: height, height: width } : { width, height };
+    sizes.set(`${size.width}x${size.height}`, size);
+  }
   return [...sizes.values()];
 }
 
