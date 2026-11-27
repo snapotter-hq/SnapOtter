@@ -226,6 +226,14 @@ interface ParsedStep {
   pool: Pool;
 }
 
+function pipelineStepCount(raw: string | null): number {
+  try {
+    return (JSON.parse(raw ?? "{}") as { steps?: unknown[] }).steps?.length ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 function firstPipelineToolId(raw: string | null): string | undefined {
   try {
     return (JSON.parse(raw ?? "{}") as { steps?: Array<{ toolId?: string }> }).steps?.[0]?.toolId;
@@ -641,7 +649,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 }
                 try {
                   const firstConfig = getToolConfig(firstToolId ?? "");
-                  if (!firstConfig?.keepSvgVector) {
+                  // Later steps would hand the kept SVG to sharp in-process, so
+                  // only a single-step pipeline may skip the deadline render.
+                  if (!(firstConfig?.keepSvgVector && pipelineStepCount(pipelineRaw) === 1)) {
                     processBuffer = await rasterizeSvgInput(processBuffer, {
                       density: firstConfig?.svgDensity,
                     });
@@ -1950,7 +1960,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   const firstStepToolId = parsedSteps[0]?.resolvedToolId;
                   try {
                     const firstConfig = getToolConfig(firstStepToolId ?? "");
-                    if (!firstConfig?.keepSvgVector) {
+                    if (!(firstConfig?.keepSvgVector && parsedSteps.length === 1)) {
                       processBuffer = await rasterizeSvgInput(processBuffer, {
                         density: firstConfig?.svgDensity,
                       });

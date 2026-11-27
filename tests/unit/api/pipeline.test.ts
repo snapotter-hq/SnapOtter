@@ -3694,6 +3694,56 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(autoOrient).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { steps: 1, stored: "<svg" },
+    { steps: 2, stored: "PNG" },
+  ])(
+    "keeps SVG source for a keepSvgVector first step only when it is the sole step ($steps steps)",
+    async ({ steps, stored }) => {
+      vi.clearAllMocks();
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "svg",
+        width: 0,
+        height: 0,
+      });
+      const baseConfig = getToolConfig(executeTestToolId);
+      getToolConfigSpy.mockImplementation((toolId: string) =>
+        toolId === executeTestToolId ? { ...baseConfig, keepSvgVector: true } : baseConfig,
+      );
+      try {
+        const reply = await invokePipelineExecuteRoute([
+          {
+            type: "file",
+            filename: "icon.svg",
+            content: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+              "utf-8",
+            ),
+          },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: Array.from({ length: steps }, () => ({
+                toolId: executeTestToolId,
+                settings: {},
+              })),
+            }),
+          },
+        ]);
+
+        expect(reply.statusCode).toBe(202);
+        const call = putObjectMock.mock.calls[0] as unknown[] | undefined;
+        const body = (call ? (call[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
+        expect(stored === "PNG" ? body.slice(1, 4) : body).toContain(stored);
+        expect(body).not.toContain("<script");
+      } finally {
+        getToolConfigSpy.mockReset();
+      }
+    },
+  );
+
   it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /api/v1/pipeline/execute and /api/v1/pipeline/batch (#3749)", async () => {
     vi.clearAllMocks();
     const sharpMod = (await import("sharp")).default;

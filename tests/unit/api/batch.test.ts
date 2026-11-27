@@ -1178,6 +1178,45 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(mocks.autoOrient).not.toHaveBeenCalled();
   });
 
+  it("keeps sanitized SVG source for optimize-svg batch uploads (keepSvgVector)", async () => {
+    const uploadedPayloads: string[] = [];
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "svg" });
+    mocks.putObject.mockImplementation(async (_key: string, data: Buffer) => {
+      uploadedPayloads.push(data.toString("utf-8"));
+    });
+    mocks.getToolConfig.mockImplementation(() => ({
+      settingsSchema: z.record(z.unknown()),
+      keepSvgVector: true,
+    }));
+
+    try {
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "optimize-svg",
+        parts: [
+          {
+            type: "file",
+            filename: "a.svg",
+            content: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+              "utf-8",
+            ),
+          },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      });
+
+      expect(reply.statusCode).toBe(202);
+      expect(uploadedPayloads).toHaveLength(1);
+      expect(uploadedPayloads[0]).toContain("<svg");
+      expect(uploadedPayloads[0]).not.toContain("<script");
+    } finally {
+      mocks.getToolConfig.mockImplementation((_toolId?: string) => ({
+        settingsSchema: z.record(z.unknown()),
+      }));
+    }
+  });
+
   it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /batch (#3749)", async () => {
     const sharpMod = (await import("sharp")).default;
     const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
