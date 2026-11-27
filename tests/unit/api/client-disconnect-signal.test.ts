@@ -41,10 +41,18 @@ function post(port: number, onSent: (destroy: () => void) => void): Promise<void
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 describe("clientDisconnectSignal", () => {
   it("aborts when the client hangs up after the whole body arrived", async () => {
-    const seen = Promise.withResolvers<AbortSignal>();
-    const aborted = Promise.withResolvers<void>();
+    const seen = deferred<AbortSignal>();
+    const aborted = deferred<void>();
     const port = await listen((instance) => {
       instance.post("/", async (_request, reply) => {
         const signal = clientDisconnectSignal(reply);
@@ -64,7 +72,7 @@ describe("clientDisconnectSignal", () => {
   });
 
   it("stays unaborted for a request that finishes normally", async () => {
-    const seen = Promise.withResolvers<AbortSignal>();
+    const seen = deferred<AbortSignal>();
     const port = await listen((instance) => {
       instance.post("/", async (_request, reply) => {
         seen.resolve(clientDisconnectSignal(reply));
@@ -94,8 +102,8 @@ describe("clientDisconnectSignal", () => {
   });
 
   it("cancels an SVG render that is already running when the client leaves", async () => {
-    const started = Promise.withResolvers<void>();
-    const outcome = Promise.withResolvers<unknown>();
+    const started = deferred<void>();
+    const outcome = deferred<unknown>();
     const port = await listen((instance) => {
       instance.post("/", async (_request, reply) => {
         const signal = clientDisconnectSignal(reply);

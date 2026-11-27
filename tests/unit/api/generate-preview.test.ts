@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 /**
  * generatePreview honesty (#746). When the processed result can't be decoded
  * for a preview, generatePreview must return no preview and log the failure. It
@@ -665,6 +666,7 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
     let statusCode = 200;
     let payload: unknown;
     const reply = {
+      raw: new EventEmitter(),
       status(code: number) {
         statusCode = code;
         return reply;
@@ -1238,6 +1240,7 @@ describe("registerSvgToRaster JXL preview generation (#3179)", () => {
     let statusCode = 200;
     let payload: unknown;
     const reply = {
+      raw: new EventEmitter(),
       status(code: number) {
         statusCode = code;
         return reply;

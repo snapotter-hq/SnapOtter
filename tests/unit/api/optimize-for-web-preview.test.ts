@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { ToolInputError } from "@snapotter/shared";
@@ -102,6 +103,7 @@ describe("POST /api/v1/tools/image/optimize-for-web/preview SVG/SVGZ handling (#
       },
     };
     const reply = {
+      raw: new EventEmitter(),
       statusCode: 200,
       headers,
       payload: undefined as unknown,
