@@ -2769,6 +2769,8 @@ export const nl: TranslationKeys = {
       boxLabel: "Tekstvak. Sleep om te verplaatsen of gebruik de pijltoetsen.",
       dragHint:
         "Sleep het vak om de tekst te plaatsen. Het vak is bij benadering; de download wordt op de server gemaakt.",
+      batchPositionHint:
+        "Boven en Onder worden op elk bestand apart toegepast, dus er is geen vak om te slepen. Kies Aangepast om het terug te halen.",
     },
     compose: {
       screen: "Scherm",

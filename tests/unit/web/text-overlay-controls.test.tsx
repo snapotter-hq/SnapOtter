@@ -95,3 +95,27 @@ describe("TextOverlayControls", () => {
     expect(lastSettings(onChange)).toMatchObject({ position: "bottom", x: 50, y: 50 });
   });
 });
+
+// #5319: a multi-file batch hides the drag box for Top and Bottom, so say why.
+describe("TextOverlayControls batch hint", () => {
+  const hint = /applied to each file/i;
+
+  it("explains the missing box for Top and Bottom across several files", () => {
+    render(<TextOverlayControls fileCount={3} onChange={vi.fn()} />);
+    expect(screen.getByText(hint)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Position"), { target: { value: "top" } });
+    expect(screen.getByText(hint)).toBeTruthy();
+  });
+
+  it("stays quiet for one file, Center, Custom and pipeline steps", () => {
+    const { rerender } = render(<TextOverlayControls fileCount={1} onChange={vi.fn()} />);
+    expect(screen.queryByText(hint)).toBeNull();
+    rerender(<TextOverlayControls onChange={vi.fn()} />);
+    expect(screen.queryByText(hint)).toBeNull();
+    rerender(<TextOverlayControls fileCount={3} onChange={vi.fn()} />);
+    for (const position of ["center", "custom"]) {
+      fireEvent.change(screen.getByLabelText("Position"), { target: { value: position } });
+      expect(screen.queryByText(hint)).toBeNull();
+    }
+  });
+});

@@ -2435,6 +2435,8 @@ export const zhTW: TranslationKeys = {
       previewImage: "圖片預覽",
       boxLabel: "文字方塊。拖曳即可移動，也可以使用方向鍵。",
       dragHint: "拖曳方框來放置文字。方框只是大略位置，下載的檔案由伺服器算繪。",
+      batchPositionHint:
+        "「上方」和「下方」會分別套用到每個檔案，所以不會顯示可拖曳的方框。選擇「自訂」即可讓方框重新出現。",
     },
     compose: {
       screen: "螢幕",

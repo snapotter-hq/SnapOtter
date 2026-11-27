@@ -2750,6 +2750,8 @@ export const vi: TranslationKeys = {
       boxLabel: "Khung văn bản. Kéo để di chuyển hoặc dùng phím mũi tên.",
       dragHint:
         "Kéo khung để đặt văn bản. Khung chỉ mang tính tương đối; tệp tải xuống được tạo trên máy chủ.",
+      batchPositionHint:
+        "Trên và Dưới được áp dụng cho từng tệp riêng, nên không có khung để kéo. Chọn Tùy chỉnh để hiện lại khung.",
     },
     compose: {
       screen: "Màn hình",

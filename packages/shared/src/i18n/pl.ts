@@ -2759,6 +2759,8 @@ export const pl: TranslationKeys = {
       boxLabel: "Pole tekstowe. Przeciągnij, aby je przesunąć, lub użyj klawiszy strzałek.",
       dragHint:
         "Przeciągnij pole, aby umieścić tekst. Pole jest przybliżone; pobierany plik powstaje na serwerze.",
+      batchPositionHint:
+        "Góra i Dół są stosowane do każdego pliku osobno, dlatego nie ma pola do przeciągania. Wybierz Własna, aby je przywrócić.",
     },
     compose: {
       screen: "Ekran",

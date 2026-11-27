@@ -2761,6 +2761,8 @@ export const it: TranslationKeys = {
       boxLabel: "Casella di testo. Trascinala per spostarla o usa i tasti freccia.",
       dragHint:
         "Trascina la casella per posizionare il testo. La casella è approssimativa; il file scaricato viene generato sul server.",
+      batchPositionHint:
+        "Alto e Basso vengono applicati a ogni file singolarmente, quindi non c'è nessuna casella da trascinare. Scegli Personalizzata per riaverla.",
     },
     compose: {
       screen: "Schermo",
