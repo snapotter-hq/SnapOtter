@@ -1040,7 +1040,7 @@ export const zhTW: TranslationKeys = {
     },
     "crop-pdf": {
       name: "裁切 PDF",
-      description: "以統一邊距裁切所有頁面",
+      description: "依邊距或區域裁切頁面",
     },
     "resize-pdf-pages": {
       name: "調整 PDF 頁面尺寸",
@@ -3829,6 +3829,19 @@ export const zhTW: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "邊距（點）",
+      mode: "裁切方式",
+      modeUniform: "四邊相同邊距",
+      modeSides: "每邊個別邊距",
+      modeRegion: "區域",
+      top: "上（點）",
+      right: "右（點）",
+      bottom: "下（點）",
+      left: "左（點）",
+      x: "距左側（點）",
+      y: "距頂部（點）",
+      width: "寬度（點）",
+      height: "高度（點）",
+      regionHint: "從每頁左上角開始測量。4x6 英吋標籤為 288 x 432 點。",
       submit: "裁剪",
       submitBatch: "裁剪（{count} 個檔案）",
       progressLabel: "正在裁剪",

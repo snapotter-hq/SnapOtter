@@ -1085,7 +1085,7 @@ export const hi: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF क्रॉप",
-      description: "एक समान मार्जिन से सभी पेज क्रॉप करें",
+      description: "मार्जिन से या किसी क्षेत्र तक पेज क्रॉप करें",
     },
     "resize-pdf-pages": {
       name: "PDF पेज का आकार बदलें",
@@ -3906,6 +3906,19 @@ export const hi: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "मार्जिन (पॉइंट)",
+      mode: "क्रॉप का तरीका",
+      modeUniform: "हर किनारे पर एक जैसा मार्जिन",
+      modeSides: "हर किनारे का अलग मार्जिन",
+      modeRegion: "क्षेत्र",
+      top: "ऊपर (पॉइंट)",
+      right: "दाएँ (पॉइंट)",
+      bottom: "नीचे (पॉइंट)",
+      left: "बाएँ (पॉइंट)",
+      x: "बाएँ से (पॉइंट)",
+      y: "ऊपर से (पॉइंट)",
+      width: "चौड़ाई (पॉइंट)",
+      height: "ऊँचाई (पॉइंट)",
+      regionHint: "हर पेज के ऊपरी बाएँ कोने से मापा जाता है। 4x6 इंच का लेबल 288 x 432 पॉइंट का होता है।",
       submit: "क्रॉप करें",
       submitBatch: "क्रॉप करें ({count} फ़ाइलें)",
       progressLabel: "क्रॉप हो रहा है",

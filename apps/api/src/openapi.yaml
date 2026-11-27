@@ -13983,7 +13983,7 @@ paths:
       operationId: cropPdf
       tags: [PDF]
       summary: Crop PDF
-      description: Crop all pages with a uniform margin.
+      description: Crop all pages by margins or to a region.
       security:
         - bearerAuth: []
       requestBody:
@@ -14001,8 +14001,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `margin` (number 0-2000, default 20) - Uniform crop margin in points
+                    JSON string with options (all values in points):
+                    - `mode` ("uniform" | "sides" | "region", default "uniform") - How to crop. Each mode reads only its own fields
+                    - `margin` (number 0-2000, default 20) - `uniform`: crop margin for every edge
+                    - `top`, `right`, `bottom`, `left` (number 0-2000, default 0) - `sides`: crop margin for each edge
+                    - `x`, `y` (number 0-14400, default 0) - `region`: offset from each page's left and top edges
+                    - `width`, `height` (number 1-14400, default 288 and 432) - `region`: size of the region, which must fit inside every page
             example:
               file: photo.png
               settings: '{}'

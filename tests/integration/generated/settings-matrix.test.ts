@@ -1051,6 +1051,14 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
     { label: "margin 0", settings: { margin: 0 } },
     { label: "margin 20", settings: { margin: 20 } },
     { label: "margin max", settings: { margin: 2000 } },
+    {
+      label: "sides",
+      settings: { mode: "sides", top: 10, right: 20, bottom: 30, left: 40 },
+    },
+    {
+      label: "region",
+      settings: { mode: "region", x: 0, y: 0, width: 200, height: 300 },
+    },
   ],
 
   "resize-pdf-pages": [

@@ -1267,7 +1267,7 @@ export const en = {
     },
     "crop-pdf": {
       name: "Crop PDF",
-      description: "Crop all pages with a uniform margin",
+      description: "Crop pages by margins or to a region",
     },
     "resize-pdf-pages": {
       name: "Resize PDF Pages",
@@ -4093,6 +4093,19 @@ export const en = {
     },
     "crop-pdf": {
       margin: "Margin (points)",
+      mode: "Crop by",
+      modeUniform: "Same margin on every edge",
+      modeSides: "Margin per edge",
+      modeRegion: "Region",
+      top: "Top (points)",
+      right: "Right (points)",
+      bottom: "Bottom (points)",
+      left: "Left (points)",
+      x: "From left (points)",
+      y: "From top (points)",
+      width: "Width (points)",
+      height: "Height (points)",
+      regionHint: "Measured from each page's top-left corner. A 4x6 in label is 288 x 432 points.",
       submit: "Crop",
       submitBatch: "Crop ({count} files)",
       progressLabel: "Cropping",

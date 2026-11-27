@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: a096d5a03ebe
-i18n_source_hash: 8c13236dfbb2
+i18n_output_hash: baf7a91b9a10
+i18n_source_hash: 257573503eba
 i18n_provenance: human
 ---
 
@@ -343,7 +343,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 | `linearize-pdf` | Tối ưu PDF cho Web | - (tuyến tính hóa để xem web nhanh) |
 | `grayscale-pdf` | PDF thang xám | - |
 | `pdfa-convert` | Chuyển đổi PDF/A | - (PDF/A-2 lưu trữ) |
-| `crop-pdf` | Cắt PDF | `margin` (0-2000 điểm) |
+| `crop-pdf` | Cắt PDF | `mode` (uniform/sides/region), `margin` (0-2000 điểm), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | Đổi kích thước trang PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | N-up PDF | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Booklet PDF | `perSheet` (2/4/6/8) |

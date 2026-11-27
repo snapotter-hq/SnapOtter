@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 1c512cd28525
-i18n_source_hash: 8c13236dfbb2
+i18n_output_hash: 5ee72343924e
+i18n_source_hash: 257573503eba
 i18n_provenance: human
 ---
 
@@ -343,7 +343,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 | `linearize-pdf` | Optimizar PDF para web | - (lineariza para una visualización web rápida) |
 | `grayscale-pdf` | PDF en escala de grises | - |
 | `pdfa-convert` | Convertir a PDF/A | - (PDF/A-2 de archivo) |
-| `crop-pdf` | Recortar PDF | `margin` (0-2000 puntos) |
+| `crop-pdf` | Recortar PDF | `mode` (uniform/sides/region), `margin` (0-2000 puntos), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | Cambiar tamaño de páginas PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | Folleto PDF | `perSheet` (2/4/6/8) |

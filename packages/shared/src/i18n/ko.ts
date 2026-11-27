@@ -1260,7 +1260,7 @@ export const ko: TranslationKeys = {
     },
     "crop-pdf": {
       name: "PDF 크롭",
-      description: "균일한 여백으로 모든 페이지 크롭",
+      description: "여백 또는 영역으로 페이지 크롭",
     },
     "resize-pdf-pages": {
       name: "PDF 페이지 크기 조정",
@@ -4086,6 +4086,20 @@ export const ko: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "여백(포인트)",
+      mode: "크롭 방식",
+      modeUniform: "모든 가장자리에 같은 여백",
+      modeSides: "가장자리별 여백",
+      modeRegion: "영역",
+      top: "위(포인트)",
+      right: "오른쪽(포인트)",
+      bottom: "아래(포인트)",
+      left: "왼쪽(포인트)",
+      x: "왼쪽에서(포인트)",
+      y: "위에서(포인트)",
+      width: "너비(포인트)",
+      height: "높이(포인트)",
+      regionHint:
+        "각 페이지의 왼쪽 위 모서리부터 측정합니다. 4x6인치 라벨은 288 x 432포인트입니다.",
       submit: "자르기",
       submitBatch: "자르기 ({count}개 파일)",
       progressLabel: "자르는 중",

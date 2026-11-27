@@ -1299,7 +1299,7 @@ export const th: TranslationKeys = {
     },
     "crop-pdf": {
       name: "ครอป PDF",
-      description: "ครอปทุกหน้าด้วยขอบเท่ากัน",
+      description: "ครอปหน้าตามระยะขอบหรือเฉพาะพื้นที่",
     },
     "resize-pdf-pages": {
       name: "ปรับขนาดหน้า PDF",
@@ -4098,6 +4098,19 @@ export const th: TranslationKeys = {
     },
     "crop-pdf": {
       margin: "ระยะขอบ (พอยต์)",
+      mode: "ครอปตาม",
+      modeUniform: "ระยะขอบเท่ากันทุกด้าน",
+      modeSides: "ระยะขอบแต่ละด้าน",
+      modeRegion: "พื้นที่",
+      top: "บน (พอยต์)",
+      right: "ขวา (พอยต์)",
+      bottom: "ล่าง (พอยต์)",
+      left: "ซ้าย (พอยต์)",
+      x: "จากซ้าย (พอยต์)",
+      y: "จากบน (พอยต์)",
+      width: "ความกว้าง (พอยต์)",
+      height: "ความสูง (พอยต์)",
+      regionHint: "วัดจากมุมซ้ายบนของแต่ละหน้า ฉลากขนาด 4x6 นิ้วคือ 288 x 432 พอยต์",
       submit: "ครอป",
       submitBatch: "ครอป ({count} ไฟล์)",
       progressLabel: "กำลังครอป",

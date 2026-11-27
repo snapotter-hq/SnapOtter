@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 475bb43fddc4
-i18n_source_hash: 8c13236dfbb2
+i18n_output_hash: 89918d08222a
+i18n_source_hash: 257573503eba
 i18n_provenance: human
 ---
 
@@ -343,7 +343,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 | `linearize-pdf` | تحسين PDF للويب | - (تحسين خطي للعرض السريع على الويب) |
 | `grayscale-pdf` | PDF بتدرج رمادي | - |
 | `pdfa-convert` | التحويل إلى PDF/A | - (PDF/A-2 للأرشفة) |
-| `crop-pdf` | قص PDF | `margin` (0-2000 نقطة) |
+| `crop-pdf` | قص PDF | `mode` (uniform/sides/region), `margin` (0-2000 نقطة), `top`/`right`/`bottom`/`left`, `x`/`y`/`width`/`height` |
 | `resize-pdf-pages` | تغيير حجم صفحات PDF | `pageSize` (`4x6in`, `100x150mm`, `a4`, `a5`, `a6`, `letter`, `legal`, `custom`), `width`, `height`, `unit` (`in`, `mm`), `keepOrientation` |
 | `nup-pdf` | PDF N-up | `perSheet` (2/3/4/8/9/12/16) |
 | `booklet-pdf` | كتيّب PDF | `perSheet` (2/4/6/8) |
