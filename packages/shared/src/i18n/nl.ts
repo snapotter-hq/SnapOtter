@@ -6180,7 +6180,9 @@ export const nl: TranslationKeys = {
         "De installatie werkt de AI-omgeving bij en kan nu niet worden gestopt. Ze is zo klaar.",
       MULTI_FRAME_UNSUPPORTED:
         "Deze tool bewerkt één afbeelding tegelijk. Splits de pagina's of frames eerst in losse afbeeldingen.",
-      SVG_TOO_LARGE: "Deze SVG is te groot of te complex om te optimaliseren.",
+      SVG_TOO_LARGE: "Deze SVG is te groot of te complex om te verwerken.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Deze SVG moet als UTF-8 zijn gecodeerd. Sla hem op als UTF-8 en probeer het opnieuw.",
       CANCELED: "De bewerking is geannuleerd.",
       PAGE_OUT_OF_RANGE: "Dat paginabereik bevat een pagina die deze PDF niet heeft.",
       INVALID_PAGE_RANGE: "Dat paginabereik is ongeldig. Gebruik paginanummers zoals 1-3,5.",

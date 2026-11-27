@@ -6133,7 +6133,9 @@ export const vi: TranslationKeys = {
         "Quá trình cài đặt đang cập nhật môi trường AI và không thể dừng lúc này. Sẽ sớm hoàn tất.",
       MULTI_FRAME_UNSUPPORTED:
         "Công cụ này chỉ chỉnh sửa từng ảnh một. Hãy tách các trang hoặc khung hình thành các ảnh riêng trước.",
-      SVG_TOO_LARGE: "SVG này quá lớn hoặc quá phức tạp để tối ưu.",
+      SVG_TOO_LARGE: "SVG này quá lớn hoặc quá phức tạp để xử lý.",
+      SVG_ENCODING_UNSUPPORTED:
+        "SVG này phải được mã hóa UTF-8. Hãy lưu dưới dạng UTF-8 rồi thử lại.",
       CANCELED: "Thao tác đã bị hủy.",
       PAGE_OUT_OF_RANGE: "Phạm vi trang đó có một trang mà PDF này không có.",
       INVALID_PAGE_RANGE: "Phạm vi trang đó không hợp lệ. Hãy dùng số trang như 1-3,5.",

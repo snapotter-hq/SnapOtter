@@ -6215,7 +6215,9 @@ export const de: TranslationKeys = {
         "Die Installation aktualisiert gerade die AI-Umgebung und kann jetzt nicht gestoppt werden. Sie ist gleich fertig.",
       MULTI_FRAME_UNSUPPORTED:
         "Dieses Werkzeug bearbeitet jeweils nur ein Bild. Teilen Sie die Seiten oder Frames zuerst in einzelne Bilder auf.",
-      SVG_TOO_LARGE: "Diese SVG-Datei ist zu groß oder zu komplex, um optimiert zu werden.",
+      SVG_TOO_LARGE: "Diese SVG-Datei ist zu groß oder zu komplex, um verarbeitet zu werden.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Diese SVG-Datei muss als UTF-8 codiert sein. Speichere sie als UTF-8 und versuche es erneut.",
       CANCELED: "Der Vorgang wurde abgebrochen.",
       PAGE_OUT_OF_RANGE:
         "Dieser Seitenbereich enthält eine Seite, die es in diesem PDF nicht gibt.",

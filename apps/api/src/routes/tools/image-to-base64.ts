@@ -17,7 +17,12 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   outputFormat: z.enum(["original", "jpeg", "png", "webp", "avif", "jxl"]).default("original"),
@@ -41,6 +46,7 @@ interface FileResult {
 interface FileError {
   filename: string;
   error: string;
+  code?: string;
 }
 
 const MIME_MAP: Record<string, string> = {
@@ -276,6 +282,7 @@ export function registerImageToBase64(app: FastifyInstance) {
             error:
               imageSizeLimitError(err)?.message ??
               stripInternalPaths(err instanceof Error ? err.message : "Failed to process image"),
+            ...svgClientErrorFields(err),
           });
         }
       }

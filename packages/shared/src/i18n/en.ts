@@ -6069,7 +6069,9 @@ export const en = {
         "The install is updating the AI environment and can't be stopped right now. It will finish shortly.",
       MULTI_FRAME_UNSUPPORTED:
         "This tool edits one image at a time. Split the pages or frames into separate images first.",
-      SVG_TOO_LARGE: "This SVG is too large or complex to optimize.",
+      SVG_TOO_LARGE: "This SVG is too large or complex to process.",
+      SVG_ENCODING_UNSUPPORTED:
+        "This SVG must be encoded as UTF-8. Save it as UTF-8 and try again.",
       CANCELED: "The operation was canceled.",
       PAGE_OUT_OF_RANGE: "That page range includes a page this PDF doesn't have.",
       INVALID_PAGE_RANGE: "That page range isn't valid. Use page numbers like 1-3,5.",

@@ -16,6 +16,7 @@ import {
   isSvgBuffer,
   isSvgClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -154,6 +155,7 @@ export function registerStripMetadata(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);
@@ -181,6 +183,7 @@ export function registerStripMetadata(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);

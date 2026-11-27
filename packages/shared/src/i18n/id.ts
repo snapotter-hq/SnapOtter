@@ -6154,7 +6154,9 @@ export const id: TranslationKeys = {
         "Instalasi sedang memperbarui lingkungan AI dan tidak dapat dihentikan sekarang. Instalasi akan segera selesai.",
       MULTI_FRAME_UNSUPPORTED:
         "Alat ini mengedit satu gambar dalam satu waktu. Pisahkan halaman atau frame menjadi gambar terpisah terlebih dahulu.",
-      SVG_TOO_LARGE: "SVG ini terlalu besar atau rumit untuk dioptimasi.",
+      SVG_TOO_LARGE: "SVG ini terlalu besar atau rumit untuk diproses.",
+      SVG_ENCODING_UNSUPPORTED:
+        "SVG ini harus dienkode sebagai UTF-8. Simpan sebagai UTF-8 lalu coba lagi.",
       CANCELED: "Operasi dibatalkan.",
       PAGE_OUT_OF_RANGE: "Rentang halaman itu mencakup halaman yang tidak ada di PDF ini.",
       INVALID_PAGE_RANGE: "Rentang halaman itu tidak valid. Gunakan nomor halaman seperti 1-3,5.",

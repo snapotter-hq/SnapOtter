@@ -22,7 +22,12 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   direction: z.enum(["horizontal", "vertical", "grid"]).default("horizontal"),
@@ -151,6 +156,7 @@ export function registerStitch(app: FastifyInstance) {
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);

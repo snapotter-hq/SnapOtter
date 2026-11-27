@@ -1290,6 +1290,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
               {
                 filename: "too-many.svg",
                 error: "SVG exceeds maximum element count of 5000",
+                code: "SVG_TOO_LARGE",
               },
             ],
           }),

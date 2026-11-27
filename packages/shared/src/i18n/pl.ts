@@ -6175,7 +6175,9 @@ export const pl: TranslationKeys = {
         "Instalacja aktualizuje środowisko AI i nie można jej teraz zatrzymać. Wkrótce się zakończy.",
       MULTI_FRAME_UNSUPPORTED:
         "To narzędzie edytuje jeden obraz naraz. Najpierw podziel strony lub klatki na osobne obrazy.",
-      SVG_TOO_LARGE: "Ten plik SVG jest zbyt duży lub złożony, aby go zoptymalizować.",
+      SVG_TOO_LARGE: "Ten plik SVG jest zbyt duży lub złożony, aby go przetworzyć.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Ten plik SVG musi być zakodowany w UTF-8. Zapisz go jako UTF-8 i spróbuj ponownie.",
       CANCELED: "Operację anulowano.",
       PAGE_OUT_OF_RANGE: "Ten zakres zawiera stronę, której nie ma w tym pliku PDF.",
       INVALID_PAGE_RANGE: "Ten zakres stron jest nieprawidłowy. Użyj numerów stron, np. 1-3,5.",

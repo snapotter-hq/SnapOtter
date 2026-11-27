@@ -1717,6 +1717,7 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       expect(body.results[1]).toMatchObject({
         success: false,
         error: "SVG exceeds maximum element count of 5000",
+        code: "SVG_TOO_LARGE",
       });
       expect(body.results[2]).toMatchObject({
         success: true,
@@ -1777,6 +1778,7 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
             success: false,
             url: "http://1.2.3.4:9999/padded-over.tga",
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           },
         ],
       });

@@ -96,7 +96,12 @@ import { resolveCanonicalToolId, resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerForInput } from "../modality/input-handler.js";
@@ -681,6 +686,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                         originalIndex: i,
                         filename: file.filename,
                         error: err instanceof Error ? err.message : "Invalid SVG",
+                        ...svgClientErrorFields(err),
                       });
                       continue;
                     }

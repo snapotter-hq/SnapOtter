@@ -6151,7 +6151,9 @@ export const sv: TranslationKeys = {
         "Installationen uppdaterar AI-miljön och kan inte stoppas just nu. Den blir klar snart.",
       MULTI_FRAME_UNSUPPORTED:
         "Det här verktyget redigerar en bild åt gången. Dela först upp sidorna eller bildrutorna i separata bilder.",
-      SVG_TOO_LARGE: "Den här SVG-filen är för stor eller komplex för att optimeras.",
+      SVG_TOO_LARGE: "Den här SVG-filen är för stor eller komplex för att bearbetas.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Den här SVG-filen måste vara kodad som UTF-8. Spara den som UTF-8 och försök igen.",
       CANCELED: "Åtgärden avbröts.",
       PAGE_OUT_OF_RANGE: "Sidintervallet innehåller en sida som den här PDF-filen inte har.",
       INVALID_PAGE_RANGE: "Sidintervallet är ogiltigt. Använd sidnummer som 1-3,5.",

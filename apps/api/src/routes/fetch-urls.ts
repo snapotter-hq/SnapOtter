@@ -44,6 +44,7 @@ import {
   isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { requireFileAccess } from "../permissions.js";
@@ -363,7 +364,12 @@ async function fetchSingleUrl(
           safeBuffer = buffer;
         } else if (isSvgzClientError(err)) {
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
-          return { success: false, url, error: (err as Error).message };
+          return {
+            success: false,
+            url,
+            error: (err as Error).message,
+            ...svgClientErrorFields(err),
+          };
         } else {
           const oom = asDecoderOutOfMemory(err);
           if (oom instanceof DecoderOutOfMemoryError) throw oom;
@@ -401,7 +407,12 @@ async function fetchSingleUrl(
       } catch (err) {
         if (isSvgClientError(err)) {
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
-          return { success: false, url, error: (err as Error).message };
+          return {
+            success: false,
+            url,
+            error: (err as Error).message,
+            ...svgClientErrorFields(err),
+          };
         }
         const oom = asDecoderOutOfMemory(err);
         if (oom instanceof DecoderOutOfMemoryError) throw oom;
@@ -494,7 +505,12 @@ async function fetchSingleUrl(
       } catch (err) {
         if (isSvgClientError(err)) {
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
-          return { success: false, url, error: (err as Error).message };
+          return {
+            success: false,
+            url,
+            error: (err as Error).message,
+            ...svgClientErrorFields(err),
+          };
         }
         const oom = asDecoderOutOfMemory(err);
         if (oom instanceof DecoderOutOfMemoryError) throw oom;

@@ -6106,7 +6106,9 @@ export const ja: TranslationKeys = {
         "インストールが AI 環境を更新中のため、今は停止できません。まもなく完了します。",
       MULTI_FRAME_UNSUPPORTED:
         "このツールは一度に1枚の画像のみ編集できます。先にページやフレームを個別の画像に分割してください。",
-      SVG_TOO_LARGE: "このSVGは大きすぎるか複雑すぎるため最適化できません。",
+      SVG_TOO_LARGE: "このSVGは大きすぎるか複雑すぎるため処理できません。",
+      SVG_ENCODING_UNSUPPORTED:
+        "このSVGはUTF-8でエンコードされている必要があります。UTF-8で保存してからもう一度お試しください。",
       CANCELED: "操作はキャンセルされました。",
       PAGE_OUT_OF_RANGE: "このページ範囲には、このPDFにないページが含まれています。",
       INVALID_PAGE_RANGE: "このページ範囲は無効です。1-3,5 のようにページ番号を指定してください。",

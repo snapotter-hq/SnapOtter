@@ -6201,7 +6201,9 @@ export const fr: TranslationKeys = {
         "L'installation met à jour l'environnement AI et ne peut pas être arrêtée maintenant. Elle se terminera sous peu.",
       MULTI_FRAME_UNSUPPORTED:
         "Cet outil modifie une seule image à la fois. Séparez d'abord les pages ou les images en fichiers distincts.",
-      SVG_TOO_LARGE: "Ce SVG est trop volumineux ou trop complexe pour être optimisé.",
+      SVG_TOO_LARGE: "Ce SVG est trop volumineux ou trop complexe pour être traité.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Ce SVG doit être encodé en UTF-8. Enregistrez-le en UTF-8 et réessayez.",
       CANCELED: "L'opération a été annulée.",
       PAGE_OUT_OF_RANGE: "Cette plage contient une page que ce PDF n'a pas.",
       INVALID_PAGE_RANGE:

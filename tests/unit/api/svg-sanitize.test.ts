@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
+import { toolInputErrorCode } from "@snapotter/shared";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -13,6 +14,7 @@ import {
   isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
+  svgClientErrorFields,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
 
 // fast-xml-parser is an apps/api dependency, so resolve it from there.
@@ -1034,5 +1036,63 @@ describe("sanitizeSvg: base64 raster data URIs on <image> (#5101)", () => {
     const out = clean(`<svg>${'<image a="'.repeat(4000)}${"x".repeat(1_000_000)}</svg>`);
     expect(performance.now() - start).toBeLessThan(2000);
     expect(out.length).toBeGreaterThan(1_000_000);
+  });
+});
+
+describe("sanitizeSvg refusals carry a translatable code", () => {
+  const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">';
+  const refusal = (input: string | Buffer, mutate?: () => void): unknown => {
+    try {
+      sanitizeSvg(Buffer.isBuffer(input) ? input : Buffer.from(input));
+    } catch (err) {
+      return err;
+    } finally {
+      mutate?.();
+    }
+    throw new Error("sanitizeSvg accepted the input");
+  };
+
+  it("codes an SVG with too many elements as SVG_TOO_LARGE", () => {
+    const err = refusal(`${SVG_OPEN}${"<rect/>".repeat(5_001)}</svg>`);
+    expect(toolInputErrorCode(err)).toBe("SVG_TOO_LARGE");
+    expect(svgClientErrorFields(err)).toEqual({ code: "SVG_TOO_LARGE" });
+    expect(isSvgClientError(err)).toBe(true);
+  });
+
+  it("codes tags that keep re-forming as SVG_TOO_LARGE", () => {
+    const nested = `${"<se".repeat(6)}<set>${"t>".repeat(6)}`;
+    expect(toolInputErrorCode(refusal(`${SVG_OPEN}${nested}<rect/></svg>`))).toBe("SVG_TOO_LARGE");
+  });
+
+  it("codes more than one DOCTYPE as SVG_TOO_LARGE", () => {
+    const err = refusal(`<!DOCTYPE svg><!DOCTYPE svg>${SVG_OPEN}<rect/></svg>`);
+    expect(toolInputErrorCode(err)).toBe("SVG_TOO_LARGE");
+  });
+
+  it("codes an oversized SVG as SVG_TOO_LARGE", async () => {
+    const { env } = await import("../../../apps/api/src/config.js");
+    const saved = env.MAX_SVG_SIZE_MB;
+    env.MAX_SVG_SIZE_MB = 0.000001;
+    try {
+      expect(toolInputErrorCode(refusal(`${SVG_OPEN}<rect/></svg>`))).toBe("SVG_TOO_LARGE");
+    } finally {
+      env.MAX_SVG_SIZE_MB = saved;
+    }
+  });
+
+  it("codes a non-UTF-8 encoding as SVG_ENCODING_UNSUPPORTED", () => {
+    const err = refusal(`<?xml version="1.0" encoding="EUC-KR"?>${SVG_OPEN}<rect/></svg>`);
+    expect(toolInputErrorCode(err)).toBe("SVG_ENCODING_UNSUPPORTED");
+  });
+
+  it("adds no code for a gzip fault", () => {
+    let caught: unknown;
+    try {
+      decompressSvgz(Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]));
+    } catch (err) {
+      caught = err;
+    }
+    expect(isSvgClientError(caught)).toBe(true);
+    expect(svgClientErrorFields(caught)).toEqual({});
   });
 });

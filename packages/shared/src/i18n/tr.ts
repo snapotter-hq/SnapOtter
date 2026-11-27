@@ -6162,7 +6162,9 @@ export const tr: TranslationKeys = {
         "Kurulum AI ortamını güncelliyor ve şu anda durdurulamaz. Kısa süre içinde tamamlanacak.",
       MULTI_FRAME_UNSUPPORTED:
         "Bu araç aynı anda tek bir görseli düzenler. Önce sayfaları veya kareleri ayrı görsellere bölün.",
-      SVG_TOO_LARGE: "Bu SVG optimize edilemeyecek kadar büyük veya karmaşık.",
+      SVG_TOO_LARGE: "Bu SVG işlenemeyecek kadar büyük veya karmaşık.",
+      SVG_ENCODING_UNSUPPORTED:
+        "Bu SVG UTF-8 olarak kodlanmış olmalı. UTF-8 olarak kaydedip tekrar deneyin.",
       CANCELED: "İşlem iptal edildi.",
       PAGE_OUT_OF_RANGE: "Bu sayfa aralığı, bu PDF'de olmayan bir sayfa içeriyor.",
       INVALID_PAGE_RANGE: "Bu sayfa aralığı geçersiz. 1-3,5 gibi sayfa numaraları kullanın.",

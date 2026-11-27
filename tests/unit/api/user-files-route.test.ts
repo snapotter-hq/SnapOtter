@@ -2936,6 +2936,7 @@ describe("user files route logic", () => {
           expect(overUploadReply.statusCode).toBe(400);
           expect(overUploadReply.payload).toEqual({
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           });
 
           // Unexpected sanitizer fault on .apng upload returns 500
@@ -3029,6 +3030,7 @@ describe("user files route logic", () => {
           expect(overSaveReply.statusCode).toBe(400);
           expect(overSaveReply.payload).toEqual({
             error: "SVG exceeds maximum element count of 5000",
+            code: "SVG_TOO_LARGE",
           });
 
           // Unexpected sanitizer fault on .apng save-result returns 500

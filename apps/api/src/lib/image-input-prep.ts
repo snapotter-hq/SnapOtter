@@ -20,7 +20,12 @@ import {
 import { decodeHeic } from "./heic-converter.js";
 import { asInputErrorIfUndecodable } from "./image-error.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
-import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "./svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgzClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "./svg-sanitize.js";
 
 export interface PrepareRouteImageOptions {
   /**
@@ -161,6 +166,9 @@ export async function prepareRouteImage(
       ) {
         const validationErr = new InputValidationError(
           err instanceof Error ? err.message : "Invalid SVG",
+          400,
+          undefined,
+          svgClientErrorFields(err).code,
         );
         validationErr.cause = err;
         throw validationErr;

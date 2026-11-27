@@ -30,7 +30,12 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { scrubPdfProducer } from "../../lib/pdf-producer.js";
-import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgClientError,
+  sanitizeSvg,
+  svgClientErrorFields,
+} from "../../lib/svg-sanitize.js";
 
 const targetSizeSchema = z.object({
   value: z.number().positive(),
@@ -294,6 +299,7 @@ export function registerImageToPdfRoute(
           if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
+              ...svgClientErrorFields(err),
             });
           }
           throw asDecoderOutOfMemory(err);

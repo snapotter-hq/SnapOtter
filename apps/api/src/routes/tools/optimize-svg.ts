@@ -1,4 +1,4 @@
-import { SafeError, ToolInputError } from "@snapotter/shared";
+import { SafeError, ToolInputError, toolInputErrorCode } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import type { Config } from "svgo";
 import { z } from "zod";
@@ -56,7 +56,10 @@ function sanitizeOrReject(svg: Buffer): Buffer {
     return sanitizeSvg(svg);
   } catch (err) {
     if (isSvgClientError(err) && err instanceof Error) {
-      throw new ToolInputError(err.message, { cause: err, code: SVG_TOO_LARGE });
+      throw new ToolInputError(err.message, {
+        cause: err,
+        code: toolInputErrorCode(err) ?? SVG_TOO_LARGE,
+      });
     }
     throw err;
   }
