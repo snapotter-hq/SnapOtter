@@ -1,12 +1,24 @@
 ---
 description: "SnapOtter के रिलीज़ नोट्स और संस्करण इतिहास। देखें कि हर रिलीज़ में क्या नया, बेहतर और ठीक किया गया है।"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: 9ae2cc8f90fa
+i18n_output_hash: 90d0ab9ba71b
 i18n_hash_version: 2
 ---
 
 # चेंजलॉग {#changelog}
+
+## अप्रकाशित {#unreleased}
+
+### बदलाव {#unreleased-changed}
+
+- **Content-aware resize अब बैकग्राउंड जॉब के रूप में चलता है।** `POST /api/v1/tools/image/content-aware-resize` पूरे seam carve के दौरान रिक्वेस्ट को खुला रखता था और नतीजे के साथ `200` देता था। अब यह `202 Accepted` देता है, जिसके साथ `jobId`, `statusUrl` और `progressUrl` होते हैं, जैसे अन्य लंबे चलने वाले टूल में। `/api/v1/jobs/{jobId}/progress` को SSE पर फ़ॉलो करें: `result`, जो `phase: "complete"` वाले फ़्रेम पर होता है, उन्हीं `downloadUrl`, `originalSize`, `processedSize`, `width` और `height` फ़ील्ड्स को रखता है जो पुरानी `200` बॉडी में थे, और प्रोसेसिंग विफलता `phase: "failed"` फ़्रेम के रूप में आती है, `422` के रूप में नहीं। उस फ़्रेम का `httpStatus` तब `400` होता है जब समस्या इनपुट में थी (25 MP से बड़ी इमेज, या 2x से अधिक बड़ा करना), जहाँ पुराना रूट `422` देता था। अब आप चल रहे जॉब को रद्द कर सकते हैं और अपना `clientJobId` दे सकते हैं। जिस रिक्वेस्ट में `width`, `height` या `square` नहीं होता, उसे अब `400` `"Invalid settings"` मिलता है, और पुराना संदेश `details` में रहता है। (#4338)
+- **Image to SVG (`vectorize`) अब कतार वाले जॉब के रूप में चलता है।** `POST /api/v1/tools/image/vectorize` पहले रिक्वेस्ट पर ही ट्रेस करता था और हमेशा `200` देता था। अब यह अन्य टूल की तरह जॉब क्यू से गुज़रता है: जो ट्रेस synchronous प्रतीक्षा विंडो के भीतर पूरा हो जाता है वह अब भी `200` देता है, उसी बॉडी के साथ, और लंबा ट्रेस `202` देता है, job id, `statusUrl` और `progressUrl` के साथ। जो API क्लाइंट केवल `200` संभालते हैं, उन्हें `202` मिलने पर जॉब को फ़ॉलो करना चाहिए। जॉब अब रद्द किया जा सकता है और प्रगति बताता है, और एरर बॉडी मानक टूल आकार इस्तेमाल करती हैं (फ़ाइल न होने पर `No file provided` आता है; डिकोड न होने वाली इमेज `400` है)। SVG आउटपुट अपरिवर्तित है। (#4337)
+- **Passport photo generate अब कतार वाले जॉब के रूप में चलता है।** `POST /api/v1/tools/image/passport-photo/generate` पहले रिक्वेस्ट पर ही क्रॉप करता था और हमेशा `200` देता था। जो क्रॉप synchronous प्रतीक्षा विंडो के भीतर पूरा हो जाता है वह अब भी `200` देता है, उसी बॉडी (साथ में `originalSize` और `processedSize`) के साथ, और धीमा क्रॉप `202` देता है, job id, `statusUrl` और `progressUrl` के साथ; `result`, जो `phase: "complete"` फ़्रेम पर होता है, `downloadUrl`, `dimensions`, `spec` और `printDownloadUrl` रखता है। जो API क्लाइंट केवल `200` संभालते हैं, उन्हें `202` मिलने पर जॉब को फ़ॉलो करना चाहिए। बॉडी में वैकल्पिक `clientJobId` दिया जा सकता है, और जॉब रद्द किया जा सकता है। जॉब शुरू होने से पहले के एरर स्टेटस अपरिवर्तित हैं (`400`, `404`, `410 ANALYSIS_EXPIRED`); प्रोसेसिंग विफलता अब भी `422` देती है, `details` के साथ, और अब जहाँ हो वहाँ `code` भी देती है, जैसे `TARGET_SIZE_UNREACHABLE`। analyze चरण अपरिवर्तित है। (#4337)
+
+### पदावनत {#unreleased-deprecated}
+
+- **इमेज की पाँच compress-to-size ऑपरेशन पदावनत हैं।** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` और `-500kb` OpenAPI स्पेक में पदावनत चिह्नित हैं और कम से कम एक माइनर रिलीज़ तक रहेंगे। `POST /api/v1/tools/image/compress` भेजें, जिसमें `settings` को `{"mode":"targetSize","targetSizeKb":20}` पर सेट करें (या 50, 100, 200, 500)। आउटपुट वही है। PDF प्रीसेट पाथ अपरिवर्तित हैं।
 
 ## v2.3.0 {#v2-3-0}
 

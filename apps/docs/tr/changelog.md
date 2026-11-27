@@ -1,12 +1,24 @@
 ---
 description: "SnapOtter için sürüm notları ve sürüm geçmişi. Her sürümde nelerin yeni olduğunu, geliştirildiğini ve düzeltildiğini görün."
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: e6ef84034a08
+i18n_output_hash: 5adc8c002708
 i18n_hash_version: 2
 ---
 
 # Değişiklik günlüğü {#changelog}
+
+## Yayımlanmamış {#unreleased}
+
+### Değişenler {#unreleased-changed}
+
+- **İçeriğe duyarlı yeniden boyutlandırma artık arka plan işi olarak çalışıyor.** `POST /api/v1/tools/image/content-aware-resize` eskiden tüm seam carve işlemi boyunca isteği açık tutuyor ve sonucu `200` ile yanıtlıyordu. Artık diğer uzun süren araçlar gibi `202 Accepted` yanıtı verip `jobId`, `statusUrl` ve `progressUrl` döndürüyor. `/api/v1/jobs/{jobId}/progress` akışını SSE üzerinden izleyin: `result`, `phase: "complete"` olan karede `downloadUrl`, `originalSize`, `processedSize`, `width` ve `height` alanlarını taşır; bunlar eski `200` gövdesindekilerle aynıdır. Bir işleme hatası `phase: "failed"` karesi olarak gelir, `422` olarak değil. Bu karenin `httpStatus` değeri, sorun girdideyse `400` olur (25 MP üzerinde bir görsel ya da 2x'ten büyük büyütme); eski rota bu durumda `422` yanıtlıyordu. Artık çalışan bir işi iptal edebilir ve kendi `clientJobId` değerinizi verebilirsiniz. `width`, `height` veya `square` içermeyen bir istek artık `400` `"Invalid settings"` alır; eski mesaj `details` içinde yer alır. (#4338)
+- **Görseli SVG'ye dönüştürme (`vectorize`) artık kuyruğa alınan bir iş olarak çalışıyor.** `POST /api/v1/tools/image/vectorize` eskiden izlemeyi istek üzerinde yapıyor ve her zaman `200` yanıtlıyordu. Artık diğer araçlar gibi iş kuyruğundan geçiyor: eşzamanlı bekleme süresi içinde biten bir izleme yine aynı gövdeyle `200` yanıtlar, daha uzun süren ise `202` yanıtlar ve bir iş kimliği, `statusUrl` ile `progressUrl` döndürür. Yalnızca `200` işleyen API istemcileri `202` aldıklarında işi izlemelidir. İş artık iptal edilebiliyor ve ilerleme bildiriyor, hata gövdeleri de standart araç biçimlerini kullanıyor (eksik dosya `No file provided` der; çözülemeyen görsel `400` olur). SVG çıktısı değişmedi. (#4337)
+- **Vesikalık fotoğraf oluşturma artık kuyruğa alınan bir iş olarak çalışıyor.** `POST /api/v1/tools/image/passport-photo/generate` eskiden kırpmayı istek üzerinde yapıyor ve her zaman `200` yanıtlıyordu. Eşzamanlı bekleme süresi içinde biten bir kırpma yine aynı gövdeyle `200` yanıtlar (ek olarak `originalSize` ve `processedSize`), daha yavaş olan ise `202` yanıtlar ve bir iş kimliği, `statusUrl` ile `progressUrl` döndürür; `result` ise `phase: "complete"` karesinde `downloadUrl`, `dimensions`, `spec` ve `printDownloadUrl` taşır. Yalnızca `200` işleyen API istemcileri `202` aldıklarında işi izlemelidir. Gövde isteğe bağlı bir `clientJobId` alır ve iş iptal edilebilir. İş başlamadan önceki hata durumları değişmedi (`400`, `404`, `410 ANALYSIS_EXPIRED`); bir işleme hatası yine `422` ile `details` yanıtlar ve artık varsa bir `code` da taşır, örneğin `TARGET_SIZE_UNREACHABLE`. Analiz adımı değişmedi. (#4337)
+
+### Kullanımdan kaldırılanlar {#unreleased-deprecated}
+
+- **Beş görsel hedef boyuta sıkıştırma işlemi kullanımdan kaldırıldı.** `/api/v1/tools/image/compress-image-to-20kb`, `-50kb`, `-100kb`, `-200kb` ve `-500kb` OpenAPI belirtiminde kullanımdan kaldırıldı olarak işaretlendi ve en az bir minör sürüm boyunca kalacak. `POST /api/v1/tools/image/compress` isteğini, `settings` değeri `{"mode":"targetSize","targetSizeKb":20}` (veya 50, 100, 200, 500) olacak şekilde gönderin. Çıktı aynıdır. PDF ön ayar yolları değişmedi.
 
 ## v2.3.0 {#v2-3-0}
 

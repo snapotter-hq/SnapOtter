@@ -1,12 +1,24 @@
 ---
 description: "SnapOtter 的发布说明与版本历史。了解每个版本的新增、改进和修复内容。"
-i18n_source_hash: 952098c65251
+i18n_source_hash: 8cacf16b4c4d
 i18n_provenance: machine
-i18n_output_hash: 399a8cfd30a6
+i18n_output_hash: c1b59c57a529
 i18n_hash_version: 2
 ---
 
 # 更新日志 {#changelog}
+
+## 未发布 {#unreleased}
+
+### 变更 {#unreleased-changed}
+
+- **内容感知缩放现在作为后台作业运行。** `POST /api/v1/tools/image/content-aware-resize` 以前会在整个 seam carve 过程中保持请求打开，并用 `200` 返回结果。现在它与其他耗时工具一样，用 `202 Accepted` 返回 `jobId`、`statusUrl` 和 `progressUrl`。通过 SSE 跟踪 `/api/v1/jobs/{jobId}/progress`：`result` 在带有 `phase: "complete"` 的帧上包含 `downloadUrl`、`originalSize`、`processedSize`、`width` 和 `height` 字段，与旧 `200` 响应体中的字段相同。处理失败会以 `phase: "failed"` 帧而不是 `422` 的形式到达。当问题出在输入上（图片超过 25 MP，或放大超过 2x）时，该帧的 `httpStatus` 为 `400`，而旧路由返回的是 `422`。现在可以取消正在运行的作业，并传入自己的 `clientJobId`。不带 `width`、`height` 或 `square` 的请求现在会得到 `400` `"Invalid settings"`，旧的消息放在 `details` 中。(#4338)
+- **图片转 SVG（`vectorize`）现在作为队列作业运行。** `POST /api/v1/tools/image/vectorize` 以前在请求内完成描摹，并且总是返回 `200`。现在它与其他工具一样经过作业队列：在同步等待窗口内完成的描摹仍以相同的响应体返回 `200`，耗时更长的则返回 `202`，附带作业 id、`statusUrl` 和 `progressUrl`。只处理 `200` 的 API 客户端在收到 `202` 时应跟踪该作业。作业现在可以取消并报告进度，错误响应体采用标准的工具格式（缺少文件时返回 `No file provided`；无法解码的图片是 `400`）。SVG 输出不变。(#4337)
+- **证件照生成现在作为队列作业运行。** `POST /api/v1/tools/image/passport-photo/generate` 以前在请求内完成裁剪，并且总是返回 `200`。在同步等待窗口内完成的裁剪仍以相同的响应体返回 `200`（另加 `originalSize` 和 `processedSize`），较慢的则返回 `202`，附带作业 id、`statusUrl` 和 `progressUrl`；`result` 在 `phase: "complete"` 帧上携带 `downloadUrl`、`dimensions`、`spec` 和 `printDownloadUrl`。只处理 `200` 的 API 客户端在收到 `202` 时应跟踪该作业。请求体接受可选的 `clientJobId`，作业也可以取消。作业开始前的错误状态不变（`400`、`404`、`410 ANALYSIS_EXPIRED`）；处理失败仍返回 `422` 和 `details`，现在在有的时候还会携带 `code`，例如 `TARGET_SIZE_UNREACHABLE`。分析步骤不变。(#4337)
+
+### 已弃用 {#unreleased-deprecated}
+
+- **五个图片压缩到目标大小的操作已弃用。** `/api/v1/tools/image/compress-image-to-20kb`、`-50kb`、`-100kb`、`-200kb` 和 `-500kb` 在 OpenAPI 规范中被标记为已弃用，并将至少保留一个次要版本。请发送 `POST /api/v1/tools/image/compress`，并将 `settings` 设为 `{"mode":"targetSize","targetSizeKb":20}`（或 50、100、200、500）。输出相同。PDF 预设路径不变。
 
 ## v2.3.0 {#v2-3-0}
 

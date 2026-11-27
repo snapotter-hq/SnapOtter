@@ -2,7 +2,7 @@
 description: "Verwalte Benutzer, integrierte und benutzerdefinierte Rollen, Berechtigungen, API-Schlüssel, Teams, Sitzungen und das Audit-Log in SnapOtter."
 i18n_source_hash: 2578a09d3493
 i18n_provenance: machine
-i18n_output_hash: cffc1fc124c1
+i18n_output_hash: 99869cc5a5fd
 i18n_hash_version: 2
 ---
 
