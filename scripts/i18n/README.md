@@ -108,12 +108,16 @@ source and exits non-zero if any locale is missing a unit or carries a stale
 source hash. It is the build-time mirror of the app's TypeScript key-parity
 guarantee, and it imports the same `adapters/registry.mjs` the CLI does.
 
-Run it before committing regenerated translations. It is documented as a local
-and optional gate rather than wired as an always-on required status check: on
-this repo, a required context that never reports a conclusion deadlocks
-docs-only and landing-only PRs (see the header of `.github/workflows/ci.yml`).
-The first surface plan that needs a hard gate can add a non-required
-`pull_request` job that runs `pnpm i18n:check`.
+Run it before committing regenerated translations. `--surface=<key>` (or a comma
+list) checks only those surfaces, and an unknown key exits 2 instead of passing.
+
+CI runs `pnpm i18n:check --surface=api` as the non-required `API translations
+(advisory)` job in `ci.yml`, on PRs that touch `apps/api/src/openapi*.yaml` or
+`scripts/i18n/` or the locale list. It isn't a required context: a required job that can skip
+without reporting deadlocks docs-only and landing-only PRs (see the header of
+`.github/workflows/ci.yml`). Landing and docs still report problems on main, so
+they aren't gated. Making the API job required is a change to the `main`
+ruleset, not to this repo.
 
 ## Deliberately no translation CI job
 
