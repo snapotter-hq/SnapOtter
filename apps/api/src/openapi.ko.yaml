@@ -14266,8 +14266,8 @@ paths:
       operationId: resizePdfPages
       tags:
         - PDF
-      summary: Resize PDF Pages
-      description: Resize every page to a preset or custom size, such as a 4x6 in shipping label. Content is scaled to fit and centered without rasterizing.
+      summary: PDF 페이지 크기 조정
+      description: 모든 페이지를 4x6인치 배송 라벨 같은 프리셋 또는 사용자 지정 크기로 조정합니다. 내용은 래스터화 없이 크기에 맞게 조정되고 가운데에 배치됩니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -14282,22 +14282,22 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: PDF file to resize
+                  description: 크기를 조정할 PDF 파일
                 settings:
                   type: string
                   description: |
-                    JSON string with options:
-                    - `pageSize` (string, default "4x6in") - One of: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
-                    - `width` (number, default 4) - Custom page width, used when pageSize is custom
-                    - `height` (number, default 6) - Custom page height, used when pageSize is custom
-                    - `unit` (string, default "in") - Unit for the custom size: in or mm. Each custom side must be 0.5-200 in (12.7-5080 mm)
-                    - `keepOrientation` (boolean, default false) - Turn the target size to match each page's orientation instead of forcing width x height
+                    옵션이 담긴 JSON 문자열:
+                    - `pageSize` (문자열, 기본값 "4x6in") - 다음 중 하나: 4x6in, 100x150mm, a4, a5, a6, letter, legal, custom
+                    - `width` (숫자, 기본값 4) - 사용자 지정 페이지 너비, pageSize가 custom일 때 사용
+                    - `height` (숫자, 기본값 6) - 사용자 지정 페이지 높이, pageSize가 custom일 때 사용
+                    - `unit` (문자열, 기본값 "in") - 사용자 지정 크기의 단위: in 또는 mm. 사용자 지정 크기의 각 변은 0.5-200 in(12.7-5080 mm)이어야 합니다
+                    - `keepOrientation` (불리언, 기본값 false) - 너비 x 높이를 강제하지 않고 각 페이지의 방향에 맞게 목표 크기를 회전
             example:
               file: photo.png
               settings: '{}'
       responses:
         '200':
-          description: Resized PDF
+          description: 크기가 조정된 PDF
           content:
             application/json:
               schema:
@@ -14310,13 +14310,13 @@ paths:
                 previewUrl: example
                 savedFileId: 3f2c8a1e-6b7d-4c9a-9e1f-2a5b8c7d6e4f
         '400':
-          description: Invalid input
+          description: 잘못된 입력
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '401':
-          description: Authentication required
+          description: 인증 필요
           content:
             application/json:
               schema:
@@ -30293,6 +30293,14 @@ x-i18n:
       sourceHash: bf41f42bcf80
       provenance: machine
       outputHash: fb903303dc8e
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.summary:
+      sourceHash: f039f9dab0da
+      provenance: machine
+      outputHash: 27b440df6399
+    paths./api/v1/tools/pdf/resize-pdf-pages.post.description:
+      sourceHash: 9e7561e87b60
+      provenance: machine
+      outputHash: 288e5bf615e6
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36962,6 +36970,26 @@ x-i18n:
       provenance: machine
       outputHash: a65096e342c8
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/401/description:
+      sourceHash: 0fcfb12dfad0
+      provenance: machine
+      outputHash: 3f38a45f6f11
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/file/description:
+      sourceHash: fb92ed6305d1
+      provenance: machine
+      outputHash: 80fe78708305
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
+      sourceHash: 476b98ec148d
+      provenance: machine
+      outputHash: 149f16c0b0a4
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/200/description:
+      sourceHash: d5564f0f993b
+      provenance: machine
+      outputHash: 3b96fd9c7898
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/400/description:
+      sourceHash: c9bbbe834722
+      provenance: machine
+      outputHash: a65096e342c8
+    ptr:/paths/~1api~1v1~1tools~1pdf~1resize-pdf-pages/post/responses/401/description:
       sourceHash: 0fcfb12dfad0
       provenance: machine
       outputHash: 3f38a45f6f11
