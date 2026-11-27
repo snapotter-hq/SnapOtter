@@ -1,4 +1,4 @@
-import { expect, test, uploadTestImage } from "./helpers";
+import { expect, mockAllAiFeaturesInstalled, test, uploadTestImage } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // GUI E2E: AI-Powered Tools
@@ -11,6 +11,10 @@ import { expect, test, uploadTestImage } from "./helpers";
 // ---------------------------------------------------------------------------
 
 test.describe("GUI AI Tools", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAllAiFeaturesInstalled(page);
+  });
+
   // ========================================================================
   // REMOVE BACKGROUND
   // ========================================================================
