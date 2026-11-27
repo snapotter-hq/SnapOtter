@@ -44,6 +44,7 @@ class FakePipe:
         mask_image=None,
         num_inference_steps=1,
         guidance_scale=7.0,
+        strength=1.0,
         height=512,
         width=512,
         generator=None,

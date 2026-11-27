@@ -37,7 +37,9 @@ def echo_pipe(image, mask_image, **kwargs):
 
 def erase(mask, model_window=True):
     crops = []
-    echo = inpaint_hq.make_run_model(echo_pipe, "cpu")
+    # strength=1 skips the context-fill pre-pass (#5000), which would otherwise
+    # change the echoed pixels and hide a resize round trip.
+    echo = inpaint_hq.make_run_model(echo_pipe, "cpu", strength=1.0)
     def run_model(crop_img, crop_mask):
         crops.append(crop_img.shape[:2])
         return echo(crop_img, crop_mask)
