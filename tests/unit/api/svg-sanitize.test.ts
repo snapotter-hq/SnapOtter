@@ -610,6 +610,33 @@ describe("sanitizeSvg: event handlers only where an attribute can start (#5122)"
   });
 
   it.each([
+    [
+      "two handlers",
+      '<svg><rect onclick="a" onload="b"/></svg>',
+      '<svg><rect data-removed=""/></svg>',
+    ],
+    [
+      "three handlers around a kept attribute",
+      '<svg><rect onclick="a" fill="red" onload=b onerror=\'c\'/></svg>',
+      '<svg><rect data-removed="" fill="red"/></svg>',
+    ],
+    [
+      "handlers on separate tags",
+      '<svg onload="a"><rect onclick="b" onfocus="c"/></svg>',
+      '<svg data-removed=""><rect data-removed=""/></svg>',
+    ],
+    [
+      "handlers split by newlines",
+      '<svg><rect\n  onclick="a"\n  onload="b"\n  fill="red"/></svg>',
+      '<svg><rect\n  data-removed=""\n  fill="red"/></svg>',
+    ],
+  ])("writes the marker once for %s", (_label, input, expected) => {
+    const out = clean(input);
+    expect(XMLValidator.validate(out)).toBe(true);
+    expect(out).toBe(expected);
+  });
+
+  it.each([
     ["after a slash", "<svg/onload=alert(1)><rect/></svg>"],
     ["straight after a quoted value", '<svg><rect x="a"onclick="alert(1)"/></svg>'],
     ["after an = with no attribute name", '<svg><a ="x onload=alert(1)"><text>c</text></a></svg>'],

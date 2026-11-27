@@ -245,12 +245,12 @@ function matchAt(pattern: RegExp, input: string, pos: number): string {
 function stripTagHandlers(seg: string): string | null {
   let pos = matchAt(TAG_NAME, seg, 0).length;
   let out = seg.slice(0, pos);
+  let marked = false;
   for (;;) {
     const sep = matchAt(TAG_SEPARATORS, seg, pos);
-    out += sep;
     pos += sep.length;
     if (pos >= seg.length) return null;
-    if (seg[pos] === ">") return out + seg.slice(pos);
+    if (seg[pos] === ">") return out + sep + seg.slice(pos);
 
     const start = pos;
     const name = matchAt(ATTR_NAME, seg, pos);
@@ -267,7 +267,15 @@ function stripTagHandlers(seg: string): string | null {
         pos += matchAt(UNQUOTED_VALUE, seg, pos).length;
       }
     }
-    out += equals && HANDLER_NAME.test(name) ? 'data-removed=""' : seg.slice(start, pos);
+    if (equals && HANDLER_NAME.test(name)) {
+      // One marker per tag: a repeated attribute is not well-formed XML (#5162).
+      // A handler after the first goes with the separator in front of it.
+      if (marked) continue;
+      marked = true;
+      out += sep + 'data-removed=""';
+    } else {
+      out += sep + seg.slice(start, pos);
+    }
   }
 }
 
