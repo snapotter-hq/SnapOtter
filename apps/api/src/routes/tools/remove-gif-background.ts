@@ -29,7 +29,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -425,6 +425,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
             bgBuffer = preparedBg.buffer;
             bgName = preparedBg.filename;
           } catch (rawErr) {
+            if (dropIfClientGone(request, reply, rawErr, toolId)) return reply;
             const err = normalizeOperationalWriteError(rawErr);
             if (err instanceof InputValidationError) {
               return reply.status(400).send({ error: err.message });

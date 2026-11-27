@@ -2,7 +2,10 @@ import { request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
-import { clientDisconnectSignal } from "../../../apps/api/src/lib/client-disconnect-signal.js";
+import {
+  clientDisconnectSignal,
+  dropIfClientGone,
+} from "../../../apps/api/src/lib/client-disconnect-signal.js";
 import { prepareRouteImage } from "../../../apps/api/src/lib/image-input-prep.js";
 
 const expensiveSvg = Buffer.from(
@@ -129,4 +132,93 @@ describe("clientDisconnectSignal", () => {
     expect(failure?.name).toBe("AbortError");
     expect(elapsedMs).toBeLessThan(5000);
   }, 30_000);
+});
+
+describe("dropIfClientGone", () => {
+  it("treats the abort from a hang-up as a quiet cancel: debug log only", async () => {
+    const started = deferred<void>();
+    const outcome = deferred<{ dropped: boolean; levels: string[] }>();
+    const port = await listen((instance) => {
+      instance.post("/", async (request, reply) => {
+        const levels: string[] = [];
+        for (const level of ["debug", "error", "warn"] as const) {
+          request.log[level] = (() => levels.push(level)) as never;
+        }
+        const signal = clientDisconnectSignal(reply);
+        started.resolve();
+        const failure = await prepareRouteImage(expensiveSvg, "x.svg", "svg", { signal }).then(
+          () => null,
+          (err: unknown) => err,
+        );
+        outcome.resolve({ dropped: dropIfClientGone(request, reply, failure, "upscale"), levels });
+        return reply;
+      });
+    });
+
+    const done = post(port, (destroy) => {
+      void started.promise.then(() => destroy());
+    });
+    const { dropped, levels } = await outcome.promise;
+    await done;
+    expect(dropped).toBe(true);
+    expect(levels).toEqual(["debug"]);
+  }, 30_000);
+
+  it("does not swallow an abort while the client is still connected", async () => {
+    const port = await listen((instance) => {
+      instance.post("/", async (request, reply) => {
+        const abort = new AbortController();
+        abort.abort();
+        return reply.send({ dropped: dropIfClientGone(request, reply, abort.signal.reason, "x") });
+      });
+    });
+    const body = await new Promise<string>((resolve) => {
+      const req = httpRequest(
+        {
+          port,
+          host: "127.0.0.1",
+          method: "POST",
+          path: "/",
+          headers: { "content-type": "text/plain" },
+        },
+        (res) => {
+          let text = "";
+          res.on("data", (chunk) => {
+            text += chunk;
+          });
+          res.on("end", () => resolve(text));
+        },
+      );
+      req.end("body");
+    });
+    expect(JSON.parse(body)).toEqual({ dropped: false });
+  });
+
+  it("leaves an ordinary decode failure to the route", async () => {
+    const port = await listen((instance) => {
+      instance.post("/", async (request, reply) =>
+        reply.send({ dropped: dropIfClientGone(request, reply, new Error("bad"), "x") }),
+      );
+    });
+    const body = await new Promise<string>((resolve) => {
+      const req = httpRequest(
+        {
+          port,
+          host: "127.0.0.1",
+          method: "POST",
+          path: "/",
+          headers: { "content-type": "text/plain" },
+        },
+        (res) => {
+          let text = "";
+          res.on("data", (chunk) => {
+            text += chunk;
+          });
+          res.on("end", () => resolve(text));
+        },
+      );
+      req.end("body");
+    });
+    expect(JSON.parse(body)).toEqual({ dropped: false });
+  });
 });

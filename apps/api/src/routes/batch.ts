@@ -46,6 +46,7 @@ import {
 } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
+import { clientDisconnectSignal } from "../lib/client-disconnect-signal.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import {
   type BatchFault,
@@ -192,8 +193,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return withRouteScratch("batch", async (scratchDir) => {
-        const ingressAbort = new AbortController();
-        const abortIngress = () => ingressAbort.abort();
+        const ingressSignal = clientDisconnectSignal(reply);
         // Every key stored for this batch until the flow is enqueued. An
         // ingress failure after some files were stored (the workspace cap
         // tripping on a later file) must not leave them behind: they are
@@ -209,8 +209,6 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           childIds: string[];
           preFailures: Array<{ filename: string; error: string }>;
         } | null = null;
-        request.raw.once("aborted", abortIngress);
-        if (request.raw.aborted) ingressAbort.abort();
         try {
           // Parse multipart: spool all files to scratch and collect the settings field
           const files: SpooledMultipartFile[] = [];
@@ -246,7 +244,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 try {
                   file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
                     maxBytes: partMaxBytes,
-                    signal: ingressAbort.signal,
+                    signal: ingressSignal,
                   });
                 } catch (spoolErr) {
                   if (
@@ -505,7 +503,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               try {
                 await storeValidatedOcrPdf(file, key, {
                   maxBytes: ocrUploadLimits?.fileBytes ?? file.size,
-                  signal: ingressAbort.signal,
+                  signal: ingressSignal,
                   beforeStore: async () => {
                     await insertChildRow(key);
                   },
@@ -712,7 +710,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     if (!toolConfig.keepSvgVector) {
                       processBuffer = await rasterizeSvgInput(processBuffer, {
                         density: toolConfig.svgDensity,
-                        signal: ingressAbort.signal,
+                        signal: ingressSignal,
                       });
                       processFilename = replaceExtWithPng(processFilename);
                     }
@@ -1159,7 +1157,6 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
           throw err;
         } finally {
-          request.raw.removeListener("aborted", abortIngress);
           await Promise.all(
             [...uncommittedKeys].map((key) =>
               deleteObject(key).catch((cleanupErr) => {

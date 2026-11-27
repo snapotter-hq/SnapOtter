@@ -23,7 +23,7 @@ import { db, schema } from "../../db/index.js";
 import { insertToolJobAlias } from "../../jobs/enqueue.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, type Pool, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
@@ -624,6 +624,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageHeight: landmarksResult.imageHeight,
         });
       } catch (rawErr) {
+        if (dropIfClientGone(request, reply, rawErr, "passport-photo")) return reply;
         const err = normalizeOperationalWriteError(rawErr);
         const details = stripInternalPaths(err instanceof Error ? err.message : "Unknown error");
         const progressError =

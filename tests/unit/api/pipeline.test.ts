@@ -567,6 +567,7 @@ async function invokePipelineExecuteRoute(
   };
   const reply = {
     statusCode: 200,
+    raw: { destroyed: false, writableFinished: false, once: vi.fn() },
     sent: false,
     payload: undefined as unknown,
     status(code: number) {
@@ -640,6 +641,7 @@ async function invokePipelineBatchRoute(
   };
   const reply = {
     statusCode: 200,
+    raw: { destroyed: false, writableFinished: false, once: vi.fn() },
     sent: false,
     payload: undefined as unknown,
     log: request.log,

@@ -46,6 +46,7 @@ import {
 } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
+import { clientDisconnectSignal } from "../lib/client-disconnect-signal.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import {
   type BatchFault,
@@ -437,11 +438,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       if (!authUser) return reply;
 
       return withRouteScratch("pipeline", async (scratchDir) => {
-        const ingressAbort = new AbortController();
-        const abortIngress = () => ingressAbort.abort();
+        const ingressSignal = clientDisconnectSignal(reply);
         let uncommittedUploadKey: string | undefined;
-        request.raw.once("aborted", abortIngress);
-        if (request.raw.aborted) ingressAbort.abort();
         try {
           let file: SpooledMultipartFile | null = null;
           let filename = "file";
@@ -471,7 +469,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB) ?? Number.MAX_SAFE_INTEGER,
                     ingressLimits?.fileBytes ?? Number.MAX_SAFE_INTEGER,
                   ),
-                  signal: ingressAbort.signal,
+                  signal: ingressSignal,
                 });
                 filename = file.filename;
               } else if (part.fieldname === "pipeline") {
@@ -654,7 +652,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   if (!(firstConfig?.keepSvgVector && pipelineStepCount(pipelineRaw) === 1)) {
                     processBuffer = await rasterizeSvgInput(processBuffer, {
                       density: firstConfig?.svgDensity,
-                      signal: ingressAbort.signal,
+                      signal: ingressSignal,
                     });
                     filename = replaceExtWithPng(filename);
                   }
@@ -842,7 +840,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             try {
               await storeValidatedOcrPdf(file, uploadKey, {
                 maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
-                signal: ingressAbort.signal,
+                signal: ingressSignal,
               });
               uncommittedUploadKey = uploadKey;
             } catch (err) {
@@ -1125,7 +1123,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             steps: result.resultPayload?.steps ?? [],
           });
         } finally {
-          request.raw.removeListener("aborted", abortIngress);
           if (uncommittedUploadKey) {
             const key = uncommittedUploadKey;
             await deleteObject(key).catch((cleanupErr) => {
@@ -1327,8 +1324,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       if (!authUser) return reply;
 
       return withRouteScratch("pipeline-batch", async (scratchDir) => {
-        const ingressAbort = new AbortController();
-        const abortIngress = () => ingressAbort.abort();
+        const ingressSignal = clientDisconnectSignal(reply);
         const uncommittedOcrKeys = new Set<string>();
         let stagedBatch: {
           parentId: string;
@@ -1336,8 +1332,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           childIds: string[];
           preFailures: Array<{ filename: string; error: string }>;
         } | null = null;
-        request.raw.once("aborted", abortIngress);
-        if (request.raw.aborted) ingressAbort.abort();
         try {
           // ── Parse multipart ──────────────────────────────────────────────
           const files: SpooledMultipartFile[] = [];
@@ -1379,7 +1373,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 try {
                   file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
                     maxBytes: partMaxBytes,
-                    signal: ingressAbort.signal,
+                    signal: ingressSignal,
                   });
                 } catch (spoolErr) {
                   if (
@@ -1726,7 +1720,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               try {
                 await storeValidatedOcrPdf(file, uploadKey, {
                   maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
-                  signal: ingressAbort.signal,
+                  signal: ingressSignal,
                   beforeStore: async () => {
                     await insertFileRows(uploadKey, processFilename);
                   },
@@ -1964,7 +1958,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     if (!(firstConfig?.keepSvgVector && parsedSteps.length === 1)) {
                       processBuffer = await rasterizeSvgInput(processBuffer, {
                         density: firstConfig?.svgDensity,
-                        signal: ingressAbort.signal,
+                        signal: ingressSignal,
                       });
                       processFilename = replaceExtWithPng(processFilename);
                     }
@@ -2370,7 +2364,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
           throw err;
         } finally {
-          request.raw.removeListener("aborted", abortIngress);
           await Promise.all(
             [...uncommittedOcrKeys].map((key) =>
               deleteObject(key).catch((cleanupErr) => {

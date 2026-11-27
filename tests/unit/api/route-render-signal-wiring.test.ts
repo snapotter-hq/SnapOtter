@@ -48,3 +48,35 @@ describe("single-tool routes pass an abort signal to the SVG render", () => {
     expect(withCalls.length).toBeGreaterThanOrEqual(18);
   });
 });
+
+// A disconnect during the render lands in the route's decode catch as an
+// AbortError (#5363). Every route that hands the render a disconnect signal
+// has to drop it quietly there, or it logs an error and writes a 422 to a
+// closed socket.
+describe("routes that pass a disconnect signal drop the abort quietly", () => {
+  const sources = readdirSync(routesDir)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => ({ name, source: readFileSync(join(routesDir, name), "utf8") }));
+
+  it("calls dropIfClientGone wherever clientDisconnectSignal(reply) is used", () => {
+    const missing = sources
+      .filter(
+        ({ source }) =>
+          source.includes("clientDisconnectSignal(reply)") && !source.includes("dropIfClientGone("),
+      )
+      .map(({ name }) => name);
+    expect(missing).toEqual([]);
+  });
+});
+
+// Node never emits `aborted` on a request whose body has fully arrived, so the
+// ingress signal of batch and pipeline listens on the response instead.
+describe("batch and pipeline ingress signals", () => {
+  for (const name of ["batch.ts", "pipeline.ts"]) {
+    it(`${name} builds the ingress signal from the response close`, () => {
+      const source = readFileSync(join(routesDir, "..", name), "utf8");
+      expect(source).not.toContain('"aborted"');
+      expect(source).toContain("clientDisconnectSignal(reply)");
+    });
+  }
+});

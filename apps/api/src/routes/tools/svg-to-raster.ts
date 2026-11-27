@@ -14,7 +14,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import {
   allFailedFault,
@@ -417,10 +417,12 @@ export function registerSvgToRasterRoute(
               ...(unavailable.code && { code: unavailable.code }),
             });
           } else {
-            request.log?.warn(
-              { err, filename: file.filename, toolId: opts.toolId },
-              "SVG batch file conversion failed",
-            );
+            if (!signal.aborted) {
+              request.log?.warn(
+                { err, filename: file.filename, toolId: opts.toolId },
+                "SVG batch file conversion failed",
+              );
+            }
             const error =
               imageSizeLimitError(err)?.message ??
               stripInternalPaths(err instanceof Error ? err.message : "Conversion failed");
@@ -822,6 +824,7 @@ export function registerSvgToRasterRoute(
         processedSize: buffer.length,
       });
     } catch (rawErr) {
+      if (dropIfClientGone(request, reply, rawErr, opts.toolId)) return reply;
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       if (isToolInputError(err)) {
