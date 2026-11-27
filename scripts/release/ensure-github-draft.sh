@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 # Resolve the release by numeric id, never by tag. GitHub's
 # /releases/tags/{tag} endpoint returns 404 for a draft, and
 # draftRelease is on, so a tag lookup here would 404 on the release
@@ -32,9 +35,9 @@ fi
 }
 
 release_endpoint="repos/${GITHUB_REPOSITORY}/releases/${release_id}"
-gh api "${release_endpoint}" > /tmp/release.json
+gh api "${release_endpoint}" > "${scratch}/release.json"
 jq -e --arg tag "v${VERSION}" \
-  '.draft == true and .tag_name == $tag' /tmp/release.json >/dev/null || {
+  '.draft == true and .tag_name == $tag' "${scratch}/release.json" >/dev/null || {
   echo "::error::Expected release is missing, public, or bound to the wrong tag"
   exit 1
 }
@@ -43,8 +46,8 @@ jq -e --arg tag "v${VERSION}" \
 gh release edit "v${VERSION}" \
   --repo "${GITHUB_REPOSITORY}" \
   --notes-file /tmp/release-notes.md
-gh api "${release_endpoint}" > /tmp/release.json
-node --input-type=module - /tmp/release.json /tmp/release-notes.md <<'NODE'
+gh api "${release_endpoint}" > "${scratch}/release.json"
+node --input-type=module - "${scratch}/release.json" /tmp/release-notes.md <<'NODE'
 import { readFileSync } from "node:fs";
 
 const [releasePath, notesPath] = process.argv.slice(2);

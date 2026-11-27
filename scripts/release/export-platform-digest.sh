@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 mkdir -p /tmp/digests /tmp/release-digests
 digest="${EXISTING_DIGEST:-${BUILT_DIGEST}}"
 [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]] || {
@@ -15,7 +18,7 @@ expected_source="https://github.com/${GITHUB_REPOSITORY}"
 for reference in \
   ghcr.io/snapotter-hq/snapotter \
   snapotter/snapotter; do
-  manifest="/tmp/exported-release-manifest-${registry_index}.json"
+  manifest="${scratch}/exported-release-manifest-${registry_index}.json"
   docker buildx imagetools inspect "${reference}@${digest}" --raw > "${manifest}"
   actual_digest="sha256:$(sha256sum "${manifest}" | cut -d ' ' -f 1)"
   [[ "${actual_digest}" == "${digest}" ]] || {
