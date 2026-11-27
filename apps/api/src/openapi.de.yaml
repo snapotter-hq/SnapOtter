@@ -14207,7 +14207,7 @@ paths:
       tags:
         - PDF
       summary: PDF zuschneiden
-      description: Alle Seiten mit einem einheitlichen Rand zuschneiden.
+      description: Alle Seiten über Ränder oder auf einen Bereich zuschneiden.
       security:
         - bearerAuth: []
       requestBody:
@@ -14226,8 +14226,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON-Zeichenkette mit Optionen:
-                    - `margin` (Zahl 0-2000, Standard 20) - Einheitlicher Beschnittrand in Punkt
+                    JSON-Zeichenkette mit Optionen (alle Werte in Punkt):
+                    - `mode` ("uniform" | "sides" | "region", Standard "uniform") - Art des Zuschneidens. Jeder Modus liest nur seine eigenen Felder
+                    - `margin` (Zahl 0-2000, Standard 20) - `uniform`: Beschnittrand für jede Kante
+                    - `top`, `right`, `bottom`, `left` (Zahl 0-2000, Standard 0) - `sides`: Beschnittrand für jede einzelne Kante
+                    - `x`, `y` (Zahl 0-14400, Standard 0) - `region`: Abstand von der linken und oberen Kante jeder Seite
+                    - `width`, `height` (Zahl 1-14400, Standard 288 und 432) - `region`: Größe des Bereichs, der auf jede Seite passen muss
             example:
               file: photo.png
               settings: '{}'
@@ -30288,9 +30292,9 @@ x-i18n:
       provenance: machine
       outputHash: f87281cfc51e
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: c236ea1feb82
+      outputHash: b68d7716c18c
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36948,9 +36952,9 @@ x-i18n:
       provenance: machine
       outputHash: 5544bc760e0b
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 7ff5895ad60a
+      outputHash: 62a073217358
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

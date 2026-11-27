@@ -14211,7 +14211,7 @@ paths:
       tags:
         - PDF
       summary: Recortar PDF
-      description: Recorta todas as páginas com uma margem uniforme.
+      description: Corta todas as páginas por margens ou para uma região.
       security:
         - bearerAuth: []
       requestBody:
@@ -14230,8 +14230,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    String JSON com as opções:
-                    - `margin` (número de 0 a 2000, padrão 20) - Margem de recorte uniforme em pontos
+                    String JSON com opções (todos os valores em pontos):
+                    - `mode` ("uniform" | "sides" | "region", padrão "uniform") - Como cortar. Cada modo lê apenas os próprios campos
+                    - `margin` (número 0-2000, padrão 20) - `uniform`: margem de corte para cada borda
+                    - `top`, `right`, `bottom`, `left` (número 0-2000, padrão 0) - `sides`: margem de corte para cada borda separadamente
+                    - `x`, `y` (número 0-14400, padrão 0) - `region`: deslocamento a partir das bordas esquerda e superior de cada página
+                    - `width`, `height` (número 1-14400, padrão 288 e 432) - `region`: tamanho da região, que precisa caber em todas as páginas
             example:
               file: photo.png
               settings: '{}'
@@ -30292,9 +30296,9 @@ x-i18n:
       provenance: machine
       outputHash: d00194f776de
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: d04e8c15f7c4
+      outputHash: a8033d466d64
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36952,9 +36956,9 @@ x-i18n:
       provenance: machine
       outputHash: 2521c27b161b
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 2503fbd965da
+      outputHash: 76a1d3e20005
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

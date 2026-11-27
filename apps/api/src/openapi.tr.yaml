@@ -14211,7 +14211,7 @@ paths:
       tags:
         - PDF
       summary: PDF'i Kırp
-      description: Tüm sayfaları eşit bir kenar boşluğuyla kırpın.
+      description: Tüm sayfaları kenar boşluklarına göre veya bir bölgeye kırpar.
       security:
         - bearerAuth: []
       requestBody:
@@ -14230,8 +14230,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    Seçenekleri içeren JSON dizgesi:
-                    - `margin` (sayı 0-2000, varsayılan 20) - Puntolar cinsinden tek tip kırpma kenar boşluğu
+                    Seçeneklerle birlikte JSON dizesi (tüm değerler punto cinsinden):
+                    - `mode` ("uniform" | "sides" | "region", varsayılan "uniform") - Nasıl kırpılacağı. Her mod yalnızca kendi alanlarını okur
+                    - `margin` (sayı 0-2000, varsayılan 20) - `uniform`: her kenar için kırpma boşluğu
+                    - `top`, `right`, `bottom`, `left` (sayı 0-2000, varsayılan 0) - `sides`: her kenar için ayrı kırpma boşluğu
+                    - `x`, `y` (sayı 0-14400, varsayılan 0) - `region`: her sayfanın sol ve üst kenarından kayma
+                    - `width`, `height` (sayı 1-14400, varsayılan 288 ve 432) - `region`: her sayfaya sığması gereken bölgenin boyutu
             example:
               file: photo.png
               settings: '{}'
@@ -30291,9 +30295,9 @@ x-i18n:
       provenance: machine
       outputHash: 80c4736710e3
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 3d5d015d2b89
+      outputHash: cd7324926eac
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36951,9 +36955,9 @@ x-i18n:
       provenance: machine
       outputHash: c2a164bd6e2b
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 5f4b5f13314f
+      outputHash: cccf25653292
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

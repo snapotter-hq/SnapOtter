@@ -14140,7 +14140,7 @@ paths:
       tags:
         - PDF
       summary: 裁剪 PDF
-      description: 以一致的邊界裁剪所有頁面。
+      description: 依邊界或指定區域裁切所有頁面。
       security:
         - bearerAuth: []
       requestBody:
@@ -14159,8 +14159,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    選項的 JSON 字串：
-                    - `margin`（number 0-2000，預設 20）- 統一裁切邊界（點）
+                    含選項的 JSON 字串(所有值皆以點為單位):
+                    - `mode` ("uniform" | "sides" | "region", 預設 "uniform") - 裁切方式。每種模式只讀取自己的欄位
+                    - `margin` (數字 0-2000, 預設 20) - `uniform`: 每條邊的裁切邊界
+                    - `top`, `right`, `bottom`, `left` (數字 0-2000, 預設 0) - `sides`: 每條邊各自的裁切邊界
+                    - `x`, `y` (數字 0-14400, 預設 0) - `region`: 距每頁左邊緣與上邊緣的偏移
+                    - `width`, `height` (數字 1-14400, 預設 288 和 432) - `region`: 區域大小,必須能放入每一頁
             example:
               file: photo.png
               settings: '{}'
@@ -30204,9 +30208,9 @@ x-i18n:
       provenance: machine
       outputHash: ba224e4a9268
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 1d8d6bb53c1e
+      outputHash: bf8957b5c4d2
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36864,9 +36868,9 @@ x-i18n:
       provenance: machine
       outputHash: 54bd1b27b088
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 7dff63d10edf
+      outputHash: bb419f91f3ef
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

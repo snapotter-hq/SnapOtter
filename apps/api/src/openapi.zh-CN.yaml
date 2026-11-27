@@ -14153,7 +14153,7 @@ paths:
       tags:
         - PDF
       summary: 裁剪 PDF
-      description: 以统一的边距裁剪所有页面。
+      description: 按边距或指定区域裁剪所有页面。
       security:
         - bearerAuth: []
       requestBody:
@@ -14172,8 +14172,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON 字符串，包含以下选项：
-                    - `margin`（数字 0-2000，默认 20）- 统一裁剪边距（点）
+                    带选项的 JSON 字符串(所有值均以点为单位):
+                    - `mode` ("uniform" | "sides" | "region", 默认 "uniform") - 裁剪方式。每种模式只读取自己的字段
+                    - `margin` (数字 0-2000, 默认 20) - `uniform`: 每条边的裁剪边距
+                    - `top`, `right`, `bottom`, `left` (数字 0-2000, 默认 0) - `sides`: 每条边各自的裁剪边距
+                    - `x`, `y` (数字 0-14400, 默认 0) - `region`: 距每页左边缘和上边缘的偏移
+                    - `width`, `height` (数字 1-14400, 默认 288 和 432) - `region`: 区域大小,必须能放入每一页
             example:
               file: photo.png
               settings: '{}'
@@ -30217,9 +30221,9 @@ x-i18n:
       provenance: machine
       outputHash: ba224e4a9268
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 5e77bbffe824
+      outputHash: ea4d342c7361
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36877,9 +36881,9 @@ x-i18n:
       provenance: machine
       outputHash: 20234f59749f
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 9ccf675e9bc0
+      outputHash: 0d73eec9bcb1
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

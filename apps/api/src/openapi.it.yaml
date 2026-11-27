@@ -14211,7 +14211,7 @@ paths:
       tags:
         - PDF
       summary: Ritaglia PDF
-      description: Ritaglia tutte le pagine con un margine uniforme.
+      description: Ritaglia tutte le pagine per margini o in una regione.
       security:
         - bearerAuth: []
       requestBody:
@@ -14230,8 +14230,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    Stringa JSON con le opzioni:
-                    - `margin` (numero 0-2000, predefinito 20) - Margine di ritaglio uniforme in punti
+                    Stringa JSON con opzioni (tutti i valori in punti):
+                    - `mode` ("uniform" | "sides" | "region", predefinito "uniform") - Come ritagliare. Ogni modalità legge solo i propri campi
+                    - `margin` (numero 0-2000, predefinito 20) - `uniform`: margine di ritaglio per ogni bordo
+                    - `top`, `right`, `bottom`, `left` (numero 0-2000, predefinito 0) - `sides`: margine di ritaglio per ciascun bordo
+                    - `x`, `y` (numero 0-14400, predefinito 0) - `region`: scostamento dai bordi sinistro e superiore di ogni pagina
+                    - `width`, `height` (numero 1-14400, predefinito 288 e 432) - `region`: dimensione della regione, che deve rientrare in ogni pagina
             example:
               file: photo.png
               settings: '{}'
@@ -30292,9 +30296,9 @@ x-i18n:
       provenance: machine
       outputHash: 54522485a449
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 0f184bbb4147
+      outputHash: 978938e29e5e
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36952,9 +36956,9 @@ x-i18n:
       provenance: machine
       outputHash: 32e7f7a6f961
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: e5960bc9b06f
+      outputHash: 3506ecbedc76
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine
