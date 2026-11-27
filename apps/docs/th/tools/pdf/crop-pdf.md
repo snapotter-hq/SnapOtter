@@ -1,13 +1,14 @@
 ---
-description: "ครอปทุกหน้าของ PDF ด้วยระยะขอบที่เท่ากัน"
-i18n_source_hash: ffa1a2cee08d
-i18n_provenance: human
-i18n_output_hash: cc4d0b14eb47
+description: "ครอปทุกหน้าของ PDF ด้วยระยะขอบหรือครอปเป็นพื้นที่ที่กำหนด"
+i18n_source_hash: 338ff7bb64e5
+i18n_provenance: machine
+i18n_output_hash: c8a8f0df0d05
+i18n_hash_version: 2
 ---
 
 # Crop PDF {#crop-pdf}
 
-ครอปทุกหน้าของ PDF โดยใช้ระยะขอบที่เท่ากัน ตัดเนื้อหาออกจากแต่ละขอบเท่า ๆ กัน
+ครอปทุกหน้าของ PDF ด้วยระยะขอบเดียวกันทุกขอบ ระยะขอบแยกแต่ละขอบ หรือครอปเหลือเฉพาะพื้นที่ที่กำหนด เช่น ป้ายจัดส่งที่พิมพ์อยู่มุมหนึ่งของแผ่น
 
 ## API Endpoint {#api-endpoint}
 
@@ -19,7 +20,11 @@ i18n_output_hash: cc4d0b14eb47
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| margin | number | No | `20` | ระยะขอบครอปที่เท่ากันเป็นพอยต์ (0-2000) |
+| mode | string | No | `uniform` | `uniform`, `sides`, หรือ `region` |
+| margin | number | No | `20` | โหมด `uniform`: ระยะขอบครอปสำหรับทุกขอบเป็นพอยต์ (0-2000) |
+| top, right, bottom, left | number | No | `0` | โหมด `sides`: ระยะขอบครอปสำหรับแต่ละขอบเป็นพอยต์ (0-2000) |
+| x, y | number | No | `0` | โหมด `region`: ระยะของพื้นที่จากขอบซ้ายและขอบบนของหน้าเป็นพอยต์ |
+| width, height | number | No | `288`, `432` | โหมด `region`: ขนาดของพื้นที่เป็นพอยต์ (ป้ายขนาด 4x6 in) |
 
 ## Example Request {#example-request}
 
@@ -28,6 +33,15 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@document.pdf" \
   -F 'settings={"margin": 50}'
+```
+
+เก็บไว้เฉพาะป้ายขนาด 4x6 in ที่มุมซ้ายบนของแต่ละหน้า:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@label.pdf" \
+  -F 'settings={"mode": "region", "x": 0, "y": 0, "width": 288, "height": 432}'
 ```
 
 ## Example Response {#example-response}
@@ -43,6 +57,8 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/crop-pdf \
 
 ## Notes {#notes}
 
-- ค่าระยะขอบมีหน่วยเป็นพอยต์ของ PDF (1 พอยต์ = 1/72 นิ้ว)
-- ระยะขอบเดียวกันจะถูกใช้กับทั้งสี่ขอบของทุกหน้า
-- ระยะขอบเท่ากับ `0` จะลบระยะขอบครอปเดิมทั้งหมด แสดงกล่องสื่อ (media box) เต็มขนาด
+- ค่าทั้งหมดมีหน่วยเป็นพอยต์ของ PDF (1 พอยต์ = 1/72 นิ้ว) หน้า US Letter มีขนาด 612 x 792 พอยต์
+- แต่ละโหมดอ่านเฉพาะฟิลด์ของตัวเอง ดังนั้นคำขอที่ส่งเพียง `margin` จึงยังทำงานได้ตามเดิม
+- พื้นที่จะวัดจากมุมซ้ายบนของแต่ละหน้า และต้องอยู่ภายในทุกหน้า ระยะขอบต้องเหลือพื้นที่ของแต่ละหน้าไว้บ้าง ไม่เช่นนั้นคำขอจะล้มเหลวพร้อม `400`
+- บนหน้าที่ตั้งค่าให้แสดงแบบหมุน ตำแหน่งและขอบจะอ้างอิงถึงหน้าตามที่แสดงอยู่ ดังนั้นมุมซ้ายบนของพื้นที่คือมุมซ้ายบนของหน้าที่หมุนแล้ว
+- ทุกโหมดวัดจาก media box เต็มขนาด ดังนั้นการครอปหน้าที่ถูกครอปไว้แล้วจะเริ่มใหม่จากหน้าเต็ม ระยะขอบเท่ากันทุกด้านที่ `0` จะแสดง media box ทั้งหมด
