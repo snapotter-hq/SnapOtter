@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
-import { pythonWith } from "../../../helpers/python-gate.js";
+import { hasWeasyprint, pythonWith } from "../../../helpers/python-gate.js";
 import { waitForDownloadedJobArtifact } from "../../settle-job.js";
 import {
   buildTestApp,
@@ -16,7 +16,6 @@ import {
 
 const MD = readFixture(fixtures.document.tiny("md"));
 
-const hasWeasyprint = pythonWith("weasyprint");
 const hasMarkdownMod = pythonWith("markdown");
 
 let testApp: TestApp;

@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   findMissingGeneratedPythonPrerequisite,
+  hasPython,
   resolvePython,
+  weasyprintUsable,
 } from "../../helpers/python-gate.js";
 
 const NO_CAPABILITIES = {
@@ -78,6 +83,36 @@ describe("Python interpreter resolution", () => {
         platform: "linux",
       }),
     ).toBe("/usr/local/bin/python3");
+  });
+});
+
+describe.skipIf(!hasPython)("WeasyPrint capability probe", () => {
+  let stubRoot: string;
+  beforeAll(() => {
+    stubRoot = mkdtempSync(join(tmpdir(), "weasyprint-gate-"));
+  });
+  afterAll(() => rmSync(stubRoot, { recursive: true, force: true }));
+
+  // A stub package on PYTHONPATH shadows any real WeasyPrint the host has.
+  function stubWeasyprint(name: string, urlsSource: string): NodeJS.ProcessEnv {
+    const pkg = join(stubRoot, name, "weasyprint");
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, "__init__.py"), "class HTML:\n    pass\n");
+    writeFileSync(join(pkg, "urls.py"), urlsSource);
+    return { ...process.env, PYTHONPATH: join(stubRoot, name) };
+  }
+
+  it("rejects a release whose weasyprint.urls has no URLFetcher", () => {
+    // Ubuntu 24.04's apt python3-weasyprint 61.1 imports fine but fails the tool (#5077).
+    const env = stubWeasyprint("old", "def fetch(url):\n    pass\n");
+
+    expect(weasyprintUsable(env)).toBe(false);
+  });
+
+  it("accepts a release that has URLFetcher", () => {
+    const env = stubWeasyprint("current", "class URLFetcher:\n    pass\n");
+
+    expect(weasyprintUsable(env)).toBe(true);
   });
 });
 
