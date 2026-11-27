@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter için güvenlik sıkılaştırma rehberi. Kapsayıcı güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk çıktıları."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 1625c6891f7a
+i18n_output_hash: 3d486391c9a9
 i18n_hash_version: 2
 ---
 
 # Güvenlik ve Sıkılaştırma {#security-hardening}
 
-SnapOtter dosyaları tamamen kendi altyapınızda işler. Projeyi geliştirmeye yardımcı olmak için varsayılan olarak anonim, içerik içermeyen ürün analitiği ve çökme raporları gönderir. Dosyalarınızı, dosya adlarını, dosya içeriklerini, OCR çıktısını, görsel meta verilerini veya belge metnini asla göndermez. İsteğe bağlı geri bildirim yalnızca kullanıcı gönderdikten sonra, yalnızca analitik etkinken ve iletişim alanları yalnızca açık iletişim onayıyla gönderilir. Bir yönetici, yeniden derleme gerekmeden Ayarlar > Sistem > Gizlilik altında analitiği ve geri bildirim toplamayı tek tıkla kapatabilir. Dosya işleme her zaman kapsayıcınızın içinde kalır.
+SnapOtter dosyaları tamamen kendi altyapınızda işler. Projeyi geliştirmeye yardımcı olmak için anonim, içerik içermeyen ürün analitiği ve çökme raporları gönderebilir, ancak yeni bir kurulum önce yöneticisine sorar ve yanıt verilene kadar hiçbir şey göndermez. Dosyalarınızı, dosya adlarını, dosya içeriklerini, OCR çıktısını, görsel meta verilerini veya belge metnini asla göndermez. İsteğe bağlı geri bildirim yalnızca kullanıcı gönderdikten sonra, yalnızca analitik etkinken ve iletişim alanları yalnızca açık iletişim onayıyla gönderilir. Bir yönetici, yeniden derleme gerekmeden Ayarlar > Sistem > Gizlilik altında analitiği ve geri bildirim toplamayı tek tıkla kapatabilir. Dosya işleme her zaman kapsayıcınızın içinde kalır.
 
 Kapsayıcı, gereken asgari küme dışındaki tüm Linux yetenekleri kaldırılmış olarak özel bir root olmayan kullanıcıyla (`snapotter`) çalışır. Tam güvenlik açığı bildirim ilkesi ve güvenlik mimarisi için GitHub'daki [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) dosyasına bakın.
 
@@ -19,7 +19,7 @@ Kanonik [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/docke
 Her iki yığın da aşağıdaki denetimleri uygular:
 
 - Bellek, takas, CPU ve PID sınırları kontrolden çıkan yerel işlemeyi sınırlar.
-- Her servis tüm Linux yeteneklerini bırakır. Uygulama yalnızca birim sahipliği, tek yönlü `gosu` kimlik düşürme ve düzgün sinyal iletimi için `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` yeteneklerini geri ekler. PostgreSQL ve Redis yalnızca resmi giriş noktalarının ihtiyaç duyduğu alt kümeyi alır.
+- Her servis tüm Linux yeteneklerini bırakır. Uygulama yalnızca `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` yeteneklerini geri ekler: birim sahipliği, tek yönlü `gosu` kimlik düşürme ve düzgün sinyal iletimi için. PostgreSQL ve Redis yalnızca resmi giriş noktalarının ihtiyaç duyduğu alt kümeyi alır.
 - `security_opt: [no-new-privileges:true]`, uygulama, PostgreSQL ve Redis kapsayıcılarındaki işlemlerin ek ayrıcalık kazanmasını önler. Bu, `gosu` ile uyumlu kalır: giriş noktası root olarak başlar, birimleri hazırlar ve yalnızca özel `snapotter` kullanıcısına düşer.
 - PostgreSQL ve Redis imaj girdileri özet (digest) ile sabitlenmiştir. Uygulama da `latest` yerine doğrulanmış bir sürüm etiketine veya özete sabitlenmelidir.
 - Sağlık denetimleri, sınırlı JSON günlük döndürme, kalıcı Redis AOF ve yeniden başlatma ilkesi kanonik dosyalarda merkezi olarak tanımlanmıştır.
@@ -28,7 +28,7 @@ Her iki yığın da aşağıdaki denetimleri uygular:
 
 ### `read_only` Neden Ayarlanmaz {#why-read-only-is-not-set}
 
-[PUID](/tr/guide/configuration#env-puid)/[PGID](/tr/guide/configuration#env-pgid) yeniden eşlemesi başlangıçta `/etc/passwd` ve `/etc/group` dosyalarına yazdığı için `read_only: true` ayarlanmaz. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser` ayarını kullanırsanız salt okunur bir kök dosya sistemini güvenle etkinleştirebilirsiniz.
+`read_only: true` ayarlanmaz, çünkü [PUID](/tr/guide/configuration#env-puid)/[PGID](/tr/guide/configuration#env-pgid) yeniden eşlemesi başlangıçta `/etc/passwd` ve `/etc/group` dosyalarına yazar. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser` ayarını kullanırsanız salt okunur bir kök dosya sistemini güvenle etkinleştirebilirsiniz. Salt okunur bir kökte PUID veya PGID değerini 999 dışında bir değere ayarlarsanız kapsayıcı başlangıçta bunu belirten bir iletiyle durur ve /data içinde zaten bulunan hiçbir şeyin sahibini değiştirmez. Hepsi bir arada imajı da PUID ve PGID ayarlanmamışsa salt okunur kökle çalışır; ancak /run ve /tmp tmpfs bağlama noktaları olmalı ve /run exec'e izin vermelidir, çünkü s6-overlay denetçisini oradan başlatır.
 
 ## Ağ Yalıtımı {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose secrets (Swarm olmadan) Compose v2.23 veya üstünü gerektirir.
 
 ## Kubernetes Dağıtımı {#kubernetes-deployment}
 
-Giriş noktası, kapsayıcının zaten root olmayan olarak çalıştığını algıladığında (örneğin Kubernetes `runAsUser` ile) gosu ayrıcalık düşürmeyi otomatik olarak atlar. Bu durumda bağlanan birimlerin sahipliğini kendisi değiştiremez; bu yüzden yazılabilir olduklarını doğrular ve değillerse uygulanabilir yönlendirmeyle erken çıkar. `fsGroup` ve yabancı UID kurulumları (TrueNAS, OpenShift) için [Depolama izinleri](/tr/guide/deployment#storage-permissions) sayfasına bakın.
+Giriş noktası, kapsayıcının zaten root olmayan olarak çalıştığını algıladığında (örneğin Kubernetes `runAsUser` ile) gosu ayrıcalık düşürmeyi otomatik olarak atlar. Bu durumda bağlanan birimlerin sahipliğini kendisi değiştiremez; bu yüzden yazılabilir olduklarını doğrular ve değillerse uygulanabilir yönlendirmeyle erken çıkar. [Depolama izinleri](/tr/guide/deployment#storage-permissions) bölümünde `fsGroup` ve yabancı UID kurulumları (TrueNAS, OpenShift) anlatılır.
 
 **Önerilen Pod SecurityContext:**
 

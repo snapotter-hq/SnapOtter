@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 45ddcb0c25f0
+i18n_output_hash: 189f3dbf0c29
 i18n_hash_version: 2
 ---
 # Setups met weinig resources {#low-resource-setups}
@@ -88,11 +88,12 @@ Alle limieten zijn omgevingsvariabelen, volledig beschreven in [Configuratie](/n
 |---|---|---|
 | [`CONCURRENT_JOBS`](/nl/guide/configuration#env-concurrent-jobs) | `1` | Hoeveel jobs parallel draaien. Automatische detectie gebruikt het aantal CPU-cores min één, wat prima is op grote machines en te gretig op een machine met 2 cores onder geheugendruk. |
 | [`MAX_WORKER_THREADS`](/nl/guide/configuration#env-max-worker-threads) | `2` | Threadpool voor beeldverwerking. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/nl/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Hoe lang het Python-AI-proces en de OCR-runtime geladen blijven na het laatste verzoek. Ze houden 1-2 GB vast zolang ze warm zijn, dus een korter venster geeft het geheugen eerder terug, ten koste van een paar seconden bij de volgende AI-aanroep. Verlaag ook [`AI_SESSION_IDLE_TIMEOUT`](/nl/guide/configuration#env-ai-session-idle-timeout), want het afsluiten van het proces gooit de gecachete modellen weg. |
 | [`MAX_BATCH_SIZE`](/nl/guide/configuration#env-max-batch-size) | `5` | Bij batches loopt het geheugen van machines met 1-2 GB het eerst vol. |
 | [`MAX_UPLOAD_SIZE_MB`](/nl/guide/configuration#env-max-upload-size-mb) | `100` | Voorkomt dat één enorm bestand de hele werkruimte bezet. |
-| [`MAX_MEGAPIXELS`](/nl/guide/configuration#env-max-megapixels) | `50` | Het decoderen van een afbeelding van 100+ MP kost RAM, ongeacht de bestandsgrootte. |
+| [`MAX_MEGAPIXELS`](/nl/guide/configuration#env-max-megapixels) | `50` | Het decoderen van een afbeelding van 100+ MP kost RAM, ongeacht de bestandsgrootte. Afbeeldingen boven ongeveer 268 MP worden zelfs bij `0` geweigerd. |
 | [`MAX_VIDEO_DURATION_S`](/nl/guide/configuration#env-max-video-duration-s) | `300` | Lange transcodes monopoliseren een kleine CPU gedurende minuten tot uren. |
-| [`PROCESSING_TIMEOUT_S`](/nl/guide/configuration#env-processing-timeout-s) | `600` | Harde bovengrens zodat een op hol geslagen job de machine uiteindelijk vrijgeeft. |
+| [`JOB_TIMEOUT_LONG_S`](/nl/guide/configuration#env-job-timeout-long-s) | `3600` | Harde bovengrens voor AI- en mediajobs, zodat een op hol geslagen job de machine uiteindelijk vrijgeeft. De standaardwaarde is twee uur. Afbeeldings- en documentjobs stoppen al bij [`JOB_TIMEOUT_FAST_S`](/nl/guide/configuration#env-job-timeout-fast-s) (standaard 120 seconden). |
 
 Deze limieten gelden voor wat de server accepteert, dus stel ze in op wat u daadwerkelijk gebruikt in plaats van zo klein mogelijk. Als u nooit video gebruikt, kost een limiet van `MAX_VIDEO_DURATION_S` niets; scant u dagelijks documenten, beperk [`MAX_PDF_PAGES`](/nl/guide/configuration#env-max-pdf-pages) dan niet.
 

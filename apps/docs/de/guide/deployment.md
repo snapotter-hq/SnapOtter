@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter in der Produktion mit Docker bereitstellen. Hardwareanforderungen, GPU-Einrichtung und Reverse-Proxy-Konfigurationen für Nginx, Traefik und Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: b8a385307b96
+i18n_output_hash: 6134646ae7ab
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Wenn KI-Tools auf der CPU laufen, obwohl `--gpus all` und das NVIDIA Container Toolkit korrekt eingerichtet sind, installieren Sie das betroffene Bundle (zum Beispiel Hintergrundentfernung) unter **Einstellungen → KI-Funktionen** neu. Das Installationsprogramm stellt den GPU-Build von ONNX Runtime wieder her, den ein CPU-only-Build, der von einem anderen Bundle (etwa Transkription) mitgebracht wurde, in der gemeinsamen KI-Umgebung sonst überdecken kann. Wenn die Neuinstallation über die Oberfläche bei einem älteren Image die GPU nicht wiederherstellt, finden Sie die manuelle Reparatur in [Issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+Das Proxmox-LXC-Installationsprogramm wird im Projekt [community-scripts](https://community-scripts.org) gepflegt, nicht in diesem Repository. Es verwendet nicht die Standardwerte `admin` / `admin` aus den Docker-Beispielen. Die Installation erzeugt ein zufälliges Passwort mit 20 Zeichen für den Benutzer `admin` und speichert es im Container. Öffnen Sie eine Shell im Container und führen Sie aus:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Derselbe Wert steht in `DEFAULT_PASSWORD` in `/opt/snapotter_data/.env`. Diese Variable legt das Konto nur beim ersten Start an. Wenn Sie das Passwort inzwischen in der App geändert haben, stimmt die Datei daher nicht mehr damit überein.
+
 ## Hardwareanforderungen {#hardware-requirements}
 
 Diese Zahlen stammen aus Benchmarks auf einer Reihe von Systemen, von einer modernen amd64-Workstation mit NVIDIA RTX 4070 bis hinunter zu einem Raspberry Pi. Auf jedem wurde der gesamte Tool-Katalog ausgeführt, und die Docker-Ressourcenlimits wurden variiert, um die tatsächliche Untergrenze zu finden.
@@ -288,7 +298,7 @@ deploy:
       memory: 2G
 ```
 
-**Die eine CPU-intensive Ausnahme ist das Neukodieren von Videos.** Stream-Copy-Vorgänge (Kürzen, Stummschalten, Container-Remux) sind augenblicklich, aber das Transkodieren in einen anderen Codec ist CPU-gebunden. Ein 1080p-Clip von 45 Sekunden, der nach VP9 (WebM) neu kodiert wird, braucht auf einer schnellen modernen CPU etwa **~40 s**, auf Apple Silicon ~45 s, auf einem älteren mobilen 4-Kern-Prozessor ~80 s und auf einem älteren 4-Kern-Server **~130 s**. Wenn Ihre Arbeitslast videolastig ist, priorisieren Sie CPU-Kerne und Taktrate oder erhöhen Sie das `cpus:`-Limit des Containers: Das mitgelieferte Compose begrenzt die App standardmäßig auf 4 Kerne (8 beim GPU-Compose).
+**Die eine CPU-intensive Ausnahme ist das Neukodieren von Videos.** Stream-Copy-Vorgänge (Kürzen, Stummschalten, Container-Remux) sind augenblicklich, aber das Transkodieren in einen anderen Codec ist CPU-gebunden. Ein 1080p-Clip von 45 Sekunden, der nach VP9 (WebM) neu kodiert wird, braucht auf einer schnellen modernen CPU etwa **~40 s**, auf Apple Silicon ~45 s, auf einem älteren mobilen 4-Kern-Prozessor ~80 s und auf einem älteren 4-Kern-Server **~130 s**. Wenn Ihre Arbeitslast videolastig ist, priorisieren Sie CPU-Kerne und Taktrate oder erhöhen Sie das `cpus:`-Limit des Containers. Das mitgelieferte Compose begrenzt die App standardmäßig auf 4 Kerne (8 beim GPU-Compose).
 
 ### Empfohlen (KI-Tools auf der CPU) {#recommended-ai-tools-on-cpu}
 
@@ -406,7 +416,7 @@ Die [vollständige Formatliste](/de/guide/supported-formats) enthält Details zu
 
 - **Inhaltsbewusstes Skalieren** stürzt bei großen Bildern (>5 MP) wegen einer Einschränkung im caire-Binary ab. Bei kleineren Bildern funktioniert es einwandfrei.
 - **HEIF-Dekodierung** dauert 13-23 Sekunden. HEIC (Apples Variante) ist mit 0,3-0,9 Sekunden deutlich schneller.
-- **Hochskalierung** läuft auf der CPU bei allem über kleinen Bildern in ein Timeout. Für den praktischen Einsatz ist eine GPU erforderlich.
+- **Hochskalierung** ohne GPU verkleinert eine Eingabe, die über der CPU-Obergrenze liegt (standardmäßig 4 MP, bei hohen Skalierungsfaktoren weniger), vor dem Hochskalieren und läuft deutlich langsamer als auf einer GPU. [`MAX_CPU_UPSCALE_MP`](/de/guide/configuration#processing-limits) hebt diese Obergrenze an oder entfernt sie, wenn der Host dafür genug RAM hat.
 - Die Gesichtsverbesserung mit **CodeFormer** ist deutlich langsamer als GFPGAN (53 s gegenüber 2 s auf der GPU). GFPGAN wird für die meisten Anwendungsfälle empfohlen.
 
 ### KI-Bundle-Installationen mit mehreren Replikaten {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter schreibt zur Laufzeit an zwei Orte: `/data` (Benutzerdateien, Logs, KI
 
 Wie Berechtigungen behandelt werden, hängt davon ab, wie der Container gestartet wird:
 
-**Standard (startet als root, wechselt zu `snapotter`)**: Der Entrypoint startet als root, korrigiert den Besitz der eingebundenen Volumes und wechselt dann über `gosu` zum unprivilegierten Benutzer `snapotter`. Benannte Volumes funktionieren ohne Konfiguration. Setzen Sie bei Bind-Mounts `PUID`/`PGID` auf Ihren Host-Benutzer (siehe oben), damit die geschriebenen Dateien Ihnen gehören.
+**Standard (startet als root, wechselt zu `snapotter`)**: Der Entrypoint startet als root, korrigiert den Besitz der eingebundenen Volumes und wechselt dann zum unprivilegierten Benutzer `snapotter` über `gosu`. Benannte Volumes funktionieren ohne Konfiguration. Setzen Sie bei Bind-Mounts `PUID`/`PGID` auf Ihren Host-Benutzer (siehe oben), damit die geschriebenen Dateien Ihnen gehören.
 
 **Kubernetes / OpenShift (ohne root über `runAsUser`)**: Wird der Container direkt als Nicht-root-Benutzer gestartet, kann er die Volumes nicht selbst per chown ändern, daher muss der Orchestrator sie beschreibbar machen. Setzen Sie `fsGroup`:
 
@@ -493,8 +503,8 @@ Der Startfehler nennt die genaue zu verwendende UID. Am schnellsten starten Sie 
 | [`RATE_LIMIT_PER_MIN`](/de/guide/configuration#env-rate-limit-per-min) | `1000` | API-Anfragen pro Minute und IP (0 setzen zum Deaktivieren) |
 | [`MAX_USERS`](/de/guide/configuration#env-max-users) | `0` (unbegrenzt) | Maximale Zahl an Benutzerkonten |
 | [`TRUST_PROXY`](/de/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Welche Peers die Client-IP über `X-Forwarded-For` setzen dürfen. Standardmäßig nur private Netzwerke |
-| `PUID` | `999` | Als diese UID ausführen (für Bind-Mount-Berechtigungen) |
-| `PGID` | `999` | Als diese GID ausführen (für Bind-Mount-Berechtigungen) |
+| `PUID` | `999` | Als diese UID ausführen (für Bind-Mount-Berechtigungen). Benötigt ein beschreibbares Root-Dateisystem; siehe den [Sicherheitsleitfaden](/de/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Als diese GID ausführen (für Bind-Mount-Berechtigungen). Benötigt ein beschreibbares Root-Dateisystem; siehe den [Sicherheitsleitfaden](/de/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/de/guide/configuration#env-log-level) | `info` | Log-Detailgrad: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/de/guide/configuration#env-concurrent-jobs) | `0` (automatisch) | Maximale Zahl paralleler KI-Verarbeitungsjobs |
 | [`SESSION_DURATION_HOURS`](/de/guide/configuration#env-session-duration-hours) | `168` | Lebensdauer der Anmeldesitzung (7 Tage) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Halten Sie die Proxy-Zugangsdaten außerhalb der Compose-Datei (zum Beispiel in einer geschützten `.env`-Datei oder einem Secret). Deaktivieren Sie die TLS-Prüfung nicht: Der signierte OCR-Index authentifiziert die Release-Metadaten, während die normale TLS-Validierung weiterhin den Transport und jede andere ausgehende Anfrage schützt.
+
+Wenn huggingface.co selbst blockiert oder gedrosselt wird und nicht etwa einen Proxy erfordert, richten Sie KI-Downloads mit `HF_ENDPOINT` auf einen Hugging-Face-Mirror (zum Beispiel `HF_ENDPOINT: https://hf-mirror.com`). Siehe [Download über einen Mirror](/de/api/ai#downloading-through-a-mirror).
 
 ## Health-Check {#health-check}
 
@@ -719,7 +731,7 @@ Semantic-release bestimmt die Version aus der Commit-Historie. Das Docker-Tag `l
 
 ## Analytics {#analytics}
 
-SnapOtter enthält anonyme Produktanalysen (Nutzungsmuster der Tools, Fehlerberichte), um Fehler zu finden und Funktionen zu verbessern. Sie sind standardmäßig aktiviert. Ihre Dateien, Dateinamen und personenbezogenen Daten sind nie Teil davon. SnapOtter funktioniert bei deaktivierten Analysen normal.
+SnapOtter enthält anonyme Produktanalysen (Nutzungsmuster der Tools, Fehlerberichte), um Fehler zu finden und Funktionen zu verbessern. Eine neue Instanz fragt beim ersten Start ihren Administrator und sendet nichts, bis dieser geantwortet hat. Ihre Dateien, Dateinamen und personenbezogenen Daten sind nie Teil davon. SnapOtter funktioniert bei deaktivierten Analysen normal.
 
 ### Analytics deaktivieren {#disabling-analytics}
 

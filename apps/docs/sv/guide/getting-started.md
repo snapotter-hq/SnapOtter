@@ -1,8 +1,8 @@
 ---
 description: "Installera SnapOtter med Docker med ett enda kommando, logga in och öppna ditt första verktyg. Omfattar GPU-acceleration, små maskiner, Docker Compose och bygge från källkod."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 481bc5e0c995
+i18n_output_hash: 57aaa95afd8d
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ På en Raspberry Pi, en gammal bärbar dator eller en liten VPS kör du ett jobb
 :::
 
 ::: tip Anonym produktanalys
-SnapOtter innehåller anonym produktanalys som standard. Du stänger av den genom att öppna **Settings → System → Privacy** och stänga av **Anonymous Product Analytics**. Den slutar omedelbart för hela instansen.
+SnapOtter innehåller anonym produktanalys. En ny instans frågar sin administratör vid första körningen och skickar ingenting förrän den fått svar. Du stänger av den senare genom att öppna **Settings → System → Privacy** och stänga av **Anonymous Product Analytics**. Den slutar omedelbart för hela instansen.
 
 Du kan också ange miljövariabeln `SNAPOTTER_TELEMETRY=0` (`false` och `off` fungerar också) för att stänga av all telemetri för instansen utan ombyggnad.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalitet | Antal | Exempelverktyg |
 |----------|-------|---------------|
-| **Bild** | 112 | Ändra storlek, Beskär, Komprimera, Konvertera, Ta bort bakgrund, Skala upp, OCR, Vattenstämpel, Collage, Färglägg, GIF-verktyg, formatförinställningar |
+| **Bild** | 114 | Ändra storlek, Beskär, Komprimera, Konvertera, Ta bort bakgrund, Skala upp, OCR, Vattenstämpel, Collage, Färglägg, GIF-verktyg, formatförinställningar |
 | **Video** | 63 | Klipp, Beskär, Komprimera, Konvertera, Slå ihop, Extrahera ljud, Automatiska undertexter, Video till GIF, Ändra storlek, Stabilisera, formatförinställningar |
 | **Ljud** | 57 | Klipp, Slå ihop, Konvertera, Normalisera, Brusreducering, Transkribera, Tonhöjdsförskjutning, Tona, Ringsignalsskapare, formatförinställningar |
 | **PDF / Dokument** | 37 | Slå ihop, Dela, Komprimera, OCR, Vattenstämpel, Maskera, Word till PDF, Excel till PDF, Rotera, Skydda, Reparera |
-| **Filer** | 25 | CSV till JSON, JSON till XML, Slå ihop CSV, Dela CSV, Skapa ZIP, Extrahera ZIP, Diagramskapare, YAML/JSON |
+| **Filer** | 32 | CSV till JSON, JSON till XML, Slå ihop CSV, Dela CSV, Skapa ZIP, Extrahera ZIP, Diagramskapare, YAML/JSON, Konvertera typsnitt, Proportionskalkylator, Base64, formatförinställningar |
 
 ### Pipelines {#pipelines}
 

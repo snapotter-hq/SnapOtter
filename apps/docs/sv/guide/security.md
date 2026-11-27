@@ -1,14 +1,14 @@
 ---
 description: "Säkerhetshärdningsguide för SnapOtter. Containersäkerhet, nätverksisolering, Docker-hemligheter, Kubernetes-driftsättning och efterlevnadsartefakter."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 6123ec629809
+i18n_output_hash: 5b9aee8851e4
 i18n_hash_version: 2
 ---
 
 # Säkerhet och härdning {#security-hardening}
 
-SnapOtter bearbetar filer helt på din egen infrastruktur. Som standard skickar det anonym, innehållsfri produktanalys och kraschrapporter för att hjälpa till att förbättra projektet. Det skickar aldrig dina filer, filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Valfri feedback skickas först när en användare lämnar in den, bara när analys är aktiverat, och kontaktfält inkluderas bara med uttryckligt samtycke till kontakt. En administratör kan stänga av insamling av analys och feedback med ett klick under Settings > System > Privacy, utan ombyggnad. Filbearbetningen stannar alltid inuti din container.
+SnapOtter bearbetar filer helt på din egen infrastruktur. Det kan skicka anonym, innehållsfri produktanalys och kraschrapporter för att hjälpa till att förbättra projektet, men en ny instans frågar först sin administratör och skickar ingenting förrän den har fått svar. Det skickar aldrig dina filer, filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Valfri feedback skickas först när en användare lämnar in den, bara när analys är aktiverat, och kontaktfält inkluderas bara med uttryckligt samtycke till kontakt. En administratör kan stänga av insamling av analys och feedback med ett klick under Settings > System > Privacy, utan ombyggnad. Filbearbetningen stannar alltid inuti din container.
 
 Containern körs som en dedikerad icke-root-användare (`snapotter`) där alla Linux-capabilities är borttagna utom den nödvändiga minimimängden. För den fullständiga policyn för sårbarhetsrapportering och säkerhetsarkitekturen, se [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) på GitHub.
 
@@ -28,7 +28,7 @@ För en driftsättning mot internet, bind port 1349 till loopback och avsluta TL
 
 ### Varför `read_only` inte är angivet {#why-read-only-is-not-set}
 
-`read_only: true` är inte angivet eftersom omkartläggning av [PUID](/sv/guide/configuration#env-puid)/[PGID](/sv/guide/configuration#env-pgid) skriver till `/etc/passwd` och `/etc/group` vid start. Om du använder Dockers flagga `--user` eller Kubernetes `runAsUser` i stället för PUID/PGID kan du säkert aktivera ett skrivskyddat rotfilsystem.
+`read_only: true` är inte angivet eftersom omkartläggning av [PUID](/sv/guide/configuration#env-puid)/[PGID](/sv/guide/configuration#env-pgid) skriver till `/etc/passwd` och `/etc/group` vid start. Om du använder Dockers flagga `--user` eller Kubernetes `runAsUser` i stället för PUID/PGID kan du säkert aktivera ett skrivskyddat rotfilsystem. Om du anger PUID eller PGID till något annat än 999 på en skrivskyddad rot stoppas containern vid start med ett meddelande om det, innan den ändrar ägare på något som redan finns i /data. Allt-i-ett-avbilden körs också med skrivskyddad rot när PUID och PGID inte är angivna, så länge /run och /tmp är tmpfs-monteringar och /run tillåter exec, eftersom s6-overlay startar sin övervakare därifrån.
 
 ## Nätverksisolering {#network-isolation}
 

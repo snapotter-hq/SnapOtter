@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter 安全加固指南。容器安全、网络隔离、Docker 密钥、Kubernetes 部署以及合规产物。"
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 2cb527647220
+i18n_output_hash: e29232b968ce
 i18n_hash_version: 2
 ---
 
 # 安全与加固 {#security-hardening}
 
-SnapOtter 完全在你的基础设施上处理文件。默认情况下，它会发送匿名且不含内容的产品分析和崩溃报告，以帮助改进项目。它绝不会发送你的文件、文件名、文件内容、OCR 输出、图像元数据或文档文本。可选的反馈仅在用户提交后才会发送，仅在启用分析时发送，并且只有在明确同意联系时才会包含联系字段。管理员可以在 设置 > 系统 > 隐私 下一键关闭分析和反馈收集，无需重新构建。文件处理始终保留在你的容器内。
+SnapOtter 完全在你的基础设施上处理文件。它可以发送匿名且不含内容的产品分析和崩溃报告，以帮助改进项目，但新实例会先询问管理员，在得到答复之前不会发送任何内容。它绝不会发送你的文件、文件名、文件内容、OCR 输出、图像元数据或文档文本。可选的反馈仅在用户提交后才会发送，仅在启用分析时发送，并且只有在明确同意联系时才会包含联系字段。管理员可以在 设置 > 系统 > 隐私 下一键关闭分析和反馈收集，无需重新构建。文件处理始终保留在你的容器内。
 
 容器以专用的非 root 用户（`snapotter`）运行，除所需的最小集合之外，所有 Linux 能力均已移除。完整的漏洞披露政策和安全架构请参阅 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
 
@@ -28,7 +28,7 @@ SnapOtter 完全在你的基础设施上处理文件。默认情况下，它会�
 
 ### 为什么不设置 `read_only` {#why-read-only-is-not-set}
 
-不设置 `read_only: true` 是因为 [PUID](/zh-CN/guide/configuration#env-puid)/[PGID](/zh-CN/guide/configuration#env-pgid) 重映射会在启动时写入 `/etc/passwd` 和 `/etc/group`。如果你使用 Docker 的 `--user` 标志或 Kubernetes 的 `runAsUser` 来代替 PUID/PGID，就可以安全地启用只读根文件系统。
+不设置 `read_only: true` 是因为 [PUID](/zh-CN/guide/configuration#env-puid)/[PGID](/zh-CN/guide/configuration#env-pgid) 重映射会在启动时写入 `/etc/passwd` 和 `/etc/group`。如果你使用 Docker 的 `--user` 标志或 Kubernetes 的 `runAsUser` 来代替 PUID/PGID，就可以安全地启用只读根文件系统。如果在只读根文件系统上将 PUID 或 PGID 设置为 999 以外的任何值，容器会在启动时停止并给出相应提示，且不会更改 /data 中任何已有内容的所有者。当未设置 PUID 和 PGID 时，一体化镜像同样可以使用只读根文件系统，前提是 /run 和 /tmp 是 tmpfs 挂载，且 /run 允许执行，因为 s6-overlay 会从那里启动其监督进程。
 
 ## 网络隔离 {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose 密钥（不使用 Swarm）需要 Compose v2.23 或更高版本�
 
 ## Kubernetes 部署 {#kubernetes-deployment}
 
-当容器已经以非 root 身份运行时（例如通过 Kubernetes 的 `runAsUser`），入口点会检测到这一点，并自动跳过 gosu 降权。在这种情况下，它无法自行 chown 已挂载的卷，因此会验证这些卷是否可写，如果不可写，则提前退出并给出可操作的指引。关于 `fsGroup` 和外部 UID 设置（TrueNAS、OpenShift），请参阅[存储权限](/zh-CN/guide/deployment#storage-permissions)。
+当容器已经以非 root 身份运行时（例如通过 Kubernetes 的 `runAsUser`），入口点会检测到这一点，并自动跳过 gosu 降权。在这种情况下，它无法自行 chown 已挂载的卷，因此会验证这些卷是否可写，如果不可写，则提前退出并给出可操作的指引。请参阅[存储权限](/zh-CN/guide/deployment#storage-permissions)，了解 `fsGroup` 和外部 UID 设置（TrueNAS、OpenShift）。
 
 **推荐的 Pod SecurityContext：**
 

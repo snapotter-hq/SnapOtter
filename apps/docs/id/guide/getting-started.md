@@ -1,8 +1,8 @@
 ---
-description: "Instal SnapOtter dengan Docker dalam satu perintah, masuk, lalu buka alat pertama Anda. Mencakup akselerasi GPU, mesin kecil, Docker Compose, dan build dari source."
-i18n_source_hash: c2aae540add0
+description: "Instal SnapOtter dengan Docker hanya dengan satu perintah, masuk, lalu buka alat pertama Anda. Mencakup akselerasi GPU, mesin kecil, Docker Compose, dan build dari source."
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: b74ee775acaa
+i18n_output_hash: 9ffb1c68be8f
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Di Raspberry Pi, laptop lama, atau VPS kecil, jalankan satu job dalam satu waktu
 :::
 
 ::: tip Analitik Produk Anonim
-SnapOtter menyertakan analitik produk anonim secara default. Untuk mematikannya, buka **Settings → System → Privacy** dan matikan **Anonymous Product Analytics**. Analitik berhenti seketika untuk seluruh instance.
+SnapOtter menyertakan analitik produk anonim. Instance baru menanyakannya kepada administrator pada saat pertama kali dijalankan dan tidak mengirim apa pun sampai pertanyaan itu dijawab. Untuk mematikannya nanti, buka **Settings → System → Privacy** dan matikan **Anonymous Product Analytics**. Analitik berhenti seketika untuk seluruh instance.
 
 Anda juga dapat mengatur variabel lingkungan `SNAPOTTER_TELEMETRY=0` (`false` dan `off` juga berfungsi) untuk menonaktifkan semua telemetri pada instance tanpa build ulang.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalitas | Jumlah | Contoh Alat |
 |----------|-------|---------------|
-| **Gambar** | 112 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, preset format |
+| **Gambar** | 114 | Resize, Crop, Compress, Convert, Remove Background, Upscale, OCR, Watermark, Collage, Colorize, GIF Tools, preset format |
 | **Video** | 63 | Trim, Crop, Compress, Convert, Merge, Extract Audio, Auto Subtitles, Video to GIF, Resize, Stabilize, preset format |
 | **Audio** | 57 | Trim, Merge, Convert, Normalize, Noise Reduction, Transcribe, Pitch Shift, Fade, Ringtone Maker, preset format |
 | **PDF / Dokumen** | 37 | Merge, Split, Compress, OCR, Watermark, Redact, Word to PDF, Excel to PDF, Rotate, Protect, Repair |
-| **File** | 25 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON |
+| **File** | 32 | CSV to JSON, JSON to XML, Merge CSVs, Split CSV, Create ZIP, Extract ZIP, Chart Maker, YAML/JSON, Convert Font, Proportion Calculator, Base64, preset format |
 
 ### Pipeline {#pipelines}
 

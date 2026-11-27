@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter 安全性強化指南。涵蓋容器安全、網路隔離、Docker secrets、Kubernetes 部署，以及合規文件。"
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: fd656fdc997b
+i18n_output_hash: 9e988a98b2de
 i18n_hash_version: 2
 ---
 
 # 安全性與強化 {#security-hardening}
 
-SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進專案，它預設會傳送匿名且不含內容的產品分析與當機報告，但絕不會傳送您的檔案、檔名、檔案內容、OCR 輸出、圖片中繼資料或文件文字。選用的意見回饋只會在使用者提交後傳送，且僅在啟用分析時才會傳送，聯絡欄位也只有在使用者明確同意提供聯絡方式時才會包含。管理員可以在「設定 > 系統 > 隱私權」下一鍵關閉分析與意見回饋的收集，無須重新建置。檔案處理一律在您的容器內進行。
+SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進專案，它可以傳送匿名且不含內容的產品分析與當機報告，但新的執行個體會先詢問其管理員，在獲得回覆之前不會傳送任何資料。它絕不會傳送您的檔案、檔名、檔案內容、OCR 輸出、圖片中繼資料或文件文字。選用的意見回饋只會在使用者提交後傳送，且僅在啟用分析時才會傳送，聯絡欄位也只有在使用者明確同意提供聯絡方式時才會包含。管理員可以在「設定 > 系統 > 隱私權」下一鍵關閉分析與意見回饋的收集，無須重新建置。檔案處理一律在您的容器內進行。
 
 容器以專用的非 root 使用者（`snapotter`）執行，並捨棄除最低必要集合之外的所有 Linux capabilities。完整的弱點揭露政策與安全架構，請參閱 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
 
@@ -28,7 +28,7 @@ SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進�
 
 ### 為什麼未設定 `read_only` {#why-read-only-is-not-set}
 
-未設定 `read_only: true`，是因為 [PUID](/zh-TW/guide/configuration#env-puid)/[PGID](/zh-TW/guide/configuration#env-pgid) 重新對應會在啟動時寫入 `/etc/passwd` 與 `/etc/group`。如果您改用 Docker 的 `--user` 旗標或 Kubernetes 的 `runAsUser`，而不使用 PUID/PGID，就可以安全地啟用唯讀的根檔案系統。
+未設定 `read_only: true`，是因為 [PUID](/zh-TW/guide/configuration#env-puid)/[PGID](/zh-TW/guide/configuration#env-pgid) 重新對應會在啟動時寫入 `/etc/passwd` 與 `/etc/group`。如果您改用 Docker 的 `--user` 旗標或 Kubernetes 的 `runAsUser`，而不使用 PUID/PGID，就可以安全地啟用唯讀的根檔案系統。如果在唯讀的根檔案系統上將 PUID 或 PGID 設為 999 以外的值，容器會在啟動時停止並顯示相關訊息，且不會變更 /data 中任何既有內容的擁有者。當未設定 PUID 與 PGID 時，all-in-one 映像檔也能以唯讀根檔案系統執行，前提是 /run 與 /tmp 為 tmpfs 掛載，且 /run 允許執行（exec），因為 s6-overlay 會從該處啟動其監督程式。
 
 ## 網路隔離 {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose secrets（不使用 Swarm）需要 Compose v2.23 或更新版本�
 
 ## Kubernetes 部署 {#kubernetes-deployment}
 
-當容器已經以非 root 身分執行時（例如透過 Kubernetes 的 `runAsUser`），entrypoint 會偵測到並自動略過 gosu 權限降級。在這種情況下，它無法自行對掛載的磁碟區執行 chown，因此會確認這些磁碟區可寫入，若不可寫入，則提早結束並提供可據以處理的指引，請參閱[儲存空間權限](/zh-TW/guide/deployment#storage-permissions)，了解 `fsGroup` 與外部 UID 的設定（TrueNAS、OpenShift）。
+當容器已經以非 root 身分執行時（例如透過 Kubernetes 的 `runAsUser`），entrypoint 會偵測到並自動略過 gosu 權限降級。在這種情況下，它無法自行對掛載的磁碟區執行 chown，因此會確認這些磁碟區可寫入，若不可寫入，則提早結束並提供可據以處理的指引。請參閱[儲存空間權限](/zh-TW/guide/deployment#storage-permissions)，了解 `fsGroup` 與外部 UID 的設定（TrueNAS、OpenShift）。
 
 **建議的 Pod SecurityContext：**
 

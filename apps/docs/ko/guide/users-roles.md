@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter에서 사용자, 기본 및 커스텀 역할, 권한, API 키, 팀, 세션, 감사 로그를 관리합니다."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 11df59397aab
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: af42529b5f3a
 i18n_hash_version: 2
 ---
 
@@ -88,7 +88,7 @@ SnapOtter에는 기본 역할 3개가 포함됩니다. 이들은 수정하거나
 | `features:manage` | AI 기능 번들 설치 및 관리 |
 | `system:health` | 상태 및 준비 엔드포인트 접근 |
 | `audit:read` | 감사 로그 조회 및 역할 목록 조회 |
-| `compliance:manage` | GDPR 수명주기 및 규정 준수 기능을 관리합니다. 파괴적인 사용자 작업은 여전히 ​​권한 제한을 받습니다. |
+| `compliance:manage` | GDPR 수명주기 및 규정 준수 기능을 관리합니다. 파괴적인 사용자 작업은 여전히 권한 제한을 받습니다. |
 | `webhooks:manage` | 아웃바운드 웹훅 구성 |
 | `security:manage` | 보안 설정 관리(IP 허용 목록, SSO 강제) |
 
@@ -147,7 +147,16 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### 커스텀 역할 삭제 {#deleting-a-custom-role}
 
-커스텀 역할이 삭제되면, 그 역할에 배정된 모든 사용자가 자동으로 `user` 역할로 재배정됩니다.
+커스텀 역할이 삭제되면, 그 역할에 배정된 모든 사용자가 자동으로 기본 제공 `user` 역할로 재배정됩니다. 비활성화된 멤버는 `disabled:user`로 비활성화된 상태로 유지됩니다. 설정 대화상자는 삭제 확인 창에서 이 내용과 함께 이동하게 될 사용자 수를 알려 줍니다.
+
+`DELETE /api/v1/roles/{id}` 응답에는 이동된 사용자 목록이 포함되며, `ROLE_DELETED` 감사 항목은 같은 목록을 `details.reassignedUsers` 아래에 기록합니다:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## 팀 {#teams}
 
@@ -204,7 +213,7 @@ GET /api/v1/audit-log?page=1&limit=50&action=LOGIN_FAILED&from=2026-01-01T00:00:
 ::: warning 
 `TOOL_EXECUTED` 이벤트는 기본적으로 로깅되지 **않습니다**. 두 경로 중 하나를 통해 옵트인됩니다:
 
-1. `auditToolOperations` 관리자 설정을 `true`으로 설정합니다.
+1. `auditToolOperations` 관리자 설정을 `true`로 설정합니다.
 2. `audit_export` 기능(팀 및 엔터프라이즈 플랜 모두에서 사용 가능)이 포함된 활성 라이선스를 보유합니다.
 
 이 중 하나가 없으면 개별 도구 실행은 감사 로그에 기록되지 않습니다.

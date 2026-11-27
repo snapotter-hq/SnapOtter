@@ -1,8 +1,8 @@
 ---
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: e08538c3fd89
+i18n_output_hash: 6bf669b02e03
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 `--gpus all`와 NVIDIA Container Toolkit을 올바르게 설정했는데도 AI 도구가 CPU에서 실행된다면 **Settings → AI Features**에서 해당 번들(예: Background Removal)을 다시 설치하세요. 설치 프로그램이 ONNX Runtime의 GPU 빌드를 복원합니다. 다른 번들(예: 전사)이 가져온 CPU 전용 빌드가 공유 AI 환경에서 GPU 빌드를 가릴 수 있기 때문입니다. 이전 이미지에서 UI로 다시 설치해도 GPU가 복원되지 않으면 [이슈 #490](https://github.com/snapotter-hq/SnapOtter/issues/490)의 수동 복구 방법을 참고하세요.
 
+## Proxmox LXC {#proxmox-lxc}
+
+Proxmox LXC 설치 프로그램은 이 저장소가 아니라 [community-scripts](https://community-scripts.org) 프로젝트에서 관리합니다. Docker 예시의 `admin` / `admin` 기본값을 사용하지 않습니다. 설치하면 `admin` 사용자에게 무작위 20자 비밀번호가 생성되어 컨테이너 안에 저장됩니다. 컨테이너에서 셸을 열고 다음을 실행하세요.
+
+```bash
+cat ~/snapotter.creds
+```
+
+같은 값이 `DEFAULT_PASSWORD`로 `/opt/snapotter_data/.env`에도 들어 있습니다. 이 변수는 처음 실행할 때 계정을 만드는 데만 쓰이므로, 앱에서 비밀번호를 이미 바꿨다면 이 파일은 더 이상 실제 비밀번호와 일치하지 않습니다.
+
 ## 하드웨어 요구 사항 {#hardware-requirements}
 
 이 수치는 NVIDIA RTX 4070이 장착된 최신 amd64 워크스테이션부터 Raspberry Pi까지 다양한 시스템에서 전체 도구 카탈로그를 실행하고, Docker 리소스 제한을 바꿔 가며 실제 하한선을 찾은 벤치마크에서 나온 것입니다.
@@ -330,7 +340,7 @@ SnapOtter는 이러한 모델 다운로드를 Docker 이미지에 의도적으�
 | 고품질 인페인팅 (`inpaint-hq`) | 5-7 GB | 호스트 RAM 8 GB (여유 약 6 GB) |
 | **전체 번들** | **설치 시 약 25 GB** | **4 GB (`inpaint-hq` 사용 시 8 GB)** |
 
-Fast OCR은 Tesseract를 통해 이미지에 내장되어 있고, 약 25 MiB를 차지하며, 선택 OCR 팩이나 4 GiB 메모리 요구 사항이 필요하지 않습니다. Fast는 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)와 아랍어(`ar`)는 지원하지 않습니다. 이 둘은 `balanced` 또는 `best`를 사용하므로 정확한 팩이 필요합니다. 정확한 팩은 공식 Linux amd64 및 arm64 컨테이너에서 사용할 수 있으며 CPU에서 ONNX Runtime을 실행합니다. NVIDIA 호스트도 같은 CPU OCR 런타임을 사용하므로 OCR은 CUDA 버전이나 GPU 아키텍처에 의존하지 않습니다. 정확한 런타임에는 최소 4 GiB의 유효 메모리가 필요합니다. 구성된 컨테이너 cgroup 제한이 있으면 그 값이고, 없으면 호스트 메모리입니다. SnapOtter는 서명된 호환성 최소 요건에 못 미치는 시스템을 팩을 내려받기 전에 거부합니다. libc와 Python ABI를 보장할 수 없는 베어메탈/사전 빌드 아카이브에서도 정확한 팩 설치는 거부됩니다. 지원되지 않는 호스트에서 한국어와 아랍어 OCR은 호환되지 않는다는 명시적 오류를 반환하며 Fast로 조용히 대체되지 않습니다. 한국어에 대해 Fast를 명시적으로 요청하면 작업이 큐에 들어가기 전에 `fast-korean-unsupported` 사유와 함께 `FEATURE_INCOMPATIBLE`를 반환합니다.
+Fast OCR은 Tesseract를 통해 이미지에 내장되어 있고, 약 25 MiB를 차지하며, 선택 OCR 팩이나 4 GiB 메모리 요구 사항이 필요하지 않습니다. Fast는 `auto`, `en`, `de`, `es`, `fr`, `zh`, `ja`를 지원하지만 한국어(`ko`)와 아랍어(`ar`)는 지원하지 않습니다. 이 둘은 `balanced` 또는 `best`를 사용하므로 정확한 팩이 필요합니다. 정확한 팩은 공식 Linux amd64 및 arm64 컨테이너에서 사용할 수 있으며 CPU에서 ONNX Runtime을 실행합니다. NVIDIA 호스트도 같은 CPU OCR 런타임을 사용하므로 OCR은 CUDA 버전이나 GPU 아키텍처에 의존하지 않습니다. 정확한 런타임에는 최소 4 GiB의 유효 메모리가 필요합니다. 구성된 컨테이너 cgroup 제한이 있으면 그 값이고, 없으면 호스트 메모리입니다. SnapOtter는 서명된 호환성 최소 요건에 못 미치는 시스템을 팩을 내려받기 전에 거부합니다. libc와 Python ABI를 보장할 수 없는 베어메탈/사전 빌드 아카이브에서도 정확한 팩 설치는 거부됩니다. 지원되지 않는 호스트에서 한국어와 아랍어 OCR은 호환되지 않는다는 명시적 오류를 반환하며 Fast로 조용히 대체되지 않습니다. 한국어에 대해 Fast를 명시적으로 요청하면 작업이 큐에 들어가기 전에 `FEATURE_INCOMPATIBLE` 사유와 함께 `fast-korean-unsupported`를 반환합니다.
 
 같은 `DATA_DIR`를 공유하는 복제본은 동일한 CPU 아키텍처를 사용해야 합니다. 여러 복제본을 배포할 때는 노드 어피니티로 고정하세요. amd64와 arm64가 섞인 복제본은 별도의 데이터 볼륨과 독립된 SnapOtter 배포가 필요합니다.
 
@@ -406,7 +416,7 @@ SnapOtter는 **55개 이상의 입력 형식**과 **14개의 출력 형식**을 
 
 - **콘텐츠 인식 크기 조정**은 caire 바이너리의 제한 때문에 큰 이미지(5 MP 초과)에서 충돌합니다. 작은 이미지에서는 정상 작동합니다.
 - **HEIF 디코딩**에는 13-23초가 걸립니다. HEIC(Apple의 변형)는 0.3-0.9초로 훨씬 빠릅니다.
-- **업스케일**은 CPU에서 작은 이미지를 넘어가면 시간 초과가 발생합니다. 실용적으로 사용하려면 GPU가 필요합니다.
+- **업스케일**은 GPU가 없으면 CPU 상한(기본 4 MP, 배율이 높을수록 더 낮음)을 넘는 입력을 업스케일하기 전에 줄이며, GPU에서보다 훨씬 느리게 실행됩니다. 호스트에 RAM이 충분하다면 [`MAX_CPU_UPSCALE_MP`](/ko/guide/configuration#processing-limits)로 그 상한을 올리거나 없앨 수 있습니다.
 - **CodeFormer** 얼굴 보정은 GFPGAN보다 훨씬 느립니다(GPU에서 53초 대 2초). 대부분의 경우 GFPGAN을 권장합니다.
 
 ### 여러 레플리카에서 AI 번들 설치 {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter는 실행 중에 두 위치에 씁니다. `/data`(사용자 파일, �
 
 권한 처리 방식은 컨테이너를 어떻게 시작하느냐에 따라 달라집니다.
 
-**기본값(root로 시작해서 `snapotter`로 전환)**: 엔트리포인트는 root로 시작해 마운트된 볼륨의 소유권을 고친 다음, `gosu`를 통해 권한이 없는 `snapotter` 사용자로 전환합니다. 명명된 볼륨은 별도 설정 없이 작동합니다. 바인드 마운트의 경우 `PUID`/`PGID`를 (위와 같이) 호스트 사용자로 설정해야 SnapOtter가 쓰는 파일의 소유자가 본인이 됩니다.
+**기본값(root로 시작해서 `snapotter`로 전환)**: 엔트리포인트는 root로 시작해 마운트된 볼륨의 소유권을 고친 다음, 권한이 없는 `snapotter` 사용자로 `gosu`를 통해 전환합니다. 명명된 볼륨은 별도 설정 없이 작동합니다. 바인드 마운트의 경우 `PUID`/`PGID`를 (위와 같이) 호스트 사용자로 설정해야 SnapOtter가 쓰는 파일의 소유자가 본인이 됩니다.
 
 **Kubernetes / OpenShift(`runAsUser`를 통한 non-root)**: root가 아닌 사용자로 직접 실행되면 컨테이너가 스스로 볼륨의 소유자를 바꿀 수 없으므로 오케스트레이터가 볼륨을 쓰기 가능하게 만들어야 합니다. `fsGroup`를 설정하세요.
 
@@ -493,8 +503,8 @@ securityContext:
 | [`RATE_LIMIT_PER_MIN`](/ko/guide/configuration#env-rate-limit-per-min) | `1000` | IP당 분당 API 요청 수 (0으로 설정하면 비활성화) |
 | [`MAX_USERS`](/ko/guide/configuration#env-max-users) | `0` (무제한) | 최대 사용자 계정 수 |
 | [`TRUST_PROXY`](/ko/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어입니다. 기본값은 사설 네트워크만 허용 |
-| `PUID` | `999` | 이 UID로 실행 (바인드 마운트 권한용) |
-| `PGID` | `999` | 이 GID로 실행 (바인드 마운트 권한용) |
+| `PUID` | `999` | 이 UID로 실행 (바인드 마운트 권한용). 쓰기 가능한 루트 파일 시스템이 필요합니다. [보안 가이드](/ko/guide/security#why-read-only-is-not-set) 참고 |
+| `PGID` | `999` | 이 GID로 실행 (바인드 마운트 권한용). 쓰기 가능한 루트 파일 시스템이 필요합니다. [보안 가이드](/ko/guide/security#why-read-only-is-not-set) 참고 |
 | [`LOG_LEVEL`](/ko/guide/configuration#env-log-level) | `info` | 로그 상세 수준: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/ko/guide/configuration#env-concurrent-jobs) | `0` (자동) | 최대 병렬 AI 처리 작업 수 |
 | [`SESSION_DURATION_HOURS`](/ko/guide/configuration#env-session-duration-hours) | `168` | 로그인 세션 유지 시간 (7일) |
@@ -519,6 +529,8 @@ services:
 ```
 
 프록시 자격 증명은 Compose 파일 밖에 보관하세요(예: 보호된 `.env` 파일이나 시크릿). TLS 검증을 비활성화하지 마세요. 서명된 OCR 인덱스는 릴리스 메타데이터를 인증하지만, 일반 TLS 검증은 전송 구간과 그 밖의 모든 아웃바운드 요청을 계속 보호합니다.
+
+huggingface.co 자체가 차단되었거나 속도가 제한되어 프록시가 아니라 다른 경로가 필요하다면 `HF_ENDPOINT`로 AI 다운로드를 Hugging Face 미러로 지정하세요(예: `HF_ENDPOINT: https://hf-mirror.com`). [미러를 통한 다운로드](/ko/api/ai#downloading-through-a-mirror)를 참고하세요.
 
 ## 상태 확인 {#health-check}
 
@@ -578,7 +590,7 @@ server {
 
 ### 하위 경로에 배포하기 {#subpath}
 
-`https://example.com/snapotter`에서 서비스하려면 SnapOtter 컨테이너 환경에 [`BASE_PATH=/snapotter`](/ko/guide/configuration#env-base-path)를 설정하고 다시 시작하세요. 공식 CPU 및 GPU Compose 파일은 셸이나 Compose `.env` 파일에서 `BASE_PATH`도 받을 수 있습니다. 같은 이미지가 어떤 경로에서도 작동하며 프런트엔드를 다시 빌드할 필요가 없습니다.
+`https://example.com/snapotter`에서 서비스하려면 SnapOtter 컨테이너 환경에 [`BASE_PATH=/snapotter`](/ko/guide/configuration#env-base-path)를 설정하고 다시 시작하세요. 공식 CPU 및 GPU Compose 파일은 `BASE_PATH`도 셸이나 Compose `.env` 파일에서 받을 수 있습니다. 같은 이미지가 어떤 경로에서도 작동하며 프런트엔드를 다시 빌드할 필요가 없습니다.
 
 `BASE_PATH`는 문자, 숫자, `_` 또는 `-`를 포함하는 슬래시로 구분된 세그먼트를 받으며, `/apps/snapotter` 같은 중첩 경로도 가능합니다. 마지막 슬래시는 선택 사항입니다. 루트 배포에서는 비워 두거나(기본값) `/`로 설정하세요.
 
@@ -603,7 +615,7 @@ location /snapotter/ {
 
 이 예시는 접두사를 유지합니다. 전달하기 전에 `/snapotter`를 제거하는 프록시도 지원됩니다. 내부 상태 확인은 계속 `/api/v1/health`를 사용할 수 있습니다. OIDC 또는 SAML의 경우 [`EXTERNAL_URL=https://example.com/snapotter`](/ko/guide/oidc#env-external-url)도 설정하고, ID 공급자의 콜백 URL을 각각 `/snapotter/api/auth/oidc/callback` 또는 `/snapotter/api/auth/saml/callback`를 포함하도록 업데이트하세요.
 
-API 스크립트는 변경 없이 계속 작동합니다. 도구의 `downloadUrl` 같은 API 응답의 URL은 `BASE_PATH` 값과 관계없이 `/api/`로 시작합니다. 이를 도메인 루트를 기준으로 해석하지 말고 인스턴스의 기본 URL(`https://example.com/snapotter` + `/api/v1/download/...`)에 이어 붙이세요.
+API 스크립트는 변경 없이 계속 작동합니다. 도구의 `downloadUrl` 같은 API 응답의 URL은 `/api/`로 시작하며, `BASE_PATH` 값과는 관계가 없습니다. 이를 도메인 루트를 기준으로 해석하지 말고 인스턴스의 기본 URL(`https://example.com/snapotter` + `/api/v1/download/...`)에 이어 붙이세요.
 
 접두사가 포함된 URL(`https://example.com/snapotter`)로 UI를 여세요. 접두사 없이 도착한 브라우저는 자동으로 해당 주소로 이동하며, 접두사 없이 앱에 도달하리라 예상되는 것은 API 요청뿐입니다. 로그에 `Requests arrive under /snapotter/ but BASE_PATH is empty`라고 표시된다면 프록시가 `BASE_PATH`에 선언되지 않은 접두사를 전달하고 있는 것입니다. `BASE_PATH`에 해당 접두사를 설정하거나 프록시에서 접두사를 제거하세요.
 
@@ -702,7 +714,7 @@ Semantic-release는 커밋 기록으로 버전을 결정합니다. `latest` Dock
 
 ## 분석 {#analytics}
 
-SnapOtter에는 버그를 찾고 기능을 개선하는 데 도움이 되는 익명 제품 분석(도구 사용 패턴, 오류 보고서)이 포함되어 있으며 기본적으로 켜져 있습니다. 파일, 파일 이름, 개인 데이터는 절대 포함되지 않습니다. 분석을 끄더라도 SnapOtter는 정상적으로 작동합니다.
+SnapOtter에는 버그를 찾고 기능을 개선하는 데 도움이 되는 익명 제품 분석(도구 사용 패턴, 오류 보고서)이 포함되어 있습니다. 새 인스턴스는 처음 실행할 때 관리자에게 먼저 물어보며, 답하기 전에는 아무것도 전송하지 않습니다. 파일, 파일 이름, 개인 데이터는 절대 포함되지 않습니다. 분석을 끄더라도 SnapOtter는 정상적으로 작동합니다.
 
 ### 분석 끄기 {#disabling-analytics}
 

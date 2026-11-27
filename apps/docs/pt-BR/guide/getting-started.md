@@ -1,8 +1,8 @@
 ---
 description: "Instale o SnapOtter com Docker em um único comando, entre e abra sua primeira ferramenta. Inclui aceleração por GPU, máquinas pequenas, Docker Compose e compilação a partir do código-fonte."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 5dea5774fdc1
+i18n_output_hash: ab6ccbf88a8f
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Em um Raspberry Pi, um notebook antigo ou uma VPS pequena, execute um job por ve
 :::
 
 ::: tip Anonymous Product Analytics
-O SnapOtter inclui analytics de produto anônimos por padrão. Para desativá-los, abra **Configurações → Sistema → Privacidade** e desative **Anonymous Product Analytics**. Eles param imediatamente para toda a instância.
+O SnapOtter inclui analytics de produto anônimos. Uma instância nova pergunta ao administrador na primeira execução e não envia nada até receber a resposta. Para desativá-los depois, abra **Configurações → Sistema → Privacidade** e desative **Anonymous Product Analytics**. Eles param imediatamente para toda a instância.
 
 Você também pode definir a variável de ambiente `SNAPOTTER_TELEMETRY=0` (`false` e `off` também funcionam) para desativar toda a telemetria da instância sem precisar recompilar.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalidade | Quantidade | Exemplos de ferramentas |
 |----------|-------|---------------|
-| **Imagem** | 112 | Redimensionar, Cortar, Comprimir, Converter, Remover fundo, Ampliar, OCR, Marca d'água, Colagem, Colorizar, Ferramentas de GIF, predefinições de formato |
+| **Imagem** | 114 | Redimensionar, Cortar, Comprimir, Converter, Remover fundo, Ampliar, OCR, Marca d'água, Colagem, Colorizar, Ferramentas de GIF, predefinições de formato |
 | **Vídeo** | 63 | Aparar, Cortar, Comprimir, Converter, Mesclar, Extrair áudio, Legendas automáticas, Vídeo para GIF, Redimensionar, Estabilizar, predefinições de formato |
 | **Áudio** | 57 | Aparar, Mesclar, Converter, Normalizar, Redução de ruído, Transcrever, Alterar tom, Fade, Criador de toques, predefinições de formato |
 | **PDF / Documento** | 37 | Mesclar, Dividir, Comprimir, OCR, Marca d'água, Redigir, Word para PDF, Excel para PDF, Girar, Proteger, Reparar |
-| **Arquivos** | 25 | CSV para JSON, JSON para XML, Mesclar CSVs, Dividir CSV, Criar ZIP, Extrair ZIP, Criador de gráficos, YAML/JSON |
+| **Arquivos** | 32 | CSV para JSON, JSON para XML, Mesclar CSVs, Dividir CSV, Criar ZIP, Extrair ZIP, Criador de gráficos, YAML/JSON, Converter fonte, Calculadora de proporção, Base64, predefinições de formato |
 
 ### Pipelines {#pipelines}
 

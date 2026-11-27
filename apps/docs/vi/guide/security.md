@@ -1,14 +1,14 @@
 ---
 description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secrets, triển khai Kubernetes và các tài liệu tuân thủ."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 647e9dfedaae
+i18n_output_hash: 8349a54cf5f5
 i18n_hash_version: 2
 ---
 
 # Bảo mật và tăng cường {#security-hardening}
 
-SnapOtter xử lý tệp hoàn toàn trên hạ tầng của bạn. Theo mặc định, nó gửi phân tích sử dụng sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, để giúp cải thiện dự án. Nó không bao giờ gửi tệp, tên tệp, nội dung tệp, kết quả OCR, metadata ảnh hay văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi đi, chỉ khi phân tích được bật, và các trường liên hệ chỉ được đưa vào khi có sự đồng ý liên hệ rõ ràng. Quản trị viên có thể tắt phân tích và thu thập phản hồi chỉ bằng một cú nhấp trong Settings > System > Privacy, không cần build lại. Việc xử lý tệp luôn nằm bên trong container của bạn.
+SnapOtter xử lý tệp hoàn toàn trên hạ tầng của bạn. Nó có thể gửi phân tích sử dụng sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, để giúp cải thiện dự án, nhưng một instance mới sẽ hỏi quản trị viên trước và không gửi gì cho đến khi được trả lời. Nó không bao giờ gửi tệp, tên tệp, nội dung tệp, kết quả OCR, metadata ảnh hay văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi đi, chỉ khi phân tích được bật, và các trường liên hệ chỉ được đưa vào khi có sự đồng ý liên hệ rõ ràng. Quản trị viên có thể tắt phân tích và thu thập phản hồi chỉ bằng một cú nhấp trong Settings > System > Privacy, không cần build lại. Việc xử lý tệp luôn nằm bên trong container của bạn.
 
 Container chạy dưới một người dùng không phải root chuyên dụng (`snapotter`) với mọi capability Linux bị loại bỏ, trừ tập tối thiểu cần thiết. Để xem chính sách công bố lỗ hổng đầy đủ và kiến trúc bảo mật, hãy xem [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trên GitHub.
 
@@ -28,7 +28,7 @@ Với triển khai hướng ra internet, hãy gắn cổng 1349 vào loopback v�
 
 ### Vì sao `read_only` không được đặt {#why-read-only-is-not-set}
 
-`read_only: true` không được đặt vì việc ánh xạ lại [PUID](/vi/guide/configuration#env-puid)/[PGID](/vi/guide/configuration#env-pgid) ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể bật hệ thống tệp gốc chỉ đọc một cách an toàn.
+`read_only: true` không được đặt vì việc ánh xạ lại [PUID](/vi/guide/configuration#env-puid)/[PGID](/vi/guide/configuration#env-pgid) ghi vào `/etc/passwd` và `/etc/group` khi khởi động. Nếu bạn dùng cờ `--user` của Docker hoặc `runAsUser` của Kubernetes thay cho PUID/PGID, bạn có thể bật hệ thống tệp gốc chỉ đọc một cách an toàn. Nếu bạn đặt PUID hoặc PGID khác 999 trên một root chỉ đọc, container sẽ dừng khi khởi động kèm một thông báo nêu rõ điều đó, trước khi đổi chủ sở hữu của bất kỳ thứ gì đã có trong /data. Image all-in-one cũng chạy được với root chỉ đọc khi PUID và PGID không được đặt, miễn là /run và /tmp là các mount tmpfs và /run cho phép exec, vì s6-overlay khởi động trình giám sát của nó từ đó.
 
 ## Cô lập mạng {#network-isolation}
 

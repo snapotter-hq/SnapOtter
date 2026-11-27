@@ -1,8 +1,8 @@
 ---
 description: "ติดตั้ง SnapOtter ในระบบจริงด้วย Docker ครอบคลุมความต้องการด้านฮาร์ดแวร์ การตั้งค่า GPU และการกำหนดค่า reverse proxy สำหรับ Nginx, Traefik และ Cloudflare"
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: ebcf0c2cabb3
+i18n_output_hash: 93c527103fb2
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 หากเครื่องมือ AI ยังทำงานบน CPU ทั้งที่ตั้งค่า `--gpus all` และ NVIDIA Container Toolkit ถูกต้องแล้ว ให้ติดตั้งชุดที่เกี่ยวข้องใหม่ (เช่น การลบพื้นหลัง) จาก **การตั้งค่า → ฟีเจอร์ AI** ตัวติดตั้งจะคืนค่า ONNX Runtime รุ่นสำหรับ GPU ซึ่งอาจถูกรุ่น CPU เท่านั้นที่ชุดอื่น (เช่น การถอดเสียง) ดึงเข้ามาบดบังในสภาพแวดล้อม AI ที่ใช้ร่วมกัน หากการติดตั้งใหม่จาก UI ไม่คืนค่า GPU บนอิมเมจรุ่นเก่า ให้ดูขั้นตอนซ่อมแซมด้วยตนเองใน [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490)
 
+## Proxmox LXC {#proxmox-lxc}
+
+โปรแกรมติดตั้ง Proxmox LXC ดูแลอยู่ในโปรเจกต์ [community-scripts](https://community-scripts.org) ไม่ใช่ในที่เก็บนี้ โดยไม่ใช้ค่าเริ่มต้น `admin` / `admin` จากตัวอย่าง Docker การติดตั้งจะสร้างรหัสผ่านแบบสุ่มยาว 20 ตัวอักษรสำหรับผู้ใช้ `admin` และบันทึกไว้ภายในคอนเทนเนอร์ เปิดเชลล์ในคอนเทนเนอร์แล้วรัน:
+
+```bash
+cat ~/snapotter.creds
+```
+
+ค่าเดียวกันนี้อยู่ใน `DEFAULT_PASSWORD` ภายใน `/opt/snapotter_data/.env` ตัวแปรนี้ใช้สร้างบัญชีในการรันครั้งแรกเท่านั้น ดังนั้นหากคุณเปลี่ยนรหัสผ่านในแอปไปแล้ว ไฟล์นี้จะไม่ตรงกับรหัสผ่านปัจจุบัน
+
 ## ความต้องการด้านฮาร์ดแวร์ {#hardware-requirements}
 
 ตัวเลขเหล่านี้มาจากการทดสอบประสิทธิภาพบนระบบหลายแบบ ตั้งแต่เวิร์กสเตชัน amd64 รุ่นใหม่ที่ใช้ NVIDIA RTX 4070 ไปจนถึง Raspberry Pi โดยรันเครื่องมือทั้งแค็ตตาล็อกบนแต่ละเครื่อง และปรับขีดจำกัดทรัพยากรของ Docker เพื่อหาค่าต่ำสุดที่ใช้งานได้จริง
@@ -406,7 +416,7 @@ SnapOtter รองรับ **รูปแบบอินพุตมากก�
 
 - **การปรับขนาดแบบรับรู้เนื้อหา** ขัดข้องกับภาพขนาดใหญ่ (>5 MP) เนื่องจากข้อจำกัดของไบนารี caire ใช้งานได้ปกติกับภาพที่เล็กกว่า
 - **การถอดรหัส HEIF** ใช้เวลา 13-23 วินาที ส่วน HEIC (รุ่นของ Apple) เร็วกว่ามากที่ 0.3-0.9 วินาที
-- **การขยายภาพ** หมดเวลาบน CPU สำหรับภาพที่ใหญ่กว่าขนาดเล็ก ต้องใช้ GPU จึงจะใช้งานได้จริง
+- **การขยายภาพ** โดยไม่มี GPU จะย่อภาพนำเข้าที่เกินเพดานของ CPU (ค่าเริ่มต้น 4 MP และต่ำลงเมื่อใช้ตัวคูณการขยายสูง) ก่อนขยาย และทำงานช้ากว่าบน GPU มาก [`MAX_CPU_UPSCALE_MP`](/th/guide/configuration#processing-limits) ใช้เพิ่มหรือยกเลิกเพดานนี้ได้หากโฮสต์มี RAM เพียงพอ
 - **CodeFormer** สำหรับปรับปรุงใบหน้าช้ากว่า GFPGAN อย่างมาก (53 วินาทีเทียบกับ 2 วินาทีบน GPU) แนะนำ GFPGAN สำหรับกรณีใช้งานส่วนใหญ่
 
 ### การติดตั้งชุด AI เมื่อมีหลายเรพลิกา {#ai-bundle-installs-with-several-replicas}
@@ -434,13 +444,13 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data -v SnapOtter
 
 ### Bind mount เทียบกับ named volume {#bind-mounts-vs-named-volumes}
 
-**Named volume** (แนะนำ) - Docker จัดการสิทธิ์ให้อัตโนมัติ:
+**Named volume** (แนะนำ): Docker จัดการสิทธิ์ให้อัตโนมัติ:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - คุณต้องจัดการสิทธิ์เอง ตั้งค่า [`PUID`](/th/guide/configuration#env-puid)/[`PGID`](/th/guide/configuration#env-pgid) ให้ตรงกับผู้ใช้ของโฮสต์:
+**Bind mount**: คุณต้องจัดการสิทธิ์เอง ตั้งค่า [`PUID`](/th/guide/configuration#env-puid)/[`PGID`](/th/guide/configuration#env-pgid) ให้ตรงกับผู้ใช้ของโฮสต์:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -493,8 +503,8 @@ securityContext:
 | [`RATE_LIMIT_PER_MIN`](/th/guide/configuration#env-rate-limit-per-min) | `1000` | คำขอ API ต่อนาทีต่อ IP (ตั้งเป็น 0 เพื่อปิด) |
 | [`MAX_USERS`](/th/guide/configuration#env-max-users) | `0` (ไม่จำกัด) | จำนวนบัญชีผู้ใช้สูงสุด |
 | [`TRUST_PROXY`](/th/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | เพียร์ใดบ้างที่กำหนด IP ของไคลเอนต์ผ่าน `X-Forwarded-For` ได้ ค่าเริ่มต้นคือเครือข่ายส่วนตัวเท่านั้น |
-| `PUID` | `999` | รันด้วย UID นี้ (สำหรับสิทธิ์ของ bind mount) |
-| `PGID` | `999` | รันด้วย GID นี้ (สำหรับสิทธิ์ของ bind mount) |
+| `PUID` | `999` | รันด้วย UID นี้ (สำหรับสิทธิ์ของ bind mount) ต้องใช้ระบบไฟล์รากที่เขียนได้ ดู [คู่มือความปลอดภัย](/th/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | รันด้วย GID นี้ (สำหรับสิทธิ์ของ bind mount) ต้องใช้ระบบไฟล์รากที่เขียนได้ ดู [คู่มือความปลอดภัย](/th/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/th/guide/configuration#env-log-level) | `info` | ระดับความละเอียดของบันทึก: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/th/guide/configuration#env-concurrent-jobs) | `0` (อัตโนมัติ) | จำนวนงานประมวลผล AI แบบขนานสูงสุด |
 | [`SESSION_DURATION_HOURS`](/th/guide/configuration#env-session-duration-hours) | `168` | อายุเซสชันการเข้าสู่ระบบ (7 วัน) |
@@ -519,6 +529,8 @@ services:
 ```
 
 เก็บข้อมูลรับรองของพร็อกซีไว้นอกไฟล์ Compose (เช่น ในไฟล์ `.env` ที่มีการป้องกันหรือ secret) อย่าปิดการตรวจสอบ TLS ดัชนี OCR ที่ลงนามไว้ใช้ยืนยันความถูกต้องของข้อมูลเมตาของรุ่น ขณะที่การตรวจสอบ TLS ตามปกติยังคงปกป้องการส่งข้อมูลและคำขอขาออกอื่นทั้งหมด
+
+หาก huggingface.co เองถูกบล็อกหรือถูกจำกัดความเร็ว และไม่ใช่กรณีที่ต้องใช้พร็อกซี ให้ชี้การดาวน์โหลด AI ไปยังมิเรอร์ของ Hugging Face ด้วย `HF_ENDPOINT` (ตัวอย่างเช่น `HF_ENDPOINT: https://hf-mirror.com`) ดู [การดาวน์โหลดผ่านมิเรอร์](/th/api/ai#downloading-through-a-mirror)
 
 ## การตรวจสอบสถานะ {#health-check}
 
@@ -720,7 +732,7 @@ Semantic-release กำหนดเวอร์ชันจากประวั
 
 ## การวิเคราะห์การใช้งาน {#analytics}
 
-SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน (รูปแบบการใช้เครื่องมือ รายงานข้อผิดพลาด) เพื่อช่วยจับข้อบกพร่องและปรับปรุงฟีเจอร์ โดยเปิดไว้เป็นค่าเริ่มต้น ไฟล์ ชื่อไฟล์ และข้อมูลส่วนบุคคลของคุณจะไม่ถูกรวมอยู่ในนั้นเด็ดขาด SnapOtter ทำงานได้ตามปกติเมื่อปิดการวิเคราะห์
+SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน (รูปแบบการใช้เครื่องมือ รายงานข้อผิดพลาด) เพื่อช่วยจับข้อบกพร่องและปรับปรุงฟีเจอร์ อินสแตนซ์ใหม่จะถามผู้ดูแลระบบเมื่อรันครั้งแรก และจะไม่ส่งข้อมูลใดจนกว่าจะได้รับคำตอบ ไฟล์ ชื่อไฟล์ และข้อมูลส่วนบุคคลของคุณจะไม่ถูกรวมอยู่ในนั้นเด็ดขาด SnapOtter ทำงานได้ตามปกติเมื่อปิดการวิเคราะห์
 
 ### การปิดการวิเคราะห์ {#disabling-analytics}
 

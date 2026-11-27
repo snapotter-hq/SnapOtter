@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: bea861458d7b
+i18n_output_hash: cb465cbd6afa
 i18n_hash_version: 2
 ---
 # Configurations à faibles ressources {#low-resource-setups}
@@ -88,11 +88,12 @@ Tous les plafonds sont des variables d'environnement, entièrement documentées 
 |---|---|---|
 | [`CONCURRENT_JOBS`](/fr/guide/configuration#env-concurrent-jobs) | `1` | Le nombre de tâches exécutées en parallèle. La détection automatique utilise le nombre de cœurs CPU moins un, ce qui convient aux grosses machines mais est trop gourmand sur une machine à 2 cœurs sous pression mémoire. |
 | [`MAX_WORKER_THREADS`](/fr/guide/configuration#env-max-worker-threads) | `2` | Le pool de threads de traitement d'images. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/fr/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | La durée pendant laquelle le processus Python d'IA et le runtime OCR restent chargés après la dernière requête. Ils occupent 1 à 2 Go tant qu'ils sont actifs : une fenêtre plus courte rend la mémoire plus tôt, au prix de quelques secondes lors de l'appel d'IA suivant. Abaissez aussi [`AI_SESSION_IDLE_TIMEOUT`](/fr/guide/configuration#env-ai-session-idle-timeout), puisque la fin du processus supprime les modèles en cache. |
 | [`MAX_BATCH_SIZE`](/fr/guide/configuration#env-max-batch-size) | `5` | Les lots sont ce qui épuise en premier la mémoire des machines de 1 à 2 Go. |
 | [`MAX_UPLOAD_SIZE_MB`](/fr/guide/configuration#env-max-upload-size-mb) | `100` | Empêche un seul fichier énorme d'occuper tout l'espace de travail. |
-| [`MAX_MEGAPIXELS`](/fr/guide/configuration#env-max-megapixels) | `50` | Décoder une image de plus de 100 MP consomme de la RAM quelle que soit la taille du fichier. |
+| [`MAX_MEGAPIXELS`](/fr/guide/configuration#env-max-megapixels) | `50` | Décoder une image de plus de 100 MP consomme de la RAM quelle que soit la taille du fichier. Les images de plus d'environ 268 MP sont refusées même avec `0`. |
 | [`MAX_VIDEO_DURATION_S`](/fr/guide/configuration#env-max-video-duration-s) | `300` | Les longs transcodages monopolisent un petit CPU pendant des minutes, voire des heures. |
-| [`PROCESSING_TIMEOUT_S`](/fr/guide/configuration#env-processing-timeout-s) | `600` | Plafond strict pour qu'une tâche incontrôlée finisse par libérer la machine. |
+| [`JOB_TIMEOUT_LONG_S`](/fr/guide/configuration#env-job-timeout-long-s) | `3600` | Plafond strict pour les tâches d'IA et de média, afin qu'une tâche incontrôlée finisse par libérer la machine. La valeur par défaut est de deux heures. Les tâches d'image et de document s'arrêtent déjà à [`JOB_TIMEOUT_FAST_S`](/fr/guide/configuration#env-job-timeout-fast-s) (120 secondes par défaut). |
 
 Ces plafonds s'appliquent à ce que le serveur accepte : réglez-les donc en fonction de ce que vous utilisez réellement plutôt que le plus bas possible. Si vous ne touchez jamais à la vidéo, un plafond `MAX_VIDEO_DURATION_S` ne coûte rien ; si vous numérisez des documents tous les jours, ne plafonnez pas [`MAX_PDF_PAGES`](/fr/guide/configuration#env-max-pdf-pages).
 

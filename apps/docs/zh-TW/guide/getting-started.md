@@ -1,8 +1,8 @@
 ---
 description: "以單一指令透過 Docker 安裝 SnapOtter，登入並開啟您的第一個工具。內容涵蓋 GPU 加速、小型機器、Docker Compose，以及從原始碼建置。"
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: b4232fdd12fc
+i18n_output_hash: 806055d1a5aa
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip 匿名產品分析
-SnapOtter 預設包含匿名產品分析。若要關閉，請開啟 **設定 → 系統 → 隱私權**，並關閉 **匿名產品分析**。整個執行個體會立即停止收集。
+SnapOtter 包含匿名產品分析。新的執行個體在首次執行時會先詢問其管理員，在管理員回答之前不會傳送任何資料。若之後要關閉，請開啟 **設定 → 系統 → 隱私權**，並關閉 **匿名產品分析**。整個執行個體會立即停止收集。
 
 您也可以設定環境變數 `SNAPOTTER_TELEMETRY=0`（`false` 與 `off` 同樣有效），無須重新建置即可停用該執行個體的所有遙測。
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | 類型 | 數量 | 範例工具 |
 |----------|-------|---------------|
-| **圖片** | 112 | 調整大小、裁切、壓縮、轉換、去背、放大、OCR、浮水印、拼貼、上色、GIF 工具、格式預設 |
+| **圖片** | 114 | 調整大小、裁切、壓縮、轉換、去背、放大、OCR、浮水印、拼貼、上色、GIF 工具、格式預設 |
 | **影片** | 63 | 剪輯、裁切、壓縮、轉換、合併、擷取音訊、自動字幕、影片轉 GIF、調整大小、防震、格式預設 |
 | **音訊** | 57 | 剪輯、合併、轉換、正規化、降噪、轉錄、變調、淡入淡出、鈴聲製作、格式預設 |
 | **PDF / 文件** | 37 | 合併、分割、壓縮、OCR、浮水印、塗黑、Word 轉 PDF、Excel 轉 PDF、旋轉、保護、修復 |
-| **檔案** | 25 | CSV 轉 JSON、JSON 轉 XML、合併 CSV、分割 CSV、建立 ZIP、解壓縮 ZIP、圖表製作、YAML/JSON |
+| **檔案** | 32 | CSV 轉 JSON、JSON 轉 XML、合併 CSV、分割 CSV、建立 ZIP、解壓縮 ZIP、圖表製作、YAML/JSON、轉換字型、比例計算機、Base64、格式預設 |
 
 ### 管線 {#pipelines}
 

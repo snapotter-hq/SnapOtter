@@ -1,9 +1,11 @@
 ---
-i18n_source_hash: b859c4f3b301
+description: "在 Raspberry Pi、舊筆電或小型 VPS 上執行 SnapOtter：預期表現、保守的設定上限，以及哪些功能應該略過。"
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: e634988a3304
+i18n_output_hash: afe364422e04
 i18n_hash_version: 2
 ---
+
 # 低資源環境設定 {#low-resource-setups}
 
 SnapOtter 在小型硬體上也能順暢執行：Raspberry Pi 4 或 5、舊筆電，或 2 GB 的 VPS。本頁是針對這類機器的實用指南：預期表現、可直接複製貼上且帶有合理上限的設定，以及哪些功能應該略過。這些數字背後的完整基準測試資料，請見[硬體需求](/zh-TW/guide/deployment#hardware-requirements)。
@@ -88,11 +90,12 @@ Pi 等級機器的注意事項：
 |---|---|---|
 | [`CONCURRENT_JOBS`](/zh-TW/guide/configuration#env-concurrent-jobs) | `1` | 同時平行執行的工作數量。自動偵測使用 CPU 核心數減一，這對大型機器沒問題，但對承受記憶體壓力的 2 核心機器而言太過積極。 |
 | [`MAX_WORKER_THREADS`](/zh-TW/guide/configuration#env-max-worker-threads) | `2` | 圖片處理執行緒池。 |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/zh-TW/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | 最後一次請求之後，AI Python 程序與 OCR 執行環境保持載入的時間。它們在暖機狀態下會佔用 1-2 GB，因此較短的時間窗能更快歸還記憶體，代價是下一次呼叫 AI 時多等幾秒。也請一併調低 [`AI_SESSION_IDLE_TIMEOUT`](/zh-TW/guide/configuration#env-ai-session-idle-timeout)，因為程序結束會丟棄已快取的模型。 |
 | [`MAX_BATCH_SIZE`](/zh-TW/guide/configuration#env-max-batch-size) | `5` | 批次是 1-2 GB 機器最先耗盡記憶體的地方。 |
 | [`MAX_UPLOAD_SIZE_MB`](/zh-TW/guide/configuration#env-max-upload-size-mb) | `100` | 避免單一巨大檔案佔滿整個工作區。 |
-| [`MAX_MEGAPIXELS`](/zh-TW/guide/configuration#env-max-megapixels) | `50` | 無論檔案大小，解碼 100+ MP 的圖片都會消耗 RAM。 |
+| [`MAX_MEGAPIXELS`](/zh-TW/guide/configuration#env-max-megapixels) | `50` | 無論檔案大小，解碼 100+ MP 的圖片都會消耗 RAM。超過約 268 MP 的圖片即使在 `0` 下也會被拒絕。 |
 | [`MAX_VIDEO_DURATION_S`](/zh-TW/guide/configuration#env-max-video-duration-s) | `300` | 長時間轉碼會讓小型 CPU 被獨佔數分鐘到數小時。 |
-| [`PROCESSING_TIMEOUT_S`](/zh-TW/guide/configuration#env-processing-timeout-s) | `600` | 硬性上限，讓失控的工作最終能釋放機器。 |
+| [`JOB_TIMEOUT_LONG_S`](/zh-TW/guide/configuration#env-job-timeout-long-s) | `3600` | AI 與媒體工作的硬性上限，讓失控的工作最終能釋放機器。預設為兩小時。圖片與文件工作本來就會在 [`JOB_TIMEOUT_FAST_S`](/zh-TW/guide/configuration#env-job-timeout-fast-s) 停止（預設為 120 秒）。 |
 
 這些上限作用於伺服器接受的內容，因此請依照您實際的使用情況設定，而不是越小越好。如果您從不處理影片，設定 `MAX_VIDEO_DURATION_S` 上限不會有任何代價；如果您每天掃描文件，就不要限制 [`MAX_PDF_PAGES`](/zh-TW/guide/configuration#env-max-pdf-pages)。
 

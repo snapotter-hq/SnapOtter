@@ -1,8 +1,8 @@
 ---
 description: "Tutte le variabili d'ambiente di SnapOtter con i valori predefiniti. Configuri autenticazione, storage, modelli AI, analytics e altro."
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 9ec5461a5ffc
+i18n_output_hash: 4a9aaefe4153
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Tutta la configurazione avviene tramite variabili d'ambiente. Ogni variabile ha 
 | `HOST` | `0.0.0.0` | Indirizzo IP su cui il server è in ascolto. Su una rete bridge (il valore predefinito per `docker run` e Compose) mantenga `0.0.0.0` (o `::`), altrimenti le porte pubblicate smettono di funzionare. In un'installazione nativa o con un container sulla rete host, `127.0.0.1` tiene l'API fuori dalla rete; per l'accesso remoto, anteponga un reverse proxy. La [modalità embedded](#embedded-mode) funziona solo con `0.0.0.0`, `::` o `127.0.0.1`, perché il suo controllo di avvio chiama `127.0.0.1`. Con qualsiasi altro indirizzo, `::1` compreso, il container non risulta mai avviato, e un crash successivo lo ferma invece di riavviare il server. Qualsiasi valore che non sia un indirizzo IP, `localhost` compreso, arresta il server all'avvio. |
 | `BASE_PATH` | (vuoto) | Percorso pubblico di deployment, ad es. `/snapotter`. Se vuoto o `/`, il servizio risponde alla radice del dominio. Applicato a runtime; non è necessario ricostruire l'immagine. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Numero massimo di richieste al minuto per IP. Imposti 0 per disattivare il rate limiting. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Numero massimo di richieste al minuto per IP agli endpoint di gestione delle chiavi API (elenco, creazione, revoca). Le chiavi in uso per le chiamate agli strumenti non sono interessate. Non esiste un valore illimitato: `0` rifiuta ogni richiesta a quegli endpoint. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Numero massimo di richieste al minuto per IP agli endpoint di gestione delle chiavi API (elenco, creazione, revoca). Le chiavi in uso per le chiamate agli strumenti non sono interessate. Imposti `0` per nessun limite. |
 | `CORS_ORIGIN` | (vuoto) | Origini consentite per CORS, separate da virgole, oppure vuoto per consentire solo la stessa origine. |
 | `LOG_LEVEL` | `info` | Livello di dettaglio dei log. Uno tra: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quali peer possono impostare l'IP del client tramite `X-Forwarded-For`. Il valore predefinito si fida solo di un peer su rete privata, quindi un reverse proxy su una rete Docker o su una LAN è considerato attendibile, mentre l'header falsificato di un client pubblico no. Imposti `true` solo quando un proxy sotto il Suo controllo si trova davanti a un indirizzo pubblico. |
@@ -38,7 +38,7 @@ I due booleani qui sotto accettano solo `true` e `false`. Qualsiasi altro valore
 | `MAX_USERS` | `0` (illimitato) | Numero massimo di account utente registrati. Imposti 0 per nessun limite. |
 | `SESSION_DURATION_HOURS` | `168` | Durata della sessione di login in ore (il valore predefinito è 7 giorni). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Imposti `true` per saltare la richiesta obbligatoria di cambio password al primo accesso. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | Numero massimo di richieste di login al minuto per IP. I tentativi successivi ricevono un `429` fino alla fine del minuto. Gli errori ripetuti per un singolo nome utente di solito raggiungono prima `LOGIN_THROTTLE_MAX_FAILURES`. Un amministratore può sostituirlo in Impostazioni > Sistema. Non esiste un valore illimitato: `0` rifiuta ogni login. Una build da sorgente parte da 10. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Numero massimo di richieste di login al minuto per IP. I tentativi successivi ricevono un `429` fino alla fine del minuto. Gli errori ripetuti per un singolo nome utente di solito raggiungono prima `LOGIN_THROTTLE_MAX_FAILURES`. Un amministratore può sostituirlo in Impostazioni > Sistema. Imposti `0` per nessun limite. Una build da sorgente parte da 10. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Numero di login con password falliti che un singolo nome utente può avere entro `LOGIN_THROTTLE_WINDOW_S` prima che i tentativi successivi ricevano un `429`, da qualunque IP provengano. Vengono riammessi man mano che i fallimenti più vecchi escono dalla finestra. Imposti 0 per disattivare la limitazione. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Durata di quella finestra, in secondi. Deve essere almeno 1; il server si rifiuta di avviarsi con 0. |
 
@@ -47,9 +47,9 @@ I due booleani qui sotto accettano solo `true` e `false`. Qualsiasi altro valore
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` oppure `s3`. S3 e MinIO richiedono una licenza con la funzione s3_storage e le variabili `S3_*` riportate più avanti. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Stringa di connessione a PostgreSQL e connessione su cui viene servita ogni richiesta. Dalla versione 2.3.0 in poi, impostando anche `DATABASE_MIGRATION_URL` diventa il ruolo di runtime a privilegi minimi, con DML sulle tabelle dell'app e nient'altro. Lo stack Compose la punta al proprio servizio `postgres`; la lasci non impostata (insieme a `REDIS_URL`) per ottenere la modalità embedded. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Stringa di connessione a PostgreSQL e connessione su cui viene servita ogni richiesta. Dalla versione 2.3.0 in poi, impostando anche `DATABASE_MIGRATION_URL` diventa il ruolo di runtime a privilegi minimi, con DML sulle tabelle dell'app e nient'altro. Lo stack Compose la punta al proprio servizio `postgres`; la lasci non impostata (insieme a `REDIS_URL`) per ottenere la modalità embedded. Per connettersi tramite un socket unix, indichi la directory del socket in `host`, come in `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, e monti quella directory nel container. |
 | `DATABASE_MIGRATION_URL` | (vuoto) | Connessione privilegiata, usata solo durante l'avvio per eseguire le migrazioni e concedere i privilegi al ruolo di runtime, poi chiusa prima della prima richiesta. Se la lascia vuota, SnapOtter funziona con un solo ruolo, e `DATABASE_URL` svolge entrambi i compiti. Vedere [Ruoli a privilegi minimi](/it/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Stringa di connessione a Redis (usata per le code di job BullMQ). Compose la punta al proprio servizio `redis`. |
+| `REDIS_URL` | `redis://localhost:6379` | Stringa di connessione a Redis (usata per le code di job BullMQ). Compose la punta al proprio servizio `redis`. Per un socket unix, usi `unix:///run/redis/redis.sock?db=5` (aggiunga `&password=...` se Redis ne richiede una) e monti il socket nel container. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Directory per i file temporanei durante l'elaborazione. Ripulita automaticamente. L'immagine imposta `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Directory per i file utente persistenti (immagini caricate, risultati salvati). L'immagine imposta `/data/files`. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Limite in megabyte per ciò che ogni utente conserva nella libreria File. Un salvataggio che lo supererebbe viene rifiutato indicando lo spazio usato e il limite. Una quota impostata sull'utente lo sostituisce. Imposti 0 per nessun limite. |
@@ -100,7 +100,7 @@ Nota sulla telemetria: la modalità embedded eredita l'impostazione predefinita 
 | `MAX_UPLOAD_SIZE_MB` | `0` (illimitato) | Dimensione massima del file per upload in megabyte. Imposti 0 per nessun limite. L'immagine pubblicata include `0`; una build da sorgente parte da 100. |
 | `MAX_BATCH_SIZE` | `0` (illimitato) | Numero massimo di file in una singola richiesta batch. Imposti 0 per nessun limite. L'immagine pubblicata include `0`; una build da sorgente parte da 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Numero di job batch eseguiti in parallelo. Imposti 0 per il rilevamento automatico in base ai core CPU disponibili. |
-| `MAX_MEGAPIXELS` | `0` (illimitato) | Risoluzione massima consentita per le immagini, in megapixel. Imposti 0 per nessun limite. |
+| `MAX_MEGAPIXELS` | `0` (nessun limite dell'app) | Risoluzione massima consentita per le immagini, in megapixel. Imposti 0 per rimuovere il limite proprio di SnapOtter. Il decoder delle immagini rifiuta comunque qualsiasi immagine oltre circa 268 MP (16383 x 16383 pixel), quindi un valore superiore a 268 non ha alcun effetto aggiuntivo. |
 | `MAX_CPU_UPSCALE_MP` | `4` | Input più grande, in megapixel, che l'upscaling AI accetta su un host senza GPU. L'output ingrandito è inoltre limitato a 16 volte questo valore (64 MP per impostazione predefinita), quindi un fattore di scala alto riduce ulteriormente il limite di input. Un'immagine più grande viene ridotta per rientrare prima dell'upscaling; se ciò lasciasse il risultato non più grande dell'originale, la richiesta viene invece rifiutata. Lanczos salta il limite di input ma non quello di output. Imposti 0 per nessun limite, che richiede molta RAM: RealESRGAN costruisce sempre internamente un buffer 4x. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (illimitato) | Limite in GB sulla dimensione complessiva di upload e risultati memorizzati nel workspace. Una volta superato, upload e richieste agli strumenti ricevono un 503 finché i file non scadono dopo `FILE_MAX_AGE_HOURS`. Imposti 0 per nessun limite; l'archiviazione locale rifiuta comunque le scritture con un 503 quando il disco ha meno di 0,5 GB liberi. L'immagine pubblicata include `0`; una build da sorgente parte da 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Numero massimo di worker thread per l'elaborazione delle immagini. Imposti 0 per il rilevamento automatico in base ai core CPU disponibili. |
@@ -121,9 +121,9 @@ Nota sulla telemetria: la modalità embedded eredita l'impostazione predefinita 
 | `MAX_AUDIO_DURATION_S` | `0` (illimitato) | Lo stesso, per gli strumenti audio. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (illimitato) | Bitrate complessivo più alto che gli strumenti video accettano, in kilobit al secondo. Imposti 0 per nessun limite. |
 | `PREVIEW_TIMEOUT_S` | `300` | Limite di tempo per la codifica di una clip di anteprima nel browser di un file video o audio, in secondi. Le anteprime dei documenti usano invece `LIBREOFFICE_TIMEOUT_S`. Imposti 0 per nessun limite. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Limite di tempo per una conversione LibreOffice (Word, Excel e PowerPoint in PDF, i convertitori di documenti e le anteprime dei documenti), in secondi. Qui `0` non significa illimitato; ripiega su 120. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Limite di tempo per una conversione LibreOffice (Word, Excel e PowerPoint in PDF, i convertitori di documenti e le anteprime dei documenti), in secondi. Imposti `0` per nessun limite. |
 | `GIF_BG_MAX_FRAMES` | `150` | Numero massimo di frame che Remove GIF Background accetta in un'unica animazione. Le animazioni più lunghe ricevono un `400` che indica il numero di frame. Imposti 0 per nessun limite di frame; si applica comunque un budget di pixel separato. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (disattivato) | Limite di spazio di indirizzamento, in megabyte, per ogni processo ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc e pdfcpu avviato dai motori multimediale e documenti. I decoder che leggono le immagini caricate (ImageMagick, exiftool e il loro ripiego su ffmpeg) non hanno limite. Un processo che lo supera viene terminato invece di spingere l'intero container nell'out-of-memory killer. Limita la memoria virtuale, non quella residente, quindi lasci un margine. Il sidecar AI non ha mai un limite. Imposti 0 per disattivarlo e affidarsi al limite di memoria del container. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (disattivato) | Limite di spazio di indirizzamento, in megabyte, per ciascuno di questi processi ausiliari: ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc e pdfcpu nei motori multimediale e documenti, più, per le immagini, exiftool, i decoder e gli encoder HEIF, JPEG XL e JPEG 2000, il decoder RAW e il decoder di ripiego ffmpeg. ImageMagick non ha limite, perché dispone di propri limiti di memoria, e nemmeno il sidecar AI. Un processo che supera il limite viene terminato invece di spingere l'intero container nell'out-of-memory killer. Limita la memoria virtuale, non quella residente, quindi lo imposti molto al di sopra di ciò che un processo usa realmente. L'encoder JPEG XL è il più esigente: un'immagine da 24 MP ha richiesto circa 1,8 GB ed è fallita con 1 GB, e più thread o CPU non cambiano molto la situazione. Finché il limite è impostato, l'encoder HEIF è limitato a due worker thread, il che porta una codifica da 24 MP a circa 0,8 GB al costo di una codifica più lenta. Parta da `2048` e lo riduca solo dopo aver provato i Suoi file più grandi. Imposti 0 per disattivarlo e affidarsi al limite di memoria del container. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Dimensione massima del campo `settings` che una richiesta a uno strumento può contenere, in kilobyte, calcolata in byte UTF-8. Le richieste oltre il limite ricevono un `400`. Imposti 0 per nessun limite. Le impostazioni reali degli strumenti sono molto più piccole di 64 KB, quindi aumenti questo valore solo se un client invia impostazioni insolitamente grandi. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | File di sottotitoli più grande (`.srt`, `.vtt`, `.ass`) che Burn Subtitles ed Embed Subtitles accettano, in megabyte. I file più grandi ricevono un `400` che indica la dimensione del file e il limite. Imposti 0 per nessun limite. Un file di sottotitoli per un lungometraggio è di solito ben sotto 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Valore più lungo che Edit Metadata scrive in un singolo tag (artista, descrizione, parole chiave e così via), in caratteri. I valori più lunghi ricevono un `400` che indica il tag e il limite. Imposti 0 per nessun limite. Lo aumenti se conserva didascalie o descrizioni lunghe. Il valore di un tag deve inoltre rientrare in `MAX_SETTINGS_PAYLOAD_KB` e nel limite per argomento del sistema operativo (128 KB su Linux). |
@@ -157,7 +157,12 @@ I file Compose pubblicati passano tutte queste variabili da `.env`, quindi è su
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Frequenza di esecuzione del job di pulizia. |
 | `JOBS_RETENTION_DAYS` | `30` | Giorni per cui un record di job terminato (completato, fallito o annullato) viene conservato prima che la pulizia di conservazione, eseguita ogni 6 ore, lo elimini. Un amministratore può sostituirlo in Impostazioni > Sistema. Utenti e team con blocco legale conservano i propri. Imposti 0 per conservarli per sempre. |
 | `AUDIT_RETENTION_DAYS` | `0` (per sempre) | Giorni per cui le voci del registro di audit vengono conservate. Stesse regole di sostituzione e blocco legale. Non viene eliminato nulla finché è attivo il registro di audit a prova di manomissione. Imposti 0 per conservarle per sempre. |
-| `SNAPOTTER_LICENSE_KEY` | (vuoto) | Chiave di licenza che sblocca le funzionalità enterprise, come SAML, SCIM e l'archiviazione S3. Letta all'avvio, quindi riavvii dopo averla modificata. Una chiave non valida o scaduta registra un avviso e il server funziona senza di esse. Nel container può invece montarla, tramite `SNAPOTTER_LICENSE_KEY_FILE` (vedere [Docker secrets](/guide/security#docker-secrets)). |
+
+### Licenza Enterprise {#enterprise-license}
+
+| Variabile | Predefinito | Descrizione |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (vuoto) | Chiave di licenza che sblocca le funzionalità enterprise, come SAML, SCIM e l'archiviazione S3. Letta all'avvio, quindi riavvii dopo averla modificata. Una chiave non valida o scaduta registra un avviso e il server funziona senza di esse. Nel container può invece montarla, tramite `SNAPOTTER_LICENSE_KEY_FILE` (vedere [Docker secrets](/it/guide/security#docker-secrets)). |
 
 ### Aspetto {#appearance}
 
@@ -171,8 +176,8 @@ I file Compose pubblicati passano tutte queste variabili da `.env`, quindi è su
 
 | Variabile | Predefinito | Descrizione |
 |---|---|---|
-| `PUID` | `999` | Esegue il processo del container con questo UID. Lo faccia corrispondere al Suo utente host per i bind mount (`id -u`). |
-| `PGID` | `999` | Esegue il processo del container con questo GID. Lo faccia corrispondere al Suo gruppo host per i bind mount (`id -g`). |
+| `PUID` | `999` | Esegue il processo del container con questo UID. Lo faccia corrispondere al Suo utente host per i bind mount (`id -u`). Richiede un filesystem root scrivibile; vedere la [guida alla sicurezza](/it/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Esegue il processo del container con questo GID. Lo faccia corrispondere al Suo gruppo host per i bind mount (`id -g`). Richiede un filesystem root scrivibile; vedere la [guida alla sicurezza](/it/guide/security#why-read-only-is-not-set). |
 
 ## Esempio Docker {#docker-example}
 

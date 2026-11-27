@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'da kullanıcıları, yerleşik ve özel rolleri, izinleri, API anahtarlarını, ekipleri, oturumları ve denetim günlüğünü yönetin."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: ac05d2c5bd6d
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: c7a2073a2ccb
 i18n_hash_version: 2
 ---
 
@@ -115,7 +115,7 @@ Rol adları 2-30 karakter olmalı, tire ve alt çizgi içeren küçük harfli al
 
 17 iznin tamamı özel roller aracılığıyla devredilebilir ancak yönetim izni, bu rolü yerleşik `admin` rolüne eşdeğer kılmaz. `users:manage` tarafından yetkilendirilen kullanıcı mutasyonları, `compliance:manage` tarafından yetkilendirilen yıkıcı işlemler ve `security:manage` tarafından yetkilendirilen özel rol yönetimi, aktörün mevcut yetkisine tabidir:
 
-- Yerleşik roller `admin` > `editor` > `user`'yi takip eder; özel roller yerleşik rollerin altındadır.
+- Yerleşik roller `admin` > `editor` > `user` sırasını izler; özel roller yerleşik rollerin altındadır.
 - Hedefin izinleri, aktörün **etkili** izinleri tarafından kapsanmalıdır. Kapsamlı bir API anahtarı bu nedenle kapsamından çıkarılan izinleri kullanamaz.
 - Hedef rolün araç erişimi, aktörün kendi araç erişimi tarafından kapsanmalıdır.
 - Devre dışı bırakılan bir hesap, bu rol `disabled:<original-role>` olarak kaydedildiğinde orijinal rolüne göre kontrol edilir.
@@ -147,7 +147,16 @@ Genel kimlik bilgileri ve yapılandırma daha katıdır: SCIM belirtecinin veril
 
 ### Özel bir rolü silme {#deleting-a-custom-role}
 
-Özel bir rol silindiğinde, ona atanan tüm kullanıcılar otomatik olarak `user` rolüne yeniden atanır.
+Özel bir rol silindiğinde, ona atanan tüm kullanıcılar otomatik olarak yerleşik `user` rolüne yeniden atanır. Devre dışı bırakılan üyeler `disabled:user` olarak devre dışı kalır. Ayarlar iletişim kutusu bunu silme onayında, kaç kullanıcının taşınacağıyla birlikte belirtir.
+
+`DELETE /api/v1/roles/{id}` yanıtı taşınan kullanıcıları listeler ve `ROLE_DELETED` denetim girdisi aynı listeyi `details.reassignedUsers` altında kaydeder:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Ekipler {#teams}
 
@@ -228,7 +237,7 @@ Etkinleştirildiğinde, her denetim günlüğü girdisi `DATA_ENCRYPTION_KEY` de
 
 ### Saklama {#retention}
 
-Eski girdileri otomatik olarak temizlemek için [`AUDIT_RETENTION_DAYS`](/tr/guide/configuration#env-audit-retention-days) ayarını yapın. Varsayılan değer `0`'tir; bu, girdilerin süresiz olarak saklandığı anlamına gelir.
+Eski girdileri otomatik olarak temizlemek için [`AUDIT_RETENTION_DAYS`](/tr/guide/configuration#env-audit-retention-days) ayarını yapın. Varsayılan değer `0`'dır; bu, girdilerin süresiz olarak saklandığı anlamına gelir.
 
 ### Olay referansı {#event-reference}
 

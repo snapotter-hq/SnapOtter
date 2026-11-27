@@ -1,8 +1,8 @@
 ---
 description: "Instalacja SnapOtter z Docker jednym poleceniem, logowanie i otwarcie pierwszego narzędzia. Obejmuje akcelerację GPU, małe maszyny, Docker Compose i budowanie ze źródeł."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 4cb8dac7996a
+i18n_output_hash: 0c7416ff54e5
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Na Raspberry Pi, starym laptopie lub małym VPS należy uruchamiać jedno zadani
 :::
 
 ::: tip Anonimowa analityka produktu
-SnapOtter domyślnie zawiera anonimową analitykę produktu. Aby ją wyłączyć, należy otworzyć **Settings → System → Privacy** i wyłączyć **Anonymous Product Analytics**. Wyłączenie działa natychmiast dla całej instancji.
+SnapOtter zawiera anonimową analitykę produktu. Nowa instancja pyta o nią administratora przy pierwszym uruchomieniu i nie wysyła niczego, dopóki nie otrzyma odpowiedzi. Aby ją później wyłączyć, należy otworzyć **Settings → System → Privacy** i wyłączyć **Anonymous Product Analytics**. Wyłączenie działa natychmiast dla całej instancji.
 
 Można też ustawić zmienną środowiskową `SNAPOTTER_TELEMETRY=0` (działają również `false` i `off`), aby wyłączyć całą telemetrię instancji bez przebudowy.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalność | Liczba | Przykładowe narzędzia |
 |----------|-------|---------------|
-| **Obraz** | 112 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Powiększanie, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, presety formatów |
+| **Obraz** | 114 | Zmiana rozmiaru, Kadrowanie, Kompresja, Konwersja, Usuwanie tła, Powiększanie, OCR, Znak wodny, Kolaż, Koloryzacja, Narzędzia GIF, presety formatów |
 | **Wideo** | 63 | Przycinanie, Kadrowanie, Kompresja, Konwersja, Łączenie, Wyodrębnianie dźwięku, Automatyczne napisy, Wideo do GIF, Zmiana rozmiaru, Stabilizacja, presety formatów |
 | **Audio** | 57 | Przycinanie, Łączenie, Konwersja, Normalizacja, Redukcja szumów, Transkrypcja, Zmiana wysokości dźwięku, Wyciszanie, Kreator dzwonków, presety formatów |
 | **PDF / Dokument** | 37 | Łączenie, Dzielenie, Kompresja, OCR, Znak wodny, Redakcja, Word do PDF, Excel do PDF, Obracanie, Zabezpieczanie, Naprawa |
-| **Pliki** | 25 | CSV do JSON, JSON do XML, Łączenie CSV, Dzielenie CSV, Tworzenie ZIP, Wyodrębnianie ZIP, Kreator wykresów, YAML/JSON |
+| **Pliki** | 32 | CSV do JSON, JSON do XML, Łączenie CSV, Dzielenie CSV, Tworzenie ZIP, Wyodrębnianie ZIP, Kreator wykresów, YAML/JSON, Konwersja czcionek, Kalkulator proporcji, Base64, presety formatów |
 
 ### Potoki {#pipelines}
 

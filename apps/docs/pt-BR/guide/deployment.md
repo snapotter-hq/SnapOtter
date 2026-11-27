@@ -1,8 +1,8 @@
 ---
 description: "Implante o SnapOtter em produção com Docker. Requisitos de hardware, configuração de GPU e configurações de proxy reverso para Nginx, Traefik e Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: b700b5737938
+i18n_output_hash: 235c6ca5a20d
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Se as ferramentas de IA rodarem na CPU mesmo com `--gpus all` e o NVIDIA Container Toolkit configurados corretamente, reinstale o pacote afetado (por exemplo, Remoção de fundo) em **Configurações → Recursos de IA**. O instalador restaura a versão GPU do ONNX Runtime, que uma versão somente CPU trazida por outro pacote (como transcrição) pode ofuscar no ambiente de IA compartilhado. Se reinstalar pela interface não restaurar a GPU em uma imagem mais antiga, veja o reparo manual na [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+O instalador do Proxmox LXC é mantido no projeto [community-scripts](https://community-scripts.org), não neste repositório. Ele não usa os padrões `admin` / `admin` dos exemplos de Docker. A instalação gera uma senha aleatória de 20 caracteres para o usuário `admin` e a salva dentro do contêiner. Abra um shell no contêiner e execute:
+
+```bash
+cat ~/snapotter.creds
+```
+
+O mesmo valor está em `DEFAULT_PASSWORD` em `/opt/snapotter_data/.env`. Essa variável apenas cria a conta na primeira execução, então, se você já alterou a senha no app, o arquivo deixa de corresponder a ela.
+
 ## Requisitos de hardware {#hardware-requirements}
 
 Estes números vêm de benchmarks em diversos sistemas, de uma estação de trabalho amd64 moderna com NVIDIA RTX 4070 até um Raspberry Pi, executando todo o catálogo de ferramentas em cada um e variando os limites de recursos do Docker para encontrar o piso real.
@@ -406,7 +416,7 @@ Veja a [lista completa de formatos](/pt-BR/guide/supported-formats) para detalhe
 
 - **O redimensionamento com reconhecimento de conteúdo** falha em imagens grandes (>5 MP) por uma limitação do binário caire. Funciona bem com imagens menores.
 - **A decodificação de HEIF** leva de 13 a 23 segundos. O HEIC (a variante da Apple) é bem mais rápido, com 0,3 a 0,9 segundo.
-- **A ampliação** atinge o tempo limite na CPU para qualquer coisa além de imagens pequenas. É necessária uma GPU para uso prático.
+- **A ampliação** sem GPU reduz uma entrada que ultrapasse o teto da CPU (4 MP por padrão, menos em fatores de escala altos) antes de ampliá-la, e roda bem mais devagar do que em uma GPU. [`MAX_CPU_UPSCALE_MP`](/pt-BR/guide/configuration#processing-limits) eleva ou remove esse teto se o host tiver a RAM necessária.
 - **A melhoria de rostos com CodeFormer** é bem mais lenta que o GFPGAN (53s contra 2s na GPU). O GFPGAN é recomendado para a maioria dos casos.
 
 ### Instalação de pacotes de IA com várias réplicas {#ai-bundle-installs-with-several-replicas}
@@ -434,13 +444,13 @@ As stacks do Compose já montam `SnapOtter-workspace`.
 
 ### Bind mounts vs. volumes nomeados {#bind-mounts-vs-named-volumes}
 
-**Volumes nomeados** (recomendado) - o Docker gerencia as permissões automaticamente:
+**Volumes nomeados** (recomendado): o Docker gerencia as permissões automaticamente:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts** - você gerencia as permissões. Defina [`PUID`](/pt-BR/guide/configuration#env-puid)/[`PGID`](/pt-BR/guide/configuration#env-pgid) para corresponder ao usuário do seu host:
+**Bind mounts**: você gerencia as permissões. Defina [`PUID`](/pt-BR/guide/configuration#env-puid)/[`PGID`](/pt-BR/guide/configuration#env-pgid) para corresponder ao usuário do seu host:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -455,9 +465,9 @@ O SnapOtter grava em dois locais durante a execução: `/data` (arquivos dos usu
 
 Como as permissões são tratadas depende de como o contêiner é iniciado:
 
-**Padrão (inicia como root, passa para `snapotter`)** - o entrypoint inicia como root, corrige a propriedade dos volumes montados e depois passa para o usuário sem privilégios `snapotter` por meio de `gosu`. Volumes nomeados funcionam sem configuração. Para bind mounts, defina `PUID`/`PGID` para o seu usuário do host (acima) para que os arquivos gravados pertençam a você.
+**Padrão (inicia como root, passa para `snapotter`)**: o entrypoint inicia como root, corrige a propriedade dos volumes montados e depois passa para o usuário sem privilégios `snapotter` por meio de `gosu`. Volumes nomeados funcionam sem configuração. Para bind mounts, defina `PUID`/`PGID` para o seu usuário do host (acima) para que os arquivos gravados pertençam a você.
 
-**Kubernetes / OpenShift (não root via `runAsUser`)** - iniciado diretamente como usuário não root, o contêiner não consegue executar chown nos volumes por conta própria, então o orquestrador precisa torná-los graváveis. Defina `fsGroup`:
+**Kubernetes / OpenShift (não root via `runAsUser`)**: iniciado diretamente como usuário não root, o contêiner não consegue executar chown nos volumes por conta própria, então o orquestrador precisa torná-los graváveis. Defina `fsGroup`:
 
 ```yaml
 securityContext:
@@ -468,10 +478,10 @@ securityContext:
 
 Os diretórios graváveis da imagem pertencem ao grupo GID 0 e têm permissão de escrita para o grupo, então um pod executado com um **UID arbitrário** mais o grupo suplementar root (o padrão do OpenShift) consegue gravar sem `chown`.
 
-**TrueNAS Scale (e outras configurações de "UID estranho")** - o TrueNAS executa apps como um usuário não root (geralmente `568:568`) e monta datasets do host pertencentes a outro usuário, então nem o entrypoint nem `fsGroup` os tornam graváveis sozinhos. Escolha uma opção:
+**TrueNAS Scale (e outras configurações de "UID estranho")**: o TrueNAS executa apps como um usuário não root (geralmente `568:568`) e monta datasets do host pertencentes a outro usuário, então nem o entrypoint nem `fsGroup` os tornam graváveis sozinhos. Escolha uma opção:
 
-- **Execute o app como root** (recomendado) - deixe o usuário do app sem definição ou defina-o como `0`, e deixe o entrypoint padrão corrigir as permissões e passar para `snapotter`.
-- **Execute como UID `999`** - defina o usuário/grupo do app como `999:999` (o usuário `snapotter` integrado do SnapOtter) para corresponder à propriedade da imagem.
+- **Execute o app como root** (recomendado): deixe o usuário do app sem definição ou defina-o como `0`, e deixe o entrypoint padrão corrigir as permissões e passar para `snapotter`.
+- **Execute como UID `999`**: defina o usuário/grupo do app como `999:999` (o usuário `snapotter` integrado do SnapOtter) para corresponder à propriedade da imagem.
 - **`chown` o dataset do host** para o UID com o qual o contêiner é executado, a partir do shell do TrueNAS:
 
   ```bash
@@ -493,8 +503,8 @@ O erro de inicialização indica o UID exato a usar, então o caminho mais rápi
 | [`RATE_LIMIT_PER_MIN`](/pt-BR/guide/configuration#env-rate-limit-per-min) | `1000` | Requisições de API por minuto por IP (defina 0 para desativar) |
 | [`MAX_USERS`](/pt-BR/guide/configuration#env-max-users) | `0` (ilimitado) | Máximo de contas de usuário |
 | [`TRUST_PROXY`](/pt-BR/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Quais peers podem definir o IP do cliente por meio de `X-Forwarded-For`. Por padrão, somente redes privadas |
-| `PUID` | `999` | Executa com este UID (para permissões de bind mount) |
-| `PGID` | `999` | Executa com este GID (para permissões de bind mount) |
+| `PUID` | `999` | Executa com este UID (para permissões de bind mount). Exige um sistema de arquivos raiz gravável; veja o [guia de segurança](/pt-BR/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Executa com este GID (para permissões de bind mount). Exige um sistema de arquivos raiz gravável; veja o [guia de segurança](/pt-BR/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/pt-BR/guide/configuration#env-log-level) | `info` | Detalhamento dos logs: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/pt-BR/guide/configuration#env-concurrent-jobs) | `0` (auto) | Máximo de jobs de processamento de IA em paralelo |
 | [`SESSION_DURATION_HOURS`](/pt-BR/guide/configuration#env-session-duration-hours) | `168` | Duração da sessão de login (7 dias) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Mantenha as credenciais do proxy fora do arquivo Compose (por exemplo, em um arquivo `.env` protegido ou em um secret). Não desative a verificação de TLS: o índice de OCR assinado autentica os metadados da versão, enquanto a validação TLS normal continua protegendo o transporte e todas as outras requisições de saída.
+
+Se o próprio huggingface.co estiver bloqueado ou limitado, em vez de exigir um proxy, aponte os downloads de IA para um espelho do Hugging Face com `HF_ENDPOINT` (por exemplo, `HF_ENDPOINT: https://hf-mirror.com`). Veja [Baixando por um espelho](/pt-BR/api/ai#downloading-through-a-mirror).
 
 ## Verificação de integridade {#health-check}
 
@@ -720,7 +732,7 @@ O semantic-release determina a versão a partir do histórico de commits. A tag 
 
 ## Análises {#analytics}
 
-O SnapOtter inclui análises anônimas de produto (padrões de uso das ferramentas, relatórios de erro) para ajudar a encontrar bugs e melhorar os recursos. Elas vêm ativadas por padrão. Seus arquivos, nomes de arquivo e dados pessoais nunca fazem parte delas. O SnapOtter funciona normalmente com as análises desativadas.
+O SnapOtter inclui análises anônimas de produto (padrões de uso das ferramentas, relatórios de erro) para ajudar a encontrar bugs e melhorar os recursos. Uma nova instância pergunta ao administrador na primeira execução e não envia nada até receber uma resposta. Seus arquivos, nomes de arquivo e dados pessoais nunca fazem parte delas. O SnapOtter funciona normalmente com as análises desativadas.
 
 ### Desativando as análises {#disabling-analytics}
 

@@ -1,8 +1,8 @@
 ---
 description: "Wszystkie zmienne środowiskowe SnapOtter wraz z wartościami domyślnymi. Konfiguracja uwierzytelniania, przechowywania danych, modeli AI, analityki i nie tylko."
-i18n_source_hash: 02edb8bd70e5
+i18n_source_hash: 8ff4e8d32091
 i18n_provenance: machine
-i18n_output_hash: 90930d4e0e5f
+i18n_output_hash: 1934601b4aaf
 i18n_hash_version: 2
 ---
 
@@ -20,7 +20,7 @@ Cała konfiguracja odbywa się za pomocą zmiennych środowiskowych. Każda zmie
 | `HOST` | `0.0.0.0` | Adres IP, na którym nasłuchuje serwer. W sieci typu bridge (domyślnej dla `docker run` i Compose) należy pozostawić `0.0.0.0` (lub `::`), w przeciwnym razie opublikowane porty przestaną działać. W instalacji natywnej lub w kontenerze w sieci hosta `127.0.0.1` odcina API od sieci; do zdalnego dostępu należy umieścić przed nim reverse proxy. [Tryb wbudowany](#embedded-mode) działa tylko z `0.0.0.0`, `::` lub `127.0.0.1`, ponieważ jego kontrola uruchomienia odwołuje się do `127.0.0.1`. Przy każdym innym adresie, łącznie z `::1`, kontener nigdy nie zostaje uznany za uruchomiony, a późniejsza awaria zatrzymuje go zamiast ponownie uruchomić serwer. Wszystko, co nie jest adresem IP, łącznie z `localhost`, zatrzymuje serwer przy uruchomieniu. |
 | `BASE_PATH` | (puste) | Publiczna ścieżka wdrożenia, np. `/snapotter`. Puste lub `/` oznacza obsługę w katalogu głównym domeny. Stosowana w czasie działania; przebudowa obrazu nie jest wymagana. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maksymalna liczba żądań na minutę z jednego adresu IP. Ustawienie 0 wyłącza ograniczanie liczby żądań. |
-| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maksymalna liczba żądań na minutę z jednego adresu IP do endpointów zarządzania kluczami API (lista, tworzenie, unieważnianie). Nie dotyczy kluczy używanych w wywołaniach narzędzi. Nie ma wartości oznaczającej brak limitu: `0` odrzuca każde żądanie do tych endpointów. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maksymalna liczba żądań na minutę z jednego adresu IP do endpointów zarządzania kluczami API (lista, tworzenie, unieważnianie). Nie dotyczy kluczy używanych w wywołaniach narzędzi. Ustawienie `0` oznacza brak limitu. |
 | `CORS_ORIGIN` | (puste) | Dozwolone źródła (origin) dla CORS, oddzielone przecinkami, lub puste, aby dopuścić tylko to samo źródło. |
 | `LOG_LEVEL` | `info` | Szczegółowość logów. Jedna z wartości: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Określa, które węzły mogą ustawiać adres IP klienta przez `X-Forwarded-For`. Wartość domyślna ufa wyłącznie węzłowi z sieci prywatnej, więc zaufany jest reverse proxy w sieci Docker lub w sieci LAN, a sfałszowany nagłówek publicznego klienta nie. Ustawiać `true` tylko wtedy, gdy przed aplikacją stoi kontrolowany przez użytkownika proxy z publicznym adresem. |
@@ -38,7 +38,7 @@ Dwie poniższe zmienne logiczne przyjmują wyłącznie `true` i `false`. Każda 
 | `MAX_USERS` | `0` (bez limitu) | Maksymalna liczba zarejestrowanych kont użytkowników. Ustawienie 0 oznacza brak limitu. |
 | `SESSION_DURATION_HOURS` | `168` | Czas trwania sesji logowania w godzinach (domyślnie 7 dni). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Ustawienie `true` pomija wymuszony monit o zmianę hasła przy pierwszym logowaniu. |
-| `LOGIN_ATTEMPT_LIMIT` | `30` | Maksymalna liczba żądań logowania na minutę z jednego adresu IP. Kolejne próby otrzymują `429` do końca minuty. Powtarzające się niepowodzenia dla jednej nazwy użytkownika zwykle osiągają wcześniej limit `LOGIN_THROTTLE_MAX_FAILURES`. Administrator może to zastąpić w Ustawienia > System. Nie ma wartości oznaczającej brak limitu: `0` odrzuca każde logowanie. Kompilacja ze źródeł zaczyna od 10. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Maksymalna liczba żądań logowania na minutę z jednego adresu IP. Kolejne próby otrzymują `429` do końca minuty. Powtarzające się niepowodzenia dla jednej nazwy użytkownika zwykle osiągają wcześniej limit `LOGIN_THROTTLE_MAX_FAILURES`. Administrator może to zastąpić w Ustawienia > System. Ustawienie `0` oznacza brak limitu. Kompilacja ze źródeł zaczyna od 10. |
 | `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Liczba nieudanych logowań hasłem, jaką może mieć jedna nazwa użytkownika w ramach `LOGIN_THROTTLE_WINDOW_S`, zanim kolejne próby dla niej otrzymają `429`, niezależnie od adresu IP. Są ponownie dopuszczane, gdy najstarsze niepowodzenia wychodzą poza okno. Ustawienie 0 wyłącza ograniczanie. |
 | `LOGIN_THROTTLE_WINDOW_S` | `900` | Długość tego okna w sekundach. Musi wynosić co najmniej 1; serwer odmawia uruchomienia przy 0. |
 
@@ -47,9 +47,9 @@ Dwie poniższe zmienne logiczne przyjmują wyłącznie `true` i `false`. Każda 
 | Zmienna | Domyślnie | Opis |
 |---|---|---|
 | `STORAGE_MODE` | `local` | `local` lub `s3`. S3 i MinIO wymagają licencji z funkcją s3_storage oraz zmiennych `S3_*` opisanych poniżej. |
-| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Ciąg połączenia z PostgreSQL oraz połączenie, przez które obsługiwane jest każde żądanie. W wersji 2.3.0 i nowszych, po ustawieniu także `DATABASE_MIGRATION_URL`, staje się ono rolą uruchomieniową o najmniejszych uprawnieniach, z uprawnieniami DML do tabel aplikacji i niczym więcej. Stos Compose kieruje je na swoją usługę `postgres`; pozostawić bez ustawienia (razem z `REDIS_URL`), aby uzyskać tryb wbudowany. |
+| `DATABASE_URL` | `postgres://snapotter:snapotter@localhost:5432/snapotter` | Ciąg połączenia z PostgreSQL oraz połączenie, przez które obsługiwane jest każde żądanie. W wersji 2.3.0 i nowszych, po ustawieniu także `DATABASE_MIGRATION_URL`, staje się ono rolą uruchomieniową o najmniejszych uprawnieniach, z uprawnieniami DML do tabel aplikacji i niczym więcej. Stos Compose kieruje je na swoją usługę `postgres`; pozostawić bez ustawienia (razem z `REDIS_URL`), aby uzyskać tryb wbudowany. Aby połączyć się przez gniazdo unix, należy podać katalog gniazda w `host`, jak w `postgres://user:pass@localhost/snapotter?host=/var/run/postgresql`, i zamontować ten katalog w kontenerze. |
 | `DATABASE_MIGRATION_URL` | (puste) | Połączenie uprzywilejowane, używane wyłącznie podczas rozruchu do uruchamiania migracji i nadawania uprawnień roli uruchomieniowej, a następnie zamykane przed pierwszym żądaniem. Pozostawienie pustego powoduje, że SnapOtter działa z jedną rolą, a `DATABASE_URL` pełni obie funkcje. Zobacz [Role o najmniejszych uprawnieniach](/pl/guide/database#least-privilege-roles). |
-| `REDIS_URL` | `redis://localhost:6379` | Ciąg połączenia z Redis (używany do kolejek zadań BullMQ). Compose kieruje go na swoją usługę `redis`. |
+| `REDIS_URL` | `redis://localhost:6379` | Ciąg połączenia z Redis (używany do kolejek zadań BullMQ). Compose kieruje go na swoją usługę `redis`. Dla gniazda unix należy użyć `unix:///run/redis/redis.sock?db=5` (dodać `&password=...`, jeśli Redis go wymaga) i zamontować gniazdo w kontenerze. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Katalog na pliki tymczasowe podczas przetwarzania. Czyszczony automatycznie. Obraz ustawia `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Katalog na trwałe pliki użytkowników (przesłane obrazy, zapisane wyniki). Obraz ustawia `/data/files`. |
 | `MAX_STORAGE_PER_USER_MB` | `5000` | Limit w megabajtach tego, co każdy użytkownik przechowuje w bibliotece plików. Zapis, który by go przekroczył, jest odrzucany z informacją o wykorzystanej ilości i limicie. Kwota ustawiona dla użytkownika ma pierwszeństwo. Ustawienie 0 oznacza brak limitu. |
@@ -100,7 +100,7 @@ Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie anal
 | `MAX_UPLOAD_SIZE_MB` | `0` (bez limitu) | Maksymalny rozmiar pliku na jedno przesłanie w megabajtach. Ustawienie 0 oznacza brak limitu. Opublikowany obraz ma `0`; kompilacja ze źródeł zaczyna od 100. |
 | `MAX_BATCH_SIZE` | `0` (bez limitu) | Maksymalna liczba plików w jednym żądaniu wsadowym. Ustawienie 0 oznacza brak limitu. Opublikowany obraz ma `0`; kompilacja ze źródeł zaczyna od 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Liczba zadań wsadowych uruchamianych równolegle. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
-| `MAX_MEGAPIXELS` | `0` (bez limitu) | Maksymalna dozwolona rozdzielczość obrazu w megapikselach. Ustawienie 0 oznacza brak limitu. |
+| `MAX_MEGAPIXELS` | `0` (bez limitu aplikacji) | Maksymalna dozwolona rozdzielczość obrazu w megapikselach. Ustawienie 0 usuwa własny limit SnapOtter. Dekoder obrazów nadal odrzuca wszystko powyżej około 268 MP (16383 x 16383 pikseli), więc wartość powyżej 268 nie daje dodatkowego efektu. |
 | `MAX_CPU_UPSCALE_MP` | `4` | Największe wejście w megapikselach, jakie skalowanie AI przyjmuje na hoście bez GPU. Skalowany wynik jest też ograniczony do 16-krotności tej wartości (domyślnie 64 MP), więc duży współczynnik skali dodatkowo obniża limit wejścia. Większy obraz jest zmniejszany przed skalowaniem; jeśli wynik nie byłby większy od oryginału, żądanie jest odrzucane. Lanczos pomija limit wejścia, ale nie limit wyniku. Ustawienie 0 oznacza brak limitu, co wymaga dużo pamięci RAM: RealESRGAN zawsze buduje wewnętrznie bufor 4x. |
 | `MAX_WORKSPACE_SIZE_GB` | `0` (bez limitu) | Limit w GB łącznego rozmiaru przesłanych plików i zapisanych wyników w przestrzeni roboczej. Po jego przekroczeniu przesyłanie i żądania narzędzi otrzymują 503, dopóki pliki nie wygasną po `FILE_MAX_AGE_HOURS`. Ustawienie 0 oznacza brak limitu; lokalny magazyn nadal odrzuca zapisy z kodem 503, gdy na dysku zostaje mniej niż 0,5 GB. Opublikowany obraz ma `0`; kompilacja ze źródeł zaczyna od 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Maksymalna liczba wątków roboczych do przetwarzania obrazów. Ustawienie 0 włącza automatyczne wykrywanie na podstawie dostępnych rdzeni CPU. |
@@ -121,9 +121,9 @@ Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie anal
 | `MAX_AUDIO_DURATION_S` | `0` (bez limitu) | To samo, dla narzędzi audio. |
 | `MAX_VIDEO_BITRATE_KBPS` | `0` (bez limitu) | Najwyższa łączna przepływność, jaką przyjmują narzędzia wideo, w kilobitach na sekundę. Ustawienie 0 oznacza brak limitu. |
 | `PREVIEW_TIMEOUT_S` | `300` | Limit czasu kodowania jednego klipu podglądu pliku wideo lub audio w przeglądarce, w sekundach. Podglądy dokumentów używają zamiast tego `LIBREOFFICE_TIMEOUT_S`. Ustawienie 0 oznacza brak limitu. |
-| `LIBREOFFICE_TIMEOUT_S` | `120` | Limit czasu jednej konwersji LibreOffice (Word, Excel i PowerPoint do PDF, konwertery dokumentów i podglądy dokumentów), w sekundach. `0` nie oznacza tu braku limitu; wartość wraca do 120. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Limit czasu jednej konwersji LibreOffice (Word, Excel i PowerPoint do PDF, konwertery dokumentów i podglądy dokumentów), w sekundach. Ustawienie `0` oznacza brak limitu. |
 | `GIF_BG_MAX_FRAMES` | `150` | Największa liczba klatek jednej animacji, jaką przyjmuje narzędzie Usuń tło z GIF. Dłuższe animacje otrzymują `400` z podaną liczbą klatek. Ustawienie 0 oznacza brak limitu klatek; nadal obowiązuje osobny budżet pikseli. |
-| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (wyłączone) | Limit przestrzeni adresowej w megabajtach dla każdego procesu ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc i pdfcpu uruchamianego przez silniki multimediów i dokumentów. Dekodery czytające przesłane obrazy (ImageMagick, exiftool i ich zapasowy ffmpeg) nie są ograniczane. Proces, który go przekroczy, jest zabijany, zamiast doprowadzić cały kontener do mechanizmu out-of-memory. Ogranicza pamięć wirtualną, nie rezydentną, więc należy zostawić zapas. Sidecar AI nigdy nie jest ograniczany. Ustawienie 0 wyłącza limit i polega na limicie pamięci kontenera. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (wyłączone) | Limit przestrzeni adresowej w megabajtach dla każdego z tych procesów pomocniczych: ffmpeg, ffprobe, Ghostscript, qpdf, LibreOffice, pandoc i pdfcpu w silnikach multimediów i dokumentów, a dla obrazów także exiftool, dekodery i kodery HEIF, JPEG XL i JPEG 2000, dekoder RAW oraz zapasowy dekoder ffmpeg. ImageMagick nie jest ograniczany, ponieważ ma własne limity pamięci, podobnie jak sidecar AI. Proces, który przekroczy limit, jest zabijany, zamiast doprowadzić cały kontener do mechanizmu out-of-memory. Limit dotyczy pamięci wirtualnej, nie rezydentnej, więc należy ustawić go wyraźnie powyżej tego, czego proces naprawdę używa. Koder JPEG XL potrzebuje najwięcej: obraz 24 MP wymagał około 1,8 GB i zawiódł przy 1 GB, a więcej wątków lub procesorów niewiele to zmienia. Gdy limit jest ustawiony, koder HEIF jest ograniczony do dwóch wątków roboczych, co zmniejsza zapotrzebowanie przy kodowaniu 24 MP do około 0,8 GB kosztem wolniejszego kodowania. Zacząć od `2048` i obniżać go dopiero po przetestowaniu największych plików. Ustawienie 0 wyłącza limit i polega na limicie pamięci kontenera. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Największe pole `settings`, jakie może zawierać żądanie narzędzia, w kilobajtach, liczone w bajtach UTF-8. Żądania przekraczające limit otrzymują `400`. Ustawienie 0 oznacza brak limitu. Rzeczywiste ustawienia narzędzi są znacznie mniejsze niż 64 KB, więc tę wartość należy zwiększać tylko wtedy, gdy klient wysyła nietypowo duże ustawienia. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Największy plik napisów (`.srt`, `.vtt`, `.ass`), jaki przyjmują narzędzia Wypal napisy i Osadź napisy, w megabajtach. Większe pliki otrzymują `400` z podanym rozmiarem pliku i limitem. Ustawienie 0 oznacza brak limitu. Plik napisów do pełnometrażowego filmu zwykle ma znacznie mniej niż 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Najdłuższa wartość, jaką Edytuj metadane zapisuje w pojedynczym tagu (wykonawca, opis, słowa kluczowe itd.), w znakach. Dłuższe wartości otrzymują `400` z nazwą tagu i limitem. Ustawienie 0 oznacza brak limitu. Zwiększ ją, jeśli przechowujesz długie podpisy lub opisy. Wartość tagu musi się też zmieścić w `MAX_SETTINGS_PAYLOAD_KB` i w limicie systemu operacyjnego na pojedynczy argument (128 KB w Linuksie). |
@@ -157,7 +157,12 @@ Opublikowane pliki Compose przekazują wszystkie te zmienne z `.env`, więc wyst
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Jak często uruchamiane jest zadanie czyszczenia. |
 | `JOBS_RETENTION_DAYS` | `30` | Liczba dni, przez jaką zapis zakończonego zadania (ukończonego, nieudanego lub anulowanego) jest przechowywany, zanim usunie go proces retencji, uruchamiany co 6 godzin. Administrator może to zastąpić w Ustawienia > System. Użytkownicy i zespoły objęci blokadą prawną zachowują swoje. Ustawienie 0 oznacza przechowywanie bez końca. |
 | `AUDIT_RETENTION_DAYS` | `0` (bez końca) | Liczba dni przechowywania wpisów dziennika audytu. Te same zasady zastępowania i blokady prawnej. Nic nie jest usuwane, gdy włączone jest odporne na manipulacje rejestrowanie audytu. Ustawienie 0 oznacza przechowywanie bez końca. |
-| `SNAPOTTER_LICENSE_KEY` | (puste) | Klucz licencyjny odblokowujący funkcje enterprise, takie jak SAML, SCIM i magazyn S3. Odczytywany przy uruchomieniu, więc po zmianie należy uruchomić ponownie. Nieprawidłowy lub wygasły klucz zapisuje ostrzeżenie w logu, a serwer działa bez tych funkcji. W kontenerze można go zamiast tego zamontować przez `SNAPOTTER_LICENSE_KEY_FILE` (zobacz [Sekrety Docker](/guide/security#docker-secrets)). |
+
+### Licencja enterprise {#enterprise-license}
+
+| Zmienna | Domyślnie | Opis |
+|---|---|---|
+| `SNAPOTTER_LICENSE_KEY` | (puste) | Klucz licencyjny odblokowujący funkcje enterprise, takie jak SAML, SCIM i magazyn S3. Odczytywany przy uruchomieniu, więc po zmianie należy uruchomić ponownie. Nieprawidłowy lub wygasły klucz zapisuje ostrzeżenie w logu, a serwer działa bez tych funkcji. W kontenerze można go zamiast tego zamontować przez `SNAPOTTER_LICENSE_KEY_FILE` (zobacz [Sekrety Docker](/pl/guide/security#docker-secrets)). |
 
 ### Wygląd {#appearance}
 
@@ -171,8 +176,8 @@ Opublikowane pliki Compose przekazują wszystkie te zmienne z `.env`, więc wyst
 
 | Zmienna | Domyślnie | Opis |
 |---|---|---|
-| `PUID` | `999` | Uruchamia proces kontenera z tym UID. Ustawić zgodnie z użytkownikiem hosta dla bind mountów (`id -u`). |
-| `PGID` | `999` | Uruchamia proces kontenera z tym GID. Ustawić zgodnie z grupą hosta dla bind mountów (`id -g`). |
+| `PUID` | `999` | Uruchamia proces kontenera z tym UID. Ustawić zgodnie z użytkownikiem hosta dla bind mountów (`id -u`). Wymaga zapisywalnego głównego systemu plików; zobacz [przewodnik bezpieczeństwa](/pl/guide/security#why-read-only-is-not-set). |
+| `PGID` | `999` | Uruchamia proces kontenera z tym GID. Ustawić zgodnie z grupą hosta dla bind mountów (`id -g`). Wymaga zapisywalnego głównego systemu plików; zobacz [przewodnik bezpieczeństwa](/pl/guide/security#why-read-only-is-not-set). |
 
 ## Przykład Docker {#docker-example}
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutta kurun, giriş yapın ve ilk aracınızı açın. GPU hızlandırmayı, küçük makineleri, Docker Compose kurulumunu ve kaynak koddan derlemeyi kapsar."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 5c57b97d90a5
+i18n_output_hash: 9d7575825034
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Raspberry Pi, eski bir dizüstü bilgisayar ya da küçük bir VPS üzerinde ayn
 :::
 
 ::: tip Anonim Ürün Analitiği
-SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
+SnapOtter anonim ürün analitiği içerir. Yeni bir örnek ilk çalıştırmada yöneticisine sorar ve yanıt verilene kadar hiçbir şey göndermez. Daha sonra kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
 
 Yeniden derleme yapmadan örnekteki tüm telemetriyi devre dışı bırakmak için `SNAPOTTER_TELEMETRY=0` ortam değişkenini de ayarlayabilirsiniz (`false` ve `off` da çalışır).
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Kategori | Sayı | Örnek Araçlar |
 |----------|-------|---------------|
-| **Görsel** | 112 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, biçim ön ayarları |
+| **Görsel** | 114 | Yeniden Boyutlandır, Kırp, Sıkıştır, Dönüştür, Arka Planı Kaldır, Büyüt, OCR, Filigran, Kolaj, Renklendir, GIF Araçları, biçim ön ayarları |
 | **Video** | 63 | Kırp, Kes, Sıkıştır, Dönüştür, Birleştir, Ses Çıkar, Otomatik Altyazı, Videodan GIF'e, Yeniden Boyutlandır, Stabilize Et, biçim ön ayarları |
 | **Ses** | 57 | Kırp, Birleştir, Dönüştür, Normalleştir, Gürültü Azaltma, Yazıya Dök, Perde Değiştir, Solma, Zil Sesi Oluşturucu, biçim ön ayarları |
 | **PDF / Belge** | 37 | Birleştir, Böl, Sıkıştır, OCR, Filigran, Karartma, Word'den PDF'e, Excel'den PDF'e, Döndür, Koru, Onar |
-| **Dosyalar** | 25 | CSV'den JSON'a, JSON'dan XML'e, CSV Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON |
+| **Dosyalar** | 32 | CSV'den JSON'a, JSON'dan XML'e, CSV Birleştir, CSV Böl, ZIP Oluştur, ZIP Çıkar, Grafik Oluşturucu, YAML/JSON, Yazı Tipi Dönüştür, Oran Hesaplayıcı, Base64, biçim ön ayarları |
 
 ### İş Hatları {#pipelines}
 

@@ -1,8 +1,8 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 8f39e49d9c11
+i18n_output_hash: 7f2fc85b6daa
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Nếu các công cụ AI vẫn chạy trên CPU dù `--gpus all` và NVIDIA Container Toolkit đã được thiết lập đúng, hãy cài đặt lại gói bị ảnh hưởng (ví dụ Background Removal) từ **Settings → AI Features**. Trình cài đặt sẽ khôi phục bản ONNX Runtime dành cho GPU, thứ có thể bị che bởi bản chỉ dành cho CPU do một gói khác (chẳng hạn transcription) kéo vào trong môi trường AI dùng chung. Nếu cài đặt lại từ giao diện không khôi phục được GPU trên một image cũ hơn, hãy xem hướng dẫn sửa thủ công tại [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+Trình cài đặt Proxmox LXC được duy trì trong dự án [community-scripts](https://community-scripts.org), không nằm trong kho mã nguồn này. Nó không dùng mặc định `admin` / `admin` trong các ví dụ Docker. Quá trình cài đặt tạo một mật khẩu ngẫu nhiên gồm 20 ký tự cho người dùng `admin` và lưu nó bên trong container. Hãy mở một shell trong container và chạy:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Cùng giá trị đó nằm ở `DEFAULT_PASSWORD` trong `/opt/snapotter_data/.env`. Biến này chỉ dùng để tạo tài khoản ở lần chạy đầu tiên, nên nếu sau đó bạn đã đổi mật khẩu trong ứng dụng thì tệp không còn khớp với mật khẩu hiện tại.
+
 ## Yêu cầu phần cứng {#hardware-requirements}
 
 Các con số này đến từ các bài đo trên nhiều hệ thống, từ một máy trạm amd64 hiện đại với NVIDIA RTX 4070 cho đến một chiếc Raspberry Pi, chạy toàn bộ danh mục công cụ trên từng máy và quét các giới hạn tài nguyên Docker để tìm ngưỡng tối thiểu thực sự.
@@ -288,7 +298,7 @@ deploy:
       memory: 2G
 ```
 
-**Ngoại lệ duy nhất tốn nhiều CPU là mã hóa lại video.** Các thao tác sao chép luồng (cắt, tắt tiếng, remux container) diễn ra tức thì, nhưng chuyển mã sang codec khác bị giới hạn bởi CPU. Một clip 1080p / 45 giây được mã hóa lại sang VP9 (WebM) mất khoảng **~40 giây** trên CPU hiện đại nhanh, ~45 giây trên Apple Silicon, ~80 giây trên laptop 4 nhân đời cũ và **~130 giây** trên máy chủ 4 nhân đời cũ. Nếu khối lượng công việc thiên về video, hãy ưu tiên số nhân CPU và xung nhịp, hoặc nâng giới hạn `cpus:` của container: compose được cung cấp mặc định giới hạn ứng dụng ở 4 nhân (8 trên compose GPU).
+**Ngoại lệ duy nhất tốn nhiều CPU là mã hóa lại video.** Các thao tác sao chép luồng (cắt, tắt tiếng, remux container) diễn ra tức thì, nhưng chuyển mã sang codec khác bị giới hạn bởi CPU. Một clip 1080p / 45 giây được mã hóa lại sang VP9 (WebM) mất khoảng **~40 giây** trên CPU hiện đại nhanh, ~45 giây trên Apple Silicon, ~80 giây trên laptop 4 nhân đời cũ và **~130 giây** trên máy chủ 4 nhân đời cũ. Nếu khối lượng công việc thiên về video, hãy ưu tiên số nhân CPU và xung nhịp, hoặc nâng giới hạn `cpus:` của container. Compose được cung cấp mặc định giới hạn ứng dụng ở 4 nhân (8 trên compose GPU).
 
 ### Khuyến nghị (công cụ AI trên CPU) {#recommended-ai-tools-on-cpu}
 
@@ -357,12 +367,12 @@ GPU NVIDIA (CUDA) tăng tốc đáng kể các mô hình AI nặng. Đo trên RT
 
 | Công cụ AI | Mức tăng tốc với GPU | Ghi chú |
 |---|---|---|
-| Phóng to bằng AI (RealESRGAN 2×) | **~47×** | Lợi ích lớn nhất - dưới một giây so với ~33 giây (nhiều phút với ảnh lớn) |
+| Phóng to bằng AI (RealESRGAN 2×) | **~47×** | Lợi ích lớn nhất: dưới một giây so với ~33 giây (nhiều phút với ảnh lớn) |
 | Cải thiện khuôn mặt (CodeFormer) | **~12×** | ~0.9 giây so với ~11 giây |
 | Transcription (Whisper) | ~4.5× | |
 | Xóa / thay / làm mờ nền | ~4× | ~7 giây trên GPU so với ~29 giây trên CPU |
 | Colorize | ~1.8× | |
-| OCR, nhận diện khuôn mặt, red-eye, noise-removal | ~1× | Đã nhanh trên CPU - GPU không giúp ích |
+| OCR, nhận diện khuôn mặt, red-eye, noise-removal | ~1× | Đã nhanh trên CPU, GPU không giúp ích |
 | Khôi phục ảnh | không | Bị giới hạn bởi CPU ngay cả trên GPU (0% sử dụng GPU); CPU nhanh quan trọng hơn GPU ở đây |
 
 Các công cụ đáng dùng GPU là **upscale, cải thiện khuôn mặt, transcription và xóa nền**. Nhận diện khuôn mặt, OCR và red-eye bị giới hạn bởi CPU và đã nhanh sẵn, nên GPU không bổ sung gì.
@@ -406,7 +416,7 @@ Xem [danh sách định dạng đầy đủ](/vi/guide/supported-formats) để 
 
 - **Content-aware resize** bị crash với ảnh lớn (>5 MP) do hạn chế của binary caire. Hoạt động bình thường với ảnh nhỏ hơn.
 - **Giải mã HEIF** mất 13-23 giây. HEIC (biến thể của Apple) nhanh hơn nhiều, ở mức 0.3-0.9 giây.
-- **Upscale** bị hết thời gian chờ trên CPU với mọi ảnh lớn hơn ảnh nhỏ. Cần GPU để dùng thực tế.
+- **Upscale** không có GPU sẽ thu nhỏ ảnh đầu vào vượt trần CPU (mặc định 4 MP, thấp hơn ở hệ số phóng đại cao) trước khi phóng to, và chạy chậm hơn nhiều so với trên GPU. [`MAX_CPU_UPSCALE_MP`](/vi/guide/configuration#processing-limits) nâng hoặc bỏ trần đó nếu máy chủ có đủ RAM.
 - Cải thiện khuôn mặt bằng **CodeFormer** chậm hơn đáng kể so với GFPGAN (53 giây so với 2 giây trên GPU). GFPGAN được khuyến nghị cho hầu hết trường hợp.
 
 ### Cài đặt gói AI khi có nhiều replica {#ai-bundle-installs-with-several-replicas}
@@ -434,13 +444,13 @@ Các stack Compose đã mount sẵn `SnapOtter-workspace`.
 
 ### Bind mount so với named volume {#bind-mounts-vs-named-volumes}
 
-**Named volume** (khuyến nghị) - Docker tự quản lý quyền:
+**Named volume** (khuyến nghị): Docker tự quản lý quyền:
 ```yaml
 volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mount** - Bạn tự quản lý quyền. Đặt [`PUID`](/vi/guide/configuration#env-puid)/[`PGID`](/vi/guide/configuration#env-pgid) khớp với người dùng trên máy chủ của bạn:
+**Bind mount**: bạn tự quản lý quyền. Đặt [`PUID`](/vi/guide/configuration#env-puid)/[`PGID`](/vi/guide/configuration#env-pgid) khớp với người dùng trên máy chủ của bạn:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -455,9 +465,9 @@ SnapOtter ghi vào hai vị trí khi chạy: `/data` (tệp người dùng, nh�
 
 Cách xử lý quyền phụ thuộc vào cách container được khởi chạy:
 
-**Mặc định (khởi động bằng root, hạ xuống `snapotter`)** - entrypoint khởi động bằng root, sửa quyền sở hữu của các volume được mount, rồi hạ xuống người dùng không đặc quyền `snapotter` qua `gosu`. Named volume hoạt động mà không cần cấu hình. Với bind mount, hãy đặt `PUID`/`PGID` theo người dùng trên máy chủ của bạn (ở trên) để các tệp nó ghi thuộc quyền sở hữu của bạn.
+**Mặc định (khởi động bằng root, hạ xuống `snapotter`)**: entrypoint khởi động bằng root, sửa quyền sở hữu của các volume được mount, rồi hạ xuống người dùng không đặc quyền `snapotter` qua `gosu`. Named volume hoạt động mà không cần cấu hình. Với bind mount, hãy đặt `PUID`/`PGID` theo người dùng trên máy chủ của bạn (ở trên) để các tệp nó ghi thuộc quyền sở hữu của bạn.
 
-**Kubernetes / OpenShift (không phải root qua `runAsUser`)** - được khởi chạy trực tiếp bằng người dùng không phải root, container không thể tự chown các volume, nên bộ điều phối phải làm cho chúng ghi được. Đặt `fsGroup`:
+**Kubernetes / OpenShift (không phải root qua `runAsUser`)**: được khởi chạy trực tiếp bằng người dùng không phải root, container không thể tự chown các volume, nên bộ điều phối phải làm cho chúng ghi được. Đặt `fsGroup`:
 
 ```yaml
 securityContext:
@@ -468,10 +478,10 @@ securityContext:
 
 Các thư mục ghi được của image thuộc nhóm GID 0 và có quyền ghi cho nhóm, vì vậy một pod chạy với **UID tùy ý** cùng nhóm phụ root (mặc định của OpenShift) có thể ghi mà không cần `chown`.
 
-**TrueNAS Scale (và các thiết lập "UID lạ" khác)** - TrueNAS chạy ứng dụng bằng người dùng không phải root (thường là `568:568`) và mount các dataset của máy chủ thuộc về một người dùng khác, nên cả entrypoint lẫn `fsGroup` đều không tự làm cho chúng ghi được. Hãy chọn một trong các cách sau:
+**TrueNAS Scale (và các thiết lập "UID lạ" khác)**: TrueNAS chạy ứng dụng bằng người dùng không phải root (thường là `568:568`) và mount các dataset của máy chủ thuộc về một người dùng khác, nên cả entrypoint lẫn `fsGroup` đều không tự làm cho chúng ghi được. Hãy chọn một trong các cách sau:
 
-- **Chạy ứng dụng bằng root** (khuyến nghị) - để trống người dùng của ứng dụng hoặc đặt thành `0`, và để entrypoint mặc định sửa quyền rồi hạ xuống `snapotter`.
-- **Chạy với UID `999`** - đặt người dùng/nhóm của ứng dụng thành `999:999` (người dùng `snapotter` có sẵn của SnapOtter) để khớp với quyền sở hữu của image.
+- **Chạy ứng dụng bằng root** (khuyến nghị): để trống người dùng của ứng dụng hoặc đặt thành `0`, và để entrypoint mặc định sửa quyền rồi hạ xuống `snapotter`.
+- **Chạy với UID `999`**: đặt người dùng/nhóm của ứng dụng thành `999:999` (người dùng `snapotter` có sẵn của SnapOtter) để khớp với quyền sở hữu của image.
 - **`chown` dataset của máy chủ** sang UID mà container chạy, từ shell của TrueNAS:
 
   ```bash
@@ -493,8 +503,8 @@ Lỗi khi khởi động nêu chính xác UID cần dùng, nên cách nhanh nh�
 | [`RATE_LIMIT_PER_MIN`](/vi/guide/configuration#env-rate-limit-per-min) | `1000` | Số yêu cầu API mỗi phút cho mỗi IP (đặt 0 để tắt) |
 | [`MAX_USERS`](/vi/guide/configuration#env-max-users) | `0` (không giới hạn) | Số tài khoản người dùng tối đa |
 | [`TRUST_PROXY`](/vi/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP của client qua `X-Forwarded-For`. Mặc định chỉ các mạng riêng |
-| `PUID` | `999` | Chạy với UID này (cho quyền bind mount) |
-| `PGID` | `999` | Chạy với GID này (cho quyền bind mount) |
+| `PUID` | `999` | Chạy với UID này (cho quyền bind mount). Cần hệ thống tệp gốc ghi được; xem [hướng dẫn bảo mật](/vi/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Chạy với GID này (cho quyền bind mount). Cần hệ thống tệp gốc ghi được; xem [hướng dẫn bảo mật](/vi/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/vi/guide/configuration#env-log-level) | `info` | Mức độ chi tiết của nhật ký: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/vi/guide/configuration#env-concurrent-jobs) | `0` (tự động) | Số tác vụ xử lý AI song song tối đa |
 | [`SESSION_DURATION_HOURS`](/vi/guide/configuration#env-session-duration-hours) | `168` | Thời hạn phiên đăng nhập (7 ngày) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Hãy giữ thông tin xác thực của proxy bên ngoài tệp Compose (ví dụ trong một tệp `.env` được bảo vệ hoặc một secret). Không tắt xác minh TLS: chỉ mục OCR đã ký xác thực siêu dữ liệu bản phát hành, còn việc xác thực TLS thông thường vẫn bảo vệ đường truyền và mọi yêu cầu đi ra khác.
+
+Nếu bản thân huggingface.co bị chặn hoặc bị giới hạn tốc độ thay vì cần một proxy, hãy trỏ các lượt tải AI tới một bản mirror Hugging Face bằng `HF_ENDPOINT` (ví dụ `HF_ENDPOINT: https://hf-mirror.com`). Xem [Tải qua mirror](/vi/api/ai#downloading-through-a-mirror).
 
 ## Kiểm tra sức khỏe {#health-check}
 
@@ -720,7 +732,7 @@ Semantic-release xác định phiên bản từ lịch sử commit. Tag Docker `
 
 ## Phân tích ẩn danh {#analytics}
 
-SnapOtter có phân tích sản phẩm ẩn danh (mẫu sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Tính năng này được bật theo mặc định. Tệp, tên tệp và dữ liệu cá nhân của bạn không bao giờ là một phần của nó. SnapOtter vẫn hoạt động bình thường khi tắt phân tích.
+SnapOtter có phân tích sản phẩm ẩn danh (mẫu sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Một instance mới sẽ hỏi quản trị viên ở lần chạy đầu tiên và không gửi gì cho đến khi được trả lời. Tệp, tên tệp và dữ liệu cá nhân của bạn không bao giờ là một phần của nó. SnapOtter vẫn hoạt động bình thường khi tắt phân tích.
 
 ### Tắt phân tích {#disabling-analytics}
 

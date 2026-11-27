@@ -1,8 +1,8 @@
 ---
 description: "Quản lý người dùng, vai trò tích hợp sẵn và tùy chỉnh, quyền, khóa API, nhóm, phiên và nhật ký kiểm toán trong SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 2dab22860304
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: ad51b33a1ff9
 i18n_hash_version: 2
 ---
 
@@ -119,7 +119,7 @@ Tất cả 17 quyền có thể được ủy quyền thông qua các vai trò t
 - Các quyền của mục tiêu phải được bao gồm bởi các quyền **có hiệu lực** của tác nhân. Do đó, khóa API có phạm vi không thể thực hiện các quyền bị bỏ qua trong phạm vi của nó.
 - Quyền truy cập công cụ của vai trò mục tiêu phải được bao hàm bởi quyền truy cập công cụ của chính tác nhân.
 - Tài khoản bị vô hiệu hóa được kiểm tra dựa trên vai trò ban đầu khi vai trò đó được ghi là `disabled:<original-role>`.
-- Việc xóa vai trò tùy chỉnh cũng yêu cầu có quyền chỉ định dự phòng `user` tích hợp sẵn; thành viên bị khuyết tật vẫn bị vô hiệu hóa dưới dạng `disabled:user`.
+- Việc xóa vai trò tùy chỉnh cũng yêu cầu có quyền chỉ định dự phòng `user` tích hợp sẵn; thành viên bị vô hiệu hóa vẫn bị vô hiệu hóa dưới dạng `disabled:user`.
 
 Thông tin xác thực và cấu hình toàn cầu chặt chẽ hơn: việc phát hành hoặc thu hồi mã thông báo SCIM và nhập cấu hình phiên bản yêu cầu vai trò `admin` tích hợp sẵn với toàn quyền quản trị hiệu quả.
 
@@ -147,7 +147,16 @@ Khi chế độ `tool` được đặt nhưng tính năng doanh nghiệp không 
 
 ### Xóa một vai trò tùy chỉnh {#deleting-a-custom-role}
 
-Khi một vai trò tùy chỉnh bị xóa, mọi người dùng được gán vai trò đó tự động được gán lại về vai trò `user`.
+Khi một vai trò tùy chỉnh bị xóa, mọi người dùng được gán vai trò đó tự động được gán lại về vai trò `user` tích hợp sẵn. Các thành viên bị vô hiệu hóa vẫn bị vô hiệu hóa dưới dạng `disabled:user`. Hộp thoại cài đặt nêu rõ điều này trong phần xác nhận xóa, cùng với số người dùng sẽ được chuyển.
+
+Phản hồi `DELETE /api/v1/roles/{id}` liệt kê những người dùng đã được chuyển, và mục nhật ký kiểm toán `ROLE_DELETED` ghi lại cùng danh sách đó trong `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Nhóm {#teams}
 

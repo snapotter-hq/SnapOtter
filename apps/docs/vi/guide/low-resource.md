@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: 33b435ebab8d
+i18n_output_hash: 72ff91c3c23f
 i18n_hash_version: 2
 ---
 # Thiết lập cho tài nguyên thấp {#low-resource-setups}
@@ -88,11 +88,12 @@ Mọi giới hạn đều là biến môi trường, được mô tả đầy đ
 |---|---|---|
 | [`CONCURRENT_JOBS`](/vi/guide/configuration#env-concurrent-jobs) | `1` | Số job chạy song song. Tự phát hiện dùng số nhân CPU trừ một, phù hợp với máy lớn nhưng quá hăng với máy 2 nhân khi thiếu bộ nhớ. |
 | [`MAX_WORKER_THREADS`](/vi/guide/configuration#env-max-worker-threads) | `2` | Thread pool xử lý ảnh. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/vi/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Thời gian tiến trình Python AI và runtime OCR vẫn được nạp sau yêu cầu cuối cùng. Chúng giữ 1-2 GB khi còn "ấm", nên cửa sổ ngắn hơn sẽ trả bộ nhớ lại sớm hơn, đổi lại tốn thêm vài giây ở lần gọi AI kế tiếp. Hãy hạ cả [`AI_SESSION_IDLE_TIMEOUT`](/vi/guide/configuration#env-ai-session-idle-timeout), vì khi tiến trình thoát thì các model đã cache cũng bị bỏ. |
 | [`MAX_BATCH_SIZE`](/vi/guide/configuration#env-max-batch-size) | `5` | Xử lý lô là nơi máy 1-2 GB hết bộ nhớ đầu tiên. |
 | [`MAX_UPLOAD_SIZE_MB`](/vi/guide/configuration#env-max-upload-size-mb) | `100` | Ngăn một tệp khổng lồ chiếm toàn bộ không gian làm việc. |
-| [`MAX_MEGAPIXELS`](/vi/guide/configuration#env-max-megapixels) | `50` | Giải mã ảnh trên 100 MP tốn RAM bất kể dung lượng tệp. |
+| [`MAX_MEGAPIXELS`](/vi/guide/configuration#env-max-megapixels) | `50` | Giải mã ảnh trên 100 MP tốn RAM bất kể dung lượng tệp. Ảnh trên khoảng 268 MP bị từ chối ngay cả khi đặt `0`. |
 | [`MAX_VIDEO_DURATION_S`](/vi/guide/configuration#env-max-video-duration-s) | `300` | Các lần transcode dài chiếm dụng CPU nhỏ từ vài phút đến vài giờ. |
-| [`PROCESSING_TIMEOUT_S`](/vi/guide/configuration#env-processing-timeout-s) | `600` | Trần cứng để một job chạy mất kiểm soát cuối cùng cũng giải phóng máy. |
+| [`JOB_TIMEOUT_LONG_S`](/vi/guide/configuration#env-job-timeout-long-s) | `3600` | Trần cứng cho các job AI và media, để một job chạy mất kiểm soát cuối cùng cũng giải phóng máy. Mặc định là hai giờ. Các job ảnh và tài liệu đã dừng ở [`JOB_TIMEOUT_FAST_S`](/vi/guide/configuration#env-job-timeout-fast-s) (mặc định 120 giây). |
 
 Các giới hạn này áp dụng cho những gì máy chủ chấp nhận, nên hãy đặt chúng khớp với những gì bạn thực sự dùng thay vì đặt nhỏ nhất có thể. Nếu bạn không bao giờ dùng video, giới hạn `MAX_VIDEO_DURATION_S` không gây tốn kém gì; nếu bạn quét tài liệu hằng ngày, đừng giới hạn [`MAX_PDF_PAGES`](/vi/guide/configuration#env-max-pdf-pages).
 

@@ -1,8 +1,8 @@
 ---
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse proxy-configuraties voor Nginx, Traefik en Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 5d8a8964e066
+i18n_output_hash: fa3ab8c7c72b
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Als AI-tools op de CPU draaien terwijl `--gpus all` en de NVIDIA Container Toolkit juist zijn ingesteld, installeer dan de betreffende bundel (bijvoorbeeld Achtergrondverwijdering) opnieuw via **Instellingen → AI-functies**. Het installatieprogramma herstelt de GPU-build van ONNX Runtime, die anders kan worden overschaduwd door een CPU-only build die door een andere bundel (zoals transcriptie) in de gedeelde AI-omgeving is binnengehaald. Als opnieuw installeren via de UI de GPU op een oudere image niet herstelt, zie dan het handmatige herstel in [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+Het Proxmox LXC-installatieprogramma wordt onderhouden in het project [community-scripts](https://community-scripts.org), niet in deze repository. Het gebruikt niet de standaardwaarden `admin` / `admin` uit de Docker-voorbeelden. Bij de installatie wordt een willekeurig wachtwoord van 20 tekens voor de gebruiker `admin` gegenereerd en in de container opgeslagen. Open een shell in de container en voer uit:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Dezelfde waarde staat in `DEFAULT_PASSWORD` in `/opt/snapotter_data/.env`. Die variabele vult het account alleen bij de eerste start, dus als u het wachtwoord inmiddels in de app hebt gewijzigd, komt het bestand er niet meer mee overeen.
+
 ## Hardwarevereisten {#hardware-requirements}
 
 Deze cijfers komen uit benchmarks op uiteenlopende systemen, van een moderne amd64-werkstation met een NVIDIA RTX 4070 tot een Raspberry Pi. Op elk systeem is de hele toolcatalogus gedraaid en zijn de Docker-resourcelimieten doorlopen om de werkelijke ondergrens te vinden.
@@ -406,7 +416,7 @@ Zie de [volledige formatenlijst](/nl/guide/supported-formats) voor details over 
 
 - **Content-aware resize** crasht bij grote afbeeldingen (>5 MP) door een beperking in de caire-binary. Werkt goed bij kleinere afbeeldingen.
 - **HEIF-decodering** duurt 13-23 seconden. HEIC (de variant van Apple) is veel sneller met 0,3-0,9 seconden.
-- **Upscaling** loopt op CPU in een time-out bij alles boven kleine afbeeldingen. Voor praktisch gebruik is een GPU nodig.
+- **Upscaling** zonder GPU verkleint een invoerafbeelding die boven het CPU-plafond ligt (standaard 4 MP, lager bij hoge schaalfactoren) vóór het opschalen, en draait veel trager dan op een GPU. [`MAX_CPU_UPSCALE_MP`](/nl/guide/configuration#processing-limits) verhoogt of verwijdert dat plafond als de host genoeg RAM heeft.
 - **CodeFormer** voor gezichtsverbetering is aanzienlijk trager dan GFPGAN (53s tegenover 2s op GPU). GFPGAN wordt voor de meeste toepassingen aanbevolen.
 
 ### AI-bundels installeren met meerdere replica's {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter schrijft tijdens runtime naar twee locaties: `/data` (gebruikersbestan
 
 Hoe rechten worden afgehandeld, hangt af van hoe de container wordt gestart:
 
-**Standaard (start als root, schakelt over naar `snapotter`)**: de entrypoint start als root, corrigeert het eigendom van de gemounte volumes en schakelt dan via `gosu` over naar de onbevoegde gebruiker `snapotter`. Benoemde volumes werken zonder configuratie. Stel bij bind mounts `PUID`/`PGID` in op uw hostgebruiker (zie hierboven), zodat de bestanden die het schrijft uw eigendom zijn.
+**Standaard (start als root, schakelt over naar `snapotter`)**: de entrypoint start als root, corrigeert het eigendom van de gemounte volumes en schakelt dan over naar de onbevoegde gebruiker `snapotter` via `gosu`. Benoemde volumes werken zonder configuratie. Stel bij bind mounts `PUID`/`PGID` in op uw hostgebruiker (zie hierboven), zodat de bestanden die het schrijft uw eigendom zijn.
 
 **Kubernetes / OpenShift (niet-root via `runAsUser`)**: wanneer de container rechtstreeks als niet-rootgebruiker wordt gestart, kan hij de volumes zelf niet chownen, dus de orchestrator moet ze beschrijfbaar maken. Stel `fsGroup` in:
 
@@ -493,8 +503,8 @@ De opstartfout noemt de exacte te gebruiken UID, dus de snelste weg is de app é
 | [`RATE_LIMIT_PER_MIN`](/nl/guide/configuration#env-rate-limit-per-min) | `1000` | API-verzoeken per minuut per IP (stel 0 in om uit te schakelen) |
 | [`MAX_USERS`](/nl/guide/configuration#env-max-users) | `0` (onbeperkt) | Maximaal aantal gebruikersaccounts |
 | [`TRUST_PROXY`](/nl/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. Standaard alleen privénetwerken |
-| `PUID` | `999` | Draai onder deze UID (voor rechten van bind mounts) |
-| `PGID` | `999` | Draai onder deze GID (voor rechten van bind mounts) |
+| `PUID` | `999` | Draai onder deze UID (voor rechten van bind mounts). Vereist een beschrijfbaar root-bestandssysteem; zie de [beveiligingsgids](/nl/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Draai onder deze GID (voor rechten van bind mounts). Vereist een beschrijfbaar root-bestandssysteem; zie de [beveiligingsgids](/nl/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/nl/guide/configuration#env-log-level) | `info` | Uitgebreidheid van logs: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/nl/guide/configuration#env-concurrent-jobs) | `0` (auto) | Max. aantal parallelle AI-verwerkingstaken |
 | [`SESSION_DURATION_HOURS`](/nl/guide/configuration#env-session-duration-hours) | `168` | Levensduur van de inlogsessie (7 dagen) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Bewaar de proxy-inloggegevens buiten het Compose-bestand (bijvoorbeeld in een beschermd `.env`-bestand of secret). Schakel TLS-verificatie niet uit: de ondertekende OCR-index authenticeert releasemetadata, terwijl normale TLS-validatie het transport en elk ander uitgaand verzoek blijft beschermen.
+
+Als huggingface.co zelf is geblokkeerd of wordt afgeknepen en u dus geen proxy nodig hebt, richt AI-downloads dan op een Hugging Face-mirror met `HF_ENDPOINT` (bijvoorbeeld `HF_ENDPOINT: https://hf-mirror.com`). Zie [Downloaden via een mirror](/nl/api/ai#downloading-through-a-mirror).
 
 ## Health check {#health-check}
 
@@ -717,7 +729,7 @@ Semantic-release bepaalt de versie uit de commitgeschiedenis. De Docker-tag `lat
 
 ## Analytics {#analytics}
 
-SnapOtter bevat anonieme productanalyse (gebruikspatronen van tools, foutrapporten) om bugs op te sporen en functies te verbeteren. Het staat standaard aan. Uw bestanden, bestandsnamen en persoonlijke gegevens maken daar nooit deel van uit. SnapOtter werkt normaal met analytics uitgeschakeld.
+SnapOtter bevat anonieme productanalyse (gebruikspatronen van tools, foutrapporten) om bugs op te sporen en functies te verbeteren. Een nieuwe instantie vraagt de beheerder bij de eerste start om toestemming en verstuurt niets totdat er antwoord is gegeven. Uw bestanden, bestandsnamen en persoonlijke gegevens maken daar nooit deel van uit. SnapOtter werkt normaal met analytics uitgeschakeld.
 
 ### Analytics uitschakelen {#disabling-analytics}
 

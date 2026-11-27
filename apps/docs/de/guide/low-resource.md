@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: bdb7b86b19d5
+i18n_output_hash: d6ae10a81309
 i18n_hash_version: 2
 ---
 # Ressourcenschonende Setups {#low-resource-setups}
@@ -88,11 +88,12 @@ Alle Limits sind Umgebungsvariablen, die vollständig in der [Konfiguration](/de
 |---|---|---|
 | [`CONCURRENT_JOBS`](/de/guide/configuration#env-concurrent-jobs) | `1` | Wie viele Aufträge parallel laufen. Die automatische Erkennung verwendet die CPU-Kerne minus eins, was auf großen Rechnern passt, auf einem System mit 2 Kernen unter Speicherdruck aber zu eifrig ist. |
 | [`MAX_WORKER_THREADS`](/de/guide/configuration#env-max-worker-threads) | `2` | Thread-Pool der Bildverarbeitung. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/de/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Wie lange der Python-Prozess der KI und die OCR-Laufzeit nach der letzten Anfrage geladen bleiben. Solange sie warm sind, belegen sie 1-2 GB. Ein kürzeres Zeitfenster gibt den Speicher also früher zurück, auf Kosten einiger Sekunden beim nächsten KI-Aufruf. Senken Sie auch [`AI_SESSION_IDLE_TIMEOUT`](/de/guide/configuration#env-ai-session-idle-timeout), da das Beenden des Prozesses zwischengespeicherte Modelle verwirft. |
 | [`MAX_BATCH_SIZE`](/de/guide/configuration#env-max-batch-size) | `5` | Bei Batches geht Rechnern mit 1-2 GB zuerst der Speicher aus. |
 | [`MAX_UPLOAD_SIZE_MB`](/de/guide/configuration#env-max-upload-size-mb) | `100` | Verhindert, dass eine einzelne riesige Datei den gesamten Arbeitsbereich belegt. |
-| [`MAX_MEGAPIXELS`](/de/guide/configuration#env-max-megapixels) | `50` | Das Dekodieren eines Bildes mit 100+ MP kostet unabhängig von der Dateigröße RAM. |
+| [`MAX_MEGAPIXELS`](/de/guide/configuration#env-max-megapixels) | `50` | Das Dekodieren eines Bildes mit 100+ MP kostet unabhängig von der Dateigröße RAM. Bilder über etwa 268 MP werden selbst bei `0` abgelehnt. |
 | [`MAX_VIDEO_DURATION_S`](/de/guide/configuration#env-max-video-duration-s) | `300` | Lange Transkodierungen blockieren eine kleine CPU für Minuten bis Stunden. |
-| [`PROCESSING_TIMEOUT_S`](/de/guide/configuration#env-processing-timeout-s) | `600` | Harte Obergrenze, damit ein außer Kontrolle geratener Auftrag den Rechner irgendwann wieder freigibt. |
+| [`JOB_TIMEOUT_LONG_S`](/de/guide/configuration#env-job-timeout-long-s) | `3600` | Harte Obergrenze für KI- und Medienaufträge, damit ein außer Kontrolle geratener Auftrag den Rechner irgendwann wieder freigibt. Standard sind zwei Stunden. Bild- und Dokumentaufträge enden bereits bei [`JOB_TIMEOUT_FAST_S`](/de/guide/configuration#env-job-timeout-fast-s) (standardmäßig 120 Sekunden). |
 
 Diese Limits gelten für das, was der Server annimmt. Stellen Sie sie daher passend zu dem ein, was Sie tatsächlich nutzen, und nicht so klein wie möglich. Wenn Sie nie mit Video arbeiten, kostet ein Limit `MAX_VIDEO_DURATION_S` nichts; wenn Sie täglich Dokumente scannen, begrenzen Sie [`MAX_PDF_PAGES`](/de/guide/configuration#env-max-pdf-pages) nicht.
 

@@ -1,14 +1,14 @@
 ---
 description: "Panduan hardening keamanan untuk SnapOtter. Keamanan container, isolasi jaringan, Docker secrets, deployment Kubernetes, dan artefak kepatuhan."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 4657aeec03b1
+i18n_output_hash: a470b4175593
 i18n_hash_version: 2
 ---
 
 # Keamanan & Hardening {#security-hardening}
 
-SnapOtter memproses file sepenuhnya di infrastruktur Anda. Secara default SnapOtter mengirim analitik produk dan laporan crash yang anonim dan tanpa konten untuk membantu meningkatkan proyek. SnapOtter tidak pernah mengirim file, nama file, isi file, output OCR, metadata gambar, atau teks dokumen Anda. Umpan balik opsional hanya dikirim setelah pengguna mengirimkannya, hanya ketika analitik diaktifkan, dan kolom kontak hanya disertakan dengan persetujuan kontak yang eksplisit. Administrator dapat mematikan analitik dan pengumpulan umpan balik dengan satu klik di Settings > System > Privacy, tanpa perlu build ulang. Pemrosesan file selalu berada di dalam container Anda.
+SnapOtter memproses file sepenuhnya di infrastruktur Anda. SnapOtter dapat mengirim analitik produk dan laporan crash yang anonim dan tanpa konten untuk membantu meningkatkan proyek, tetapi instance baru bertanya dulu kepada administratornya dan tidak mengirim apa pun sampai pertanyaan itu dijawab. SnapOtter tidak pernah mengirim file, nama file, isi file, output OCR, metadata gambar, atau teks dokumen Anda. Umpan balik opsional hanya dikirim setelah pengguna mengirimkannya, hanya ketika analitik diaktifkan, dan kolom kontak hanya disertakan dengan persetujuan kontak yang eksplisit. Administrator dapat mematikan analitik dan pengumpulan umpan balik dengan satu klik di Settings > System > Privacy, tanpa perlu build ulang. Pemrosesan file selalu berada di dalam container Anda.
 
 Container berjalan sebagai pengguna non-root khusus (`snapotter`) dengan semua kapabilitas Linux dihapus kecuali set minimum yang diperlukan. Untuk kebijakan pengungkapan kerentanan lengkap dan arsitektur keamanan, lihat [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) di GitHub.
 
@@ -28,7 +28,7 @@ Untuk deployment yang menghadap internet, bind port 1349 ke loopback dan akhiri 
 
 ### Mengapa `read_only` Tidak Diatur {#why-read-only-is-not-set}
 
-`read_only: true` tidak diatur karena pemetaan ulang [PUID](/id/guide/configuration#env-puid)/[PGID](/id/guide/configuration#env-pgid) menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau `runAsUser` Kubernetes sebagai ganti PUID/PGID, Anda dapat dengan aman mengaktifkan filesystem root read-only.
+`read_only: true` tidak diatur karena pemetaan ulang [PUID](/id/guide/configuration#env-puid)/[PGID](/id/guide/configuration#env-pgid) menulis ke `/etc/passwd` dan `/etc/group` saat startup. Jika Anda menggunakan flag `--user` Docker atau `runAsUser` Kubernetes sebagai ganti PUID/PGID, Anda dapat dengan aman mengaktifkan filesystem root read-only. Jika Anda mengatur PUID atau PGID ke nilai selain 999 pada root read-only, container berhenti saat startup dengan pesan yang menyatakan hal itu, sebelum mengubah pemilik apa pun yang sudah ada di /data. Image all-in-one juga berjalan dengan root read-only ketika PUID dan PGID tidak diatur, selama /run dan /tmp adalah mount tmpfs dan /run mengizinkan exec, karena s6-overlay memulai supervisornya dari sana.
 
 ## Isolasi Jaringan {#network-isolation}
 
@@ -45,7 +45,7 @@ Lalu lintas keluar lainnya bergantung pada fitur: instalasi bundle/model AI meng
 | Bundle AI diperlukan | Selama instalasi, izinkan HTTPS ke `huggingface.co, *.xethub.hf.co, cdn-lfs.huggingface.co, github.com, objects.githubusercontent.com, storage.googleapis.com, pypi.org, files.pythonhosted.org`; lalu blokir host tersebut |
 | Integrasi eksternal | Izinkan hanya tujuan OIDC/SAML/OTLP/webhook/object-storage yang persis dikonfigurasi administrator |
 
-Arsip bundle dilayani dari penyimpanan Xet milik Hugging Face, yang mentransfer melalui endpoint `*.xethub.hf.co` secara paralel dan membuat unduhan bundle multi-GB menjadi cepat. Jika firewall Anda mengizinkan `huggingface.co` tetapi memblokir `*.xethub.hf.co`, instalasi tetap berhasil tetapi beralih ke unduhan single-stream yang lebih lambat, jadi masukkan host Xet ke allowlist agar tetap di jalur cepat. Instalasi yang sepenuhnya offline dapat melewati semua ini dan menggunakan [Impor Bundle Offline](/id/guide/deployment).
+Arsip bundle dilayani dari penyimpanan Xet milik Hugging Face, yang mentransfer melalui endpoint `*.xethub.hf.co` secara paralel dan membuat unduhan bundle multi-GB menjadi cepat. Jika firewall Anda mengizinkan `huggingface.co` tetapi memblokir `*.xethub.hf.co`, instalasi tetap berhasil tetapi beralih ke unduhan single-stream yang lebih lambat, jadi masukkan host Xet ke allowlist agar tetap di jalur cepat. Instalasi yang sepenuhnya offline dapat melewati semua ini dan menggunakan [Impor Bundle Offline](/id/guide/deployment) sebagai gantinya.
 
 Untuk konfigurasi reverse proxy (Nginx, Traefik, Caddy, Cloudflare Tunnels), lihat [panduan Deployment](/id/guide/deployment#reverse-proxy).
 

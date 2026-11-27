@@ -1,8 +1,8 @@
 ---
 description: "Installare SnapOtter con Docker in un solo comando, accedere e aprire il primo strumento. Copre l'accelerazione GPU, le macchine piccole, Docker Compose e la compilazione da sorgente."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: 963ba4786a57
+i18n_output_hash: f63dcf28a9e3
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Su un Raspberry Pi, un vecchio portatile o un piccolo VPS, esegua un job alla vo
 :::
 
 ::: tip Analytics di prodotto anonime
-SnapOtter include per impostazione predefinita analytics di prodotto anonime. Per disattivarle, apra **Impostazioni → Sistema → Privacy** e disattivi **Analytics di prodotto anonime**. Si interrompono immediatamente per l'intera istanza.
+SnapOtter include analytics di prodotto anonime. Una nuova istanza lo chiede al suo amministratore al primo avvio e non invia nulla finché non riceve risposta. Per disattivarle in seguito, apra **Impostazioni → Sistema → Privacy** e disattivi **Analytics di prodotto anonime**. Si interrompono immediatamente per l'intera istanza.
 
 Può anche impostare la variabile d'ambiente `SNAPOTTER_TELEMETRY=0` (funzionano anche `false` e `off`) per disabilitare tutta la telemetria dell'istanza senza ricompilare.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modalità | Numero | Strumenti di esempio |
 |----------|-------|---------------|
-| **Immagine** | 112 | Ridimensiona, Ritaglia, Comprimi, Converti, Rimuovi sfondo, Upscale, OCR, Filigrana, Collage, Colorize, Strumenti GIF, preset di formato |
+| **Immagine** | 114 | Ridimensiona, Ritaglia, Comprimi, Converti, Rimuovi sfondo, Upscale, OCR, Filigrana, Collage, Colorize, Strumenti GIF, preset di formato |
 | **Video** | 63 | Taglia, Ritaglia, Comprimi, Converti, Unisci, Estrai audio, Sottotitoli automatici, Da video a GIF, Ridimensiona, Stabilizza, preset di formato |
 | **Audio** | 57 | Taglia, Unisci, Converti, Normalizza, Riduzione del rumore, Trascrivi, Cambio di tonalità, Dissolvenza, Creatore di suonerie, preset di formato |
 | **PDF / Documento** | 37 | Unisci, Dividi, Comprimi, OCR, Filigrana, Redigi, Da Word a PDF, Da Excel a PDF, Ruota, Proteggi, Ripara |
-| **File** | 25 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON |
+| **File** | 32 | Da CSV a JSON, Da JSON a XML, Unisci CSV, Dividi CSV, Crea ZIP, Estrai ZIP, Creatore di grafici, YAML/JSON, Converti font, Calcolatore di proporzioni, Base64, preset di formato |
 
 ### Pipelines {#pipelines}
 

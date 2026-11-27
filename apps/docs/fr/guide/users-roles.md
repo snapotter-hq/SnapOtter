@@ -1,8 +1,8 @@
 ---
 description: "Gérez les utilisateurs, les rôles intégrés et personnalisés, les permissions, les clés API, les équipes, les sessions et le journal d'audit dans SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: e02644adf585
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 54072a14f520
 i18n_hash_version: 2
 ---
 
@@ -88,7 +88,7 @@ Les 17 permissions. Contrôle total sur l'instance.
 | `features:manage` | Installer et gérer les bundles de fonctionnalités IA |
 | `system:health` | Accéder aux points de terminaison de santé et de disponibilité |
 | `audit:read` | Consulter le journal d'audit et lister les rôles |
-| `compliance:manage` | Gérer le cycle de vie et les fonctionnalités de conformité du RGPD ; les opérations destructrices des utilisateurs restent limitées à l’autorité |
+| `compliance:manage` | Gérer le cycle de vie et les fonctionnalités de conformité du RGPD ; les opérations destructrices des utilisateurs restent limitées à l’autorité |
 | `webhooks:manage` | Configurer les webhooks sortants |
 | `security:manage` | Gérer les paramètres de sécurité (liste d'autorisation d'IP, application du SSO) |
 
@@ -113,15 +113,15 @@ Les noms de rôle doivent comporter de 2 à 30 caractères, en minuscules alphan
 
 ### Limites de l'administration déléguée {#delegated-administration-boundaries}
 
-Les 17 autorisations peuvent être déléguées via des rôles personnalisés, mais une autorisation administrative ne rend pas ce rôle équivalent au rôle `admin` intégré. Les mutations utilisateur autorisées par `users:manage`, les opérations destructrices autorisées par `compliance:manage` et la gestion des rôles personnalisés autorisées par `security:manage` sont limitées par l'autorité actuelle de l'acteur :
+Les 17 autorisations peuvent être déléguées via des rôles personnalisés, mais une autorisation administrative ne rend pas ce rôle équivalent au rôle `admin` intégré. Les mutations utilisateur autorisées par `users:manage`, les opérations destructrices autorisées par `compliance:manage` et la gestion des rôles personnalisés autorisée par `security:manage` sont limitées par l'autorité actuelle de l'acteur :
 
-- Les rôles intégrés suivent `admin` > `editor` > `user` ; les rôles personnalisés se trouvent sous les rôles intégrés.
+- Les rôles intégrés suivent `admin` > `editor` > `user` ; les rôles personnalisés se trouvent sous les rôles intégrés.
 - Les autorisations de la cible doivent être contenues dans les autorisations **efficaces** de l'acteur. Une clé API étendue ne peut donc pas exercer d'autorisations omises de sa portée.
 - L'accès aux outils d'un rôle cible doit être contenu par le propre accès aux outils de l'acteur.
 - Un compte désactivé est comparé à son rôle d'origine lorsque ce rôle est enregistré sous la forme `disabled:<original-role>`.
-- La suppression d'un rôle personnalisé nécessite également l'autorisation d'attribuer la solution de secours intégrée `user` ; les membres désactivés restent désactivés sous le nom `disabled:user`.
+- La suppression d'un rôle personnalisé nécessite également l'autorisation d'attribuer la solution de secours intégrée `user` ; les membres désactivés restent désactivés sous le nom `disabled:user`.
 
-Les informations d'identification et la configuration globales sont plus strictes : l'émission ou la révocation du jeton SCIM et l'importation de la configuration de l'instance nécessitent le rôle `admin` intégré avec une autorité d'administration effective complète.
+Les informations d'identification et la configuration globales sont plus strictes : l'émission ou la révocation du jeton SCIM et l'importation de la configuration de l'instance nécessitent le rôle `admin` intégré avec une autorité d'administration effective complète.
 
 ### Permissions au niveau des outils {#tool-level-permissions}
 
@@ -147,7 +147,16 @@ Lorsque le mode `tool` est défini mais que la fonctionnalité entreprise n'est 
 
 ### Supprimer un rôle personnalisé {#deleting-a-custom-role}
 
-Lorsqu'un rôle personnalisé est supprimé, tous les utilisateurs qui y sont affectés sont automatiquement réaffectés au rôle `user`.
+Lorsqu'un rôle personnalisé est supprimé, tous les utilisateurs qui y sont affectés sont automatiquement réaffectés au rôle `user` intégré. Les membres désactivés restent désactivés sous le nom `disabled:user`. La boîte de dialogue des paramètres l'indique dans sa confirmation de suppression, avec le nombre d'utilisateurs qui seront déplacés.
+
+La réponse `DELETE /api/v1/roles/{id}` liste les utilisateurs qui ont été déplacés, et l'entrée d'audit `ROLE_DELETED` enregistre la même liste sous `details.reassignedUsers` :
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Équipes {#teams}
 

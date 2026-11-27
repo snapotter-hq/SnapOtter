@@ -1,8 +1,8 @@
 ---
 description: "Driftsätt SnapOtter i produktion med Docker. Maskinvarukrav, GPU-konfiguration och reverse proxy-konfigurationer för Nginx, Traefik och Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 0ef3c1cd2679
+i18n_output_hash: 06b36975b68a
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Om AI-verktyg körs på CPU trots att `--gpus all` och NVIDIA Container Toolkit är korrekt konfigurerade, installera om det berörda paketet (till exempel Background Removal) från **Settings → AI Features**. Installationsprogrammet återställer GPU-bygget av ONNX Runtime, som annars kan skuggas av ett CPU-bygge som ett annat paket (till exempel transkribering) har dragit in i den delade AI-miljön. Om en ominstallation från gränssnittet inte återställer GPU på en äldre avbild, se den manuella reparationen i [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+Installationsprogrammet för Proxmox LXC underhålls i projektet [community-scripts](https://community-scripts.org), inte i det här förvaret. Det använder inte standardvärdena `admin` / `admin` från Docker-exemplen. Installationen genererar ett slumpmässigt lösenord på 20 tecken för användaren `admin` och sparar det inuti containern. Öppna ett skal i containern och kör:
+
+```bash
+cat ~/snapotter.creds
+```
+
+Samma värde finns i `DEFAULT_PASSWORD` i `/opt/snapotter_data/.env`. Den variabeln skapar bara kontot vid första körningen, så om du sedan har ändrat lösenordet i appen stämmer filen inte längre med det.
+
 ## Maskinvarukrav {#hardware-requirements}
 
 Siffrorna kommer från prestandatester på en rad system, från en modern amd64-arbetsstation med NVIDIA RTX 4070 ned till en Raspberry Pi. Hela verktygskatalogen kördes på varje system och Docker-resursgränserna varierades för att hitta den verkliga miniminivån.
@@ -406,7 +416,7 @@ Se den [fullständiga formatlistan](/sv/guide/supported-formats) för detaljer o
 
 - **Innehållsmedveten storleksändring** kraschar på stora bilder (>5 MP) på grund av en begränsning i binären caire. Fungerar bra med mindre bilder.
 - **HEIF-avkodning** tar 13-23 sekunder. HEIC (Apples variant) är mycket snabbare, 0,3-0,9 sekunder.
-- **Uppskalning** får tidsgränsen överskriden på CPU för allt utöver små bilder. GPU krävs för praktisk användning.
+- **Uppskalning** utan GPU förminskar en indata som ligger över CPU-taket (4 MP som standard, lägre vid höga skalfaktorer) innan den skalas upp, och går mycket långsammare än på en GPU. [`MAX_CPU_UPSCALE_MP`](/sv/guide/configuration#processing-limits) höjer eller tar bort det taket om värden har RAM för det.
 - **CodeFormer** för ansiktsförbättring är betydligt långsammare än GFPGAN (53 s jämfört med 2 s på GPU). GFPGAN rekommenderas för de flesta användningsfall.
 
 ### Installation av AI-paket med flera repliker {#ai-bundle-installs-with-several-replicas}
@@ -493,8 +503,8 @@ Startfelet anger exakt vilket UID som ska användas, så den snabbaste vägen ä
 | [`RATE_LIMIT_PER_MIN`](/sv/guide/configuration#env-rate-limit-per-min) | `1000` | API-förfrågningar per minut och IP (sätt 0 för att inaktivera) |
 | [`MAX_USERS`](/sv/guide/configuration#env-max-users) | `0` (obegränsat) | Maximalt antal användarkonton |
 | [`TRUST_PROXY`](/sv/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Som standard endast privata nätverk |
-| `PUID` | `999` | Kör som detta UID (för behörigheter på bind mounts) |
-| `PGID` | `999` | Kör som detta GID (för behörigheter på bind mounts) |
+| `PUID` | `999` | Kör som detta UID (för behörigheter på bind mounts). Kräver ett skrivbart rotfilsystem, se [säkerhetsguiden](/sv/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Kör som detta GID (för behörigheter på bind mounts). Kräver ett skrivbart rotfilsystem, se [säkerhetsguiden](/sv/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/sv/guide/configuration#env-log-level) | `info` | Loggdetaljnivå: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/sv/guide/configuration#env-concurrent-jobs) | `0` (auto) | Max antal parallella AI-bearbetningsjobb |
 | [`SESSION_DURATION_HOURS`](/sv/guide/configuration#env-session-duration-hours) | `168` | Inloggningssessionens livslängd (7 dagar) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Håll proxyns inloggningsuppgifter utanför Compose-filen (till exempel i en skyddad `.env`-fil eller en hemlighet). Inaktivera inte TLS-verifiering: det signerade OCR-indexet autentiserar utgåvans metadata, medan vanlig TLS-validering fortsatt skyddar transporten och alla andra utgående förfrågningar.
+
+Om huggingface.co självt är blockerat eller strypt i stället för att kräva en proxy, peka AI-nedladdningar mot en Hugging Face-spegel med `HF_ENDPOINT` (till exempel `HF_ENDPOINT: https://hf-mirror.com`). Se [Ladda ned via en spegel](/sv/api/ai#downloading-through-a-mirror).
 
 ## Hälsokontroll {#health-check}
 
@@ -720,7 +732,7 @@ Semantic-release avgör versionen utifrån incheckningshistoriken. Docker-taggen
 
 ## Analys {#analytics}
 
-SnapOtter innehåller anonym produktanalys (användningsmönster för verktyg, felrapporter) som hjälper till att hitta buggar och förbättra funktioner. Den är påslagen som standard. Dina filer, filnamn och personuppgifter ingår aldrig. SnapOtter fungerar normalt med analysen avstängd.
+SnapOtter innehåller anonym produktanalys (användningsmönster för verktyg, felrapporter) som hjälper till att hitta buggar och förbättra funktioner. En ny instans frågar sin administratör vid första körningen och skickar ingenting förrän frågan har besvarats. Dina filer, filnamn och personuppgifter ingår aldrig. SnapOtter fungerar normalt med analysen avstängd.
 
 ### Inaktivera analys {#disabling-analytics}
 

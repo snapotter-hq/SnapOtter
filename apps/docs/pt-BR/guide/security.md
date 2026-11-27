@@ -1,14 +1,14 @@
 ---
 description: "Guia de hardening de segurança do SnapOtter. Segurança de contêineres, isolamento de rede, Docker secrets, implantação em Kubernetes e artefatos de conformidade."
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 2b2336231b76
+i18n_output_hash: 74c1337ab28f
 i18n_hash_version: 2
 ---
 
 # Segurança e hardening {#security-hardening}
 
-O SnapOtter processa arquivos inteiramente na sua infraestrutura. Por padrão, ele envia analytics de produto anônimos e sem conteúdo, além de relatórios de falhas, para ajudar a melhorar o projeto. Ele nunca envia seus arquivos, nomes de arquivos, conteúdo de arquivos, saída de OCR, metadados de imagens nem texto de documentos. O feedback opcional só é enviado depois que um usuário o submete, apenas quando o analytics está ativado, e os campos de contato só são incluídos com consentimento explícito de contato. Um administrador pode desativar o analytics e a captura de feedback com um clique em Configurações > Sistema > Privacidade, sem necessidade de rebuild. O processamento de arquivos sempre permanece dentro do seu contêiner.
+O SnapOtter processa arquivos inteiramente na sua infraestrutura. Ele pode enviar analytics de produto anônimos e sem conteúdo, além de relatórios de falhas, para ajudar a melhorar o projeto, mas uma nova instância pergunta primeiro ao administrador e não envia nada até que ele responda. Ele nunca envia seus arquivos, nomes de arquivos, conteúdo de arquivos, saída de OCR, metadados de imagens nem texto de documentos. O feedback opcional só é enviado depois que um usuário o submete, apenas quando o analytics está ativado, e os campos de contato só são incluídos com consentimento explícito de contato. Um administrador pode desativar o analytics e a captura de feedback com um clique em Configurações > Sistema > Privacidade, sem necessidade de rebuild. O processamento de arquivos sempre permanece dentro do seu contêiner.
 
 O contêiner roda como um usuário dedicado não root (`snapotter`), com todas as capabilities do Linux removidas, exceto o conjunto mínimo necessário. Para a política completa de divulgação de vulnerabilidades e a arquitetura de segurança, consulte o [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) no GitHub.
 
@@ -28,7 +28,7 @@ Em uma implantação exposta à internet, associe a porta 1349 ao loopback e enc
 
 ### Por que `read_only` não está definido {#why-read-only-is-not-set}
 
-`read_only: true` não está definido porque o remapeamento de [PUID](/pt-BR/guide/configuration#env-puid)/[PGID](/pt-BR/guide/configuration#env-pgid) grava em `/etc/passwd` e `/etc/group` na inicialização. Se você usa a flag `--user` do Docker ou `runAsUser` do Kubernetes em vez de PUID/PGID, pode ativar com segurança um sistema de arquivos raiz somente leitura.
+`read_only: true` não está definido porque o remapeamento de [PUID](/pt-BR/guide/configuration#env-puid)/[PGID](/pt-BR/guide/configuration#env-pgid) grava em `/etc/passwd` e `/etc/group` na inicialização. Se você usa a flag `--user` do Docker ou `runAsUser` do Kubernetes em vez de PUID/PGID, pode ativar com segurança um sistema de arquivos raiz somente leitura. Se você definir PUID ou PGID com qualquer valor diferente de 999 em uma raiz somente leitura, o contêiner para na inicialização com uma mensagem informando isso, antes de alterar o proprietário de qualquer coisa que já esteja em /data. A imagem all-in-one também roda com raiz somente leitura quando PUID e PGID não estão definidos, desde que /run e /tmp sejam montagens tmpfs e /run permita exec, porque o s6-overlay inicia o supervisor a partir dali.
 
 ## Isolamento de rede {#network-isolation}
 
@@ -92,7 +92,7 @@ Os secrets do Docker Compose (sem Swarm) exigem o Compose v2.23 ou posterior.
 
 ## Implantação em Kubernetes {#kubernetes-deployment}
 
-O entrypoint detecta quando o contêiner já está rodando como não root (por exemplo, via `runAsUser` do Kubernetes) e ignora automaticamente a troca de privilégios do gosu. Nesse caso, ele não consegue executar chown nos volumes montados, então verifica se são graváveis e encerra cedo com orientações práticas caso não sejam. Consulte [Permissões de armazenamento](/pt-BR/guide/deployment#storage-permissions) para `fsGroup` e configurações com UID estrangeiro (TrueNAS, OpenShift).
+O entrypoint detecta quando o contêiner já está rodando como não root (por exemplo, via `runAsUser` do Kubernetes) e ignora automaticamente a troca de privilégios com gosu. Nesse caso ele não consegue executar chown nos volumes montados por conta própria, então verifica se eles são graváveis e encerra logo com orientações acionáveis se não forem. Consulte [Permissões de armazenamento](/pt-BR/guide/deployment#storage-permissions) para configurações com `fsGroup` e UID externo (TrueNAS, OpenShift).
 
 **SecurityContext de Pod recomendado:**
 
@@ -167,16 +167,16 @@ Para o dimensionamento de recursos, consulte [Requisitos de hardware](/pt-BR/gui
 
 ## Backup e recuperação {#backup-and-recovery}
 
-A stack Compose de produção define quatro volumes. Interrompa a entrada de tráfego e deixe as tarefas ativas terminarem antes de fazer um backup coordenado, para que o PostgreSQL, o Redis e o estado dos arquivos descrevam o mesmo ponto no tempo.
+A stack Compose de produção define quatro volumes. Interrompa a entrada de tráfego e deixe os jobs ativos terminarem antes de fazer um backup coordenado, para que o PostgreSQL, o Redis e o estado dos arquivos descrevam o mesmo ponto no tempo.
 
-| Volume | Conteúdo | Tratamento na recuperação |
+| Volume | Conteúdo | Tratamento de recuperação |
 |---|---|---|
-| `SnapOtter-pgdata` | Usuários, configurações, pipelines, tarefas, metadados de arquivos e log de auditoria do PostgreSQL | Crítico; use um dump lógico com falha rápida para recuperação portável |
-| `SnapOtter-data` | Objetos salvos da biblioteca, logs e estado da IA (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Faça backup do volume inteiro; para economizar espaço, omita deliberadamente todo o estado da IA e reinstale os bundles |
-| `SnapOtter-redisdata` | AOF do Redis para o estado durável das filas do BullMQ | Faça backup depois de pausar o app e forçar `SAVE`; necessário para retomar o trabalho enfileirado exatamente |
-| `SnapOtter-workspace` | Chaves temporárias do armazenamento de objetos (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Não faça backup depois que todas as tarefas forem esgotadas ou canceladas; nunca o descarte enquanto houver tarefas ativas |
+| `SnapOtter-pgdata` | Usuários, configurações, pipelines, jobs, metadados de arquivos e log de auditoria do PostgreSQL | Crítico; use um dump lógico com falha rápida para recuperação portátil |
+| `SnapOtter-data` | Objetos salvos da biblioteca, logs e estado de IA (`/data/files, /data/logs, /data/ai, /data/ai/venv`) | Faça backup do volume inteiro; para economizar espaço, omita deliberadamente todo o estado de IA e reinstale os bundles |
+| `SnapOtter-redisdata` | AOF do Redis para o estado durável da fila do BullMQ | Faça backup depois de pausar o aplicativo e forçar `SAVE`; necessário para retomar exatamente o trabalho enfileirado |
+| `SnapOtter-workspace` | Chaves temporárias do armazenamento de objetos (`/tmp/workspace/uploads, /tmp/workspace/outputs`) | Não faça backup depois que todos os jobs forem drenados ou cancelados; nunca o descarte enquanto houver jobs ativos |
 
-O Compose normalmente prefixa os nomes dos volumes com o nome do projeto. Resolva o volume de origem real a partir do contêiner montado, em vez de presumir que um nome de exibição como `SnapOtter-data` seja o nome do volume do Docker.
+O Compose normalmente adiciona o nome do projeto como prefixo aos nomes dos volumes. Resolva o volume de origem real a partir do contêiner montado em vez de presumir que um nome de exibição como `SnapOtter-data` seja o nome do volume do Docker.
 
 ### Backup do banco de dados {#database-backup}
 
@@ -194,7 +194,7 @@ docker exec -i SnapOtter-postgres \
   -U snapotter -d snapotter < snapotter.dump
 ```
 
-Teste cada backup restaurando-o em uma stack isolada, conferindo os registros do banco de dados e os checksums dos arquivos e iniciando o aplicativo. O `tests/qa/backup-restore-drill.sh` do repositório automatiza essa etapa de validação do release contra um `QA_IMAGE` explícito.
+Teste todo backup restaurando-o em uma stack isolada, conferindo os registros do banco de dados e os checksums dos arquivos e iniciando o aplicativo. O `tests/qa/backup-restore-drill.sh` do repositório automatiza essa etapa de validação do release contra um `QA_IMAGE` explícito.
 
 Se a sua plataforma fizer snapshots de volume consistentes em caso de falha, interrompa antes a stack inteira e faça o snapshot de todos os volumes críticos como um conjunto. Uma cópia bruta do diretório de dados do PostgreSQL feita a partir de um contêiner em execução não é um backup lógico compatível.
 

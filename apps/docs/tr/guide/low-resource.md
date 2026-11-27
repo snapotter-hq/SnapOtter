@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: b859c4f3b301
+i18n_source_hash: 919652d75ac6
 i18n_provenance: machine
-i18n_output_hash: df19cc3cfa4b
+i18n_output_hash: c1fc53caff9c
 i18n_hash_version: 2
 ---
 # Düşük Kaynaklı Kurulumlar {#low-resource-setups}
@@ -88,11 +88,12 @@ Tüm sınırlar ortam değişkenleridir ve [Yapılandırma](/tr/guide/configurat
 |---|---|---|
 | [`CONCURRENT_JOBS`](/tr/guide/configuration#env-concurrent-jobs) | `1` | Kaç işin paralel çalışacağı. Otomatik algılama CPU çekirdek sayısından bir eksiğini kullanır; bu büyük makinelerde uygundur, bellek baskısı altındaki 2 çekirdekli bir makine için fazla ataktır. |
 | [`MAX_WORKER_THREADS`](/tr/guide/configuration#env-max-worker-threads) | `2` | Görsel işleme iş parçacığı havuzu. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/tr/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | Yapay zeka Python süreci ve OCR çalışma zamanının son istekten sonra ne kadar süre yüklü kaldığı. Sıcakken 1-2 GB tutarlar; bu yüzden daha kısa bir pencere belleği daha çabuk geri verir, bunun bedeli bir sonraki yapay zeka çağrısında birkaç saniyedir. Süreç çıkışı önbelleğe alınmış modelleri sileceği için [`AI_SESSION_IDLE_TIMEOUT`](/tr/guide/configuration#env-ai-session-idle-timeout) değerini de düşürün. |
 | [`MAX_BATCH_SIZE`](/tr/guide/configuration#env-max-batch-size) | `5` | 1-2 GB'lık makinelerde belleğin ilk tükendiği yer toplu işlemlerdir. |
 | [`MAX_UPLOAD_SIZE_MB`](/tr/guide/configuration#env-max-upload-size-mb) | `100` | Tek bir dev dosyanın tüm çalışma alanını işgal etmesini önler. |
-| [`MAX_MEGAPIXELS`](/tr/guide/configuration#env-max-megapixels) | `50` | 100+ MP'lik bir görseli çözmek, dosya boyutundan bağımsız olarak RAM harcar. |
+| [`MAX_MEGAPIXELS`](/tr/guide/configuration#env-max-megapixels) | `50` | 100+ MP'lik bir görseli çözmek, dosya boyutundan bağımsız olarak RAM harcar. Yaklaşık 268 MP üzerindeki görseller `0` olsa bile reddedilir. |
 | [`MAX_VIDEO_DURATION_S`](/tr/guide/configuration#env-max-video-duration-s) | `300` | Uzun kodlama işlemleri küçük bir CPU'yu dakikalarca ya da saatlerce meşgul eder. |
-| [`PROCESSING_TIMEOUT_S`](/tr/guide/configuration#env-processing-timeout-s) | `600` | Kontrolden çıkan bir işin makineyi eninde sonunda serbest bırakmasını sağlayan kesin üst sınır. |
+| [`JOB_TIMEOUT_LONG_S`](/tr/guide/configuration#env-job-timeout-long-s) | `3600` | Yapay zeka ve medya işleri için kesin üst sınır; böylece kontrolden çıkan bir iş makineyi eninde sonunda serbest bırakır. Varsayılan iki saattir. Görsel ve belge işleri zaten [`JOB_TIMEOUT_FAST_S`](/tr/guide/configuration#env-job-timeout-fast-s) değerinde durur (varsayılan 120 saniye). |
 
 Bu sınırlar sunucunun kabul ettiklerine uygulanır; bu yüzden olabildiğince küçük yapmak yerine gerçekten kullandıklarınıza göre ayarlayın. Hiç video kullanmıyorsanız `MAX_VIDEO_DURATION_S` sınırının size maliyeti yoktur; her gün belge tarıyorsanız [`MAX_PDF_PAGES`](/tr/guide/configuration#env-max-pdf-pages) değerini sınırlamayın.
 

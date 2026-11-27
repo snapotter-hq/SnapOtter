@@ -1,8 +1,8 @@
 ---
 description: "Beheer gebruikers, ingebouwde en aangepaste rollen, permissies, API-sleutels, teams, sessies en het auditlogboek in SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 8e014bb6a26b
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: 6a35065c8d49
 i18n_hash_version: 2
 ---
 
@@ -83,7 +83,7 @@ Alle 17 permissies. Volledige controle over de instantie.
 | `pipelines:all` | Pipelines van alle gebruikers bekijken en beheren |
 | `settings:read` | Instantie-instellingen bekijken |
 | `settings:write` | Instantie-instellingen wijzigen |
-| `users:manage` | Creëer en beheer gebruikersaccounts binnen de bevoegdheidsgrens van de actor |
+| `users:manage` | Gebruikersaccounts aanmaken en beheren binnen de bevoegdheidsgrens van de actor |
 | `teams:manage` | Teams aanmaken, bijwerken en verwijderen |
 | `features:manage` | AI-featurebundels installeren en beheren |
 | `system:health` | Toegang tot health- en readiness-endpoints |
@@ -115,11 +115,11 @@ Rolnamen moeten 2-30 tekens zijn, kleine letters, alfanumeriek met koppeltekens 
 
 Alle 17 machtigingen kunnen worden gedelegeerd via aangepaste rollen, maar een beheerdersmachtiging maakt die rol niet gelijkwaardig aan de ingebouwde `admin`-rol. Gebruikersmutaties geautoriseerd door `users:manage`, destructieve bewerkingen geautoriseerd door `compliance:manage`, en beheer van aangepaste rollen geautoriseerd door `security:manage` worden begrensd door de huidige autoriteit van de actor:
 
-- Ingebouwde rollen volgen `admin` > `editor` > `user`; aangepaste rollen staan ​​onder ingebouwde rollen.
-- De machtigingen van het doelwit moeten worden vastgelegd in de **effectieve** machtigingen van de acteur. Een API-sleutel met een bereik kan daarom geen machtigingen uitoefenen die zijn weggelaten uit het bereik ervan.
+- Ingebouwde rollen volgen `admin` > `editor` > `user`; aangepaste rollen staan onder ingebouwde rollen.
+- De machtigingen van het doelwit moeten worden vastgelegd in de **effectieve** machtigingen van de actor. Een API-sleutel met een bereik kan daarom geen machtigingen uitoefenen die zijn weggelaten uit het bereik ervan.
 - De tooltoegang van een doelrol moet beperkt zijn tot de tooltoegang van de actor zelf.
 - Een uitgeschakeld account wordt gecontroleerd aan de hand van de oorspronkelijke rol wanneer die rol wordt geregistreerd als `disabled:<original-role>`.
-- Het verwijderen van een aangepaste rol vereist ook de bevoegdheid om de ingebouwde `user`-fallback toe te wijzen; gehandicapte leden blijven uitgeschakeld als `disabled:user`.
+- Het verwijderen van een aangepaste rol vereist ook de bevoegdheid om de ingebouwde `user`-fallback toe te wijzen; uitgeschakelde leden blijven uitgeschakeld als `disabled:user`.
 
 De algemene inloggegevens en configuratie zijn strenger: voor het uitgeven of intrekken van het SCIM-token en het importeren van de instanceconfiguratie is de ingebouwde `admin`-rol met volledige effectieve beheerdersbevoegdheid vereist.
 
@@ -147,7 +147,16 @@ Wanneer de modus `tool` is ingesteld maar de enterprise-feature niet beschikbaar
 
 ### Een aangepaste rol verwijderen {#deleting-a-custom-role}
 
-Wanneer een aangepaste rol wordt verwijderd, worden alle daaraan toegewezen gebruikers automatisch opnieuw toegewezen aan de rol `user`.
+Wanneer een aangepaste rol wordt verwijderd, worden alle daaraan toegewezen gebruikers automatisch opnieuw toegewezen aan de ingebouwde rol `user`. Uitgeschakelde leden blijven uitgeschakeld als `disabled:user`. Het instellingendialoogvenster vermeldt dit in de verwijderbevestiging, samen met het aantal gebruikers dat wordt verplaatst.
+
+De `DELETE /api/v1/roles/{id}`-respons vermeldt de gebruikers die zijn verplaatst, en de auditvermelding `ROLE_DELETED` legt dezelfde lijst vast onder `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Teams {#teams}
 

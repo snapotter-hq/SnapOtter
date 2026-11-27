@@ -1,8 +1,8 @@
 ---
 description: "在 SnapOtter 中管理用户、内置角色与自定义角色、权限、API 密钥、团队、会话以及审计日志。"
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: 92bd76988717
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: e2a9cc1d9929
 i18n_hash_version: 2
 ---
 
@@ -113,13 +113,13 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### 委派管理边界 {#delegated-administration-boundaries}
 
-所有 17 个权限都可以通过自定义角色委派，但管理权限并不会使该角色等同于内置 `admin` 角色。 `users:manage`授权的用户突变、`compliance:manage`授权的破坏性操作以及`security:manage`授权的自定义角色管理均受参与者当前权限的约束：
+所有 17 个权限都可以通过自定义角色委派，但管理权限并不会使该角色等同于内置 `admin` 角色。由 `users:manage` 授权的用户变更、由 `compliance:manage` 授权的破坏性操作以及由 `security:manage` 授权的自定义角色管理均受参与者当前权限的约束：
 
-- 内置角色遵循`admin` > `editor` > `user`；自定义角色位于内置角色下方。
+- 内置角色遵循 `admin` > `editor` > `user`；自定义角色位于内置角色下方。
 - 目标的权限必须包含在参与者的**有效**权限中。因此，限定范围的 API 密钥无法行使其范围中省略的权限。
 - 目标角色的工具访问权限必须包含在参与者自己的工具访问权限中。
 - 当角色记录为 `disabled:<original-role>` 时，已禁用的帐户将根据其原始角色进行检查。
-- 删除自定义角色还需要分配内置`user`后备的权限；禁用的成员仍然禁用为 `disabled:user`。
+- 删除自定义角色还需要分配内置 `user` 后备角色的权限；禁用的成员仍然禁用为 `disabled:user`。
 
 全局凭证和配置更加严格：颁发或撤销 SCIM 令牌以及导入实例配置需要具有完整有效管理权限的内置 `admin` 角色。
 
@@ -147,7 +147,16 @@ curl -X POST http://localhost:1349/api/v1/roles \
 
 ### 删除自定义角色 {#deleting-a-custom-role}
 
-当删除自定义角色时，所有分配到该角色的用户会自动重新分配到 `user` 角色。
+当删除自定义角色时，所有分配到该角色的用户会自动重新分配到内置的 `user` 角色。已禁用的成员仍然禁用为 `disabled:user`。设置对话框会在删除确认中说明这一点，并显示将被转移的用户数量。
+
+`DELETE /api/v1/roles/{id}` 响应会列出被转移的用户，`ROLE_DELETED` 审计条目也会在 `details.reassignedUsers` 下记录同一份列表：
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## 团队 {#teams}
 

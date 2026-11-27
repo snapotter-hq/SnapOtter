@@ -1,8 +1,8 @@
 ---
 description: "Hantera användare, inbyggda och anpassade roller, behörigheter, API-nycklar, team, sessioner och granskningsloggen i SnapOtter."
-i18n_source_hash: bea8955f3aff
-i18n_provenance: human
-i18n_output_hash: a3bdb0c3f9a1
+i18n_source_hash: 2578a09d3493
+i18n_provenance: machine
+i18n_output_hash: a1dcb4154651
 i18n_hash_version: 2
 ---
 
@@ -113,13 +113,13 @@ Rollnamn måste vara 2-30 tecken, gemena alfanumeriska med bindestreck och under
 
 ### Delegerade administrationsgränser {#delegated-administration-boundaries}
 
-Alla 17 behörigheter kan delegeras genom anpassade roller, men en administrativ behörighet gör inte den rollen likvärdig med den inbyggda `admin`-rollen. Användarmutationer godkända av `users:manage`, destruktiva operationer godkända av `compliance:manage` och anpassade rollhantering auktoriserad av `security:manage` begränsas av skådespelarens nuvarande auktoritet:
+Alla 17 behörigheter kan delegeras genom anpassade roller, men en administrativ behörighet gör inte den rollen likvärdig med den inbyggda `admin`-rollen. Användarmutationer godkända av `users:manage`, destruktiva operationer godkända av `compliance:manage` och hantering av anpassade roller auktoriserad av `security:manage` begränsas av aktörens nuvarande auktoritet:
 
 - Inbyggda roller följer `admin` > `editor` > `user`; anpassade roller är under inbyggda roller.
-- Målets behörigheter måste innehållas av skådespelarens **effektiva** behörigheter. En scoped API-nyckel kan därför inte utöva behörigheter som utelämnas från dess scope.
+- Målets behörigheter måste innehållas av aktörens **effektiva** behörigheter. En scoped API-nyckel kan därför inte utöva behörigheter som utelämnas från dess scope.
 - En målrolls verktygsåtkomst ska innehållas av aktörens egen verktygsåtkomst.
 - Ett inaktiverat konto kontrolleras mot sin ursprungliga roll när den rollen registreras som `disabled:<original-role>`.
-- Att ta bort en anpassad roll kräver också behörighet att tilldela den inbyggda `user` reserv; funktionshindrade medlemmar förblir inaktiverade som `disabled:user`.
+- Att ta bort en anpassad roll kräver också behörighet att tilldela den inbyggda reservrollen `user`; inaktiverade medlemmar förblir inaktiverade som `disabled:user`.
 
 Globala autentiseringsuppgifter och konfiguration är strängare: utfärdande eller återkallande av SCIM-token och import av instanskonfiguration kräver den inbyggda `admin`-rollen med fullständig effektiv administratörsbehörighet.
 
@@ -147,7 +147,16 @@ När läget `tool` är satt men enterprise-funktionen inte är tillgänglig, deg
 
 ### Radera en anpassad roll {#deleting-a-custom-role}
 
-När en anpassad roll raderas tilldelas alla användare som tilldelats den automatiskt om till rollen `user`.
+När en anpassad roll raderas tilldelas alla användare som tilldelats den automatiskt om till den inbyggda rollen `user`. Inaktiverade medlemmar förblir inaktiverade som `disabled:user`. Inställningsdialogen anger detta i sin raderingsbekräftelse, tillsammans med hur många användare som flyttas.
+
+Svaret från `DELETE /api/v1/roles/{id}` listar de användare som flyttades, och granskningsposten `ROLE_DELETED` registrerar samma lista under `details.reassignedUsers`:
+
+```json
+{
+  "ok": true,
+  "reassignedUsers": [{ "id": "8b1d4f2a-3c5e-4a7b-9d1f-6e2c8a4b7d3e", "username": "jane" }]
+}
+```
 
 ## Team {#teams}
 

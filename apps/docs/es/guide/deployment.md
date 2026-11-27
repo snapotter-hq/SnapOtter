@@ -1,8 +1,8 @@
 ---
 description: "Despliegue de SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare."
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: c4de73e4647d
+i18n_output_hash: eb1fac00168a
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 Si las herramientas de IA se ejecutan en CPU aunque `--gpus all` y NVIDIA Container Toolkit estén bien configurados, reinstale el paquete afectado (por ejemplo Eliminación de fondo) desde **Configuración → Funciones de IA**. El instalador restaura la compilación para GPU de ONNX Runtime, que una compilación solo para CPU incorporada por otro paquete (como la transcripción) puede ocultar en el entorno de IA compartido. Si reinstalar desde la interfaz no restaura la GPU en una imagen anterior, consulte la reparación manual en el [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+El instalador de Proxmox LXC se mantiene en el proyecto [community-scripts](https://community-scripts.org), no en este repositorio. No usa los valores predeterminados `admin` / `admin` de los ejemplos de Docker. La instalación genera una contraseña aleatoria de 20 caracteres para el usuario `admin` y la guarda dentro del contenedor. Abra una shell en el contenedor y ejecute:
+
+```bash
+cat ~/snapotter.creds
+```
+
+El mismo valor se encuentra en `DEFAULT_PASSWORD` dentro de `/opt/snapotter_data/.env`. Esa variable solo inicializa la cuenta en la primera ejecución, así que si desde entonces ha cambiado la contraseña en la aplicación, el archivo ya no coincide con ella.
+
 ## Requisitos de hardware {#hardware-requirements}
 
 Estas cifras provienen de pruebas de rendimiento en una variedad de sistemas, desde una estación de trabajo amd64 moderna con una NVIDIA RTX 4070 hasta una Raspberry Pi, ejecutando todo el catálogo de herramientas en cada uno y variando los límites de recursos de Docker para encontrar el mínimo real.
@@ -406,7 +416,7 @@ Consulte la [lista completa de formatos](/es/guide/supported-formats) para ver l
 
 - El **redimensionado con detección de contenido** falla en imágenes grandes (>5 MP) por una limitación del binario caire. Funciona bien con imágenes más pequeñas.
 - La **decodificación HEIF** tarda de 13 a 23 segundos. HEIC (la variante de Apple) es mucho más rápida, de 0,3 a 0,9 segundos.
-- La **ampliación** agota el tiempo en CPU con cualquier imagen que no sea pequeña. Se necesita GPU para un uso práctico.
+- La **ampliación** sin GPU reduce una entrada que supera el límite de CPU (4 MP por defecto, menor con factores de escala altos) antes de ampliarla, y se ejecuta mucho más lenta que en una GPU. [`MAX_CPU_UPSCALE_MP`](/es/guide/configuration#processing-limits) eleva o elimina ese límite si el host dispone de la RAM necesaria.
 - La mejora de rostros con **CodeFormer** es bastante más lenta que GFPGAN (53 s frente a 2 s en GPU). Se recomienda GFPGAN para la mayoría de los casos.
 
 ### Instalación de paquetes de IA con varias réplicas {#ai-bundle-installs-with-several-replicas}
@@ -493,8 +503,8 @@ El error de inicio indica el UID exacto que debe usar, así que el camino más r
 | [`RATE_LIMIT_PER_MIN`](/es/guide/configuration#env-rate-limit-per-min) | `1000` | Solicitudes de API por minuto por IP (establezca 0 para deshabilitar) |
 | [`MAX_USERS`](/es/guide/configuration#env-max-users) | `0` (sin límite) | Máximo de cuentas de usuario |
 | [`TRUST_PROXY`](/es/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Qué peers pueden establecer la IP del cliente mediante `X-Forwarded-For`. Por defecto, solo redes privadas |
-| `PUID` | `999` | Ejecutar con este UID (para permisos de bind mount) |
-| `PGID` | `999` | Ejecutar con este GID (para permisos de bind mount) |
+| `PUID` | `999` | Ejecutar con este UID (para permisos de bind mount). Requiere un sistema de archivos raíz escribible; consulte la [guía de seguridad](/es/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | Ejecutar con este GID (para permisos de bind mount). Requiere un sistema de archivos raíz escribible; consulte la [guía de seguridad](/es/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/es/guide/configuration#env-log-level) | `info` | Nivel de detalle del registro: fatal, error, warn, info, debug, trace |
 | [`CONCURRENT_JOBS`](/es/guide/configuration#env-concurrent-jobs) | `0` (automático) | Máximo de trabajos de procesamiento de IA en paralelo |
 | [`SESSION_DURATION_HOURS`](/es/guide/configuration#env-session-duration-hours) | `168` | Duración de la sesión de inicio de sesión (7 días) |
@@ -519,6 +529,8 @@ services:
 ```
 
 Mantenga las credenciales del proxy fuera del archivo de Compose (por ejemplo en un archivo `.env` protegido o en un secreto). No deshabilite la verificación TLS: el índice firmado de OCR autentica los metadatos de la versión, mientras que la validación TLS normal sigue protegiendo el transporte y todas las demás solicitudes salientes.
+
+Si huggingface.co está bloqueado o limitado en lugar de requerir un proxy, dirija las descargas de IA a un espejo de Hugging Face con `HF_ENDPOINT` (por ejemplo `HF_ENDPOINT: https://hf-mirror.com`). Consulte [Descarga mediante un espejo](/es/api/ai#downloading-through-a-mirror).
 
 ## Comprobación de estado {#health-check}
 
@@ -719,7 +731,7 @@ Semantic-release determina la versión a partir del historial de commits. La eti
 
 ## Analítica {#analytics}
 
-SnapOtter incluye analítica de producto anónima (patrones de uso de herramientas, informes de errores) para ayudar a detectar errores y mejorar las funciones. Está activada por defecto. Sus archivos, nombres de archivo y datos personales nunca forman parte de ella. SnapOtter funciona con normalidad con la analítica deshabilitada.
+SnapOtter incluye analítica de producto anónima (patrones de uso de herramientas, informes de errores) para ayudar a detectar errores y mejorar las funciones. Una instancia nueva pregunta a su administrador en el primer inicio y no envía nada hasta que responda. Sus archivos, nombres de archivo y datos personales nunca forman parte de ella. SnapOtter funciona con normalidad con la analítica deshabilitada.
 
 ### Deshabilitar la analítica {#disabling-analytics}
 

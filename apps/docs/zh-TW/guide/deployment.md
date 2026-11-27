@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 與 Cloudflare 的反向代理設定。"
-i18n_source_hash: 524ec02adde3
+i18n_source_hash: 5c1e739cb3eb
 i18n_provenance: machine
-i18n_output_hash: 31ee54283f3a
+i18n_output_hash: acc024e715a6
 i18n_hash_version: 2
 ---
 
@@ -251,6 +251,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 如果 `--gpus all` 與 NVIDIA Container Toolkit 都已正確設定，AI 工具卻仍在 CPU 上執行，請從 **設定 → AI 功能** 重新安裝受影響的套件（例如背景移除）。安裝程式會還原 ONNX Runtime 的 GPU 版本；在共用的 AI 環境中，其他套件（例如轉錄）引入的純 CPU 版本可能會遮蔽它。如果在較舊的映像檔上從 UI 重新安裝無法還原 GPU，請參閱 [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490) 中的手動修復方式。
 
+## Proxmox LXC {#proxmox-lxc}
+
+Proxmox LXC 安裝程式由 [community-scripts](https://community-scripts.org) 專案維護，不在此儲存庫中。它不使用 Docker 範例中的 `admin` / `admin` 預設值。安裝時會為 `admin` 使用者產生一組隨機的 20 字元密碼，並儲存在容器內。請在容器中開啟 shell 並執行：
+
+```bash
+cat ~/snapotter.creds
+```
+
+相同的值存放在 `DEFAULT_PASSWORD`（位於 `/opt/snapotter_data/.env`）。該變數只會在首次執行時建立帳號，因此如果您之後已在應用程式中變更密碼，該檔案就不會再與之相符。
+
 ## 硬體需求 {#hardware-requirements}
 
 這些數字來自對各種系統的基準測試，範圍從搭載 NVIDIA RTX 4070 的新型 amd64 工作站，到 Raspberry Pi。我們在每台機器上執行完整的工具目錄，並調整 Docker 資源限制以找出真正的下限。
@@ -288,7 +298,7 @@ deploy:
       memory: 2G
 ```
 
-**唯一吃重 CPU 的例外是影片重新編碼。** 串流複製操作（剪輯、靜音、容器重新封裝）是瞬間完成的，但轉碼為不同的編解碼器則受限於 CPU。將 1080p、45 秒的片段重新編碼為 VP9（WebM），在快速的新型 CPU 上約需 **40 秒**，在 Apple Silicon 上約 45 秒，在較舊的 4 核心行動處理器上約 80 秒，在較舊的 4 核心伺服器上約需 **130 秒**。如果您的工作負載以影片為主，請優先考慮 CPU 核心數與時脈，或提高容器的 `cpus:` 限制，隨附的 compose 預設將應用程式限制在 4 核心（GPU 版 compose 為 8 核心）。
+**唯一吃重 CPU 的例外是影片重新編碼。** 串流複製操作（剪輯、靜音、容器重新封裝）是瞬間完成的，但轉碼為不同的編解碼器則受限於 CPU。將 1080p、45 秒的片段重新編碼為 VP9（WebM），在快速的新型 CPU 上約需 **40 秒**，在 Apple Silicon 上約 45 秒，在較舊的 4 核心行動處理器上約 80 秒，在較舊的 4 核心伺服器上約需 **130 秒**。如果您的工作負載以影片為主，請優先考慮 CPU 核心數與時脈，或提高容器的 `cpus:` 限制。隨附的 compose 預設將應用程式限制在 4 核心（GPU 版 compose 為 8 核心）。
 
 ### 建議（CPU 上的 AI 工具）{#recommended-ai-tools-on-cpu}
 
@@ -406,7 +416,7 @@ SnapOtter 支援 **55 種以上的輸入格式**與 **14 種輸出格式**，包
 
 - **內容感知縮放**在大型圖片（超過 5 MP）上會當機，這是 caire 執行檔的限制。較小的圖片則運作正常。
 - **HEIF 解碼**需要 13-23 秒。HEIC（Apple 的變體）則快得多，只需 0.3-0.9 秒。
-- **放大**在 CPU 上對於稍大於小圖的圖片就會逾時，實際使用需要 GPU。
+- **放大**在沒有 GPU 時，若輸入超過 CPU 上限（預設為 4 MP，放大倍率高時更低），會先縮小再放大，且執行速度比 GPU 慢得多。如果主機有足夠的 RAM，[`MAX_CPU_UPSCALE_MP`](/zh-TW/guide/configuration#processing-limits) 可以提高或移除該上限。
 - **CodeFormer** 臉部強化明顯比 GFPGAN 慢（GPU 上為 53 秒對 2 秒）。多數情況下建議使用 GFPGAN。
 
 ### 多個副本時安裝 AI 套件 {#ai-bundle-installs-with-several-replicas}
@@ -455,7 +465,7 @@ SnapOtter 在執行期間會寫入兩個位置：`/data`（使用者檔案、日
 
 權限的處理方式取決於容器的啟動方式：
 
-**預設（以 root 啟動，再降權為 `snapotter`）**：進入點以 root 啟動，修正已掛載磁碟區的擁有者，然後透過 `gosu` 降權為無特權的 `snapotter` 使用者。具名磁碟區無需任何設定即可運作。對於綁定掛載，請將 `PUID`/`PGID` 設為您的主機使用者（如上所示），讓它寫入的檔案歸您所有。
+**預設（以 root 啟動，再降權為 `snapotter`）**：進入點以 root 啟動，修正已掛載磁碟區的擁有者，然後降權為無特權的 `snapotter` 使用者（透過 `gosu`）。具名磁碟區無需任何設定即可運作。對於綁定掛載，請將 `PUID`/`PGID` 設為您的主機使用者（如上所示），讓它寫入的檔案歸您所有。
 
 **Kubernetes / OpenShift（透過 `runAsUser` 以非 root 執行）**：直接以非 root 使用者啟動時，容器無法自行對磁碟區執行 chown，因此必須由協調器讓它們可寫入。請設定 `fsGroup`：
 
@@ -493,8 +503,8 @@ securityContext:
 | [`RATE_LIMIT_PER_MIN`](/zh-TW/guide/configuration#env-rate-limit-per-min) | `1000` | 每個 IP 每分鐘的 API 請求數（設為 0 即停用） |
 | [`MAX_USERS`](/zh-TW/guide/configuration#env-max-users) | `0`（無限制） | 使用者帳號數上限 |
 | [`TRUST_PROXY`](/zh-TW/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | 允許哪些對等端透過 `X-Forwarded-For` 設定用戶端 IP。預設僅限私人網路 |
-| `PUID` | `999` | 以此 UID 執行（用於綁定掛載權限） |
-| `PGID` | `999` | 以此 GID 執行（用於綁定掛載權限） |
+| `PUID` | `999` | 以此 UID 執行（用於綁定掛載權限）。需要可寫入的根檔案系統；請參閱[安全性指南](/zh-TW/guide/security#why-read-only-is-not-set) |
+| `PGID` | `999` | 以此 GID 執行（用於綁定掛載權限）。需要可寫入的根檔案系統；請參閱[安全性指南](/zh-TW/guide/security#why-read-only-is-not-set) |
 | [`LOG_LEVEL`](/zh-TW/guide/configuration#env-log-level) | `info` | 日誌詳細程度：fatal、error、warn、info、debug、trace |
 | [`CONCURRENT_JOBS`](/zh-TW/guide/configuration#env-concurrent-jobs) | `0`（自動） | AI 並行處理工作數上限 |
 | [`SESSION_DURATION_HOURS`](/zh-TW/guide/configuration#env-session-duration-hours) | `168` | 登入工作階段的有效期限（7 天） |
@@ -519,6 +529,8 @@ services:
 ```
 
 請將代理伺服器的憑證資訊放在 Compose 檔案之外（例如放在受保護的 `.env` 檔案或 secret 中）。請勿停用 TLS 驗證：簽署的 OCR 索引會驗證發行中繼資料，而一般的 TLS 驗證仍會保護傳輸過程以及其他所有對外請求。
+
+如果是 huggingface.co 本身被封鎖或限速，而不是需要代理，請用 `HF_ENDPOINT` 將 AI 下載指向 Hugging Face 鏡像站（例如 `HF_ENDPOINT: https://hf-mirror.com`）。請參閱[透過鏡像站下載](/zh-TW/api/ai#downloading-through-a-mirror)。
 
 ## 健康檢查 {#health-check}
 
@@ -578,7 +590,7 @@ server {
 
 ### 部署於子路徑下 {#subpath}
 
-若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器環境中設定 [`BASE_PATH=/snapotter`](/zh-TW/guide/configuration#env-base-path) 並重新啟動。正式的 CPU 與 GPU Compose 檔案也接受來自您 shell 或 Compose `.env` 檔案的 `BASE_PATH`。同一個映像檔可在任何路徑運作，無需重新建置前端。
+若要在 `https://example.com/snapotter` 提供服務，請在 SnapOtter 容器環境中設定 [`BASE_PATH=/snapotter`](/zh-TW/guide/configuration#env-base-path) 並重新啟動。正式的 CPU 與 GPU Compose 檔案也接受 `BASE_PATH`，可由您的 shell 或 Compose `.env` 檔案提供。同一個映像檔可在任何路徑運作，無需重新建置前端。
 
 `BASE_PATH` 接受以斜線分隔、由字母、數字、`_` 或 `-` 組成的區段，包括 `/apps/snapotter` 這類巢狀路徑。結尾斜線為選用。若為根路徑部署，請留空（預設），或設為 `/`。
 
@@ -603,7 +615,7 @@ location /snapotter/ {
 
 此範例會保留前綴。在轉送之前先移除 `/snapotter` 的代理也同樣受支援。內部健康檢查可繼續使用 `/api/v1/health`。若使用 OIDC 或 SAML，請同時設定 [`EXTERNAL_URL=https://example.com/snapotter`](/zh-TW/guide/oidc#env-external-url)，並更新身分提供者的回呼 URL，分別加入 `/snapotter/api/auth/oidc/callback` 或 `/snapotter/api/auth/saml/callback`。
 
-API 指令碼無需修改即可繼續運作：API 回應中的 URL，例如工具的 `downloadUrl`，無論 `BASE_PATH` 為何，都以 `/api/` 開頭。請將它們附加到您執行個體的基底 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不要依網域根路徑來解析。
+API 指令碼無需修改即可繼續運作：API 回應中的 URL，例如工具的 `downloadUrl`，都以 `/api/` 開頭，不論 `BASE_PATH` 為何。請將它們附加到您執行個體的基底 URL（`https://example.com/snapotter` + `/api/v1/download/...`），而不要依網域根路徑來解析。
 
 請透過帶有前綴的 URL（`https://example.com/snapotter`）開啟 UI。未帶前綴到達的瀏覽器會被自動導向該處；只有 API 請求預期會不帶前綴地到達應用程式。如果日誌顯示 `Requests arrive under /snapotter/ but BASE_PATH is empty`，表示您的代理轉送了 `BASE_PATH` 未宣告的前綴：請將 `BASE_PATH` 設為該前綴，或在代理端移除前綴。
 
@@ -702,7 +714,7 @@ Semantic-release 會依據提交歷史決定版本。Docker 標籤 `latest` 永�
 
 ## 分析 {#analytics}
 
-SnapOtter 包含匿名的產品分析（工具使用模式、錯誤報告），協助找出錯誤並改進功能。此功能預設為開啟。您的檔案、檔名與個人資料絕不會成為其中的一部分。停用分析後，SnapOtter 仍可正常運作。
+SnapOtter 包含匿名的產品分析（工具使用模式、錯誤報告），協助找出錯誤並改進功能。全新的執行個體會在首次執行時詢問管理員，在得到回答之前不會傳送任何資料。您的檔案、檔名與個人資料絕不會成為其中的一部分。停用分析後，SnapOtter 仍可正常運作。
 
 ### 停用分析 {#disabling-analytics}
 

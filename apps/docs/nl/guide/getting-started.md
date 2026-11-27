@@ -1,8 +1,8 @@
 ---
 description: "Installeer SnapOtter met Docker in één opdracht, log in en open uw eerste tool. Behandelt GPU-versnelling, kleine machines, Docker Compose en bouwen vanaf de broncode."
-i18n_source_hash: c2aae540add0
+i18n_source_hash: 83126a46454e
 i18n_provenance: machine
-i18n_output_hash: fef86fe2f0d3
+i18n_output_hash: f3e7e3e17e53
 i18n_hash_version: 2
 ---
 
@@ -33,9 +33,9 @@ Voer op een Raspberry Pi, een oude laptop of een kleine VPS één taak tegelijk 
 :::
 
 ::: tip Anonieme productanalyse
-SnapOtter bevat standaard anonieme productanalyse. Om dit uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
+SnapOtter bevat anonieme productanalyse. Een nieuwe instantie vraagt de beheerder bij de eerste keer opstarten om toestemming en verstuurt niets totdat die vraag is beantwoord. Om het later uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
 
-U kunt ook de omgevingsvariabele `SNAPOTTER_TELEMETRY=0` instellen (`false` en `off` werken ook) om alle telemetrie voor de instantie uit te schakelen zonder opnieuw te bouwen.
+U kunt ook de omgevingsvariabele `SNAPOTTER_TELEMETRY=0` (`false` en `off` werken ook) instellen om alle telemetrie voor de instantie uit te schakelen zonder opnieuw te bouwen.
 
 Foutmonitoring wordt verzorgd door [Sentry](https://sentry.io), dat SnapOtter sponsort via zijn open-sourceprogramma.
 
@@ -141,11 +141,11 @@ pnpm dev
 
 | Modaliteit | Aantal | Voorbeeldtools |
 |----------|-------|---------------|
-| **Afbeelding** | 112 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Opschalen, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
+| **Afbeelding** | 114 | Formaat wijzigen, Bijsnijden, Comprimeren, Converteren, Achtergrond verwijderen, Opschalen, OCR, Watermerk, Collage, Inkleuren, GIF-tools, formaatpresets |
 | **Video** | 63 | Knippen, Bijsnijden, Comprimeren, Converteren, Samenvoegen, Audio extraheren, Automatische ondertitels, Video naar GIF, Formaat wijzigen, Stabiliseren, formaatpresets |
 | **Audio** | 57 | Knippen, Samenvoegen, Converteren, Normaliseren, Ruisonderdrukking, Transcriberen, Toonhoogte wijzigen, Fade, Ringtone-maker, formaatpresets |
 | **PDF / Document** | 37 | Samenvoegen, Splitsen, Comprimeren, OCR, Watermerk, Redigeren, Word naar PDF, Excel naar PDF, Roteren, Beveiligen, Repareren |
-| **Bestanden** | 25 | CSV naar JSON, JSON naar XML, CSV's samenvoegen, CSV splitsen, ZIP maken, ZIP uitpakken, Grafiekmaker, YAML/JSON |
+| **Bestanden** | 32 | CSV naar JSON, JSON naar XML, CSV's samenvoegen, CSV splitsen, ZIP maken, ZIP uitpakken, Grafiekmaker, YAML/JSON, Lettertype converteren, Verhoudingscalculator, Base64, formaatpresets |
 
 ### Pipelines {#pipelines}
 

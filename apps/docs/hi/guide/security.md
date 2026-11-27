@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter के लिए सुरक्षा hardening गाइड। Container सुरक्षा, network isolation, Docker secrets, Kubernetes deployment, और compliance artifacts।"
-i18n_source_hash: 630381c08cde
+i18n_source_hash: bc7bf9ded9eb
 i18n_provenance: machine
-i18n_output_hash: 0af587aa158e
+i18n_output_hash: 6b5c7a140615
 i18n_hash_version: 2
 ---
 
 # सुरक्षा और Hardening {#security-hardening}
 
-SnapOtter फ़ाइलों को पूरी तरह आपके अपने infrastructure पर प्रोसेस करता है। प्रोजेक्ट को बेहतर बनाने में मदद के लिए यह डिफ़ॉल्ट रूप से गुमनाम, सामग्री-रहित product analytics और crash reports भेजता है। यह आपकी फ़ाइलें, फ़ाइल नाम, फ़ाइल सामग्री, OCR output, image metadata, या दस्तावेज़ का टेक्स्ट कभी नहीं भेजता। वैकल्पिक फ़ीडबैक केवल तब भेजा जाता है जब उपयोगकर्ता उसे सबमिट करे, केवल तब जब analytics सक्षम हो, और संपर्क फ़ील्ड केवल स्पष्ट संपर्क सहमति के साथ शामिल होते हैं। कोई administrator Settings > System > Privacy में एक क्लिक से analytics और फ़ीडबैक कैप्चर बंद कर सकता है, rebuild की ज़रूरत नहीं। फ़ाइल प्रोसेसिंग हमेशा आपके container के भीतर ही रहती है।
+SnapOtter फ़ाइलों को पूरी तरह आपके अपने infrastructure पर प्रोसेस करता है। प्रोजेक्ट को बेहतर बनाने में मदद के लिए यह गुमनाम, सामग्री-रहित product analytics और crash reports भेज सकता है, लेकिन नया instance पहले अपने administrator से पूछता है और जवाब मिलने तक कुछ नहीं भेजता। यह आपकी फ़ाइलें, फ़ाइल नाम, फ़ाइल सामग्री, OCR output, image metadata, या दस्तावेज़ का टेक्स्ट कभी नहीं भेजता। वैकल्पिक फ़ीडबैक केवल तब भेजा जाता है जब उपयोगकर्ता उसे सबमिट करे, केवल तब जब analytics सक्षम हो, और संपर्क फ़ील्ड केवल स्पष्ट संपर्क सहमति के साथ शामिल होते हैं। कोई administrator Settings > System > Privacy में एक क्लिक से analytics और फ़ीडबैक कैप्चर बंद कर सकता है, rebuild की ज़रूरत नहीं। फ़ाइल प्रोसेसिंग हमेशा आपके container के भीतर ही रहती है।
 
 Container एक समर्पित non-root उपयोगकर्ता (`snapotter`) के रूप में चलता है, जिसमें न्यूनतम आवश्यक सेट को छोड़कर सभी Linux capabilities हटा दी जाती हैं। पूरी vulnerability disclosure policy और सुरक्षा architecture के लिए GitHub पर [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) देखें।
 
@@ -19,7 +19,7 @@ Canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/doc
 दोनों stacks ये नियंत्रण लागू करते हैं:
 
 - Memory, swap, CPU, और PID सीमाएँ बेकाबू native processing को रोकती हैं।
-- हर service सभी Linux capabilities हटा देती है। Application केवल volume ownership, एकतरफ़ा `gosu` identity drop, और graceful signal forwarding के लिए `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` वापस जोड़ता है। PostgreSQL और Redis को केवल वही उपसमूह मिलता है जो उनके आधिकारिक entrypoints को चाहिए।
+- हर service सभी Linux capabilities हटा देती है। Application केवल `CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER, KILL` वापस जोड़ता है: volume ownership, एकतरफ़ा `gosu` identity drop, और graceful signal forwarding के लिए। PostgreSQL और Redis को केवल वही उपसमूह मिलता है जो उनके आधिकारिक entrypoints को चाहिए।
 - `security_opt: [no-new-privileges:true]` application, PostgreSQL, और Redis containers की processes को अतिरिक्त privileges पाने से रोकता है। यह `gosu` के साथ संगत रहता है: entrypoint root के रूप में शुरू होता है, volumes तैयार करता है, और केवल समर्पित `snapotter` उपयोगकर्ता पर आता है।
 - PostgreSQL और Redis image इनपुट्स digest द्वारा pin किए गए हैं। Application को भी `latest` के बजाय सत्यापित release tag या digest पर pin किया जाना चाहिए।
 - Health checks, सीमित JSON log rotation, durable Redis AOF, और restart policy canonical फ़ाइलों में केंद्रीय रूप से परिभाषित हैं।
@@ -28,7 +28,7 @@ Canonical [CPU](https://github.com/snapotter-hq/SnapOtter/blob/v2.3.0/docker/doc
 
 ### `read_only` सेट क्यों नहीं है {#why-read-only-is-not-set}
 
-`read_only: true` सेट नहीं है क्योंकि [PUID](/hi/guide/configuration#env-puid)/[PGID](/hi/guide/configuration#env-pgid) remapping startup पर `/etc/passwd` और `/etc/group` में लिखता है। यदि आप PUID/PGID के बजाय Docker के `--user` flag या Kubernetes `runAsUser` का उपयोग करते हैं, तो आप read-only root filesystem सुरक्षित रूप से सक्षम कर सकते हैं।
+`read_only: true` सेट नहीं है क्योंकि [PUID](/hi/guide/configuration#env-puid)/[PGID](/hi/guide/configuration#env-pgid) remapping startup पर `/etc/passwd` और `/etc/group` में लिखता है। यदि आप PUID/PGID के बजाय Docker के `--user` flag या Kubernetes `runAsUser` का उपयोग करते हैं, तो आप read-only root filesystem सुरक्षित रूप से सक्षम कर सकते हैं। यदि आप read-only root पर PUID या PGID को 999 के अलावा कुछ भी सेट करते हैं, तो container startup पर रुक जाता है और इसका संदेश देता है, इससे पहले कि वह /data में पहले से मौजूद किसी चीज़ का owner बदले। All-in-one image भी, जब PUID और PGID सेट न हों, read-only root के साथ चलती है, बशर्ते /run और /tmp tmpfs mounts हों और /run में exec की अनुमति हो, क्योंकि s6-overlay अपना supervisor वहीं से शुरू करता है।
 
 ## Network Isolation {#network-isolation}
 
@@ -92,7 +92,7 @@ Docker Compose secrets (Swarm के बिना) के लिए Compose v2.2
 
 ## Kubernetes Deployment {#kubernetes-deployment}
 
-Entrypoint पहचान लेता है कि container पहले से non-root के रूप में चल रहा है (जैसे Kubernetes `runAsUser` के ज़रिए) और gosu privilege drop अपने आप छोड़ देता है। उस स्थिति में वह mount किए गए volumes पर खुद chown नहीं कर सकता, इसलिए वह जाँचता है कि वे writable हैं या नहीं, और न होने पर उपयोगी मार्गदर्शन के साथ जल्दी बाहर निकल जाता है। `fsGroup` और foreign-UID सेटअप (TrueNAS, OpenShift) के लिए [Storage permissions](/hi/guide/deployment#storage-permissions) देखें।
+Entrypoint पहचान लेता है कि container पहले से non-root के रूप में चल रहा है (जैसे Kubernetes `runAsUser` के ज़रिए) और gosu privilege drop अपने आप छोड़ देता है। उस स्थिति में वह mount किए गए volumes पर खुद chown नहीं कर सकता, इसलिए वह जाँचता है कि वे writable हैं या नहीं, और न होने पर उपयोगी मार्गदर्शन के साथ जल्दी बाहर निकल जाता है। [Storage permissions](/hi/guide/deployment#storage-permissions) देखें, `fsGroup` और foreign-UID सेटअप (TrueNAS, OpenShift) के लिए।
 
 **अनुशंसित Pod SecurityContext:**
 
