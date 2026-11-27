@@ -1,8 +1,8 @@
 ---
 description: "모든 로컬 ML 도구를 다루는 AI 엔진 레퍼런스. 배경 제거, 업스케일링, OCR, 얼굴 감지, 사진 복원 등."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 420151074af7
+i18n_output_hash: 28d3931cbe71
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ done
 | `enhance` | boolean | 등급에 따라 다름 | 로컬 대비를 개선합니다. Fast는 이를 직접 적용하고, 정확한 등급은 보정된 점수가 OCR을 개선할 때만 변형을 유지합니다. Best에서는 기본으로 켜져 있습니다 |
 | `engine` | string | - | 더 이상 사용되지 않는 호환성 별칭입니다. `tesseract`를 `fast`에 매핑하고 레거시 `paddleocr` 값을 `balanced`에 매핑합니다. PaddlePaddle은 로드하지 않습니다 |
 
-추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환하며 `fast`를 자동으로 실행하지 않습니다. 한국어에 Fast 또는 레거시 `tesseract`를 명시하면 작업이 대기열에 들어가기 전에 `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, 정확한 팩 안내를 반환합니다.
+추출된 텍스트와 출처 메타데이터(엔진, 요청 및 실제 품질, 장치, 공급자, 성능 저하 상태, 경고, 해당되는 경우 정확한 런타임/모델 버전)를 반환합니다. 명시적인 품질 요청은 다른 계층으로 돌아가지 않습니다. `balanced` 또는 `best`를 사용할 수 없는 경우 API 는 `FEATURE_NOT_INSTALLED` 또는 `FEATURE_INCOMPATIBLE`를 반환하며 `fast`를 자동으로 실행하지 않습니다. 한국어에 Fast 또는 레거시 `tesseract`를 명시하면 작업이 대기열에 들어가기 전에 `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported`, 정확한 팩 안내를 반환합니다.
 
 ## PDF OCR {#pdf-ocr}
 

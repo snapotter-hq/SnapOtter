@@ -1,8 +1,8 @@
 ---
 description: "Referência do motor de IA com todas as ferramentas de ML locais. Remoção de fundo, ampliação, OCR, detecção de rostos, restauração de fotos e muito mais."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: f099121783c7
+i18n_output_hash: 644effea40d1
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Desfoca o fundo mantendo o sujeito nítido.
 | `enhance` | booleano | Dependente do nível | Melhore o contraste local. Fast aplica-o diretamente; níveis precisos mantêm a variante somente quando a pontuação calibrada melhora OCR. O padrão é Melhor |
 | `engine` | corda | - | Alias ​​de compatibilidade obsoleta. Mapeia `tesseract` para `fast` e o valor herdado de `paddleocr` para `balanced`; não carrega PaddlePaddle |
 
-Retorna o texto extraído mais os metadados de origem: mecanismo, qualidade solicitada e real, dispositivo, provedor, estado de degradação, avisos e versões de tempo de execução/modelo precisos, quando aplicável. Solicitações de qualidade explícitas nunca voltam para outro nível. Se `balanced` ou `best` não estiver disponível, API retornará `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` em vez de executar `fast` silenciosamente. Fast explícito ou o legado `tesseract` com coreano retorna `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` e orientação sobre o pacote preciso antes que um job seja enfileirado.
+Retorna o texto extraído mais os metadados de origem: mecanismo, qualidade solicitada e real, dispositivo, provedor, estado de degradação, avisos e versões de tempo de execução/modelo precisos, quando aplicável. Solicitações de qualidade explícitas nunca voltam para outro nível. Se `balanced` ou `best` não estiver disponível, API retornará `FEATURE_NOT_INSTALLED` ou `FEATURE_INCOMPATIBLE` em vez de executar `fast` silenciosamente. Fast explícito ou o legado `tesseract` com coreano retorna `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` e orientação sobre o pacote preciso antes que um job seja enfileirado.
 
 ## OCR de PDF {#pdf-ocr}
 

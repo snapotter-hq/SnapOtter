@@ -1,8 +1,8 @@
 ---
 description: "KI-Engine-Referenz mit allen lokalen ML-Werkzeugen. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: 2f329722a940
+i18n_output_hash: e2aa146396bc
 i18n_hash_version: 2
 ---
 
@@ -194,7 +194,7 @@ Zeichnet den Hintergrund weich und hält das Motiv scharf.
 | `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
 | `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
 
-Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen. Explizites Fast oder das alte `tesseract` mit Koreanisch gibt vor dem Einreihen eines Jobs `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` und einen Hinweis auf das genaue Paket zurück.
+Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen. Explizites Fast oder das alte `tesseract` mit Koreanisch gibt vor dem Einreihen eines Jobs `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` und einen Hinweis auf das genaue Paket zurück.
 
 ## PDF-OCR {#pdf-ocr}
 

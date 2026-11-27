@@ -189,7 +189,7 @@ Blurs the background while keeping the subject sharp.
 | `enhance` | boolean | Tier-dependent | Improve local contrast. Fast applies it directly; accurate tiers keep the variant only when calibrated scoring improves OCR. Defaults on for Best |
 | `engine` | string | - | Deprecated compatibility alias. Maps `tesseract` to `fast` and the legacy `paddleocr` value to `balanced`; it does not load PaddlePaddle |
 
-Returns extracted text plus provenance metadata: engine, requested and actual quality, device, provider, degradation state, warnings, and accurate-runtime/model versions when applicable. Explicit quality requests never fall back to another tier. If `balanced` or `best` is unavailable, the API returns `FEATURE_NOT_INSTALLED` or `FEATURE_INCOMPATIBLE` instead of silently running `fast`. Explicit Fast or legacy `tesseract` with Korean returns `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, and accurate-pack guidance before a job is queued.
+Returns extracted text plus provenance metadata: engine, requested and actual quality, device, provider, degradation state, warnings, and accurate-runtime/model versions when applicable. Explicit quality requests never fall back to another tier. If `balanced` or `best` is unavailable, the API returns `FEATURE_NOT_INSTALLED` or `FEATURE_INCOMPATIBLE` instead of silently running `fast`. Explicit Fast or legacy `tesseract` with Korean returns `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported`, and accurate-pack guidance before a job is queued.
 
 ## PDF OCR {#pdf-ocr}
 

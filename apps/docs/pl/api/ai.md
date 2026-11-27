@@ -1,8 +1,8 @@
 ---
 description: "Dokumentacja silnika AI ze wszystkimi lokalnymi narzędziami ML. Usuwanie tła, powiększanie, OCR, wykrywanie twarzy, renowacja zdjęć i więcej."
-i18n_source_hash: 8eb785f85304
+i18n_source_hash: e4a3b9ca0d58
 i18n_provenance: machine
-i18n_output_hash: c606f8eac7f4
+i18n_output_hash: 6e53ba8bb522
 i18n_hash_version: 2
 ---
 
@@ -193,7 +193,7 @@ Rozmywa tło, zachowując ostrość obiektu.
 | `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Best |
 | `engine` | string | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
 
-Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`. Jawne użycie Fast lub starszego `tesseract` z językiem koreańskim zwraca `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` i wskazówkę dotyczącą dokładnego pakietu, zanim zadanie trafi do kolejki.
+Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`. Jawne użycie Fast lub starszego `tesseract` z językiem koreańskim zwraca `FEATURE_INCOMPATIBLE`, `compatibilityReason`: `fast-korean-unsupported` i wskazówkę dotyczącą dokładnego pakietu, zanim zadanie trafi do kolejki.
 
 ## OCR PDF {#pdf-ocr}
 
