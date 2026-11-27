@@ -29,6 +29,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -417,6 +418,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           try {
             const preparedBg = await prepareRouteImage(bgBuffer, bgName, bgValidation.format, {
               log: request.log,
+              signal: clientDisconnectSignal(reply),
               rewriteFilenameToPng: true,
               rasterizeToPng: true,
             });

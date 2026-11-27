@@ -23,6 +23,7 @@ import {
 } from "../../jobs/types.js";
 import { assertSingleFrameFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -213,6 +214,7 @@ export function registerColorize(app: FastifyInstance) {
       try {
         const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
           log: request.log,
+          signal: clientDisconnectSignal(reply),
           rewriteFilenameToPng: true,
         });
         fileBuffer = prepared.buffer;

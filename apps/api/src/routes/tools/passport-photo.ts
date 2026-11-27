@@ -23,6 +23,7 @@ import { db, schema } from "../../db/index.js";
 import { insertToolJobAlias } from "../../jobs/enqueue.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, type Pool, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
 import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
@@ -492,6 +493,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
       try {
         const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
           log: request.log,
+          signal: clientDisconnectSignal(reply),
           rewriteFilenameToPng: true,
         });
         fileBuffer = prepared.buffer;

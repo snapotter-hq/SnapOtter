@@ -68,7 +68,9 @@ export function registerContentAwareResize(app: FastifyInstance) {
             : ext === "svg" || ext === "svgz"
               ? "svg"
               : "png";
-        const prepared = await prepareRouteImage(inputBuffer, filename, format, {});
+        const prepared = await prepareRouteImage(inputBuffer, filename, format, {
+          signal: ctx?.signal,
+        });
         const orientedBuffer = prepared.buffer;
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
