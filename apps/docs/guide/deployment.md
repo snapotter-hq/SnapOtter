@@ -247,6 +247,16 @@ docker logs SnapOtter 2>&1 | head -20
 
 If AI tools run on CPU even though `--gpus all` and the NVIDIA Container Toolkit are set up correctly, reinstall the affected bundle (for example Background Removal) from **Settings → AI Features**. The installer restores the GPU build of ONNX Runtime, which a CPU-only build pulled in by another bundle (such as transcription) can otherwise shadow in the shared AI environment. If reinstalling from the UI doesn't restore GPU on an older image, see the manual repair in [issue #490](https://github.com/snapotter-hq/SnapOtter/issues/490).
 
+## Proxmox LXC {#proxmox-lxc}
+
+The Proxmox LXC installer is maintained in the [community-scripts](https://community-scripts.org) project, not in this repository. It doesn't use the `admin` / `admin` defaults from the Docker examples. The install generates a random 20 character password for the `admin` user and saves it inside the container. Open a shell in the container and run:
+
+```bash
+cat ~/snapotter.creds
+```
+
+The same value sits in `DEFAULT_PASSWORD` in `/opt/snapotter_data/.env`. That variable only seeds the account on first run, so if you've since changed the password in the app, the file no longer matches it.
+
 ## Hardware Requirements {#hardware-requirements}
 
 These numbers come from benchmarks across a range of systems, from a modern amd64 workstation with an NVIDIA RTX 4070 down to a Raspberry Pi, running the whole tool catalog on each and sweeping Docker resource limits to find the real floor.
