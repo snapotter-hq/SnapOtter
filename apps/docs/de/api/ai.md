@@ -1,8 +1,9 @@
 ---
 description: "KI-Engine-Referenz mit allen lokalen ML-Werkzeugen. Hintergrundentfernung, Hochskalierung, OCR, Gesichtserkennung, Fotorestaurierung und mehr."
-i18n_output_hash: 33295375ea44
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 2f329722a940
+i18n_hash_version: 2
 ---
 
 # KI-Engine-Referenz {#ai-engine-reference}
@@ -16,11 +17,6 @@ Eine iGPU-Beschleunigung von Intel/AMD über VA-API, Quick Sync oder OpenCL wird
 19 KI-Werkzeuge im Python-Sidecar über vier Modalitäten hinweg (Bild, Audio, Video, Dokument), plus 2 Werkzeuge mit optionalen KI-Fähigkeiten. Alle Modelle laufen lokal - nach dem ersten Modell-Download ist kein Internet erforderlich.
 
 
-<!-- korean-ocr-contract:start -->
-::: info Kompatibilität für koreanische OCR
-Fast OCR unterstützt `auto`, `en`, `de`, `es`, `fr`, `zh` und `ja`, aber weder Koreanisch (`ko`) noch Arabisch (`ar`). Beide benötigen das genaue OCR-Paket und `balanced` oder `best`. Das Paket läuft in offiziellen Linux-amd64- und arm64-Containern, auch auf NVIDIA-Hosts weiterhin auf der CPU. Nicht unterstützte Systeme erhalten einen eindeutigen Kompatibilitätsfehler und keinen stillen Rückfall auf `fast`. Koreanisch oder Arabisch mit `fast` oder dem alten Alias `tesseract` wird vor dem Einreihen mit `FEATURE_INCOMPATIBLE` und `fast-korean-unsupported` abgelehnt.
-:::
-<!-- korean-ocr-contract:end -->
 ## Architektur {#architecture}
 
 ```
@@ -84,6 +80,10 @@ Werkzeuge mit bundleübergreifenden Abhängigkeiten:
 
 Ein Tool ist nur verfügbar, wenn alle erforderlichen Bundles installiert sind, mit Ausnahme von OCR: Die integrierte `fast`-Stufe bleibt auch ohne das optionale OCR-Paket verfügbar. Teilinstallationen sind gültig und werden inkrementell verarbeitet: Installierte Bundles werden wiederverwendet, fehlende Bundles werden als Downloads angezeigt und Installationen in der Warteschlange werden einzeln ausgeführt, sodass die freigegebene Python-Umgebung nicht gleichzeitig geändert wird.
 
+### Download über einen Mirror {#downloading-through-a-mirror}
+
+Bundle-Archive und die genaue OCR-Laufzeit werden von huggingface.co heruntergeladen. Wenn dieser Host blockiert oder langsam ist, setzen Sie `HF_ENDPOINT` auf dem App-Container auf einen Hugging-Face-Mirror, zum Beispiel `HF_ENDPOINT=https://hf-mirror.com`. Jeder Bundle-Download und die OCR-Laufzeit verwenden ihn, einschließlich des Fallback-Downloaders und des Links zum manuellen Download in einer Installationsfehlermeldung. Verwenden Sie eine `https`-URL ohne Zugangsdaten; die Installation der OCR-Laufzeit lehnt alles andere ab. Die Integrität hängt nicht vom Mirror ab: Jedes Bundle-Archiv wird gegen seine SHA-256 geprüft und der OCR-Laufzeitindex ist signiert, sodass ein Mirror, der veränderte Dateien ausliefert, die Installation scheitern lässt. Die Ausnahme ist `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: Die Laufzeit-Downloads, die ein fehlendes Modellgewicht nachladen, verwenden ebenfalls `HF_ENDPOINT`, und diese Gewichte werden nicht per Prüfsumme verifiziert, kombinieren Sie die beiden also nur mit einem Mirror, dem Sie vertrauen. Wenn der Server stattdessen über einen Proxy ins Internet geht, siehe [Ausgehender Proxy und private CA](/de/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Alle Bundles auf einmal installieren {#installing-every-bundle-at-once}
 
 Unter **Einstellungen → KI-Funktionen** gibt es eine Schaltfläche **Alle installieren**, die jedes Bundle in die Warteschlange stellt, das der Host ausführen kann. Sie überspringt alles, was bereits installiert ist, überspringt Bundles, die als mit dem Host inkompatibel gemeldet werden, und versucht ein fehlgeschlagenes Bundle einmal erneut, bevor sie weitermacht. Für eine normale Instanz ist diese Schaltfläche die ganze Antwort, und nichts von dem folgenden Verfahren ist nötig.
@@ -107,7 +107,7 @@ Zwei Dinge sollten Sie erwarten. Das Bundle `ocr` führt eine Host-Kompatibilit�
 
 ### Genaue OCR-Laufzeitinstallation {#accurate-ocr-runtime-installation}
 
-Das genaue OCR-Paket ist eine plattformspezifische Laufzeit für den offiziellen Linux amd64- oder Linux arm64-Container. Der amd64-Build verwendet Python 3.12; Der arm64-Build verwendet Python 3.11. Beide Builds führen RapidOCR über ONNX Runtime s `CPUExecutionProvider` aus, sodass dasselbe Paket auf Nur-CPU- und NVIDIA Docker-Hosts funktioniert. Die genaue Laufzeit erfordert mindestens 4 GiB effektiven Speicher: das konfigurierte Container-cgroup-Limit, andernfalls Host-Speicher. Ein System unterhalb dieses signierten Kompatibilitätsminimums wird vor dem Download abgelehnt. Diese Anforderung gilt nicht für integrierte Fast OCR. Bare-metal-Builds werden abgelehnt, da ihre libc und Python ABI nicht sicher abgeleitet werden können. Schnelles OCR bleibt verfügbar, wenn der Host Tesseract und Ghostscript bereitstellt.
+Das genaue OCR-Paket ist eine plattformspezifische Laufzeit für den offiziellen Linux amd64- oder Linux arm64-Container. Der amd64-Build verwendet Python 3.12; Der arm64-Build verwendet Python 3.11. Beide Builds führen RapidOCR über den `CPUExecutionProvider` von ONNX Runtime aus, sodass dasselbe Paket auf Nur-CPU- und NVIDIA Docker-Hosts funktioniert. Die genaue Laufzeit erfordert mindestens 4 GiB effektiven Speicher: das konfigurierte Container-cgroup-Limit, andernfalls Host-Speicher. Ein System unterhalb dieses signierten Kompatibilitätsminimums wird vor dem Download abgelehnt. Diese Anforderung gilt nicht für integrierte Fast OCR. Bare-metal-Builds werden abgelehnt, da ihre libc und Python ABI nicht sicher abgeleitet werden können. Schnelles OCR bleibt verfügbar, wenn der Host Tesseract und Ghostscript bereitstellt. Fast unterstützt `auto`, `en`, `de`, `es`, `fr`, `zh` und `ja`, aber nicht Koreanisch (`ko`). Koreanisch erfordert daher eine unterstützte genaue Laufzeit und die Stufe `balanced` oder `best`; nicht unterstützte Hosts erhalten eine explizite Inkompatibilitätsantwort statt eines stillen Fast-Rückfalls.
 
 Das optionale Artefakt ist je nach Architektur etwa 208–234 MiB komprimiert und 409–488 MiB extrahiert. Der signierte Index bindet die genauen komprimierten und extrahierten Bytezahlen, die vom Installationsprogramm erzwungen werden. Das integrierte Tesseract fügt etwa 25 MiB zum offiziellen Image hinzu und benötigt keine Dateien in `/data/ai`.
 
@@ -189,12 +189,12 @@ Zeichnet den Hintergrund weich und hält das Motiv scharf.
 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch und Arabisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verarbeitungsstufe. Ohne Angabe wird die höchste verfügbare Stufe in dieser Reihenfolge gewählt: `best`, `balanced`, `fast`. Für Koreanisch und Arabisch wird `fast` nie gewählt; ohne genaue Stufe wird der Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben |
 | `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast unterstützt `ko` und `ar` nicht |
 | `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
 | `engine` | Zeichenfolge | - | Veralteter Kompatibilitätsalias. Ordnet `tesseract` `fast` und den alten `paddleocr`-Wert `balanced` zu; PaddlePaddle wird nicht geladen |
 
-Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen. Explizites Fast oder das alte `tesseract` mit Koreanisch oder Arabisch gibt vor dem Einreihen eines Jobs `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` und einen Hinweis auf das genaue Paket zurück.
+Gibt extrahierten Text plus Herkunftsmetadaten zurück: Engine, angeforderte und tatsächliche Qualität, Gerät, Anbieter, Verschlechterungsstatus, Warnungen und ggf. genaue Laufzeit-/Modellversionen. Explizite Qualitätsanforderungen fallen nie auf eine andere Ebene zurück. Wenn `balanced` oder `best` nicht verfügbar ist, gibt API `FEATURE_NOT_INSTALLED` oder `FEATURE_INCOMPATIBLE` zurück, anstatt `fast` stillschweigend auszuführen. Explizites Fast oder das alte `tesseract` mit Koreanisch gibt vor dem Einreihen eines Jobs `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` und einen Hinweis auf das genaue Paket zurück.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -205,7 +205,7 @@ Extrahiert Text aus gescannten PDF-Dokumenten mittels KI-gestützter OCR, Seite 
 
 | Parameter | Typ | Standard | Beschreibung |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Wenn `quality` und `engine` fehlen, wählt SnapOtter die höchste verfügbare Stufe in dieser Reihenfolge: `best`, `balanced`, `fast`. Für Koreanisch und Arabisch wird `fast` nie gewählt; es wird `best`, dann `balanced` verwendet oder ein Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisch | Verarbeitungsstufe. Ohne Angabe wird die höchste verfügbare Stufe in dieser Reihenfolge gewählt: `best`, `balanced`, `fast`. Für Koreanisch und Arabisch wird `fast` nie gewählt; ohne genaue Stufe wird der Installations- bzw. Kompatibilitätsfehler der genauen Laufzeit zurückgegeben |
 | `language` | string | `"auto"` | Sprache: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast unterstützt `ko` und `ar` nicht |
 | `pages` | string | `"all"` | Seitenauswahl: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | Boolescher Wert | Tierabhängig | Verbessern Sie den lokalen Kontrast. Fast wendet es direkt an; Genaue Stufen behalten die Variante nur bei, wenn die kalibrierte Bewertung OCR verbessert. Standardmäßig ist „Best“ aktiviert |
@@ -327,6 +327,9 @@ Nimmt einen JSON-Body mit den Ergebnissen aus Phase 1 sowie den Generierungseins
 | `landmarks` | object | (erforderlich) | Landmarken aus Phase 1 |
 | `imageWidth` | number | (erforderlich) | Bildbreite aus Phase 1 |
 | `imageHeight` | number | (erforderlich) | Bildhöhe aus Phase 1 |
+| `clientJobId` | string | (generiert) | Ihre eigene Job-ID für den Fortschrittsstream |
+
+Generate läuft als Job in der Warteschlange: `200` mit dem Ergebnis innerhalb des synchronen Wartefensters, `202` mit einer Job-ID danach. Einzelheiten stehen unter [Passfoto](/de/tools/image/passport-photo#phase-2-generate).
 
 ## Objekte entfernen (Inpainting) {#object-erasing-inpainting}
 

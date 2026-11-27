@@ -1,8 +1,9 @@
 ---
 description: "Referens för AI-motorn med alla lokala ML-verktyg. Bakgrundsborttagning, uppskalning, OCR, ansiktsdetektering, fotorestaurering och mer."
-i18n_output_hash: dee9a6647e0e
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: d591e4edc56d
+i18n_hash_version: 2
 ---
 
 # Referens för AI-motorn {#ai-engine-reference}
@@ -15,12 +16,6 @@ Acceleration via Intel/AMD-iGPU genom VA-API, Quick Sync eller OpenCL stöds int
 
 19 Python-sidecar-AI-verktyg över fyra modaliteter (bild, ljud, video, dokument), plus 2 verktyg med valfria AI-funktioner. Alla modeller körs lokalt - ingen internetuppkoppling krävs efter den första nedladdningen av modellerna.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Kompatibilitet för koreansk och arabisk OCR
-Snabb OCR stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`) eller arabiska (`ar`). Koreanska och arabiska kräver det exakta OCR-paketet och `balanced` eller `best`. Paketet fungerar i officiella Linux amd64- och arm64-containrar, även på NVIDIA-värdar där OCR fortsätter köras på CPU. System som inte stöds får ett uttryckligt kompatibilitetsfel och faller aldrig tyst tillbaka till `fast`. Koreanska eller arabiska med `fast` eller det äldre aliaset `tesseract` avvisas före köläggning med `FEATURE_INCOMPATIBLE` och `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Arkitektur {#architecture}
 
 ```
@@ -82,7 +77,11 @@ Verktyg med beroenden över flera paket:
 | `passport-photo` | `background-removal`, `face-detection` | Tar bort bakgrunden och använder sedan ansiktslandmärken för att beskära bilden enligt reglerna för pass- och ID-foton. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Detekterar ansikten innan GFPGAN- eller CodeFormer-förbättring körs på de valda ansiktsregionerna. |
 
-Ett verktyg är endast tillgängligt när alla dess nödvändiga buntar är installerade, förutom OCR: dess inbyggda `fast`-nivå förblir tillgänglig utan det valfria OCR-paketet. Delinstallationer är giltiga och hanteras inkrementellt: installerade paket återanvänds, saknade paket visas som nedladdningar och installationer i kö körs en i taget så att den delade Python-miljön inte ändras samtidigt.
+Ett verktyg är endast tillgängligt när alla dess nödvändiga paket är installerade, förutom OCR: dess inbyggda `fast`-nivå förblir tillgänglig utan det valfria OCR-paketet. Delinstallationer är giltiga och hanteras inkrementellt: installerade paket återanvänds, saknade paket visas som nedladdningar och installationer i kö körs en i taget så att den delade Python-miljön inte ändras samtidigt.
+
+### Ladda ned via en spegel {#downloading-through-a-mirror}
+
+Paketarkiv och den exakta OCR-körtiden laddas ned från huggingface.co. Där den värden är blockerad eller långsam anger du `HF_ENDPOINT` på appcontainern till en Hugging Face-spegel, till exempel `HF_ENDPOINT=https://hf-mirror.com`. Varje paketnedladdning och OCR-körtiden använder den, inklusive reservnedladdaren och länken för manuell nedladdning i ett installationsfel. Använd en `https`-URL utan inloggningsuppgifter; installationen av OCR-körtiden vägrar allt annat. Integriteten beror inte på spegeln: varje paketarkiv kontrolleras mot sin SHA-256 och OCR-körtidens index är signerat, så en spegel som serverar ändrade filer får installationen att misslyckas. Undantaget är `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: körtidsnedladdningar som fyller i en saknad modellvikt använder också `HF_ENDPOINT`, och dessa vikter är inte checksummeverifierade, så kombinera de två bara med en spegel du litar på. Om servern i stället når internet via en proxy, se [Utgående proxy och privat CA](/sv/guide/deployment#outbound-proxy-and-private-ca).
 
 ### Installera alla paket på en gång {#installing-every-bundle-at-once}
 
@@ -107,7 +106,7 @@ Två saker att förvänta sig. Paketet `ocr` kör en förkontroll av värdkompat
 
 ### Exakt OCR runtime installation {#accurate-ocr-runtime-installation}
 
-Det exakta OCR-paketet är en plattformsspecifik körtid för den officiella Linux amd64- eller Linux arm64-behållaren. amd64-bygget använder Python 3.12; arm64-bygget använder Python 3.11. Båda byggen kör RapidOCR genom ONNX Runtime:s `CPUExecutionProvider`, så samma paket fungerar på endast CPU- och NVIDIA Docker-värdar. Den exakta körtiden kräver minst 4 GiB effektivt minne: den konfigurerade behållarens cgroup-gräns, annars värdminne. Ett system under det signerade kompatibilitetsminimum avvisas före nedladdning. Detta krav gäller inte för inbyggd Fast OCR. Bare-metal-builds avvisas eftersom deras libc och Python ABI inte kan härledas säkert; Snabb OCR förblir tillgänglig när värden tillhandahåller Tesseract och Ghostscript.
+Det exakta OCR-paketet är en plattformsspecifik körtid för den officiella Linux amd64- eller Linux arm64-behållaren. amd64-bygget använder Python 3.12; arm64-bygget använder Python 3.11. Båda byggen kör RapidOCR genom ONNX Runtime:s `CPUExecutionProvider`, så samma paket fungerar på endast CPU- och NVIDIA Docker-värdar. Den exakta körtiden kräver minst 4 GiB effektivt minne: den konfigurerade behållarens cgroup-gräns, annars värdminne. Ett system under det signerade kompatibilitetsminimum avvisas före nedladdning. Detta krav gäller inte för inbyggd Fast OCR. Bare-metal-builds avvisas eftersom deras libc och Python ABI inte kan härledas säkert; Snabb OCR förblir tillgänglig när värden tillhandahåller Tesseract och Ghostscript. Fast stöder `auto`, `en`, `de`, `es`, `fr`, `zh` och `ja`, men inte koreanska (`ko`). Koreanska kräver därför en exakt körtid som stöds och nivån `balanced` eller `best`; värdar som inte stöds får ett uttryckligt inkompatibilitetssvar i stället för en tyst Fast-reserv.
 
 Den valfria artefakten är cirka 208-234 MiB komprimerad och 409-488 MiB extraherad, beroende på arkitektur. Det signerade indexet binder de exakta komprimerade och extraherade byteantalerna som upprätthålls av installationsprogrammet. Inbyggd Tesseract lägger till cirka 25 MiB till den officiella bilden och behöver inga filer i `/data/ai`.
 
@@ -189,12 +188,12 @@ Gör bakgrunden oskarp samtidigt som motivet hålls skarpt.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om quality utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden |
 | `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast stöder inte `ko` eller `ar` |
-| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
-| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
+| `enhance` | boolean | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
+| `engine` | string | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
-Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och korrekt körtid/modellversioner när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska eller arabiska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
+Returnerar extraherad text plus härkomstmetadata: motor, begärd och faktisk kvalitet, enhet, leverantör, försämringstillstånd, varningar och körtid/modellversioner för exakt OCR när tillämpligt. Explicita kvalitetsförfrågningar faller aldrig tillbaka till en annan nivå. Om `balanced` eller `best` är otillgängliga, returnerar API `FEATURE_NOT_INSTALLED` eller `FEATURE_INCOMPATIBLE` i stället för att köra `fast` tyst. Explicit Fast eller det äldre `tesseract` med koreanska returnerar `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` och hänvisning till det exakta paketet innan ett jobb köas.
 
 ## PDF-OCR {#pdf-ocr}
 
@@ -205,11 +204,11 @@ Extraherar text från inskannade PDF-dokument med AI-driven OCR, sida för sida.
 
 | Parameter | Typ | Standard | Beskrivning |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om `quality` utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamisk | Bearbetningsnivå. Om quality utelämnas väljs den högsta tillgängliga nivån i denna ordning: `best`, `balanced`, `fast`. Koreanska och arabiska väljer aldrig `fast`; utan en exakt nivå returneras installations- eller kompatibilitetsfelet för den exakta körtiden |
 | `language` | string | `"auto"` | Språk: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast stöder inte `ko` eller `ar` |
 | `pages` | string | `"all"` | Sidval: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | booleskt | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
-| `engine` | sträng | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
+| `enhance` | boolean | Tierberoende | Förbättra den lokala kontrasten. Fast applicerar det direkt; exakta nivåer behåller varianten endast när kalibrerad poängsättning förbättrar OCR. Aktiverat som standard för Best |
+| `engine` | string | - | Utfasat kompatibilitetsalias. Mappar `tesseract` till `fast` och det äldre `paddleocr`-värdet till `balanced`; det laddar inte PaddlePaddle |
 
 Samma regler om ingen nedgradering och koreansk och arabisk kompatibilitet gäller för PDF-OCR. PDF-sidor rastreras före igenkänning, och en begäran kan välja högst 50 sidor.
 
@@ -327,6 +326,9 @@ Tar emot en JSON-kropp med resultaten från Fas 1 plus genereringsinställningar
 | `landmarks` | object | (obligatorisk) | Landmärken från Fas 1 |
 | `imageWidth` | number | (obligatorisk) | Bildbredd från Fas 1 |
 | `imageHeight` | number | (obligatorisk) | Bildhöjd från Fas 1 |
+| `clientJobId` | string | (genereras) | Ditt eget jobb-ID för förloppsströmmen |
+
+Generate körs som ett köat jobb: `200` med resultatet inom det synkrona väntefönstret, `202` med ett jobb-ID efter det. Se [Passfoto](/sv/tools/image/passport-photo#phase-2-generate) för detaljer.
 
 ## Objektborttagning (Inpainting) {#object-erasing-inpainting}
 

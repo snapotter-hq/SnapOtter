@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的 monorepo 結構、app 與套件架構、請求生命週期，以及資源占用。"
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 712a7e7cf078
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 18df69311ce0
 i18n_hash_version: 2
 ---
 
@@ -37,13 +37,13 @@ snapotter/
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-呼叫本機和 Python ML 運作時的橋接層。 大多數 Python 工具使用持久性 dispatcher 來預先匯入重型庫（PIL、NumPy、MediaPipe、rembg），因此後續呼叫會跳過匯入開銷。 OCR 與此可變共享環境隔離： `fast` 呼叫原生 Tesseract， 而 `balanced` 和 `best` 使用專用的持久性 JSONL dispatcher，固定到活動的不可變 RapidOCR/ONNX 世代。 每個請求都包含一個 generation lease。 啟動首先在候選者上運行 smoke test，然後自動切換到其 dispatcher。 先前的 dispatcher 在其生成被垃圾收集之前耗盡。
+呼叫原生和 Python ML 執行環境的橋接層。大多數 Python 工具使用持久性 dispatcher 來預先匯入重型程式庫（PIL、NumPy、MediaPipe、rembg），因此後續呼叫會跳過匯入開銷。OCR 與此可變的共用環境隔離：`fast` 呼叫原生 Tesseract，而 `balanced` 和 `best` 使用專用的持久性 JSONL dispatcher，固定到目前啟用的不可變 RapidOCR/ONNX 世代。每個請求都持有一個 generation lease。啟用時會先對候選世代執行 smoke test，再以原子方式切換到它的 dispatcher。先前的 dispatcher 會先排空，其世代才會被垃圾回收。
 
 **模型不會預先載入。** 每個工具指令碼會在請求時從磁碟載入其模型權重，並在請求結束時捨棄。完整的記憶體剖析請參閱[資源占用](#resource-footprint)。
 
-支援的操作： 背景去除（rembg/BiRefNet）， 升級（RealESRGAN）， 臉部模糊（MediaPipe）， 人臉增強（GFPGAN/CodeFormer）， 物件擦除（LaMa ONNX）， OCR（Tesseract 和 RapidOCR 以及 PP-OCR ONNX 機型）， 著色（DDColor）， 消除噪音， 消除紅眼， 照片修復、 護照照片生成， 透明度固定（BiRefNet HR-matting）， 和內容感知調整大小（Go caire 二進位）。
+支援的操作：背景去除（rembg/BiRefNet）、升級（RealESRGAN）、臉部模糊（MediaPipe）、人臉增強（GFPGAN/CodeFormer）、物件擦除（LaMa ONNX）、OCR（Tesseract 和 RapidOCR 搭配 PP-OCR ONNX 模型）、著色（DDColor）、消除噪音、消除紅眼、照片修復、護照照片生成、透明度修正（BiRefNet HR-matting），以及內容感知調整大小（Go caire 二進位檔）。
 
-Python 腳本位於 `packages/ai/python/` 中。大型可選模型包根據需要安裝到持久性 `/data/ai` 卷中。準確的 OCR 使用簽署的、特定於平台的工件；內建 Tesseract 圖層無需下載模型包。
+Python 腳本位於 `packages/ai/python/` 中。大型可選模型包根據需要安裝到持久性 `/data/ai` 卷中。準確的 OCR 使用經簽署、特定於平台的產物；內建的 Tesseract 層級無需下載模型包。
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -88,7 +88,7 @@ Python 腳本位於 `packages/ai/python/` 中。大型可選模型包根據需�
 2. 前端將含檔案與設定的 multipart POST 送往 `/api/v1/tools/:section/:toolId`。
 3. API 路由以 Zod 驗證輸入，然後分派處理。
 4. 對於標準工具，工作會依模態排入適當的 BullMQ pool（image、media 或 docs）。程序內的 BullMQ worker 會根據 EXIF 中繼資料自動校正影像方向、執行工具的處理函式，並回傳結果。
-5. 對於大多數 AI 工具，TypeScript 橋會向持久性 Python dispatcher 發送請求。 快速 OCR 而是呼叫 Tesseract，而準確的 OCR 從活動的不可變 OCR 產生中啟動固定的執行檔。 請求的 OCR 層在入口處固定，並且在執行期間永遠不會默默更改。
+5. 對於大多數 AI 工具，TypeScript 橋接層會向持久性 Python dispatcher 發送請求。快速 OCR 則改為呼叫 Tesseract，而準確 OCR 會從目前啟用的不可變 OCR 世代啟動固定的執行檔。請求的 OCR 層級在入口處固定，執行期間永遠不會被默默更改。
 6. 工作進度會持久化至 PostgreSQL 中的 `jobs` 資料表，因此狀態可在容器重新啟動後保留。即時更新透過位於 `/api/v1/jobs/:jobId/progress` 的 SSE 傳遞。
 7. API 回傳一個 `jobId` 與 `downloadUrl`。使用者從 `/api/v1/download/:jobId/:filename` 下載處理後的檔案。
 

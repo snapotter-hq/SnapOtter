@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 로컬 개발 환경 설정, 명령어, 코드 규칙, 새 도구를 추가하는 방법."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 9cee42f280c7
+i18n_output_hash: 2a0610100adf
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ Drizzle ORM(pg-core)을 통한 PostgreSQL 17. 로컬 개발에는 Postgres와 Re
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-이것은 5432 포트의 Postgres와 6379 포트의 Redis를 제공합니다. 그런 다음 마이그레이션을 생성하고 적용하세요:
+이것은 5432 포트의 Postgres와 6379 포트의 Redis를 제공합니다. API는 부팅할 때 대기 중인 마이그레이션을 직접 적용하므로 개발 서버를 시작하기만 하면 됩니다. 스키마를 변경한 뒤에는 마이그레이션을 생성하세요. 다음 부팅 때 적용되며 수동 마이그레이션 단계는 필요 없습니다:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-스키마는 `apps/api/src/db/schema.ts`에 정의되어 있습니다. 테이블: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+스키마는 `apps/api/src/db/schema.ts`에 정의되어 있으며, 현재 테이블 목록이 여기에 있습니다.
 
 ## 새 도구 추가하기 {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI는 `linux`(`ubuntu-latest`)와 `darwin`(`macos-latest`) 베이스라인을 �
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-각 OS 작업은 `visual-baselines-linux-<run-id>-<attempt>` 또는 `visual-baselines-darwin-<run-id>-<attempt>` 아티팩트를 업로드하고, 다시 생성된 PNG로 `main` 대상 초안 PR(`chore/visual-baselines-linux-...` 및 `chore/visual-baselines-darwin-...`)을 엽니다. 각 초안 PR 본문에 `gh run download` 명령이 있으니 체크아웃 루트에서 두 명령을 모두 실행해 PNG를 브랜치로 가져오고, 커밋한 뒤 초안 PR을 닫으세요. 바뀔 것으로 예상한 스크린샷을 `changed`가 놓치면 대신 `update_snapshots=all`을 사용하세요. 실행하려면 저장소 쓰기 권한이 필요하므로, 브랜치가 포크에 있다면 PR에 베이스라인 갱신이 필요하다고 적어 주세요. 메인테이너가 실행합니다.
+각 OS 작업은 `visual-baselines-linux-<run-id>-<attempt>` 또는 `visual-baselines-darwin-<run-id>-<attempt>` 아티팩트를 업로드하고, 다시 생성된 PNG가 담긴 초안 PR(`chore/visual-baselines-linux-...` 및 `chore/visual-baselines-darwin-...`)을 `main` 대상으로 엽니다. 각 초안 PR 본문에 `gh run download` 명령이 있으니 체크아웃 루트에서 두 명령을 모두 실행해 PNG를 브랜치로 가져오고, 커밋한 뒤 초안 PR을 닫으세요. `update_snapshots=all`을 대신 사용하세요. `changed`가 바뀔 것으로 예상한 스크린샷을 놓치는 경우입니다. 실행하려면 저장소 쓰기 권한이 필요하므로, 브랜치가 포크에 있다면 PR에 베이스라인 갱신이 필요하다고 적어 주세요. 메인테이너가 실행합니다.
 
 Mac에서는 빠른 반복 작업을 위해 `darwin` 베이스라인을 로컬에서 직접 갱신할 수도 있습니다:
 

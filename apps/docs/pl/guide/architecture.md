@@ -1,8 +1,8 @@
 ---
 description: "Struktura monorepozytorium, architektura aplikacji i pakietów, cykl życia żądania oraz zapotrzebowanie na zasoby w SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: def9eb02d8d4
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 202f0d0c11a1
 i18n_hash_version: 2
 ---
 
@@ -37,11 +37,11 @@ Ten pakiet nie ma zależności sieciowych i działa w całości w procesie.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Warstwa pomostowa wywołująca środowiska wykonawcze natywne i Python ML. Większość narzędzi Python używa trwałego dispatcher, który wstępnie importuje duże biblioteki (PIL, NumPy, MediaPipe, rembg), więc kolejne wywołania pomijają obciążenie związane z importem. OCR jest izolowany od tego zmiennego środowiska współdzielonego: `fast` wywołuje natywny Tesseract, podczas gdy `balanced` i `best` używają dedykowanego, trwałego JSONL dispatcher przypiętego do aktywnej, niezmiennej generacji RapidOCR/ONNX. Każde żądanie zawiera generation lease. Aktywacja najpierw uruchamia smoke test na kandydacie, a następnie atomowo przełącza się na jego dispatcher. Poprzednie dispatcher drenuje, zanim zostanie wygenerowane, i zostanie usunięte.
+Warstwa pomostowa wywołująca środowiska wykonawcze natywne i Python ML. Większość narzędzi Python używa trwałego dispatcher, który wstępnie importuje duże biblioteki (PIL, NumPy, MediaPipe, rembg), więc kolejne wywołania pomijają obciążenie związane z importem. OCR jest izolowany od tego zmiennego środowiska współdzielonego: `fast` wywołuje natywny Tesseract, podczas gdy `balanced` i `best` używają dedykowanego, trwałego JSONL dispatcher przypiętego do aktywnej, niezmiennej generacji RapidOCR/ONNX. Każde żądanie utrzymuje generation lease. Aktywacja najpierw uruchamia smoke test na kandydacie, a następnie atomowo przełącza się na jego dispatcher. Poprzedni dispatcher kończy obsługę bieżących żądań, zanim jego generacja zostanie usunięta przez garbage collection.
 
 **Modele nie są wstępnie ładowane.** Każdy skrypt narzędzia ładuje swoje wagi modelu z dysku w momencie żądania i odrzuca je po zakończeniu żądania. Zobacz [Zapotrzebowanie na zasoby](#resource-footprint), aby poznać pełny profil pamięci.
 
-Obsługiwane operacje: usuwanie tła (rembg/BiRefNet), skalowanie (RealESRGAN), rozmycie twarzy (MediaPipe), ulepszanie twarzy (GFPGAN/CodeFormer), usuwanie obiektów (LaMa ONNX), OCR (Tesseract i RapidOCR z modelami PP-OCR ONNX), kolorowanie (DDColor), usuwanie szumu, efekt czerwonych oczu usuwanie, przywracanie zdjęć, generowanie zdjęć paszportowych, utrwalanie przezroczystości (matowanie BiRefNet HR) i zmiana rozmiaru z uwzględnieniem zawartości (Go Caire binary).
+Obsługiwane operacje: usuwanie tła (rembg/BiRefNet), skalowanie (RealESRGAN), rozmycie twarzy (MediaPipe), ulepszanie twarzy (GFPGAN/CodeFormer), usuwanie obiektów (LaMa ONNX), OCR (Tesseract i RapidOCR z modelami PP-OCR ONNX), kolorowanie (DDColor), usuwanie szumu, usuwanie efektu czerwonych oczu, przywracanie zdjęć, generowanie zdjęć paszportowych, utrwalanie przezroczystości (matowanie BiRefNet HR) i zmiana rozmiaru z uwzględnieniem zawartości (Go caire binary).
 
 Skrypty Python są dostępne w `packages/ai/python/`. Duże opcjonalne pakiety modeli są instalowane na żądanie w trwałym woluminie `/data/ai`. Dokładny OCR wykorzystuje podpisane artefakty specyficzne dla platformy; wbudowana warstwa Tesseract nie wymaga pobierania pakietu modeli.
 
@@ -88,7 +88,7 @@ Ta witryna VitePress. Wdrażana automatycznie do Cloudflare Pages przy wypchnię
 2. Frontend wysyła wieloczęściowe żądanie POST do `/api/v1/tools/:section/:toolId` z plikiem i ustawieniami.
 3. Trasa API waliduje dane wejściowe za pomocą Zod, a następnie rozdziela przetwarzanie.
 4. W przypadku standardowych narzędzi zadanie jest kolejkowane do odpowiedniej puli BullMQ (image, media lub docs w zależności od modalności). Proces roboczy BullMQ działający w procesie automatycznie orientuje obraz na podstawie metadanych EXIF, uruchamia funkcję przetwarzającą narzędzia i zwraca wynik.
-5. W przypadku większości narzędzi AI most TypeScript wysyła żądanie do trwałego Python dispatcher. Zamiast tego szybki OCR wywołuje Tesseract, a dokładny OCR uruchamia przypięty plik wykonywalny z aktywnej, niezmiennej generacji OCR. Żądany poziom OCR jest ustalany na wejściu i nigdy nie jest zmieniany w trybie cichym podczas wykonywania.
+5. W przypadku większości narzędzi AI most TypeScript wysyła żądanie do trwałego Python dispatcher. Zamiast tego szybki OCR wywołuje Tesseract, a dokładny OCR uruchamia przypięty plik wykonywalny z aktywnej, niezmiennej generacji OCR. Żądany poziom OCR jest ustalany na wejściu i nigdy nie jest po cichu zmieniany podczas wykonywania.
 6. Postęp zadania jest utrwalany w tabeli `jobs` w PostgreSQL, więc stan przetrwa ponowne uruchomienia kontenera. Aktualizacje w czasie rzeczywistym są dostarczane przez SSE pod adresem `/api/v1/jobs/:jobId/progress`.
 7. API zwraca `jobId` i `downloadUrl`. Użytkownik pobiera przetworzony plik z `/api/v1/download/:jobId/:filename`.
 

@@ -1,8 +1,8 @@
 ---
 description: "Estructura del monorepo, arquitectura de aplicaciones y paquetes, ciclo de vida de las solicitudes y huella de recursos de SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: c72b34a809f5
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: e3d7f1dbbdae
 i18n_hash_version: 2
 ---
 

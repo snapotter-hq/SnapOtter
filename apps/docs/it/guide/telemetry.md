@@ -1,8 +1,8 @@
 ---
 description: "Quali dati di utilizzo anonimi raccoglie SnapOtter, quando vengono inviati, come funziona la scelta al primo avvio e come disattivare le analisi di prodotto per l'intera istanza."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 0d690cb2220e
+i18n_output_hash: b502be948a3b
 i18n_hash_version: 2
 ---
 
@@ -12,9 +12,17 @@ Anonymous Product Analytics viene impostato per l'intera istanza da un amministr
 
 Quando le analisi sono attive, SnapOtter invia a PostHog quali strumenti e pipeline vengono eseguiti, quanto durano, se vanno a buon fine, i codici di errore e il numero di file, insieme all'ID anonimo dell'istanza, alla sua versione, all'architettura della CPU, al sistema operativo, al tipo di installazione e alla presenza o meno di una GPU. Le segnalazioni di arresto anomalo vanno a Sentry senza nomi di file, percorsi, indirizzi e-mail e valori tra virgolette. Non invia mai i tuoi file, i loro nomi o percorsi, il loro contenuto, l'output dell'OCR o il testo estratto, i metadati delle immagini o l'identità del tuo account. PostHog e Sentry sono gli unici due destinatari, e con le analisi disattivate non viene inviato nulla a nessuno dei due.
 
+## Scelta al primo avvio {#first-run-choice}
+
+La prima volta che un amministratore apre una nuova istanza, SnapOtter chiede: "Send anonymous usage stats and crash reports? Your files are never sent." Le due risposte hanno lo stesso peso e nessuna è preselezionata. Chiudere la richiesta senza rispondere lascia le analisi disattivate e la richiesta ricompare alla visita successiva. La vede solo un amministratore. Con `AUTH_ENABLED=false` non esistono account e l'utente locale agisce da amministratore, quindi risponde chiunque apra l'app. L'app desktop lo chiede nello stesso modo.
+
+Un'istanza già in esecuzione prima dell'introduzione di questa richiesta non viene interpellata. Mantiene l'impostazione delle analisi che aveva: attiva, a meno che un amministratore o `SNAPOTTER_ANALYTICS_DEFAULT=off` l'abbia disattivata.
+
+## Eventi che inviamo (se attivo) {#events-we-send-when-enabled}
+
 - tool_used: id dello strumento, stato, durata, categoria, se è uno strumento AI, un codice di errore in caso di fallimento e il nome del passaggio per uno strumento che segnala una fase a sé (il passaggio di analisi di Passport Photo).
 - pipeline_executed: numero di passaggi, id degli strumenti, flag batch, numero di file, durata, stato.
-- ai_bundle_action: id del bundle, azione (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), durata e, se l'installazione non riesce, una categoria di errore da un elenco fisso (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). L'output del programma di installazione, i percorsi e i messaggi di errore non vengono mai inviati.
+- ai_bundle_action: id del bundle, azione (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment` o `imported`), durata e, se l'installazione non riesce, una categoria di errore da un elenco fisso (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout` o `other`). L'output del programma di installazione, i percorsi e i messaggi di errore non vengono mai inviati.
 - Utilizzo del frontend: quali pagine degli strumenti vengono aperte, file aggiunti (solo conteggi), strumento avviato, download, salvataggi, ricerca (solo numero di risultati), elaborazione batch.
 - Report sui crash: tipo di errore, un messaggio di errore oscurato (senza nomi di file, percorsi, email e valori tra virgolette), uno stack sorgente con i nomi base dei file e, per gli strumenti AI, un traceback Python con solo i nomi base dei file.
 

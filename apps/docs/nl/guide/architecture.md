@@ -1,8 +1,8 @@
 ---
 description: "Monorepo-structuur, app- en package-architectuur, request-levenscyclus en resourcegebruik van SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 073fb843bda2
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: b58c3dcc05b9
 i18n_hash_version: 2
 ---
 
@@ -37,13 +37,13 @@ Dit package heeft geen netwerkafhankelijkheden en draait volledig in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Een bruglaag die native en Python ML runtimes aanroept. De meeste Python-tools gebruiken een persistente dispatcher die zware bibliotheken (PIL, NumPy, MediaPipe, rembg) vooraf importeert, zodat daaropvolgende oproepen de importoverhead overslaan. OCR is geïsoleerd van die veranderlijke gedeelde omgeving: `fast` roept native Tesseract op, terwijl `balanced` en `best` een speciale persistente JSONL dispatcher gebruiken die is vastgemaakt aan de actieve onveranderlijke RapidOCR/ONNX-generatie. Elk verzoek bevat een generation lease. Bij activering wordt eerst een smoke test op een kandidaat uitgevoerd en vervolgens atomair overgeschakeld naar de dispatcher. De eerdere dispatcher loopt leeg voordat het afval wordt opgehaald.
+Een bruglaag die native en Python ML runtimes aanroept. De meeste Python-tools gebruiken een persistente dispatcher die zware bibliotheken (PIL, NumPy, MediaPipe, rembg) vooraf importeert, zodat daaropvolgende oproepen de importoverhead overslaan. OCR is geïsoleerd van die veranderlijke gedeelde omgeving: `fast` roept native Tesseract op, terwijl `balanced` en `best` een speciale persistente JSONL dispatcher gebruiken die is vastgemaakt aan de actieve onveranderlijke RapidOCR/ONNX-generatie. Elk verzoek bevat een generation lease. Bij activering wordt eerst een smoke test op een kandidaat uitgevoerd en vervolgens atomair overgeschakeld naar de dispatcher. De vorige dispatcher loopt leeg voordat de bijbehorende generatie wordt opgeruimd.
 
 **Modellen worden niet vooraf geladen.** Elk toolscript laadt zijn modelgewichten bij het verzoek van schijf en verwijdert ze zodra het verzoek klaar is. Zie [Resourcegebruik](#resource-footprint) voor het volledige geheugenprofiel.
 
 Ondersteunde bewerkingen: achtergrondverwijdering (rembg/BiRefNet), opschaling (RealESRGAN), gezichtsvervaging (MediaPipe), gezichtsverbetering (GFPGAN/CodeFormer), object wissen (LaMa ONNX), OCR (Tesseract en RapidOCR met PP-OCR ONNX-modellen), inkleuring (DDColor), ruisverwijdering, verwijdering van rode ogen, fotoherstel, pasfoto generatie, transparantiefixatie (BiRefNet HR-matting) en inhoudsbewust formaat wijzigen (Go caire binary).
 
-Python-scripts zijn live in `packages/ai/python/`. Grote optionele modelpakketten worden op aanvraag geïnstalleerd in het permanente `/data/ai`-volume. Nauwkeurige OCR maakt gebruik van ondertekende, platformspecifieke artefacten; Voor de ingebouwde Tesseract-laag is geen download van een modelpakket vereist.
+Python-scripts zijn live in `packages/ai/python/`. Grote optionele modelpakketten worden op aanvraag geïnstalleerd in het permanente `/data/ai`-volume. Nauwkeurige OCR maakt gebruik van ondertekende, platformspecifieke artefacten; voor de ingebouwde Tesseract-laag is geen download van een modelpakket vereist.
 
 ### `@snapotter/shared` {#snapotter-shared}
 

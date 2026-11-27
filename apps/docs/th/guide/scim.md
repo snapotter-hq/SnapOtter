@@ -1,7 +1,7 @@
 ---
 description: "ตั้งค่าการจัดสรร SCIM 2.0 เพื่อซิงก์ผู้ใช้และกลุ่มจากผู้ให้บริการข้อมูลประจำตัว (identity provider) ของคุณไปยัง SnapOtter ครอบคลุม Okta, Azure AD / Entra ID และการผสานรวมแบบกำหนดเอง"
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
 i18n_output_hash: 4f3b836f075a
 i18n_hash_version: 2
 ---

@@ -1,8 +1,8 @@
 ---
 description: "Vilka anonyma användningsdata SnapOtter samlar in, när de skickas, hur valet vid första start fungerar och hur du stänger av produktanalysen för hela instansen."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: c068c02556a3
+i18n_output_hash: 34467ec206ac
 i18n_hash_version: 2
 ---
 
@@ -12,9 +12,17 @@ Anonymous Product Analytics ställs in för hela instansen av en administratör.
 
 När analys är på skickar SnapOtter till PostHog vilka verktyg och pipelines som körs, hur lång tid de tar, om de lyckas, felkoder och antal filer, tillsammans med instansens anonyma id, dess version, CPU-arkitektur, operativsystem, installationstyp och om den har en GPU. Kraschrapporter skickas till Sentry med filnamn, sökvägar, e-postadresser och värden inom citattecken borttagna. Den skickar aldrig dina filer, deras namn eller sökvägar, deras innehåll, OCR-utdata eller extraherad text, bildmetadata eller din kontoidentitet. PostHog och Sentry är de enda två platser dit något skickas, och när analys är av skickas ingenting till någon av dem.
 
+## Val vid första start {#first-run-choice}
+
+Första gången en administratör öppnar en ny instans frågar SnapOtter: "Send anonymous usage stats and crash reports? Your files are never sent." De två svaren väger lika tungt och inget är förvalt. Om du stänger dialogrutan utan att svara förblir analys av, och frågan ställs igen vid nästa besök. Bara en administratör ser den. Med `AUTH_ENABLED=false` finns det inga konton och den lokala användaren fungerar som administratör, så den som öppnar appen svarar. Skrivbordsappen frågar på samma sätt.
+
+En instans som redan körde innan den här frågan fanns tillfrågas inte. Den behåller den analysinställning den hade: på, om inte en administratör eller `SNAPOTTER_ANALYTICS_DEFAULT=off` stängde av den.
+
+## Händelser vi skickar (när det är aktiverat) {#events-we-send-when-enabled}
+
 - tool_used: verktygs-id, status, varaktighet, kategori, om det är ett AI-verktyg, en felkod vid misslyckande och stegnamnet för ett verktyg som rapporterar ett steg för sig (analyssteget i Passport Photo).
 - pipeline_executed: antal steg, verktygs-id:n, batch-flagga, antal filer, varaktighet, status.
-- ai_bundle_action: paket-id, åtgärd (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), varaktighet och, vid en misslyckad installation, en felkategori från en fast lista (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Installationsutdata, sökvägar och felmeddelanden skickas aldrig.
+- ai_bundle_action: paket-id, åtgärd (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment` eller `imported`), varaktighet och, vid en misslyckad installation, en felkategori från en fast lista (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout` eller `other`). Installationsutdata, sökvägar och felmeddelanden skickas aldrig.
 - Frontend-användning: vilka verktygssidor som öppnas, tillagda filer (endast antal), verktyg startat, nedladdningar, sparanden, sökning (endast antal resultat), batch bearbetad.
 - Kraschrapporter: feltyp, ett rensat felmeddelande (filnamn, sökvägar, e-postadresser och citerade värden borttagna), en källstack med filbasnamn och, för AI-verktyg, en Python-traceback med endast filbasnamn.
 

@@ -1,8 +1,8 @@
 ---
 description: "Lokale ontwikkelomgeving opzetten, commando's, codeconventies en hoe je een nieuwe tool aan SnapOtter toevoegt."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 9fedc9dd58a7
+i18n_output_hash: b18de4b9be54
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 via Drizzle ORM (pg-core). Lokale ontwikkeling vereist dat Postgre
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Dit geeft je Postgres op poort 5432 en Redis op poort 6379. Genereer en pas vervolgens migraties toe:
+Dit geeft je Postgres op poort 5432 en Redis op poort 6379. De API past openstaande migraties zelf toe bij het opstarten, dus het starten van de dev-servers is genoeg. Na een schemawijziging genereer je een migratie en de volgende start past die toe, zonder handmatige migratiestap:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Het schema is gedefinieerd in `apps/api/src/db/schema.ts`. Tabellen: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Het schema is gedefinieerd in `apps/api/src/db/schema.ts`, de actuele lijst met tabellen.
 
 ## Een nieuwe tool toevoegen {#adding-a-new-tool}
 

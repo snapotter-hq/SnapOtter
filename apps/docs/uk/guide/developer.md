@@ -1,8 +1,8 @@
 ---
 description: "Локальне налаштування розробки, команди, конвенції коду та як додати новий інструмент до SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 628aa9beb1eb
+i18n_output_hash: 927d603ec495
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 через Drizzle ORM (pg-core). Локальна розробк�
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Це дає вам Postgres на порту 5432 та Redis на порту 6379. Потім згенеруйте та застосуйте міграції:
+Це дає вам Postgres на порту 5432 та Redis на порту 6379. API сам застосовує невиконані міграції під час запуску, тож достатньо запустити сервери розробки. Після зміни схеми згенеруйте міграцію, і наступний запуск її застосує, без ручного кроку migrate:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Схему визначено у `apps/api/src/db/schema.ts`. Таблиці: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Схему визначено у `apps/api/src/db/schema.ts`, і це актуальний список таблиць.
 
 ## Додавання нового інструмента {#adding-a-new-tool}
 

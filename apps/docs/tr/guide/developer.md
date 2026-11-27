@@ -1,8 +1,8 @@
 ---
-description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir araç ekleme."
-i18n_source_hash: e04bd8b67465
+description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir aracın nasıl ekleneceği."
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 91b3d7cf7c1e
+i18n_output_hash: 28e5c5e8c38b
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ Drizzle ORM (pg-core) aracılığıyla PostgreSQL 17. Yerel geliştirme, Postgre
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Bu size 5432 portunda Postgres ve 6379 portunda Redis verir. Ardından migration'ları oluşturup uygulayın:
+Bu size 5432 portunda Postgres ve 6379 portunda Redis verir. API, bekleyen migration'ları açılışta kendisi uygular, bu yüzden ihtiyacınız olan tek şey geliştirme sunucularını başlatmaktır. Şemayı değiştirdikten sonra bir migration oluşturun; bir sonraki açılış onu uygular, elle migrate adımı gerekmez:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Şema `apps/api/src/db/schema.ts` dosyasında tanımlanır. Tablolar: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Şema, güncel tablo listesi olan `apps/api/src/db/schema.ts` dosyasında tanımlanır.
 
 ## Yeni bir araç ekleme {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI hem `linux` (`ubuntu-latest`) hem de `darwin` (`macos-latest`) referansların
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Her işletim sistemi işi bir `visual-baselines-linux-<run-id>-<attempt>` veya `visual-baselines-darwin-<run-id>-<attempt>` yapıtı yükler ve yeniden oluşturulan PNG'lerle `main` dalına karşı taslak bir PR (`chore/visual-baselines-linux-...` ve `chore/visual-baselines-darwin-...`) açar. Her taslak PR'ın açıklamasında bir `gh run download` komutu bulunur; PNG'leri dalınıza almak için ikisini de checkout'unuzun kök dizininde çalıştırın, commit edin ve taslak PR'ları kapatın. Değişmesini beklediğiniz bir görüntüyü `changed` kaçırırsa bunun yerine `update_snapshots=all` kullanın. Başlatmak için depoya yazma erişimi gerekir; dalınız bir fork'taysa PR'da referans yenilemesi gerektiğini belirtin, bir maintainer çalıştıracaktır.
+Her işletim sistemi işi bir `visual-baselines-linux-<run-id>-<attempt>` veya `visual-baselines-darwin-<run-id>-<attempt>` yapıtı yükler ve taslak bir PR (`chore/visual-baselines-linux-...` ve `chore/visual-baselines-darwin-...`) açar; bu PR'lar yeniden oluşturulan PNG'lerle `main` dalını hedefler. Her taslak PR'ın açıklamasında bir `gh run download` komutu bulunur; PNG'leri dalınıza almak için ikisini de checkout'unuzun kök dizininde çalıştırın, commit edin ve taslak PR'ları kapatın. `update_snapshots=all` değerini, `changed` değişmesini beklediğiniz bir görüntüyü kaçırırsa kullanın. Başlatmak için depoya yazma erişimi gerekir; dalınız bir fork'taysa PR'da referans yenilemesi gerektiğini belirtin, bir maintainer çalıştıracaktır.
 
 Mac kullanıyorsanız daha hızlı deneme yapmak için `darwin` referanslarını yerel olarak da yenileyebilirsiniz:
 
@@ -243,7 +242,7 @@ Daha hızlı yeniden derlemeler için BuildKit önbellek bağlamalarını kullan
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
-## Sürüm etki alanlarını yayınlayın {#release-version-domains}
+## Sürüm etki alanları {#release-version-domains}
 
 SnapOtter kasıtlı olarak üç sürüm alanına sahiptir. Sürüm sırasında bir alanı diğerine kopyalamayın:
 

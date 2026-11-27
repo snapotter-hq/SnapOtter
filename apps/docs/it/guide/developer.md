@@ -1,8 +1,8 @@
 ---
 description: "Configurazione dell'ambiente di sviluppo locale, comandi, convenzioni di codice e come aggiungere un nuovo strumento a SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 00fc76e805dc
+i18n_output_hash: 571cf28d85e8
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 via Drizzle ORM (pg-core). Lo sviluppo locale richiede Postgres e 
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Questo ti fornisce Postgres sulla porta 5432 e Redis sulla porta 6379. Poi genera e applica le migrazioni:
+Questo ti fornisce Postgres sulla porta 5432 e Redis sulla porta 6379. L'API applica da sola le migrazioni in sospeso all'avvio, quindi ti basta avviare i dev server. Dopo aver modificato lo schema, genera una migrazione e il prossimo avvio la applica, senza alcun passaggio manuale di migrate:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Lo schema è definito in `apps/api/src/db/schema.ts`. Tabelle: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Lo schema è definito in `apps/api/src/db/schema.ts`, che è l'elenco aggiornato delle tabelle.
 
 ## Aggiungere un nuovo strumento {#adding-a-new-tool}
 
@@ -243,7 +242,7 @@ Usa le cache mount di BuildKit per rebuild più veloci:
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
-## Rilascia i domini della versione {#release-version-domains}
+## Domini di versione del rilascio {#release-version-domains}
 
 SnapOtter ha intenzionalmente tre domini di versione. Non copiare un dominio in un altro durante un rilascio:
 

@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的本機開發環境設定、指令、程式碼慣例，以及如何新增工具。"
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 6846f141e196
+i18n_output_hash: 51922f0d0c91
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ pnpm test:coverage      # tests with coverage report
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-這會在 5432 埠提供 Postgres，並在 6379 埠提供 Redis。接著產生並套用遷移：
+這會在 5432 埠提供 Postgres，並在 6379 埠提供 Redis。API 會在啟動時自行套用待處理的遷移，所以只需要啟動開發伺服器即可。變更結構定義後，請產生遷移，下次啟動時就會套用，不需要手動執行 migrate 步驟：
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-結構定義於 `apps/api/src/db/schema.ts`。資料表：users、sessions、settings、jobs、apiKeys、pipelines、teams、userFiles、roles、auditLog。
+結構定義於 `apps/api/src/db/schema.ts`，其中列有目前所有的資料表。
 
 ## 新增工具 {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI 會同時產生 `linux`（`ubuntu-latest`）與 `darwin`（`macos-latest`）�
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-每個作業系統工作都會上傳 `visual-baselines-linux-<run-id>-<attempt>` 或 `visual-baselines-darwin-<run-id>-<attempt>` 產物，並針對 `main` 開啟一個包含重新產生之 PNG 的草稿 PR（`chore/visual-baselines-linux-...` 與 `chore/visual-baselines-darwin-...`）。每個草稿 PR 的描述中都有一行 `gh run download` 指令；在你的 checkout 根目錄執行這兩行指令，把 PNG 放進你的分支，提交後關閉這些草稿 PR。如果 `changed` 漏掉了你預期會改變的截圖，請改用 `update_snapshots=all`。觸發工作流程需要儲存庫的寫入權限，所以如果你的分支在 fork 上，請在 PR 中說明需要更新基準圖，維護者會來執行。
+每個作業系統工作都會上傳 `visual-baselines-linux-<run-id>-<attempt>` 或 `visual-baselines-darwin-<run-id>-<attempt>` 產物，並開啟一個草稿 PR（`chore/visual-baselines-linux-...` 與 `chore/visual-baselines-darwin-...`），目標為 `main`，內含重新產生的 PNG。每個草稿 PR 的描述中都有一行 `gh run download` 指令；在你的 checkout 根目錄執行這兩行指令，把 PNG 放進你的分支，提交後關閉這些草稿 PR。請改用 `update_snapshots=all`，若 `changed` 漏掉了你預期會改變的截圖。觸發工作流程需要儲存庫的寫入權限，所以如果你的分支在 fork 上，請在 PR 中說明需要更新基準圖，維護者會來執行。
 
 在 Mac 上，你也可以在本機更新 `darwin` 基準圖以加快迭代速度：
 
@@ -245,14 +244,14 @@ DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 
 ## 發布版本域 {#release-version-domains}
 
-SnapOtter 有意有三個版本域。發佈期間請勿將一個網域複製到另一個網域：
+SnapOtter 刻意採用三個版本域。發布期間請勿將其中一個版本域複製到另一個：
 
-- 應用程式發布版本涵蓋根清單、所有私人工作區包和 `APP_VERSION`。 Semantic-release 提供此值，`pnpm version:sync <version>` 在應用程式發布之前更新每個工作區。
-- OpenAPI `info.version` 是穩定的公開 API-主力合約。所有本地化規範都保留在 `<major>.0.0` 上以實現相容的應用程式版本，並且僅當 API 合約轉移到新的主要版本時才會更改。
-- `docker/feature-manifest.json` 保留 `imageVersion: 2.0.0` 作為不可變的舊功能包儲存時代。這些 v2 存檔路徑不是應用程式套件版本。準確的 OCR 使用運行時格式 v3 並單獨記錄其應用程式發布來源。
+- 應用程式發布版本涵蓋根清單、所有私有工作區套件和 `APP_VERSION`。此值由 Semantic-release 提供，`pnpm version:sync <version>` 會在應用程式發布之前更新每個工作區。
+- OpenAPI 的 `info.version` 是穩定的公開 API 主版本合約。所有在地化規範在相容的應用程式發布中都維持在 `<major>.0.0`，只有在 API 合約移到新的主版本時才會變更。
+- `docker/feature-manifest.json` 保留 `imageVersion: 2.0.0` 作為不可變的舊版功能套件儲存世代。這些 v2 封存路徑不是應用程式套件版本。準確 OCR 使用執行階段格式 v3，並另外記錄其應用程式發布來源。
 
-`tests/unit/infra/release-version-policy.test.ts` 強制執行這些邊界。新版本的網域或遷移必須一起更新該合約和相關的工件遷移設計。
-獨立的 API 和舊套件值位於 `config/release-version-policy.json` 中；應用程式版本同步絕對不能隱含重寫該原則檔。
+`tests/unit/infra/release-version-policy.test.ts` 會強制執行這些界線。新的版本域或遷移必須同時更新該合約與相關的產物遷移設計。
+獨立的 API 與舊版套件值位於 `config/release-version-policy.json` 中；應用程式版本同步絕對不能隱含地重寫該原則檔。
 
 ## 環境變數 {#environment-variables}
 

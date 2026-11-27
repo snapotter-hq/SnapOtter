@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter のモノレポ構造、アプリとパッケージのアーキテクチャ、リクエストのライフサイクル、リソースフットプリント。"
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 39bcdb8ad563
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 3e2ef855ce55
 i18n_hash_version: 2
 ---
 

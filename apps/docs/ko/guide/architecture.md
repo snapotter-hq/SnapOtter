@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter의 모노레포 구조, 앱 및 패키지 아키텍처, 요청 라이프사이클, 리소스 사용량."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 45e8d01172a0
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 230e5af5f1bb
 i18n_hash_version: 2
 ---
 
@@ -37,13 +37,13 @@ snapotter/
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-네이티브 및 Python ML 런타임을 호출하는 브리지 레이어입니다. 대부분의 Python 도구는 무거운 라이브러리(PIL, NumPy, MediaPipe, rembg)를 미리 가져오는 영구 dispatcher 를 사용하므로 후속 호출에서는 가져오기 오버헤드를 건너뜁니다. OCR 는 변경 가능한 공유 환경에서 격리됩니다. `fast`는 기본 Tesseract 를 호출하는 반면, `balanced` 및 `best`는 변경 불가능한 활성 RapidOCR/ONNX 세대에 고정된 전용 영구 JSONL dispatcher 를 사용합니다. 각 요청에는 generation lease 가 포함됩니다. 활성화는 먼저 후보에서 smoke test 를 실행한 다음 원자적으로 dispatcher 로 전환합니다. 이전 dispatcher 는 생성되기 전에 가비지 수집됩니다.
+네이티브 및 Python ML 런타임을 호출하는 브리지 레이어입니다. 대부분의 Python 도구는 무거운 라이브러리(PIL, NumPy, MediaPipe, rembg)를 미리 가져오는 영구 dispatcher 를 사용하므로 후속 호출에서는 가져오기 오버헤드를 건너뜁니다. OCR 는 변경 가능한 공유 환경에서 격리됩니다. `fast`는 기본 Tesseract 를 호출하는 반면, `balanced` 및 `best`는 변경 불가능한 활성 RapidOCR/ONNX 세대에 고정된 전용 영구 JSONL dispatcher 를 사용합니다. 각 요청에는 generation lease 가 포함됩니다. 활성화는 먼저 후보에서 smoke test 를 실행한 다음 원자적으로 해당 dispatcher 로 전환합니다. 이전 dispatcher 는 해당 세대가 가비지 수집되기 전에 드레인됩니다.
 
 **모델은 사전 로드되지 않습니다.** 각 도구 스크립트는 요청 시점에 디스크에서 모델 가중치를 로드하고 요청이 끝나면 이를 해제합니다. 전체 메모리 프로필은 [리소스 사용량](#resource-footprint)을 참고하세요.
 
 지원되는 작업: 배경 제거(rembg/BiRefNet), 업스케일링(RealESRGAN), 얼굴 흐림(MediaPipe), 얼굴 향상(GFPGAN/CodeFormer), 개체 삭제(LaMa ONNX), OCR(Tesseract 및 RapidOCR(PP-OCR ONNX 모델 포함)), 색상화(DDColor), 노이즈 제거, 적목 현상 제거, 사진 복원, 여권 사진 생성, 투명도 수정(BiRefNet HR-매팅) 및 내용 인식 크기 조정(Go caire 바이너리).
 
-Python 스크립트가 살고 있습니다 `packages/ai/python/`. 대규모 옵션 모델 팩은 요청 시 영구 패키지에 설치됩니다. `/data/ai` 용량. 정확한 OCR 서명된 것을 사용하고, 플랫폼별 아티팩트; 내장된 Tesseract 계층에는 모델 팩 다운로드가 필요하지 않습니다.
+Python 스크립트는 `packages/ai/python/`에 있습니다. 용량이 큰 옵션 모델 팩은 요청 시 영구 `/data/ai` 볼륨에 설치됩니다. 정확한 OCR은 서명된 플랫폼별 아티팩트를 사용하며, 내장된 Tesseract 계층에는 모델 팩 다운로드가 필요하지 않습니다.
 
 ### `@snapotter/shared` {#snapotter-shared}
 
@@ -61,7 +61,7 @@ Python 스크립트가 살고 있습니다 `packages/ai/python/`. 대규모 옵�
 - BullMQ 작업 큐(풀: image, media, ai, docs, system)를 통한 동시성 제어가 있는 배치 처리
 - 사용자 인증, RBAC(전체 권한 세트가 있는 admin/user 역할), API 키 관리, 속도 제한
 - 팀 관리 - admin 전용 CRUD. 사용자는 프로필의 `team` 필드를 통해 팀에 할당됩니다
-- 런타임 설정 - 재배포 없이 `disabledTools`, `enableExperimentalTools`, `loginAttemptLimit` 및 기타 운영 노브를 제어하는 `settings` 테이블의 키-값 저장소
+- 런타임 설정 - `settings` 테이블의 키-값 저장소로, 재배포 없이 `disabledTools`, `enableExperimentalTools`, `loginAttemptLimit` 및 기타 운영 노브를 제어합니다
 - 데이터베이스 기반 설정을 통한 사용자 지정 브랜딩 및 런타임 환경설정
 - `/api/docs`의 Scalar/OpenAPI 문서
 - 프로덕션에서 빌드된 프런트엔드를 SPA로 서빙

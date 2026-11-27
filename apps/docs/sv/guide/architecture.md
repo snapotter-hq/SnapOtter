@@ -1,8 +1,8 @@
 ---
 description: "Monorepo-struktur, app- och paketarkitektur, förfrågningslivscykel och resursavtryck för SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 4691aa895e15
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 7af20d1732ce
 i18n_hash_version: 2
 ---
 
@@ -37,13 +37,13 @@ Detta paket har inga nätverksberoenden och körs helt in-process.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Ett brygglager som anropar native och Python ML körtider. De flesta Python-verktyg använder en beständig dispatcher som förimporterar tunga bibliotek (PIL, NumPy, MediaPipe, rembg) så att efterföljande anrop hoppar över importkostnader. OCR är isolerad från den föränderliga delade miljön: `fast` anropar inbyggd Tesseract, medan `balanced` och `best` använder en dedikerad beständig JSONL dispatcher som är fäst vid den aktiva oföränderliga RapidOCR/ONNX-generationen. Varje begäran innehåller en generation lease. Aktivering kör först en smoke test på en kandidat och växlar sedan atomärt till dess dispatcher. Den tidigare dispatcher dräneras innan den genereras sopsamlas.
+Ett brygglager som anropar native och Python ML körtider. De flesta Python-verktyg använder en beständig dispatcher som förimporterar tunga bibliotek (PIL, NumPy, MediaPipe, rembg) så att efterföljande anrop hoppar över importkostnader. OCR är isolerad från den föränderliga delade miljön: `fast` anropar inbyggd Tesseract, medan `balanced` och `best` använder en dedikerad beständig JSONL dispatcher som är fäst vid den aktiva oföränderliga RapidOCR/ONNX-generationen. Varje begäran innehåller en generation lease. Aktivering kör först en smoke test på en kandidat och växlar sedan atomärt till dess dispatcher. Den tidigare dispatchern dräneras innan dess generation sopsamlas.
 
 **Modeller är inte förinlästa.** Varje verktygsskript laddar sina modellvikter från disk vid förfrågningstillfället och kasserar dem när förfrågan är klar. Se [Resursavtryck](#resource-footprint) för den fullständiga minnesprofilen.
 
 Operationer som stöds: bakgrundsborttagning (rembg/BiRefNet), uppskalning (RealESRGAN), ansiktsoskärpa (MediaPipe), ansiktsförbättring (GFPGAN/CodeFormer), objektradering (LaMa ONNX), OCR (Tesseract och RapidOCR med PP-OCR ONNX-modeller), färgläggning (DDColor), bullerborttagning, borttagning av röda ögon, foto restaurering, generering av passfoto, transparensfixering (BiRefNet HR-matta), och innehållsmedveten storleksändring (Go caire binär).
 
-Python-skript live i `packages/ai/python/`. Stora valfria modellpaket installeras på begäran i den ihållande `/data/ai`-volymen. Exakt OCR använder signerade, plattformsspecifika artefakter; den inbyggda Tesseract-nivån kräver ingen nedladdning av modellpaket.
+Python-skript finns i `packages/ai/python/`. Stora valfria modellpaket installeras på begäran i den ihållande `/data/ai`-volymen. Exakt OCR använder signerade, plattformsspecifika artefakter; den inbyggda Tesseract-nivån kräver ingen nedladdning av modellpaket.
 
 ### `@snapotter/shared` {#snapotter-shared}
 

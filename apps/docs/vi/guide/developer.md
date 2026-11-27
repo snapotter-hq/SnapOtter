@@ -1,8 +1,8 @@
 ---
 description: "Thiết lập môi trường phát triển cục bộ, lệnh, quy ước mã, và cách thêm một công cụ mới vào SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 6bf304cb83fd
+i18n_output_hash: ef4dc77725a5
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 qua Drizzle ORM (pg-core). Dev cục bộ yêu cầu Postgres và 
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Điều này cung cấp cho bạn Postgres trên cổng 5432 và Redis trên cổng 6379. Sau đó tạo và áp dụng các di trú:
+Điều này cung cấp cho bạn Postgres trên cổng 5432 và Redis trên cổng 6379. API tự áp dụng các di trú đang chờ khi khởi động, nên chỉ cần khởi động các máy chủ dev là đủ. Sau khi thay đổi lược đồ, hãy tạo một di trú và lần khởi động kế tiếp sẽ áp dụng nó, không cần bước migrate thủ công:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Lược đồ được định nghĩa trong `apps/api/src/db/schema.ts`. Các bảng: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Lược đồ được định nghĩa trong `apps/api/src/db/schema.ts`, đó là danh sách các bảng hiện tại.
 
 ## Thêm một công cụ mới {#adding-a-new-tool}
 

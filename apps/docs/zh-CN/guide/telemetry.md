@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 收集哪些匿名使用数据、何时发送、首次运行时的选择如何运作,以及如何关闭整个实例的产品分析。"
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 1e1ac83ebb8b
+i18n_output_hash: 4083e52fb452
 i18n_hash_version: 2
 ---
 
@@ -11,6 +11,14 @@ i18n_hash_version: 2
 Anonymous Product Analytics 由管理员为整个实例设置。新实例会在首次运行时询问,在有人回答之前不会发送任何内容。您可以随时在 Settings > System > Privacy 中更改。
 
 开启分析后,SnapOtter 会向 PostHog 发送运行了哪些工具和流水线、耗时多久、是否成功、错误代码和文件数量,以及实例的匿名 ID、版本、CPU 架构、操作系统、安装类型和是否有 GPU。崩溃报告会发送到 Sentry,其中的文件名、路径、电子邮件和引号内的值都已被去除。它绝不会发送您的文件、文件名或路径、文件内容、OCR 输出或提取的文本、图像元数据,也不会发送您的账户身份。它只会向 PostHog 和 Sentry 这两个地方发送数据,关闭分析后则不会向任何一方发送任何内容。
+
+## 首次运行时的选择 {#first-run-choice}
+
+管理员第一次打开新实例时,SnapOtter 会询问:"Send anonymous usage stats and crash reports? Your files are never sent."两个选项地位相同,都不会被预先选中。不回答就关闭提示,分析会保持关闭,并在下次访问时再次询问。只有管理员会看到这个提示。使用 `AUTH_ENABLED=false` 时没有账户,本地用户即管理员,因此谁打开应用谁来回答。桌面应用的询问方式相同。
+
+在此提示出现之前就已运行的实例不会被询问,它会保留原有的分析设置:除非管理员或 `SNAPOTTER_ANALYTICS_DEFAULT=off` 将其关闭,否则保持开启。
+
+## 我们发送的事件(启用时) {#events-we-send-when-enabled}
 
 - tool_used：工具 id、状态、耗时、类别、是否为 AI 工具，失败时的错误代码，以及单独报告某一阶段的工具的步骤名称（Passport Photo 的分析步骤）。
 - pipeline_executed：步骤数、工具 id、批处理标志、文件数、耗时、状态。

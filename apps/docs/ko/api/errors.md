@@ -1,9 +1,9 @@
 ---
 title: "오류 코드"
 description: "오류 본문의 형식, 안정적인 코드, 그리고 각 코드에 대한 대응 방법입니다."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 21fb8cc3337f
+i18n_output_hash: 29944f70b145
 i18n_hash_version: 2
 ---
 
@@ -56,7 +56,7 @@ i18n_hash_version: 2
 
 | `code` | 상태 | 대응 방법 |
 |--------|--------|------------|
-| `AUTH_REQUIRED` | 401 | 세션 토큰 또는 API 키(`si_...`)와 함께 `Authorization: Bearer <token>`를 보내세요. |
+| `AUTH_REQUIRED` | 401 | `Authorization: Bearer <token>`를 세션 토큰 또는 API 키(`si_...`)와 함께 보내세요. |
 | `FORBIDDEN` | 403 | 자격 증명은 유효하지만 권한이 없습니다. 관리자에게 권한을 요청하세요. |
 | `MUST_CHANGE_PASSWORD` | 403 | 다른 엔드포인트를 호출하려면 먼저 계정의 비밀번호를 변경해야 합니다. 세션 토큰으로 `POST /api/auth/change-password`를 호출한 뒤 다시 시도하세요. |
 | `USER_DISABLED` | 403 | 계정이 비활성화되어 있습니다. 관리자가 다시 활성화해야 합니다. |
@@ -67,7 +67,7 @@ i18n_hash_version: 2
 
 ## 작업 {#job-codes}
 
-실패한 작업은 HTTP 오류가 아니라 작업 자체에 실패 이유를 보고합니다. `GET /api/v1/jobs/{jobId}`에서 `error.code`와 `error.message`를 읽으세요. [진행 상황 추적](/ko/api/rest#progress-tracking)을 참고하세요.
+실패한 작업은 HTTP 오류가 아니라 작업 자체에 실패 이유를 보고합니다. `error.code`와 `error.message`을 `GET /api/v1/jobs/{jobId}`에서 읽으세요. [진행 상황 추적](/ko/api/rest#progress-tracking)을 참고하세요.
 
 실패한 작업은 실패 원인이 입력 오류이거나 서버 결함일 때만 `error.code`를 유지합니다. 그 외의 실패에는 메시지만 포함됩니다.
 
@@ -139,7 +139,8 @@ SCIM 라우트는 RFC 7644 오류 봉투(`schemas`, `detail`, `status`, 그리�
 | `code` | 상태 | 의미 | 대응 방법 |
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, 또는 스마트 크롭의 얼굴 모드에서는 400 | 도구, 또는 파이프라인이나 배치의 한 단계에 설치되지 않은 번들이 필요합니다. 본문에는 `feature`(번들 ID)와 `featureName`가 포함됩니다. | 설정에서 번들을 설치한 후 다시 시도하세요. |
-| `FEATURE_CPU_UNSUPPORTED` | 409 | 번들의 x86-64 라이브러리에 AVX가 필요한데 이 서버의 CPU에는 AVX가 없어 설치 또는 오프라인 가져오기가 거부되었습니다. 다운로드되거나 설치된 것은 없습니다. 본문에는 `feature`(번들 ID)와 `reason`(`cpu-no-avx`)이 포함됩니다. `GET /api/v1/features`는 같은 번들을 `compatibility: "incompatible"` 및 `compatibilityReason: "cpu-no-avx"`와 함께 보고합니다. | AVX가 있는 CPU 또는 arm64에서 SnapOtter를 실행하세요. 다른 번들은 계속 설치할 수 있습니다. |
+| `FEATURE_CPU_UNSUPPORTED` | 409 | 번들의 x86-64 라이브러리에 AVX가 필요한데 이 서버의 CPU에는 AVX가 없어 설치 또는 오프라인 가져오기가 거부되었습니다. 다운로드되거나 설치된 것은 없습니다. 본문에는 `feature`(번들 ID)과 `reason`(`cpu-no-avx`)이 포함됩니다. `GET /api/v1/features`는 같은 번들을 `compatibility: "incompatible"` 및 `compatibilityReason: "cpu-no-avx"`와 함께 보고합니다. | AVX가 있는 CPU 또는 arm64에서 SnapOtter를 실행하세요. 다른 번들은 계속 설치할 수 있습니다. |
+| `FEATURE_INSTALL_BUSY` | 409 | 설치 프로그램이 공유 AI 환경에 쓰는 중이라 취소가 거부되었습니다. 그 시점에 중단하면 설치된 모든 AI 도구가 깨지기 때문입니다. | 설치가 끝날 때까지 기다린 뒤, 번들이 필요 없으면 제거하세요. |
 | `FEATURE_INCOMPATIBLE` | 501, 또는 빠른 OCR이 읽을 수 없는 언어를 받으면 400 | 설치된 기능이 요청한 품질이나 언어를 처리할 수 없습니다. | 설정을 변경하거나 해당 설정을 지원하는 번들을 설치하세요. |
 | `ENGINE_UNAVAILABLE` | 503 | 필요한 엔진을 시작하지 못했거나, 요청이 검증된 후 OCR 런타임이 제거되었습니다. | 관리자가 기능을 복구하거나 다시 설치한 후 다시 시도하세요. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium이 설치되어 있지 않아 HTML을 이미지로 변환할 수 없습니다. | 관리자에게 브라우저 설치를 요청하세요. |
@@ -155,13 +156,17 @@ SCIM 라우트는 RFC 7644 오류 봉투(`schemas`, `detail`, `status`, 그리�
 | `NOT_ANIMATED` | 400 | GIF 배경 제거에 정지 이미지가 전달되었습니다. | 정지 이미지에는 배경 제거를 사용하세요. |
 | `TOO_MANY_FRAMES` | 400 | 애니메이션의 프레임 수가 서버에서 허용하는 수(`GIF_BG_MAX_FRAMES`)를 초과합니다. | 더 짧은 애니메이션을 보내거나 관리자에게 한도를 늘려 달라고 요청하세요. |
 | `TOO_MANY_PIXELS` | 400 | 애니메이션의 캔버스 크기에 프레임 수를 곱한 값이 서버 한도를 초과합니다. GIF 배경 제거는 268,402,689픽셀(16383 x 16383)이고, 다른 애니메이션 도구는 GIF 작업량 상한입니다. | 프레임 수를 줄이거나 더 작은 애니메이션을 보내세요. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | AI 이미지 도구가 여러 페이지 TIFF 또는 애니메이션 GIF나 WebP를 받았는데, 출력 형식이 모든 프레임을 그대로 유지합니다. 이 도구들은 모델을 한 번에 이미지 한 장에만 실행합니다. | 파일을 개별 이미지로 나누세요. 도구에 출력 형식 설정이 있으면 PNG 같은 정지 형식을 선택하면 첫 프레임만 처리됩니다. |
 | `IMAGE_TOO_LARGE` | 400 | 이미지의 픽셀 수가 디코더가 허용하는 수를 초과합니다. | 더 작은 이미지를 보내세요. |
+| `SVG_TOO_COMPLEX` | 400 | SVG가 `JOB_TIMEOUT_FAST_S` 안에 래스터화를 마치지 못했습니다. `<use>`가 반복하는 도형에 적용된 필터가 주된 원인인데, 각 복사본이 필터를 다시 그리기 때문입니다. | 필터나 반복되는 도형을 단순화하거나, 관리자에게 한도를 늘려 달라고 요청하세요. |
 | `RESULT_TOO_LARGE` | 400 | 이 설정으로는 인코더 또는 픽셀 한도가 허용하는 것보다 큰 이미지가 만들어집니다. | 더 작은 이미지를 사용하거나 결과가 더 작아지는 설정을 사용하세요. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice 또는 pandoc이 문서를 열 수 없었습니다. 문서가 손상되었거나, 암호로 보호되어 있거나, 확장자와 다른 형식일 수 있습니다. | 오피스 앱에서 파일이 열리는지 확인한 후 다시 보내세요. |
 | `PDF_DAMAGED` | 400 | PDF 엔진이 손상된 문서 구조를 발견했습니다. | 파일을 PDF 복구로 처리한 후 다시 시도하세요. |
 | `PDF_PASSWORD_PROTECTED` | 400 | PDF가 암호화되어 있어 이 도구로 열 수 없습니다. | 먼저 PDF 잠금 해제로 잠금을 해제하세요. |
 | `NO_AUDIO_TRACK` | 400 | 오디오 도구가 사용할 오디오 스트림이 파일에 없습니다. | 오디오가 있는 파일을 보내세요. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg가 오디오 또는 비디오를 읽을 수 없었습니다. 패킷, 코덱 매개변수, `moov` 아톰을 찾지 못했거나 파싱할 수 없는 데이터가 있습니다. | 미디어 플레이어에서 파일이 재생되는지 확인하거나 다시 내보낸 후 다시 시도하세요. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 인코딩/디코딩이 Base64가 아닌 입력을 받았습니다. 공백은 무시되며 표준 알파벳과 URL 안전 알파벳을 모두 허용합니다. | 텍스트에 불필요한 문자가 있거나 끝이 잘리지 않았는지 확인하세요. |
+| `DECODED_DATA_NOT_TEXT` | 400 | Base64는 유효하지만 UTF-8 텍스트가 아니라 바이너리 데이터로 디코딩됩니다. | 텍스트를 표시하는 대신 파일로 저장하는 도구로 디코딩하세요. |
 | `PAGE_OUT_OF_RANGE` | 400 | 페이지 범위가 PDF에 없는 페이지를 지정합니다. | 페이지 수를 확인하고 그 안의 범위를 보내세요. |
 | `INVALID_PAGE_RANGE` | 400 | 페이지 범위의 구문이 올바르지 않습니다. | `1-3,5`와 같은 페이지 번호를 사용하세요. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | 페이지 제거에서 모든 페이지를 제거하라는 요청을 받았습니다. | 최소 한 페이지는 남겨 두세요. |
@@ -172,6 +177,7 @@ SCIM 라우트는 RFC 7644 오류 봉투(`schemas`, `detail`, `status`, 그리�
 | `NO_FACE_DETECTED` | 400 | 여권 사진에서 이미지의 얼굴을 찾지 못했습니다. | 조명이 좋고 정면을 향한 선명한 사진을 보내세요. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | 압축 또는 여권 사진의 크기 제한이 크기를 줄여도 파일을 요청한 크기 이하로 만들 수 없습니다. | 목표 크기를 더 크게 지정하거나 먼저 이미지를 자르세요. |
 | `TOO_MANY_PAGES` | 400 | OCR이 한 작업에서 처리하는 것보다 많은 페이지를 요청받았습니다. | 페이지 범위로 더 적은 페이지를 선택하세요. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | 여러 페이지 TIFF의 OCR이 페이지 전체에서 1,000,000바이트를 넘는 텍스트를 읽었으며, 이는 하나의 결과에 저장할 수 있는 양보다 많습니다. | TIFF를 더 작은 파일로 나눈 뒤 각각 OCR을 실행하세요. |
 | `METADATA_DAMAGED` | 400 | 메타데이터 편집에서 이미지의 기존 EXIF 데이터가 손상된 것을 발견해 안전하게 다시 쓸 수 없습니다. | 먼저 이미지 메타데이터 제거로 메타데이터를 제거한 후 편집하세요. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML 또는 Markdown을 PDF로 변환하는 중 네트워크에 있는 이미지, 스타일시트 또는 글꼴에 대한 참조를 발견했으며, 서버는 이를 가져오지 않습니다. | 리소스를 파일에 포함한(예: `data:` URI로) 후 다시 시도하세요. |
 
@@ -218,10 +224,11 @@ GDPR 삭제 라우트는 사용자 또는 팀이 법적 보존 상태일 때 상
 | `SIEM_DECRYPTION_FAILED` | SIEM 전달이 오류 추적에 보고합니다. SIEM 인증 헤더를 복호화할 수 없습니다. |
 | `WEBHOOK_DECRYPTION_FAILED` | 오류 추적에 보고됩니다. 같은 실패를 겪은 요청은 `DECRYPTION_FAILED`로 응답합니다. |
 | `STAGED_DISCARD_FAILED` | 스테이징된 업로드를 제거할 수 없을 때 오류 추적에 보고됩니다. |
+| `RETENTION_DEADLINE_BACKFILLED` | 스토리지 TTL 정리 작업이 완료된 작업에 빠져 있던 팀 보존 기한을 채울 때 오류 추적에 보고됩니다. 이후 작업의 파일은 팀의 보존 정책을 따릅니다. |
 | `USERNAME_RACE_EXHAUSTED` | SSO 자동 생성이 모든 재시도에서 사용자 이름 경합에 실패할 때 발생합니다. 대신 로그인 페이지에 오류가 표시됩니다. |
 | `ERR_OUT_OF_RANGE` | 오브젝트 스토리지 리더가 잘못된 바이트 범위에 대해 발생시킵니다. |
 | `ETIMEDOUT` | GDPR 내보내기의 시간 초과 오류에 설정됩니다. 내보내기는 실패하며 다시 요청할 수 있습니다. |
 | `FST_REQ_FILE_TOO_LARGE` | 제한을 초과한 업로드에 대한 Fastify의 코드입니다. 클라이언트는 `PAYLOAD_TOO_LARGE`와 함께 413을 받거나, 라우트 자체의 413 메시지를 받습니다. |
 | `TARGET_SIZE_EXCEEDED` | 목표 크기 압축이 목표를 달성하지 못했을 때 발생합니다. 오류에 상태나 코드가 없으므로 클라이언트는 일반적인 실패를 받습니다. |
 | `OCR_CACHE_PERMISSIONS` | AI 데이터 볼륨 때문에 OCR 런타임 캐시가 모든 사용자에게 쓰기 가능한 상태가 되면 운영상 결함으로 오류 추적에 보고됩니다. 설치 작업은 스토리지 문제를 명시한 메시지와 함께 실패합니다. |
-| `OCR_RUNTIME_UNREACHABLE` | 서버가 OCR 런타임을 내려받기 위해 huggingface.co에 접속하지 못하면 운영상 결함으로 오류 추적에 보고됩니다. 설치 작업은 네트워크 접근, `HTTPS_PROXY`, 오프라인 가져오기에 대한 메시지와 함께 실패합니다. |
+| `OCR_RUNTIME_UNREACHABLE` | 서버가 OCR 런타임을 내려받기 위해 huggingface.co에 접속하지 못하면 운영상 결함으로 오류 추적에 보고됩니다. 설치 작업은 네트워크 접근, `HTTPS_PROXY`, `HF_ENDPOINT`, 오프라인 가져오기에 대한 메시지와 함께 실패합니다. |

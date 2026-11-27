@@ -1,8 +1,8 @@
 ---
 description: "Welche anonymen Nutzungsdaten SnapOtter erfasst, wann sie gesendet werden, wie die Auswahl beim ersten Start funktioniert und wie Sie die instanzweiten Produktanalysen deaktivieren."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 05ab72315445
+i18n_output_hash: 98edcb0d5ada
 i18n_hash_version: 2
 ---
 

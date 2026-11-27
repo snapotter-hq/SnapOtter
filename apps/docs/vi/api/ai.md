@@ -1,8 +1,9 @@
 ---
 description: "Tài liệu tham khảo engine AI với tất cả công cụ ML chạy cục bộ. Xóa nền, upscale, OCR, phát hiện khuôn mặt, phục chế ảnh và nhiều tính năng khác."
-i18n_output_hash: 2e012549bd18
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 5c8358e9788e
+i18n_hash_version: 2
 ---
 
 # Tài liệu tham khảo Engine AI {#ai-engine-reference}
@@ -15,12 +16,6 @@ Hiện chưa hỗ trợ tăng tốc iGPU Intel/AMD qua VA-API, Quick Sync hay Op
 
 19 công cụ AI sidecar Python trên bốn phương thức (ảnh, âm thanh, video, tài liệu), cộng thêm 2 công cụ có khả năng AI tùy chọn. Mọi mô hình đều chạy cục bộ, không cần internet sau khi tải mô hình lần đầu.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Khả năng tương thích OCR tiếng Hàn
-OCR Nhanh hỗ trợ `auto`, `en`, `de`, `es`, `fr`, `zh` và `ja`, nhưng không hỗ trợ tiếng Hàn (`ko`) và tiếng Ả Rập (`ar`). Cả hai cần gói OCR Chính xác và `balanced` hoặc `best`. Gói chạy trên container Linux amd64 và arm64 chính thức, kể cả máy chủ NVIDIA nơi OCR vẫn chạy bằng CPU. Với tiếng Hàn và tiếng Ả Rập, hệ thống không được hỗ trợ sẽ trả về lỗi tương thích rõ ràng và không âm thầm chuyển về `fast`. Tiếng Hàn hoặc tiếng Ả Rập với `fast` hoặc bí danh cũ `tesseract` bị từ chối trước khi xếp hàng với `FEATURE_INCOMPATIBLE` và `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Kiến trúc {#architecture}
 
 ```
@@ -83,6 +78,10 @@ Các công cụ có phụ thuộc chéo giữa nhiều gói:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Phát hiện khuôn mặt trước khi chạy tăng cường GFPGAN hoặc CodeFormer trên các vùng khuôn mặt đã chọn. |
 
 Một công cụ chỉ khả dụng khi tất cả các gói yêu cầu của nó được cài đặt, ngoại trừ OCR: tầng `fast` tích hợp của nó vẫn khả dụng mà không cần gói OCR tùy chọn. Các lượt cài đặt một phần là hợp lệ và được xử lý tăng dần: các gói đã cài đặt được sử dụng lại, các gói bị thiếu được hiển thị dưới dạng tải xuống và các lượt cài đặt trong hàng đợi chạy lần lượt để môi trường Python dùng chung không bị sửa đổi đồng thời.
+
+### Tải xuống qua mirror {#downloading-through-a-mirror}
+
+Các kho lưu trữ gói và thời gian chạy OCR chính xác được tải từ huggingface.co. Khi máy chủ đó bị chặn hoặc chậm, hãy đặt `HF_ENDPOINT` trên container ứng dụng thành một mirror Hugging Face, ví dụ `HF_ENDPOINT=https://hf-mirror.com`. Mọi lượt tải gói và thời gian chạy OCR đều dùng nó, kể cả trình tải dự phòng và liên kết tải thủ công trong lỗi cài đặt. Hãy dùng URL `https` không kèm thông tin xác thực; việc cài đặt thời gian chạy OCR từ chối mọi dạng khác. Tính toàn vẹn không phụ thuộc vào mirror: mỗi kho lưu trữ gói được kiểm tra theo SHA-256 của nó và chỉ mục thời gian chạy OCR được ký, nên một mirror phục vụ tệp bị sửa đổi sẽ làm việc cài đặt thất bại. Ngoại lệ là `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: các lượt tải thời gian chạy bù một trọng số mô hình còn thiếu cũng dùng `HF_ENDPOINT`, và các trọng số đó không được kiểm tra checksum, nên chỉ kết hợp hai thứ này với một mirror mà bạn tin tưởng. Nếu máy chủ ra internet qua proxy, hãy xem [Proxy đi ra và CA riêng](/vi/guide/deployment#outbound-proxy-and-private-ca).
 
 ### Cài đặt tất cả gói cùng lúc {#installing-every-bundle-at-once}
 
@@ -189,12 +188,12 @@ Làm mờ nền trong khi giữ chủ thể sắc nét.
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống quality, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích |
 | `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast không hỗ trợ `ko` và `ar` |
 | `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
 | `engine` | string | - | Bí danh tương thích không được dùng nữa. Ánh xạ `tesseract` thành `fast` và giá trị `paddleocr` kế thừa thành `balanced`; nó không tải PaddlePaddle |
 
-Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn hoặc tiếng Ả Rập sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
+Trả về văn bản được trích xuất cùng với siêu dữ liệu xuất xứ: công cụ, chất lượng thực tế và được yêu cầu, thiết bị, nhà cung cấp, trạng thái xuống cấp, cảnh báo và phiên bản mô hình/thời gian chạy chính xác khi có thể. Yêu cầu chất lượng rõ ràng không bao giờ rơi vào cấp độ khác. Nếu `balanced` hoặc `best` không khả dụng thì API trả về `FEATURE_NOT_INSTALLED` hoặc `FEATURE_INCOMPATIBLE` thay vì chạy `fast` âm thầm. Yêu cầu rõ ràng dùng Fast hoặc bí danh cũ `tesseract` với tiếng Hàn sẽ trả về `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` và hướng dẫn cài gói chính xác trước khi công việc được xếp hàng.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -205,7 +204,7 @@ Trích xuất văn bản từ tài liệu PDF đã quét bằng OCR chạy trên
 
 | Tham số | Kiểu | Mặc định | Mô tả |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống `quality`, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Tự động | Bậc xử lý. Khi bỏ trống quality, hệ thống chọn bậc cao nhất hiện có theo thứ tự `best`, `balanced`, `fast`. Tiếng Hàn và tiếng Ả Rập không bao giờ chọn `fast`; nếu không có bậc chính xác, hệ thống trả về lỗi cài đặt runtime chính xác hoặc lỗi tương thích |
 | `language` | string | `"auto"` | Ngôn ngữ: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast không hỗ trợ `ko` và `ar` |
 | `pages` | string | `"all"` | Chọn trang: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Phụ thuộc vào bậc | Cải thiện độ tương phản cục bộ. Fast áp dụng trực tiếp; các bậc chính xác chỉ giữ lại biến thể khi điểm số đã hiệu chỉnh cải thiện OCR. Mặc định bật cho Best |
@@ -327,6 +326,9 @@ Nhận một body JSON gồm kết quả Giai đoạn 1 cộng với các thiế
 | `landmarks` | object | (bắt buộc) | Mốc điểm từ Giai đoạn 1 |
 | `imageWidth` | number | (bắt buộc) | Chiều rộng ảnh từ Giai đoạn 1 |
 | `imageHeight` | number | (bắt buộc) | Chiều cao ảnh từ Giai đoạn 1 |
+| `clientJobId` | string | (tự tạo) | ID công việc riêng của bạn cho luồng tiến trình |
+
+Bước tạo chạy như một công việc trong hàng đợi: `200` kèm kết quả trong cửa sổ chờ đồng bộ, `202` kèm một ID công việc sau cửa sổ đó. Xem [Ảnh hộ chiếu](/vi/tools/image/passport-photo#phase-2-generate) để biết chi tiết.
 
 ## Xóa vật thể (Inpainting) {#object-erasing-inpainting}
 

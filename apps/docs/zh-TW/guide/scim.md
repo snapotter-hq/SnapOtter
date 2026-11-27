@@ -1,8 +1,8 @@
 ---
 description: "設定 SCIM 2.0 佈建，將使用者與群組從您的身分提供者同步至 SnapOtter。涵蓋 Okta、Azure AD / Entra ID 以及自訂整合。"
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: 6621d23c47f4
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: 472c82110ef5
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ SCIM 佈建需要具備 `scim` 功能的 **enterprise** 授權。team 方案無�
 
 - 一個可透過公開網址存取的執行中 SnapOtter 執行個體
 - 具備 `scim` 功能的企業版授權金鑰
-- 內建 SnapOtter `admin` 帳戶及其完整的有效權限集。委託的自訂角色或缺少任何管理權限的管理 API 金鑰無法產生或撤銷全域 SCIM 令牌。
+- 內建 SnapOtter `admin` 帳戶及其完整的有效權限集。委託的自訂角色或缺少任何管理權限的管理 API 金鑰無法產生或撤銷全域 SCIM 權杖。
 - 您身分提供者佈建設定的管理員存取權
 
 ## 快速開始 {#quick-start}
@@ -50,19 +50,19 @@ SCIM 端點使用專屬的 Bearer 權杖，與使用者工作階段及 API 金�
 
 ### 產生權杖 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` 產生新的 SCIM 代幣。由於令牌可以跨實例配置和變更用戶，因此此端點需要具有完整有效管理權限集的內建 `admin` 角色。將 `users:manage` 保留在自訂角色中是不夠的。
+`POST /api/v1/enterprise/scim/token` 產生新的 SCIM 權杖。由於該權杖可以跨整個執行個體佈建並變更使用者，因此此端點需要具有完整有效管理權限集的內建 `admin` 角色。在自訂角色中擁有 `users:manage` 並不足夠。
 
 該權杖以明文回傳，且僅回傳一次。SnapOtter 只儲存 scrypt 雜湊值。若您遺失權杖，請撤銷它並產生新的權杖。
 
 同一時間只有一個 SCIM 權杖處於使用中狀態。產生新權杖會取代先前的權杖。
 
-::: warning 升級後重新發行令牌
-舊版未版本控制的 SCIM 令牌將被拒絕。升級到頒發 `so_scim_v2_...` 令牌的版本後，請產生新令牌並更新您的身分提供者，然後再恢復配置。
+::: warning 升級後重新發行權杖
+舊版未版本化的 SCIM 權杖會被拒絕。升級到發行 `so_scim_v2_...` 權杖的版本後，請產生新權杖並更新您的身分提供者，然後再恢復佈建。
 :::
 
 ### 撤銷權杖 {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` 撤銷目前的 SCIM 令牌。它具有與令牌生成相同的完整內建管理要求。
+`DELETE /api/v1/enterprise/scim/token` 撤銷目前的 SCIM 權杖。它與產生權杖具有相同的完整內建管理員要求。
 
 ### 速率限制 {#rate-limiting}
 
@@ -145,7 +145,7 @@ SnapOtter 不會透過 SCIM 硬刪除使用者。相反地，DELETE 會執行軟
 
 ### 重新啟用使用者 {#reactivate-user}
 
-若要重新啟用先前已停用的使用者，請以 `active: true` 傳送 `PUT` 或 `PATCH` 請求。SnapOtter 會還原停用前的原始角色（例如 `disabled:editor` 會再次變回 `editor`）。若無法判定原始角色，則會回退至 `user`。
+若要重新啟用先前已停用的使用者，請傳送 `PUT` 或 `PATCH` 請求，並帶有 `active: true`。SnapOtter 會還原停用前的原始角色（例如 `disabled:editor` 會再次變回 `editor`）。若無法判定原始角色，則會回退至 `user`。
 
 ::: details 範例：透過 PATCH 停用及重新啟用
 ```json
@@ -284,7 +284,7 @@ SCIM 請求未包含 `Authorization: Bearer <token>` 標頭。請檢查您 IdP �
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-令牌格式錯誤、使用已停用的未版本化格式或與儲存的雜湊不符。產生目前的 `so_scim_v2_...` 令牌並在 IdP 的組態設定中更新該令牌。
+權杖格式錯誤、使用已淘汰的未版本化格式，或與儲存的雜湊不符。請產生目前的 `so_scim_v2_...` 權杖，並在 IdP 的佈建設定中更新該權杖。
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 
@@ -306,7 +306,7 @@ SCIM DELETE 是軟停用。已停用的使用者仍會以停用狀態顯示在�
 
 在 SCIM 的 `externalId` 擁有自己的欄位（`users.scim_external_id`）之前，對已經由 OIDC 或 SAML 登入連結的使用者執行 SCIM `PUT` 或 `PATCH`，會把 SCIM id 寫進該使用者的登入身分。升級移轉無法分辨該值與真正的 OIDC subject 或 SAML NameID，因此會略過這些使用者。對他們來說，`filter=externalId eq "..."` 會傳回空結果，直到 IdP 送出另一次帶有 `externalId` 的更新。
 
-如果你不想等 IdP，稽核日誌可以為該 id 作證。SCIM 會寫入一筆 `SCIM_USER_PROVISIONED` 記錄，內含它建立每位使用者時所用的 `externalId`。一旦你執行的是含有 `scim_external_id` 欄位的版本，請對 SnapOtter 資料庫開啟 `psql`（[帳號復原指南](./account-recovery.md#older-images-and-fallbacks) 說明了兩種設定各自的做法），並預覽登入身分仍等於該 id 的使用者：
+如果你不想等 IdP，稽核日誌可以為該 id 作證。SCIM 會寫入一筆 `SCIM_USER_PROVISIONED` 記錄，內含它建立每位使用者時所用的 `externalId`。一旦你執行的是含有 `scim_external_id` 欄位的版本，請對 SnapOtter 資料庫開啟 `psql`（[帳號復原指南](./account-recovery.md#older-images-and-fallbacks)說明了兩種設定各自的做法），並預覽登入身分仍等於該 id 的使用者：
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id

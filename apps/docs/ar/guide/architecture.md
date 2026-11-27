@@ -1,8 +1,8 @@
 ---
 description: "بنية المستودع الأحادي، وبنية التطبيقات والحزم، ودورة حياة الطلب، وبصمة الموارد الخاصة بـ SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: dbd52e665939
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 2b03034ba832
 i18n_hash_version: 2
 ---
 
@@ -41,7 +41,7 @@ snapotter/
 
 **النماذج لا تُحمَّل مسبقًا.** يحمّل كل نص أداة أوزان نموذجه من القرص عند وقت الطلب ويتخلّص منها عند انتهاء الطلب. راجع [بصمة الموارد](#resource-footprint) للاطلاع على ملف الذاكرة الكامل.
 
-العمليات المدعومة: إزالة الخلفية (rembg/BiRefNet)، والترقية (RealESRGAN)، وطمس الوجه (MediaPipe)، وتحسين الوجه (GFPGAN/CodeFormer)، ومحو الكائنات (LaMa ONNX)، و OCR (Tesseract و RapidOCR مع نماذج PP-OCR ONNX)، والتلوين (DDColor)، والضوضاء الإزالة، وإزالة العين الحمراء، واستعادة الصور، وإنشاء صور جواز السفر، وتثبيت الشفافية (BiRefNet HR-matting)، وتغيير الحجم مع مراعاة المحتوى (Go caire ثنائي).
+العمليات المدعومة: إزالة الخلفية (rembg/BiRefNet)، والترقية (RealESRGAN)، وطمس الوجه (MediaPipe)، وتحسين الوجه (GFPGAN/CodeFormer)، ومحو الكائنات (LaMa ONNX)، و OCR (Tesseract و RapidOCR مع نماذج PP-OCR ONNX)، والتلوين (DDColor)، وإزالة الضوضاء، وإزالة العين الحمراء، واستعادة الصور، وإنشاء صور جواز السفر، وتثبيت الشفافية (BiRefNet HR-matting)، وتغيير الحجم مع مراعاة المحتوى (Go caire ثنائي).
 
 البرامج النصية Python موجودة في `packages/ai/python/`. يتم تثبيت حزم النماذج الاختيارية الكبيرة عند الطلب في وحدة تخزين `/data/ai` المستمرة. يستخدم OCR الدقيق عناصر موقعة خاصة بالمنصة؛ لا تتطلب طبقة Tesseract المدمجة تنزيل حزمة النموذج.
 

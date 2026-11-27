@@ -1,8 +1,8 @@
 ---
 description: "Quais dados de uso anônimos o SnapOtter coleta, quando são enviados, como funciona a escolha da primeira execução e como desativar as análises de produto de toda a instância."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: b26fe3ff7032
+i18n_output_hash: 732ef659210e
 i18n_hash_version: 2
 ---
 

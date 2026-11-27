@@ -1,9 +1,9 @@
 ---
 title: "Codes d'erreur"
 description: "La forme du corps d'erreur, les codes stables et la marche à suivre pour chacun."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: c29dc9c96987
+i18n_output_hash: 079e0cfe4390
 i18n_hash_version: 2
 ---
 
@@ -140,6 +140,7 @@ Les outils, les exécutions par lot et les pipelines qui nécessitent un bundle 
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, ou 400 depuis le mode visage de Smart Crop | L'outil, ou une étape d'un pipeline ou d'un lot, nécessite un bundle qui n'est pas installé. Le corps inclut `feature` (l'ID du bundle) et `featureName`. | Installez le bundle dans les Paramètres, puis réessayez. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | Une installation ou un import hors ligne a été refusé car les bibliothèques x86-64 du bundle nécessitent AVX et le CPU de ce serveur ne l'a pas. Rien n'a été téléchargé ni installé. Le corps inclut `feature` (l'ID du bundle) et `reason` (`cpu-no-avx`). `GET /api/v1/features` signale le même bundle avec `compatibility: "incompatible"` et `compatibilityReason: "cpu-no-avx"`. | Exécutez SnapOtter sur un CPU avec AVX, ou sur arm64. Les autres bundles s'installent normalement. |
+| `FEATURE_INSTALL_BUSY` | 409 | Une annulation a été refusée parce que l'installateur écrit dans l'environnement IA partagé, et l'arrêter à ce moment-là casserait tous les outils IA installés. | Attendez la fin de l'installation, puis désinstallez le bundle si vous n'en voulez pas. |
 | `FEATURE_INCOMPATIBLE` | 501, ou 400 quand Fast OCR reçoit une langue qu'il ne sait pas lire | La fonctionnalité installée ne peut pas fournir la qualité ou la langue demandée. | Modifiez le paramètre, ou installez un bundle qui le prend en charge. |
 | `ENGINE_UNAVAILABLE` | 503 | Un moteur requis n'a pas pu démarrer, ou un runtime OCR a été supprimé après la validation de la requête. | Réessayez après la réparation ou la réinstallation de la fonctionnalité par un administrateur. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium n'est pas installé, donc HTML vers image ne peut pas s'exécuter. | Demandez à un administrateur d'installer le navigateur. |
@@ -155,13 +156,17 @@ Les outils, les exécutions par lot et les pipelines qui nécessitent un bundle 
 | `NOT_ANIMATED` | 400 | Remove GIF Background a reçu une image fixe. | Utilisez Remove Background pour les images fixes. |
 | `TOO_MANY_FRAMES` | 400 | L'animation a plus d'images que le serveur n'en autorise (`GIF_BG_MAX_FRAMES`). | Envoyez une animation plus courte, ou demandez à un administrateur d'augmenter la limite. |
 | `TOO_MANY_PIXELS` | 400 | Le canevas de l'animation multiplié par son nombre d'images dépasse la limite du serveur : 268 402 689 pixels (16383 x 16383) pour Remove GIF Background, ou le plafond de charge GIF pour les autres outils animés. | Envoyez moins d'images ou une animation plus petite. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | Un outil d'image IA a reçu un TIFF multipage ou un GIF ou WebP animé, et le format de sortie conserverait toutes les images. Ces outils exécutent leur modèle sur une seule image à la fois. | Séparez le fichier en images distinctes. Si l'outil propose un paramètre de format de sortie, un format fixe comme PNG ne traite que la première image. |
 | `IMAGE_TOO_LARGE` | 400 | L'image a plus de pixels que le décodeur n'en accepte. | Envoyez une image plus petite. |
+| `SVG_TOO_COMPLEX` | 400 | Le SVG n'a pas fini d'être rastérisé dans le délai `JOB_TIMEOUT_FAST_S`. La cause habituelle est un filtre appliqué à des formes que `<use>` répète, car chaque copie repeint le filtre. | Simplifiez les filtres ou les formes répétées, ou demandez à un administrateur d'augmenter la limite. |
 | `RESULT_TOO_LARGE` | 400 | Les paramètres produiraient une image plus grande que ne le permet la limite de l'encodeur ou de pixels. | Utilisez une image plus petite ou des paramètres qui donnent un résultat plus petit. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice ou pandoc n'a pas pu ouvrir le document. Il est peut-être endommagé, protégé par mot de passe, ou n'est pas au format indiqué par son extension. | Vérifiez que le fichier s'ouvre dans une application bureautique, puis renvoyez-le. |
 | `PDF_DAMAGED` | 400 | Le moteur PDF a trouvé une structure de document corrompue. | Passez le fichier dans Repair PDF, puis réessayez. |
 | `PDF_PASSWORD_PROTECTED` | 400 | Le PDF est chiffré et cet outil ne peut pas l'ouvrir. | Déverrouillez-le d'abord avec Unlock PDF. |
 | `NO_AUDIO_TRACK` | 400 | Le fichier n'a pas de flux audio utilisable par un outil audio. | Envoyez un fichier qui contient de l'audio. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg n'a pas pu lire l'audio ou la vidéo : il n'a trouvé aucun paquet, aucun paramètre de codec, aucun atome `moov`, ou des données qu'il ne sait pas analyser. | Vérifiez que le fichier se lit dans un lecteur multimédia, ou réexportez-le, puis réessayez. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode a reçu une entrée qui n'est pas du Base64. Les espaces sont ignorés et l'alphabet standard comme l'alphabet compatible URL sont acceptés. | Vérifiez que le texte ne contient pas de caractères parasites ou une fin tronquée. |
+| `DECODED_DATA_NOT_TEXT` | 400 | Le Base64 est valide mais se décode en données binaires, pas en texte UTF-8. | Décodez-le avec un outil qui enregistre un fichier au lieu d'afficher du texte. |
 | `PAGE_OUT_OF_RANGE` | 400 | La plage de pages désigne une page que le PDF n'a pas. | Vérifiez le nombre de pages et envoyez une plage qui y est contenue. |
 | `INVALID_PAGE_RANGE` | 400 | La plage de pages n'a pas une syntaxe valide. | Utilisez des numéros de page comme `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages a reçu la demande de supprimer toutes les pages. | Conservez au moins une page. |
@@ -172,6 +177,7 @@ Les outils, les exécutions par lot et les pipelines qui nécessitent un bundle 
 | `NO_FACE_DETECTED` | 400 | Passport Photo n'a trouvé aucun visage dans l'image. | Envoyez une photo nette, de face, bien éclairée. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | La compression, ou la limite de taille d'une photo d'identité, ne peut pas amener le fichier sous la taille demandée, même après réduction. | Demandez une taille cible plus grande, ou recadrez d'abord l'image. |
 | `TOO_MANY_PAGES` | 400 | L'OCR a reçu la demande de traiter plus de pages qu'il n'en traite en une tâche. | Sélectionnez moins de pages avec la plage de pages. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | L'OCR d'un TIFF multipage a lu plus de 1 000 000 d'octets de texte sur l'ensemble de ses pages, ce qui dépasse ce qu'un résultat peut stocker. | Découpez le TIFF en fichiers plus petits et lancez l'OCR sur chacun. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata a constaté que les données EXIF existantes de l'image sont endommagées, donc il ne peut pas les réécrire en toute sécurité. | Supprimez d'abord les métadonnées avec Remove Image Metadata, puis modifiez. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML ou Markdown vers PDF a trouvé une référence à une image, une feuille de style ou une police sur le réseau, que le serveur ne récupère pas. | Intégrez la ressource dans le fichier (par exemple sous forme d'URI `data:`), puis réessayez. |
 
@@ -218,10 +224,11 @@ Ces codes existent dans le code source du serveur pour les journaux, la télém�
 | `SIEM_DECRYPTION_FAILED` | Signalé au suivi des erreurs par le transfert SIEM. L'en-tête d'authentification du SIEM ne peut pas être déchiffré. |
 | `WEBHOOK_DECRYPTION_FAILED` | Signalé au suivi des erreurs. La requête qui a rencontré le même échec répond avec `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Signalé au suivi des erreurs quand un téléversement en attente ne peut pas être supprimé. |
+| `RETENTION_DEADLINE_BACKFILLED` | Signalé au suivi des erreurs par le nettoyage TTL du stockage lorsqu'il renseigne l'échéance de conservation d'équipe manquante d'une tâche terminée. Les fichiers de la tâche suivent alors la conservation de l'équipe. |
 | `USERNAME_RACE_EXHAUSTED` | Levé quand la création automatique SSO perd la course au nom d'utilisateur à chaque nouvelle tentative. La page de connexion affiche une erreur à la place. |
 | `ERR_OUT_OF_RANGE` | Levé par le lecteur de stockage d'objets pour une plage d'octets invalide. |
 | `ETIMEDOUT` | Défini sur l'erreur de délai d'attente d'un export RGPD. L'export échoue, et il peut être redemandé. |
 | `FST_REQ_FILE_TOO_LARGE` | Code de Fastify pour un téléversement dépassant la limite. Les clients reçoivent un 413 avec `PAYLOAD_TOO_LARGE`, ou le propre message 413 de la route. |
 | `TARGET_SIZE_EXCEEDED` | Levé quand une compression à taille cible manque sa cible. L'erreur n'a ni statut ni code, les clients reçoivent donc un échec générique. |
 | `OCR_CACHE_PERMISSIONS` | Signalé au suivi des erreurs comme une défaillance opérationnelle quand le volume de données d'IA laisse le cache du runtime OCR accessible en écriture à tous. La tâche d'installation échoue avec un message qui nomme le problème de stockage. |
-| `OCR_RUNTIME_UNREACHABLE` | Signalé au suivi des erreurs comme une défaillance opérationnelle quand le serveur n'a jamais atteint huggingface.co pour télécharger le runtime OCR. La tâche d'installation échoue avec un message sur l'accès réseau, `HTTPS_PROXY` et l'import hors ligne. |
+| `OCR_RUNTIME_UNREACHABLE` | Signalé au suivi des erreurs comme une défaillance opérationnelle quand le serveur n'a jamais atteint huggingface.co pour télécharger le runtime OCR. La tâche d'installation échoue avec un message sur l'accès réseau, `HTTPS_PROXY`, `HF_ENDPOINT` et l'import hors ligne. |

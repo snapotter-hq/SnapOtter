@@ -1,8 +1,8 @@
 ---
 description: "إعداد بيئة التطوير المحلية، والأوامر، وأعراف الكود، وكيفية إضافة أداة جديدة إلى SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 250c45c22132
+i18n_output_hash: a47af913888c
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 عبر Drizzle ORM (pg-core). يتطلب التطوير المحل
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-يمنحك هذا Postgres على المنفذ 5432 وRedis على المنفذ 6379. ثم ولّد عمليات الترحيل وطبّقها:
+يمنحك هذا Postgres على المنفذ 5432 وRedis على المنفذ 6379. يطبّق الـ API عمليات الترحيل المعلّقة بنفسه عند الإقلاع، لذا يكفي تشغيل خوادم التطوير. بعد تغيير المخطط، ولّد عملية ترحيل وسيطبّقها الإقلاع التالي، دون خطوة ترحيل يدوية:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-المخطط معرَّف في `apps/api/src/db/schema.ts`. الجداول: users، وsessions، وsettings، وjobs، وapiKeys، وpipelines، وteams، وuserFiles، وroles، وauditLog.
+المخطط معرَّف في `apps/api/src/db/schema.ts`، وهو القائمة الحالية للجداول.
 
 ## إضافة أداة جديدة {#adding-a-new-tool}
 
@@ -190,7 +189,7 @@ const MyToolSettings = lazy(() =>
 ["my-tool", { displayMode: "before-after", Settings: MyToolSettings }],
 ```
 
-أوضاع العرض: `"side-by-side"`، و`"before-after"`، و`"live-preview"`، و`"no-comparison"`، و`"interactive-crop"`، و`"interactive-eraser"`، و`"no-dropzone"`.
+أوضاع العرض: `"side-by-side"`، `"before-after"`، `"live-preview"`، `"no-comparison"`، `"interactive-crop"`، `"interactive-eraser"`، `"no-dropzone"`.
 
 ### 3. مدخل i18n {#_3-i18n-entry}
 
@@ -243,16 +242,16 @@ docker build -f docker/Dockerfile -t snapotter:latest .
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
-## مجالات الإصدار الإصدار {#release-version-domains}
+## مجالات رقم الإصدار {#release-version-domains}
 
-يحتوي SnapOtter على ثلاثة مجالات إصدار عمدًا. لا تقم بنسخ نطاق إلى آخر أثناء الإصدار:
+يحتوي SnapOtter عمدًا على ثلاثة مجالات للإصدار. لا تنسخ مجالًا إلى آخر أثناء الإصدار:
 
-- يغطي إصدار إصدار التطبيق بيان الجذر وجميع حزم مساحة العمل الخاصة و`APP_VERSION`. يوفر Semantic-release هذه القيمة، ويقوم `pnpm version:sync <version>` بتحديث كل مساحة عمل قبل إصدار التطبيق.
-- OpenAPI `info.version` هو العقد العام المستقر API. تظل جميع المواصفات المترجمة على `<major>.0.0` لإصدارات التطبيقات المتوافقة وتتغير فقط عندما ينتقل عقد API إلى إصدار رئيسي جديد.
-- يحافظ `docker/feature-manifest.json` على `imageVersion: 2.0.0` باعتباره عصر تخزين حزمة الميزات القديمة غير القابلة للتغيير. مسارات أرشيف الإصدار 2 هذه ليست إصدارات حزمة التطبيقات. يستخدم Accurate OCR تنسيق وقت التشغيل v3 ويسجل مصدر إصدار التطبيق الخاص به بشكل منفصل.
+- يغطي رقم إصدار التطبيق بيان الجذر وجميع حزم مساحة العمل الخاصة و`APP_VERSION`. يوفر Semantic-release هذه القيمة، ويقوم `pnpm version:sync <version>` بتحديث كل مساحة عمل قبل إصدار التطبيق.
+- OpenAPI `info.version` هو العقد العام المستقر لإصدار API الرئيسي. تظل جميع المواصفات المترجمة على `<major>.0.0` لإصدارات التطبيق المتوافقة، وتتغير فقط عندما ينتقل عقد API إلى إصدار رئيسي جديد.
+- يحافظ `docker/feature-manifest.json` على `imageVersion: 2.0.0` باعتباره عصر تخزين حزمة الميزات القديم غير القابل للتغيير. مسارات أرشيف الإصدار 2 هذه ليست أرقام إصدار لحزم التطبيق. يستخدم Accurate OCR تنسيق وقت التشغيل v3 ويسجل مصدر إصدار التطبيق الخاص به بشكل منفصل.
 
-`tests/unit/infra/release-version-policy.test.ts` يفرض هذه الحدود. يجب أن يقوم مجال الإصدار الجديد أو الترحيل بتحديث هذا العقد وتصميم ترحيل العناصر ذات الصلة معًا.
-تعيش قيم API المستقلة والحزمة القديمة في `config/release-version-policy.json`؛ يجب ألا تقوم مزامنة إصدار التطبيق أبدًا بإعادة كتابة ملف السياسة هذا ضمنيًا.
+`tests/unit/infra/release-version-policy.test.ts` يفرض هذه الحدود. يجب أن يقوم مجال إصدار جديد أو ترحيل بتحديث هذا العقد وتصميم ترحيل العناصر ذات الصلة معًا.
+تعيش قيم API المستقلة وقيمة الحزمة القديمة في `config/release-version-policy.json`؛ يجب ألا تعيد مزامنة إصدار التطبيق كتابة ملف السياسة هذا ضمنيًا أبدًا.
 
 ## متغيرات البيئة {#environment-variables}
 

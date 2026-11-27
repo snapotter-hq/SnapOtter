@@ -1,8 +1,8 @@
 ---
 description: "Struktur monorepo, arsitektur aplikasi dan paket, siklus hidup permintaan, dan jejak sumber daya SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: d266f832d3f1
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 2b64416fdd47
 i18n_hash_version: 2
 ---
 

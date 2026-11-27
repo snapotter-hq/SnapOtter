@@ -1,8 +1,8 @@
 ---
-description: "Skonfiguruj provisioning SCIM 2.0, aby synchronizować użytkowników i grupy z Twojego dostawcy tożsamości do SnapOtter. Obejmuje Okta, Azure AD / Entra ID oraz integracje niestandardowe."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: 067df367d3f5
+description: "Skonfiguruj provisioning SCIM 2.0, aby synchronizować użytkowników i grupy z dostawcy tożsamości do SnapOtter. Obejmuje Okta, Azure AD / Entra ID i integracje niestandardowe."
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: 020624f79eba
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ Provisioning SCIM wymaga licencji **enterprise** z funkcją `scim`. Nie jest dos
 
 - Działająca instancja SnapOtter dostępna pod publicznym adresem URL
 - Klucz licencji enterprise z funkcją `scim`
-- Wbudowane konto SnapOtter `admin` z pełnym efektywnym zestawem uprawnień. Delegowana rola niestandardowa lub klucz API administratora, któremu brakuje uprawnień administratora, nie mogą wygenerować ani unieważnić globalnego tokena SCIM.
+- Wbudowane konto SnapOtter `admin` z pełnym efektywnym zestawem uprawnień. Delegowana rola niestandardowa lub klucz API administratora, któremu brakuje któregokolwiek uprawnienia administratora, nie mogą wygenerować ani unieważnić globalnego tokena SCIM.
 - Dostęp administracyjny do ustawień provisioningu Twojego dostawcy tożsamości
 
 ## Szybki start {#quick-start}
@@ -50,19 +50,19 @@ Punkty końcowe SCIM używają dedykowanego tokenu Bearer, odrębnego od sesji u
 
 ### Generowanie tokenu {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` generuje nowy token SCIM. Ponieważ token może udostępniać i mutować użytkowników w całej instancji, ten punkt końcowy wymaga wbudowanej roli `admin` z pełnym efektywnym zestawem uprawnień administratora. Trzymanie `users:manage` w roli niestandardowej nie jest wystarczające.
+`POST /api/v1/enterprise/scim/token` generuje nowy token SCIM. Ponieważ token może udostępniać i mutować użytkowników w całej instancji, ten punkt końcowy wymaga wbudowanej roli `admin` z pełnym efektywnym zestawem uprawnień administratora. Posiadanie `users:manage` w roli niestandardowej nie jest wystarczające.
 
 Token jest zwracany w postaci jawnej dokładnie raz. SnapOtter przechowuje tylko hash scrypt. Jeśli utracisz token, odwołaj go i wygeneruj nowy.
 
 Jednocześnie aktywny jest tylko jeden token SCIM. Wygenerowanie nowego tokenu zastępuje poprzedni.
 
 ::: warning Ponowne wydanie tokena po aktualizacji
-Starsze, niewersjonowane tokeny SCIM są odrzucane. Po uaktualnieniu do wersji, która wystawia tokeny `so_scim_v2_...`, wygeneruj nowy token i zaktualizuj dostawcę tożsamości przed wznowieniem udostępniania.
+Starsze, niewersjonowane tokeny SCIM są odrzucane. Po uaktualnieniu do wersji, która wystawia tokeny `so_scim_v2_...`, wygeneruj nowy token i zaktualizuj dostawcę tożsamości przed wznowieniem provisioningu.
 :::
 
 ### Odwoływanie tokenu {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token` unieważnia bieżący token SCIM. Ma te same pełne wbudowane wymagania administracyjne, co generowanie tokenów.
+`DELETE /api/v1/enterprise/scim/token` unieważnia bieżący token SCIM. Ma te same pełne wymagania wbudowanej roli administratora, co generowanie tokenu.
 
 ### Ograniczanie liczby żądań {#rate-limiting}
 
@@ -284,7 +284,7 @@ Twoja licencja nie zawiera funkcji `scim` albo nie skonfigurowano żadnej licenc
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Token jest zniekształcony, używa wycofanego formatu niewersjonowanego lub nie pasuje do zapisanego skrótu. Wygeneruj aktualny token `so_scim_v2_...` i zaktualizuj token w ustawieniach udostępniania IdP.
+Token jest zniekształcony, używa wycofanego formatu niewersjonowanego lub nie pasuje do zapisanego skrótu. Wygeneruj aktualny token `so_scim_v2_...` i zaktualizuj token w ustawieniach provisioningu swojego IdP.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 
@@ -358,4 +358,4 @@ Niektórzy użytkownicy pozostają poza zasięgiem i odzyskują identyfikator pr
 - użytkownicy, których powiązanie logowania zastąpiło identyfikator SCIM i którzy nie otrzymali potem żadnego zapisu SCIM, ponieważ ich `external_id` nie pasuje już do wiersza audytu
 - użytkownicy, których wiersz provisioningu został już usunięty przez retencję audytu
 - użytkownicy, których `externalId` IdP zmienił po ich utworzeniu (wiersze aktualizacji zapisują, które pola się zmieniły, a nie ich wartości)
-- dwóch użytkowników z tym samym identyfikatorem, których zapytanie pomija, aby unikalny indeks nie przerwał operacji; podgląd bez ostatniego warunku ich wylistuje, a to, do kogo należy identyfikator, jest twoją decyzją
+- dwóch użytkowników z tym samym identyfikatorem, których zapytanie pomija, aby unikalny indeks nie przerwał operacji; podgląd bez ostatniego warunku ich wylistuje, a to, do kogo należy identyfikator, jest Twoją decyzją

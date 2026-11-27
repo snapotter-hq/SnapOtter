@@ -1,8 +1,8 @@
 ---
 description: "Lokal utvecklingskonfiguration, kommandon, kodkonventioner och hur du lägger till ett nytt verktyg i SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: ecd9b94ee474
+i18n_output_hash: c186e04f6e1c
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 via Drizzle ORM (pg-core). Lokal utveckling kräver att Postgres o
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Detta ger dig Postgres på port 5432 och Redis på port 6379. Generera sedan och tillämpa migrationer:
+Detta ger dig Postgres på port 5432 och Redis på port 6379. API:et tillämpar väntande migrationer själv vid start, så det räcker att starta utvecklingsservrarna. När du har ändrat schemat genererar du en migration, och nästa start tillämpar den, utan något manuellt migreringssteg:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Schemat definieras i `apps/api/src/db/schema.ts`. Tabeller: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Schemat definieras i `apps/api/src/db/schema.ts`, som är den aktuella listan över tabeller.
 
 ## Lägga till ett nytt verktyg {#adding-a-new-tool}
 

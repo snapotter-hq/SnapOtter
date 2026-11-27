@@ -1,9 +1,9 @@
 ---
 title: "错误码"
 description: "错误响应体的结构、稳定的错误码，以及每种错误的处理方式。"
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 52c87a836054
+i18n_output_hash: 3bfc629a5fc8
 i18n_hash_version: 2
 ---
 
@@ -67,7 +67,7 @@ i18n_hash_version: 2
 
 ## 任务 {#job-codes}
 
-失败的任务会在任务本身上报告原因，而不是通过 HTTP 错误。请从 `GET /api/v1/jobs/{jobId}` 中读取 `error.code` 和 `error.message`。参见[进度跟踪](/zh-CN/api/rest#progress-tracking)。
+失败的任务会在任务本身上报告原因，而不是通过 HTTP 错误。请读取 `error.code` 和 `error.message`，它们位于 `GET /api/v1/jobs/{jobId}` 中。参见[进度跟踪](/zh-CN/api/rest#progress-tracking)。
 
 只有当失败属于输入错误或服务器故障时，失败的任务才会保留 `error.code`。其他失败只携带消息。
 
@@ -140,6 +140,7 @@ SCIM 路由使用 RFC 7644 的错误信封进行响应（`schemas`、`detail`、
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501，或来自智能裁剪人脸模式的 400 | 该工具，或流水线或批处理中的某一步，需要尚未安装的功能包。响应体包含 `feature`（功能包 ID）和 `featureName`。 | 在设置中安装该功能包，然后重试。 |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | 安装或离线导入被拒绝，因为该功能包的 x86-64 库需要 AVX，而此服务器的 CPU 不支持。没有下载或安装任何内容。响应体包含 `feature`（功能包 ID）和 `reason`（`cpu-no-avx`）。`GET /api/v1/features` 会用 `compatibility: "incompatible"` 和 `compatibilityReason: "cpu-no-avx"` 报告同一个功能包。 | 在支持 AVX 的 CPU 或 arm64 上运行 SnapOtter。其他功能包仍可安装。 |
+| `FEATURE_INSTALL_BUSY` | 409 | 取消请求被拒绝，因为安装程序正在写入共享的 AI 环境，在此时停止会破坏所有已安装的 AI 工具。 | 等待安装完成，如果不想要该功能包，再将其卸载。 |
 | `FEATURE_INCOMPATIBLE` | 501，或在快速 OCR 收到无法识别的语言时为 400 | 已安装的功能无法满足所请求的质量或语言。 | 更改设置，或安装支持它的功能包。 |
 | `ENGINE_UNAVAILABLE` | 503 | 所需的引擎无法启动，或在请求通过校验后 OCR 运行时被移除。 | 请在管理员修复或重新安装该功能后重试。 |
 | `BROWSER_NOT_AVAILABLE` | 503 | 未安装 Chromium，因此 HTML 转图片无法运行。 | 请管理员安装该浏览器。 |
@@ -155,13 +156,17 @@ SCIM 路由使用 RFC 7644 的错误信封进行响应（`schemas`、`detail`、
 | `NOT_ANIMATED` | 400 | 移除 GIF 背景收到了静态图片。 | 静态图片请使用移除背景。 |
 | `TOO_MANY_FRAMES` | 400 | 动画的帧数超过了服务器允许的上限（`GIF_BG_MAX_FRAMES`）。 | 发送更短的动画，或请管理员调高该上限。 |
 | `TOO_MANY_PIXELS` | 400 | 动画的画布尺寸乘以帧数超过了服务器的限制：移除 GIF 背景为 268,402,689 像素（16383 x 16383），其他动画工具则为 GIF 工作负载上限。 | 发送更少的帧或更小的动画。 |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | AI 图片工具收到了多页 TIFF 或动画 GIF、WebP，而输出格式会保留每一帧。这些工具的模型一次只处理一张图片。 | 将文件拆分为单独的图片。如果工具有输出格式设置，选择 PNG 等静态格式则只会处理第一帧。 |
 | `IMAGE_TOO_LARGE` | 400 | 图片的像素数超过了解码器可接受的范围。 | 发送更小的图片。 |
+| `SVG_TOO_COMPLEX` | 400 | SVG 未能在 `JOB_TIMEOUT_FAST_S` 内完成栅格化。常见原因是对 `<use>` 重复的形状应用了滤镜，因为每个副本都会重绘一次滤镜。 | 简化滤镜或重复的形状，或请管理员调高该上限。 |
 | `RESULT_TOO_LARGE` | 400 | 这些设置会生成超出编码器或像素限制所允许的更大图片。 | 使用更小的图片，或能生成更小结果的设置。 |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice 或 pandoc 无法打开该文档。它可能已损坏、受密码保护，或实际格式与扩展名不符。 | 确认该文件能在办公软件中打开，然后重新发送。 |
 | `PDF_DAMAGED` | 400 | PDF 引擎发现文档结构已损坏。 | 先用修复 PDF 处理该文件，然后重试。 |
 | `PDF_PASSWORD_PROTECTED` | 400 | 该 PDF 已加密，此工具无法打开。 | 先用解锁 PDF 将其解锁。 |
 | `NO_AUDIO_TRACK` | 400 | 该文件没有可供音频工具使用的音频流。 | 发送包含音频的文件。 |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg 无法读取该音频或视频：找不到数据包、找不到编解码器参数、没有 `moov` atom，或遇到无法解析的数据。 | 确认该文件能在媒体播放器中播放，或重新导出，然后重试。 |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 编码 / 解码收到了不是 Base64 的输入。空白字符会被忽略，标准字母表和 URL 安全字母表都可接受。 | 检查文本中是否有多余字符或结尾被截断。 |
+| `DECODED_DATA_NOT_TEXT` | 400 | 该 Base64 有效，但解码出的是二进制数据，而不是 UTF-8 文本。 | 请改用能保存为文件而不是显示文本的工具来解码。 |
 | `PAGE_OUT_OF_RANGE` | 400 | 页码范围包含 PDF 中不存在的页。 | 检查页数，并发送位于其范围内的页码范围。 |
 | `INVALID_PAGE_RANGE` | 400 | 页码范围的语法无效。 | 使用类似 `1-3,5` 的页码。 |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | 移除页面被要求移除所有页面。 | 至少保留一页。 |
@@ -172,6 +177,7 @@ SCIM 路由使用 RFC 7644 的错误信封进行响应（`schemas`、`detail`、
 | `NO_FACE_DETECTED` | 400 | 证件照在图片中未检测到人脸。 | 发送光线良好、正面清晰的照片。 |
 | `TARGET_SIZE_UNREACHABLE` | 400 | 压缩或证件照的大小限制，即使缩小尺寸后也无法使文件小于所要求的大小。 | 请求更大的目标大小，或先裁剪图片。 |
 | `TOO_MANY_PAGES` | 400 | OCR 被要求处理的页数超过了单个任务可处理的上限。 | 通过页码范围选择更少的页。 |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | 对多页 TIFF 做 OCR 时，各页读取的文本超过 1,000,000 字节，超出了单个结果可存储的大小。 | 将 TIFF 拆分为更小的文件，并分别运行 OCR。 |
 | `METADATA_DAMAGED` | 400 | 编辑元数据发现图片现有的 EXIF 数据已损坏，因此无法安全地重写。 | 先用移除图片元数据清除元数据，然后再编辑。 |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML 或 Markdown 转 PDF 发现了对网络上图片、样式表或字体的引用，而服务器不会获取这些资源。 | 将资源嵌入文件中（例如使用 `data:` URI），然后重试。 |
 
@@ -218,10 +224,11 @@ SCIM 路由使用 RFC 7644 的错误信封进行响应（`schemas`、`detail`、
 | `SIEM_DECRYPTION_FAILED` | 由 SIEM 转发上报到错误跟踪。SIEM 认证头无法解密。 |
 | `WEBHOOK_DECRYPTION_FAILED` | 上报到错误跟踪。遇到同样故障的请求会以 `DECRYPTION_FAILED` 响应。 |
 | `STAGED_DISCARD_FAILED` | 当暂存的上传文件无法删除时，上报到错误跟踪。 |
+| `RETENTION_DEADLINE_BACKFILLED` | 由存储 TTL 清理任务在为已完成任务补填缺失的团队保留截止时间时上报到错误跟踪。该任务的文件随后遵循团队的保留策略。 |
 | `USERNAME_RACE_EXHAUSTED` | 当 SSO 自动创建在每次重试中都输掉用户名竞争时抛出。登录页会改为显示错误。 |
 | `ERR_OUT_OF_RANGE` | 由对象存储读取器针对无效的字节范围抛出。 |
 | `ETIMEDOUT` | 设置在 GDPR 导出的超时错误上。导出会失败，可以重新请求。 |
 | `FST_REQ_FILE_TOO_LARGE` | Fastify 针对超出限制的上传所使用的错误码。客户端会得到带有 `PAYLOAD_TOO_LARGE` 的 413，或该路由自己的 413 消息。 |
 | `TARGET_SIZE_EXCEEDED` | 当目标大小压缩未达到目标时抛出。该错误没有状态码或错误码，因此客户端会得到通用的失败。 |
 | `OCR_CACHE_PERMISSIONS` | 当 AI 数据卷使 OCR 运行时缓存可被任意用户写入时，作为运维故障上报到错误跟踪。安装任务会失败，并给出指出存储问题的消息。 |
-| `OCR_RUNTIME_UNREACHABLE` | 当服务器始终无法连接到 huggingface.co 下载 OCR 运行时，作为运维故障上报到错误跟踪。安装任务会失败，并给出关于网络访问、`HTTPS_PROXY` 和离线导入的消息。 |
+| `OCR_RUNTIME_UNREACHABLE` | 当服务器始终无法连接到 huggingface.co 下载 OCR 运行时，作为运维故障上报到错误跟踪。安装任务会失败，并给出关于网络访问、`HTTPS_PROXY`、`HF_ENDPOINT` 和离线导入的消息。 |

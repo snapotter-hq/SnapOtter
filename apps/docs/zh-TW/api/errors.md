@@ -1,9 +1,9 @@
 ---
 title: "錯誤碼"
 description: "錯誤回應的內容結構、穩定的錯誤碼，以及各項錯誤的處理方式。"
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 087fb3da080d
+i18n_output_hash: 6a33b43d4b2b
 i18n_hash_version: 2
 ---
 
@@ -56,7 +56,7 @@ i18n_hash_version: 2
 
 | `code` | 狀態碼 | 處理方式 |
 |--------|--------|------------|
-| `AUTH_REQUIRED` | 401 | 請以工作階段權杖或 API 金鑰（`si_...`）傳送 `Authorization: Bearer <token>`。 |
+| `AUTH_REQUIRED` | 401 | 請傳送 `Authorization: Bearer <token>`，並帶上工作階段權杖或 API 金鑰（`si_...`）。 |
 | `FORBIDDEN` | 403 | 憑證有效但缺少該權限。請向管理員申請權限。 |
 | `MUST_CHANGE_PASSWORD` | 403 | 此帳號必須先變更密碼，才能呼叫其他端點。請使用工作階段權杖呼叫 `POST /api/auth/change-password`，然後重試。 |
 | `USER_DISABLED` | 403 | 此帳號已停用，必須由管理員重新啟用。 |
@@ -67,7 +67,7 @@ i18n_hash_version: 2
 
 ## 工作 {#job-codes}
 
-失敗的工作會在工作本身回報原因，而不是透過 HTTP 錯誤。請從 `GET /api/v1/jobs/{jobId}` 讀取 `error.code` 與 `error.message`。請參閱[進度追蹤](/zh-TW/api/rest#progress-tracking)。
+失敗的工作會在工作本身回報原因，而不是透過 HTTP 錯誤。請讀取 `error.code` 與 `error.message`，來源為 `GET /api/v1/jobs/{jobId}`。請參閱[進度追蹤](/zh-TW/api/rest#progress-tracking)。
 
 失敗的工作只有在失敗原因為輸入錯誤或伺服器故障時，才會保留 `error.code`。其他失敗只會附上訊息。
 
@@ -140,6 +140,7 @@ SCIM 路由會以 RFC 7644 的錯誤封包回應（`schemas`、`detail`、`statu
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501，或智慧裁切的人臉模式為 400 | 工具，或管線或批次中的某個步驟，需要尚未安裝的套件。內容包含 `feature`（套件 ID）與 `featureName`。 | 請在設定中安裝該套件，然後重試。 |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | 安裝或離線匯入遭到拒絕，因為該套件的 x86-64 函式庫需要 AVX，而此伺服器的 CPU 不支援。沒有下載或安裝任何內容。內容包含 `feature`（套件 ID）與 `reason`（`cpu-no-avx`）。`GET /api/v1/features` 會以 `compatibility: "incompatible"` 與 `compatibilityReason: "cpu-no-avx"` 回報同一個套件。 | 請在支援 AVX 的 CPU 或 arm64 上執行 SnapOtter。其他套件仍可安裝。 |
+| `FEATURE_INSTALL_BUSY` | 409 | 取消遭到拒絕，因為安裝程式正在寫入共用的 AI 環境，在此時停止它會破壞所有已安裝的 AI 工具。 | 請等待安裝完成，若不想保留該套件，再將其解除安裝。 |
 | `FEATURE_INCOMPATIBLE` | 501，或快速 OCR 收到它無法讀取的語言時為 400 | 已安裝的功能無法提供所要求的品質或語言。 | 請變更設定，或安裝支援該項目的套件。 |
 | `ENGINE_UNAVAILABLE` | 503 | 必要的引擎無法啟動，或在請求通過驗證後 OCR 執行環境被移除。 | 請在管理員修復或重新安裝該功能後重試。 |
 | `BROWSER_NOT_AVAILABLE` | 503 | 未安裝 Chromium，因此 HTML 轉圖片無法執行。 | 請管理員安裝該瀏覽器。 |
@@ -155,13 +156,17 @@ SCIM 路由會以 RFC 7644 的錯誤封包回應（`schemas`、`detail`、`statu
 | `NOT_ANIMATED` | 400 | 移除 GIF 背景收到的是靜態圖片。 | 靜態圖片請使用移除背景。 |
 | `TOO_MANY_FRAMES` | 400 | 動畫的影格數超過伺服器允許的上限（`GIF_BG_MAX_FRAMES`）。 | 請傳送較短的動畫，或請管理員調高上限。 |
 | `TOO_MANY_PIXELS` | 400 | 動畫的畫布大小乘以影格數，超過伺服器的上限：移除 GIF 背景為 268,402,689 像素（16383 x 16383），其他動畫工具則為 GIF 工作負載上限。 | 請減少影格數，或傳送較小的動畫。 |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | AI 圖片工具收到多頁 TIFF、動態 GIF 或 WebP，而輸出格式會保留每一個影格。這些工具一次只對一張圖片執行模型。 | 請將檔案拆分為個別的圖片。若工具有輸出格式設定，選擇 PNG 等靜態格式只會處理第一個影格。 |
 | `IMAGE_TOO_LARGE` | 400 | 圖片的像素數超過解碼器可接受的範圍。 | 請傳送較小的圖片。 |
+| `SVG_TOO_COMPLEX` | 400 | SVG 未能在 `JOB_TIMEOUT_FAST_S` 內完成點陣化。常見原因是 `<use>` 重複的圖形上套用了濾鏡，因為每一份複本都會重新繪製濾鏡。 | 請簡化濾鏡或重複的圖形，或請管理員調高上限。 |
 | `RESULT_TOO_LARGE` | 400 | 這些設定會產生超出編碼器或像素上限所允許大小的圖片。 | 請使用較小的圖片，或能產生較小結果的設定。 |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice 或 pandoc 無法開啟該文件。文件可能已損毀、受密碼保護，或實際格式與副檔名不符。 | 請確認檔案能在辦公室軟體中開啟，然後重新傳送。 |
 | `PDF_DAMAGED` | 400 | PDF 引擎發現文件結構損毀。 | 請先以修復 PDF 處理該檔案，然後重試。 |
 | `PDF_PASSWORD_PROTECTED` | 400 | 此 PDF 已加密，這個工具無法開啟。 | 請先以解鎖 PDF 解鎖。 |
 | `NO_AUDIO_TRACK` | 400 | 檔案沒有音訊工具可使用的音訊串流。 | 請傳送含有音訊的檔案。 |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg 無法讀取該音訊或影片：找不到封包、找不到編碼參數、找不到 `moov` atom，或資料無法解析。 | 請確認檔案能在媒體播放器中播放，或重新匯出，然後重試。 |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 編碼 / 解碼收到不是 Base64 的輸入。空白字元會被忽略，標準與 URL 安全字母表皆可接受。 | 請檢查文字中是否有多餘字元，或結尾被截斷。 |
+| `DECODED_DATA_NOT_TEXT` | 400 | 該 Base64 有效，但解碼後是二進位資料，而非 UTF-8 文字。 | 請改用會儲存為檔案而非顯示文字的工具解碼。 |
 | `PAGE_OUT_OF_RANGE` | 400 | 頁面範圍指定了 PDF 沒有的頁面。 | 請確認頁數，並傳送在頁數範圍內的區間。 |
 | `INVALID_PAGE_RANGE` | 400 | 頁面範圍的語法無效。 | 請使用像 `1-3,5` 這樣的頁碼。 |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | 移除頁面被要求移除所有頁面。 | 請至少保留一頁。 |
@@ -172,6 +177,7 @@ SCIM 路由會以 RFC 7644 的錯誤封包回應（`schemas`、`detail`、`statu
 | `NO_FACE_DETECTED` | 400 | 證件照在圖片中找不到人臉。 | 請傳送光線良好、正面清晰的照片。 |
 | `TARGET_SIZE_UNREACHABLE` | 400 | 壓縮或證件照的大小限制，即使縮小後也無法讓檔案低於要求的大小。 | 請要求較大的目標大小，或先裁切圖片。 |
 | `TOO_MANY_PAGES` | 400 | OCR 被要求處理的頁數超過單一工作可處理的數量。 | 請以頁面範圍選擇較少的頁面。 |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | 對多頁 TIFF 執行 OCR 時，各頁讀出的文字超過 1,000,000 位元組，超出單一結果可儲存的大小。 | 請將 TIFF 拆分為較小的檔案，並對每個檔案分別執行 OCR。 |
 | `METADATA_DAMAGED` | 400 | 編輯中繼資料發現圖片現有的 EXIF 資料已損毀，因此無法安全地改寫。 | 請先以移除圖片中繼資料清除中繼資料，然後再編輯。 |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML 或 Markdown 轉 PDF 發現對網路上圖片、樣式表或字型的參照，而伺服器不會擷取這些資源。 | 請將資源嵌入檔案中（例如使用 `data:` URI），然後重試。 |
 
@@ -218,10 +224,11 @@ GDPR 清除路由在使用者或團隊處於法律保全狀態時，會回傳一
 | `SIEM_DECRYPTION_FAILED` | 由 SIEM 轉送回報至錯誤追蹤。SIEM 的驗證標頭無法解密。 |
 | `WEBHOOK_DECRYPTION_FAILED` | 回報至錯誤追蹤。遇到同樣失敗的請求會回應 `DECRYPTION_FAILED`。 |
 | `STAGED_DISCARD_FAILED` | 當暫存的上傳檔案無法移除時，回報至錯誤追蹤。 |
+| `RETENTION_DEADLINE_BACKFILLED` | 當儲存空間 TTL 清理作業為已完成工作補上缺少的團隊保留期限時，回報至錯誤追蹤。該工作的檔案之後會依團隊的保留設定處理。 |
 | `USERNAME_RACE_EXHAUSTED` | 當 SSO 自動建立在每次重試都輸掉使用者名稱競爭時引發。登入頁面會改為顯示錯誤。 |
 | `ERR_OUT_OF_RANGE` | 物件儲存讀取器遇到無效的位元組範圍時擲回。 |
 | `ETIMEDOUT` | 設定在 GDPR 匯出的逾時錯誤上。匯出會失敗，並可再次要求。 |
 | `FST_REQ_FILE_TOO_LARGE` | Fastify 對超過上限的上傳所使用的代碼。用戶端會得到帶有 `PAYLOAD_TOO_LARGE` 的 413，或該路由自己的 413 訊息。 |
 | `TARGET_SIZE_EXCEEDED` | 目標大小壓縮未達目標時擲回。該錯誤沒有狀態碼或代碼，因此用戶端會得到一般的失敗。 |
 | `OCR_CACHE_PERMISSIONS` | 當 AI 資料磁碟區使 OCR 執行環境快取可被任何人寫入時，作為營運故障回報至錯誤追蹤。安裝工作會失敗，並附上指出儲存空間問題的訊息。 |
-| `OCR_RUNTIME_UNREACHABLE` | 當伺服器始終無法連線到 huggingface.co 以下載 OCR 執行環境時，作為營運故障回報至錯誤追蹤。安裝工作會失敗，並附上關於網路存取、`HTTPS_PROXY` 與離線匯入的訊息。 |
+| `OCR_RUNTIME_UNREACHABLE` | 當伺服器始終無法連線到 huggingface.co 以下載 OCR 執行環境時，作為營運故障回報至錯誤追蹤。安裝工作會失敗，並附上關於網路存取、`HTTPS_PROXY`、`HF_ENDPOINT` 與離線匯入的訊息。 |

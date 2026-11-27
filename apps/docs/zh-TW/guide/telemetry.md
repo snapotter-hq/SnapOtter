@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 收集哪些匿名使用資料、何時傳送、首次執行時的選擇如何運作,以及如何關閉整個執行個體的產品分析。"
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: f24067aafbea
+i18n_output_hash: 41449e31687d
 i18n_hash_version: 2
 ---
 
@@ -12,11 +12,7 @@ Anonymous Product Analytics 由管理員為整個執行個體設定。新的執�
 
 開啟分析後,SnapOtter 會向 PostHog 傳送執行了哪些工具與管線、耗時多久、是否成功、錯誤代碼與檔案數量,以及執行個體的匿名 ID、版本、CPU 架構、作業系統、安裝類型和是否有 GPU。當機報告會傳送到 Sentry,其中的檔案名稱、路徑、電子郵件與引號內的值都已被移除。它絕不會傳送您的檔案、檔案名稱或路徑、檔案內容、OCR 輸出或擷取的文字、影像中繼資料,也不會傳送您的帳號身分。它只會向 PostHog 和 Sentry 這兩個地方傳送資料,關閉分析後則不會向任何一方傳送任何內容。
 
-- tool_used：工具 id、狀態、時長、類別、是否為 AI 工具，失敗時的錯誤代碼，以及單獨回報某一階段的工具的步驟名稱（Passport Photo 的分析步驟）。
-- pipeline_executed：步驟數、工具 id、批次旗標、檔案數、時長、狀態。
-- ai_bundle_action：套件包 id、動作（`install_started`、`installed`、`install_failed`、`uninstalled`、`reset_environment`、`imported`）、時長，安裝失敗時另含來自固定清單的失敗類別（`oom`、`network`、`disk`、`checksum`、`cpu_unsupported`、`timeout`、`other`）。安裝程式輸出、路徑和錯誤訊息絕不會傳送。
-- 前端使用情形：開啟了哪些工具頁面、新增的檔案（僅計數）、已啟動的工具、下載、儲存、搜尋（僅結果數量）、已批次處理。
-- 當機回報：錯誤類型、經過遮蔽處理的錯誤訊息（已移除檔案名稱、路徑、電子郵件地址與加引號的值）、僅含檔案基本名稱的來源堆疊，以及（AI 工具的）僅含檔案基本名稱的 Python 回溯。
+## 首次執行時的選擇 {#first-run-choice}
 
 管理員第一次開啟新的執行個體時,SnapOtter 會詢問:「要傳送匿名使用統計和當機報告嗎? 您的檔案永遠不會被傳送。」兩個答案的份量相同,且都沒有預先選取。不回答就關閉提示會讓分析維持關閉,並在下次造訪時再次詢問。只有管理員會看到它。在 `AUTH_ENABLED=false` 下沒有帳號,本機使用者即為管理員,因此誰開啟應用程式誰來回答。桌面應用程式的詢問方式相同。
 
@@ -24,9 +20,9 @@ Anonymous Product Analytics 由管理員為整個執行個體設定。新的執�
 
 ## 我們傳送的事件(啟用時) {#events-we-send-when-enabled}
 
-- tool_used:工具 ID、狀態、耗時、類別、是否為 AI 工具,失敗時附帶錯誤代碼。
-- pipeline_executed:步驟數、工具 ID、批次標記、檔案數量、耗時、狀態。
-- ai_bundle_action:套件 ID、動作、耗時。
+- tool_used:工具 ID、狀態、耗時、類別、是否為 AI 工具,失敗時附帶錯誤代碼,以及單獨回報某一階段的工具的步驟名稱(Passport Photo 的分析步驟)。
+- pipeline_executed:步驟數、工具 ID、批次旗標、檔案數量、耗時、狀態。
+- ai_bundle_action:套件 ID、動作(`install_started`、`installed`、`install_failed`、`uninstalled`、`reset_environment` 或 `imported`)、耗時,安裝失敗時另含來自固定清單的失敗類別(`oom`、`network`、`disk`、`checksum`、`cpu_unsupported`、`timeout` 或 `other`)。安裝程式輸出、路徑和錯誤訊息絕不會傳送。
 - 前端使用情況:開啟了哪些工具頁面、新增的檔案(僅數量)、啟動的工具、下載、儲存、搜尋(僅結果數量)、已處理的批次。
 - 當機報告:錯誤類型、經過遮蔽的錯誤訊息(已移除檔案名稱、路徑、電子郵件與引號內的值)、僅含檔案基本名稱的原始碼堆疊,以及對於 AI 工具,僅含檔案基本名稱的 Python 回溯。
 
