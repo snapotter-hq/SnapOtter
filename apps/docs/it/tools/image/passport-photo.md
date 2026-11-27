@@ -1,8 +1,9 @@
 ---
 description: "Generatore di foto tessera e per documenti basato sull'AI con rilevamento del volto, rimozione dello sfondo e composizione su foglio di stampa."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 93aa8881734e
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: f26449cb61be
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ Se viene fornito `clientJobId`, l'avanzamento viene trasmesso in streaming (0-30
 
 Ritaglia, ridimensiona e facoltativamente compone la foto su un foglio di stampa. Usa le immagini in cache dalla Fase 1 (nessuna riesecuzione dell'AI).
 
+Il ritaglio viene eseguito come job in coda. Se termina entro la finestra di attesa sincrona, ottieni il risultato qui sotto con `200`. Uno più lento risponde `202` con `{"jobId":"...","async":true}` e il risultato arriva sullo stream di avanzamento del job; seguilo come descritto in [Progress Tracking](/it/api/rest#progress-tracking). Il job può essere annullato con `POST /api/v1/jobs/{jobId}/cancel`. Fino alla 2.3.0 questo endpoint aspettava sempre e rispondeva `200`, quindi gli script che gestiscono solo `200` dovrebbero gestire anche `202`.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ Ritaglia, ridimensiona e facoltativamente compone la foto su un foglio di stampa
 | landmarks | object | Yes | - | Oggetto dei punti di riferimento dalla risposta della Fase 1 |
 | imageWidth | number | Yes | - | Larghezza dell'immagine dalla risposta della Fase 1 |
 | imageHeight | number | Yes | - | Altezza dell'immagine dalla risposta della Fase 1 |
+| clientJobId | string | No | (generated) | Un tuo ID del job, così puoi aprire lo stream di avanzamento prima che arrivi la risposta |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Restituisce indicazioni su quale sotto-endpoint corretto usare.
 - I punti di riferimento vengono restituiti come coordinate normalizzate (intervallo 0-1 relativo alle dimensioni dell'immagine).
 - Il campo `preview` nella risposta di analisi è un PNG codificato in base64 (max 800px di larghezza) per una visualizzazione rapida.
 - Le specifiche dei paesi includono le dimensioni del documento, i rapporti di altezza della testa e il posizionamento della linea degli occhi in base ai requisiti ufficiali delle foto per il passaporto.
-- L'opzione `printLayout` genera un foglio composto su carta 4x6\" o A4 con margini di 2mm tra le foto.
+- L'opzione `printLayout` genera un foglio composto su carta 4x6" o A4 con margini di 2mm tra le foto.
 - Quando è impostato `maxFileSizeKb`, la qualità JPEG dell'output viene abbassata passo dopo passo finché rientra nel limite. La dimensione in pixel è fissata dalle specifiche del paese, quindi se la foto non rientra nel limite nemmeno alla qualità più bassa, `/generate` restituisce 422 con un messaggio che lo spiega, anziché un file oltre il limite.

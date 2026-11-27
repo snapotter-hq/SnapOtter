@@ -1,8 +1,9 @@
 ---
 description: "Przechwytuj strony internetowe lub fragmenty HTML jako obrazy wysokiej jakości z emulacją urządzeń."
-i18n_source_hash: 1e49d070ea2e
-i18n_provenance: human
-i18n_output_hash: bb38d8d464f0
+i18n_source_hash: 307493f63631
+i18n_provenance: machine
+i18n_output_hash: a035a4f87f70
+i18n_hash_version: 2
 ---
 
 # HTML na obraz {#html-to-image}
@@ -27,6 +28,7 @@ Przyjmuje **treść JSON** (nie multipart). Nie jest wymagane przesyłanie pliku
 | devicePreset | string | Nie | `"desktop"` | Emulacja urządzenia: `desktop`, `tablet`, `mobile`, `custom` |
 | viewportWidth | number | Nie | `1280` | Niestandardowa szerokość widoku w pikselach (320 do 3840, używana gdy devicePreset to `custom`) |
 | viewportHeight | number | Nie | `720` | Niestandardowa wysokość widoku w pikselach (320 do 2160, używana gdy devicePreset to `custom`) |
+| clientJobId | string | Nie | - | Własny identyfikator zadania, dzięki któremu możesz otworzyć strumień postępu przed nadejściem odpowiedzi |
 
 Należy podać albo `url`, albo `html`, ale nie oba naraz.
 
@@ -70,6 +72,25 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 }
 ```
 
+### Wolne strony {#slow-pages}
+
+Przechwytywanie działa jako zadanie w kolejce. Zrzut, który zakończy się w oknie synchronicznego oczekiwania, zwraca `200` z powyższym wynikiem. Wolniejszy zwraca `202` z identyfikatorem zadania:
+
+```json
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "async": true,
+  "statusUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "progressUrl": "/api/v1/jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/progress"
+}
+```
+
+Śledź `progressUrl` (Server-Sent Events) do zakończenia zadania. Zdarzenie zakończenia niesie ten sam obiekt wyniku co odpowiedź `200`. Zadanie możesz anulować przez `POST /api/v1/jobs/{jobId}/cancel`.
+
+::: warning Zmiana po wersji 2.3.0
+Do wersji 2.3.0 ten punkt końcowy zawsze trzymał żądanie otwarte do zakończenia przechwytywania i zwracał `200`. Skrypty obsługujące tylko `200` powinny obsługiwać także `202`.
+:::
+
 ## Uwagi {#notes}
 
 - Wymaga zainstalowania Chromium na serwerze. Zwraca HTTP 503, jeśli usługa przeglądarki jest niedostępna.
@@ -77,5 +98,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/html-to-image \
 - Ten punkt końcowy jest ograniczony do 120 żądań na godzinę.
 - `originalSize` zawsze wynosi 0, ponieważ to narzędzie generuje obrazy z adresów URL/HTML.
 - Nazwa pliku wyjściowego to `screenshot.<format>`.
-- Jeśli wczytanie strony trwa zbyt długo, żądanie zwraca HTTP 504 (przekroczenie limitu czasu bramy).
-- Jeśli usługa przeglądarki wielokrotnie ulega awarii, jest tymczasowo wyłączana i zwraca HTTP 503 z kodem `BROWSER_CRASHED`.
+- Jeśli wczytanie strony trwa zbyt długo, przechwytywanie kończy się błędem HTTP 504 (przekroczenie limitu czasu bramy).
+- Jeśli usługa przeglądarki wielokrotnie ulega awarii, jest tymczasowo wyłączana, a przechwytywanie kończy się błędem HTTP 503 z kodem `BROWSER_CRASHED`.
+- Awaria przeglądarki (HTTP 503) jest ponawiana jednokrotnie, zanim zgłosi błąd, tak jak w innych zadaniach obrazów w kolejce. Przekroczenie limitu wczytywania strony nie jest ponawiane.
+- Przechwytywanie, które już zwróciło `202`, zgłasza błąd w strumieniu postępu, a nie w statusie HTTP.

@@ -1,13 +1,16 @@
 ---
 description: "Knip een sectie uit een audiobestand door begin- en eindtijden op te geven."
-i18n_source_hash: 8b80c5c8a711
-i18n_provenance: human
-i18n_output_hash: 3f72effdd9e3
+i18n_source_hash: f8d0b6a84592
+i18n_provenance: machine
+i18n_output_hash: 77db8552a6d1
+i18n_hash_version: 2
 ---
 
 # Trim Audio {#trim-audio}
 
-Knip een sectie uit een audiobestand door begin- en eindtijden in seconden op te geven.
+Knip een sectie uit een audiobestand. Bewaar het deel tussen een begin- en eindtijd, of knip een vast aantal seconden van het begin en het einde af.
+
+In de app accepteren tijdvelden gewone seconden (`90`), `MM:SS` (`1:30`) of `HH:MM:SS` (`1:02:03.5`). De API verwacht seconden.
 
 ## API Endpoint {#api-endpoint}
 
@@ -19,8 +22,11 @@ Accepteert multipart-formulierdata met een audiobestand en een JSON-veld `settin
 
 | Parameter | Type | Vereist | Standaard | Beschrijving |
 |-----------|------|----------|---------|-------------|
-| startS | number | Nee | `0` | Begintijd in seconden (minimaal 0) |
-| endS | number | Ja | - | Eindtijd in seconden (moet na begin liggen) |
+| mode | string | Nee | `range` | `range` bewaart `startS` tot `endS`. `ends` verwijdert `cutStartS` van het begin en `cutEndS` van het einde |
+| startS | number | Nee | `0` | Bereikmodus: begintijd in seconden (minimaal 0) |
+| endS | number | Bereikmodus | - | Bereikmodus: eindtijd in seconden (moet na begin liggen) |
+| cutStartS | number | Nee | `0` | Einden-modus: seconden die van het begin worden verwijderd |
+| cutEndS | number | Nee | `0` | Einden-modus: seconden die van het einde worden verwijderd |
 
 ## Example Request {#example-request}
 
@@ -29,6 +35,15 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@audio.mp3" \
   -F 'settings={"startS": 10, "endS": 45}'
+```
+
+Knip de eerste 2 seconden en de laatste 3 seconden af, ongeacht de lengte van het bestand:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@audio.mp3" \
+  -F 'settings={"mode": "ends", "cutStartS": 2, "cutEndS": 3}'
 ```
 
 ## Example Response {#example-response}
@@ -45,6 +60,6 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
 ## Notes {#notes}
 
 - Tijden worden opgegeven in seconden en kunnen decimalen bevatten (bijv. `10.5`).
-- De waarde `endS` moet groter zijn dan `startS`.
-- Als `endS` de audioduur overschrijdt, wordt het bestand tot het einde bijgesneden.
+- In de bereikmodus moet `endS` groter zijn dan `startS`. Als `endS` de audioduur overschrijdt, wordt het bestand tot het einde bijgesneden.
+- In de einden-modus moet minstens een van `cutStartS` en `cutEndS` boven nul liggen, en samen moeten ze minstens 0,1 seconde audio overlaten. Omdat het afknippen wordt gemeten vanaf de eigen lengte van elk bestand, werkt één instelling voor een batch bestanden met verschillende duur.
 - De uitvoer behoudt meestal de invoercontainer. AAC-invoer wordt weggeschreven als M4A, en niet-ondersteunde decodeer-alleen-invoer valt terug op MP3.

@@ -1,8 +1,9 @@
 ---
 description: "動画からメタデータを取り除き、見つかった内容を報告します。"
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 73c5c75470f2
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: dc8863f2a4bf
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` には、削除されたコンテナタグの名前が一覧されます。値は返されません。空の配列は、何も削除されなかったことを意味します。
 - 取り除かれるメタデータには、作成タイムスタンプ、GPS/位置情報、カメラ/デバイス情報、ソフトウェアタグが含まれます。
 - 映像と音声のストリームは再エンコードせずにコピーされるため、品質の低下はありません。
 - 動画を公開する前のプライバシー保護に役立ちます。

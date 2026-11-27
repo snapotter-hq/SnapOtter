@@ -1,8 +1,9 @@
 ---
 description: "Rasterafbeeldingen converteren naar SVG met zwart-wit (potrace) en volledige-kleur, meerlaagse vectorisatie."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: d0f566482ccd
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 88ee93af5aa0
+i18n_hash_version: 2
 ---
 
 # Afbeelding naar SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Een grote of gedetailleerde kleurtracering kan het synchrone wachtvenster overschrijden. De route antwoordt dan met `202` en `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Volg `progressUrl` via SSE (of poll `statusUrl`) en download de SVG wanneer de job klaar is. Zie [Progress Tracking](/nl/api/rest#progress-tracking).
 
 ## Opmerkingen {#notes}
 

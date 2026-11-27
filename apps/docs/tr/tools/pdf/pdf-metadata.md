@@ -1,13 +1,14 @@
 ---
 description: "PDF belge meta verilerini okuyun ve yazın."
-i18n_source_hash: b2eaebf7467f
-i18n_provenance: human
-i18n_output_hash: 675d30ac3468
+i18n_source_hash: 11de4f7991e4
+i18n_provenance: machine
+i18n_output_hash: 5a907753a887
+i18n_hash_version: 2
 ---
 
 # PDF Meta Verileri {#pdf-metadata}
 
-Başlık, yazar, konu ve anahtar kelimeler gibi PDF belge meta veri alanlarını okuyun ve güncelleyin. Herhangi bir ayar sağlanmadığında mevcut meta veriler değiştirilmeden döndürülür.
+Başlık, yazar, konu ve anahtar kelimeler gibi PDF belge meta veri alanlarını okuyun ve güncelleyin ya da belgenin meta verilerini tamamen kaldırın. Herhangi bir ayar sağlanmadığında mevcut meta veriler değiştirilmeden döndürülür.
 
 ## API Uç Noktası {#api-endpoint}
 
@@ -23,8 +24,10 @@ Bir PDF dosyası ve isteğe bağlı bir JSON `settings` alanı içeren multipart
 | author | string | Hayır | - | Belge yazarı (en fazla 500 karakter) |
 | subject | string | Hayır | - | Belge konusu (en fazla 500 karakter) |
 | keywords | string | Hayır | - | Belge anahtar kelimeleri (en fazla 500 karakter) |
+| stripAll | boolean | Hayır | false | Info sözlüğünün tamamını (tarihler, Creator, Producer, özel anahtarlar), her XMP akışını (belge, sayfalar, görseller) ve tüm PieceInfo uygulama verilerini kaldırır, ardından yukarıda verilen alanları yazar |
+| removeAttachments | boolean | Hayır | false | Gömülü dosyaları da kaldırır: belgenin ek listesi, dosya eki ek açıklamaları ve ilişkili dosyalar (`/AF`). `stripAll` gerektirir |
 
-Tüm parametreler isteğe bağlıdır. Atlanan alanlar değiştirilmeden bırakılır.
+Tüm parametreler isteğe bağlıdır. `stripAll` ayarlanmadıkça atlanan alanlar değiştirilmeden bırakılır.
 
 ## Örnek İstek {#example-request}
 
@@ -59,3 +62,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - Yanıttaki `metadata` alanı, varsa güncellemelerden sonraki nihai meta verileri içerir.
 - Meta verileri değiştirmeden okumak için `settings` alanını atlayın veya boş bir nesne gönderin.
 - Her meta veri alanı 500 karakterle sınırlıdır.
+- `stripAll` ile yanıt ayrıca `stripped` alanını da taşır: kaldırılan Info anahtarları (`removed`), belge XMP akışının kaldırılıp kaldırılmadığı (`xmpRemoved`), girdinin bildirdiği PDF/A düzeyi (`pdfa` veya `null`), sayfalardan, görsellerden ve diğer nesnelerden kaç XMP akışının çıkarıldığı (`objectXmpRemoved`), kaç PieceInfo sözlüğünün kaldırıldığı (`pieceInfoRemoved`) ve kaç gömülü dosyanın kaldırıldığı (`attachmentsRemoved`, `removeAttachments` olmadan her zaman `0`). XMP'yi kaldırmak PDF/A uyumluluğunu bozar.
+- Tek başına `stripAll`, belgenin içeriğini değiştireceği için gömülü dosya eklerini korur. Onları da kaldırmak için `removeAttachments` ekleyin. Bu, ZUGFeRD ve Factur-X e-faturalarındaki ekli XML'i kaldırır ve PDF/A-3 uyumluluğunu bozar.
+- `stripAll` olmadan `removeAttachments` göndermek 400 döndürür.

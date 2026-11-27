@@ -1,11 +1,12 @@
 ---
 layout: page
 title: "Documentação do SnapOtter"
-description: "Infraestrutura de processamento de arquivos open-source e self-hosted. Converta, comprima, faça OCR, transcreva e rode IA local em imagem, vídeo, áudio, PDF e documentos, via interface, API REST e pipelines. Faça self-host com um único comando Docker. Seus arquivos nunca saem do seu servidor."
+description: "Kit de ferramentas de arquivos open-source para PDFs, imagens, vídeo e áudio. Comprima, converta, faça OCR, remova fundos e transcreva no seu próprio servidor, sem enviar arquivos para sites. Mais de 200 ferramentas e IA local, por interface web, API REST e pipelines. Faça self-host com um único comando Docker."
 sidebar: false
-i18n_source_hash: 449a5b93eef1
-i18n_provenance: human
-i18n_output_hash: 00620f544cba
+i18n_source_hash: 1998b76dbdcb
+i18n_provenance: machine
+i18n_output_hash: a43f5b95d28d
+i18n_hash_version: 2
 ---
 
 <DocsHome />

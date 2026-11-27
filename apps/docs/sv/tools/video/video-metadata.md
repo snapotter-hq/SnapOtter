@@ -1,8 +1,9 @@
 ---
 description: "Ta bort metadata från en video och rapportera vad som hittades."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 3810cb71b19c
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 419a03cb8910
+i18n_hash_version: 2
 ---
 
 # Rensa videometadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Anteckningar {#notes}
 
+- `metadata.removed` listar namnen på de containertaggar som togs bort. Värdena returneras inte. En tom array betyder att inget togs bort.
 - Borttagen metadata inkluderar skapelsetidsstämplar, GPS-/platsdata, kamera-/enhetsinformation och programvarutaggar.
 - Video- och ljudströmmarna kopieras utan omkodning, så det finns ingen kvalitetsförlust.
 - Användbart för integritet innan videor delas offentligt.

@@ -1,8 +1,9 @@
 ---
 description: "Elimina los metadatos de un vídeo e informa de lo que se encontró."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 494ab59d19a6
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 7cb4a02d4226
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` enumera los nombres de las etiquetas del contenedor que se eliminaron. No se devuelven los valores. Una matriz vacía significa que no se eliminó nada.
 - Los metadatos eliminados incluyen marcas de tiempo de creación, datos de GPS/ubicación, información de cámara/dispositivo y etiquetas de software.
 - Los flujos de vídeo y audio se copian sin recodificar, por lo que no hay pérdida de calidad.
 - Útil para la privacidad antes de compartir vídeos públicamente.

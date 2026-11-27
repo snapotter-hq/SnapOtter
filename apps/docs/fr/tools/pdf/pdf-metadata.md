@@ -1,13 +1,14 @@
 ---
 description: "Lire et écrire les métadonnées d'un document PDF."
-i18n_source_hash: b2eaebf7467f
-i18n_provenance: human
-i18n_output_hash: 13f782479ba2
+i18n_source_hash: 11de4f7991e4
+i18n_provenance: machine
+i18n_output_hash: 8ddc124dcbb4
+i18n_hash_version: 2
 ---
 
 # Métadonnées PDF {#pdf-metadata}
 
-Lisez et mettez à jour les champs de métadonnées d'un document PDF tels que le titre, l'auteur, le sujet et les mots-clés. Lorsqu'aucun réglage n'est fourni, les métadonnées existantes sont renvoyées sans modification.
+Lisez et mettez à jour les champs de métadonnées d'un document PDF tels que le titre, l'auteur, le sujet et les mots-clés, ou supprimez entièrement les métadonnées du document. Lorsqu'aucun réglage n'est fourni, les métadonnées existantes sont renvoyées sans modification.
 
 ## Point de terminaison de l'API {#api-endpoint}
 
@@ -23,8 +24,10 @@ Accepte des données de formulaire multipart avec un fichier PDF et un champ `se
 | author | string | Non | - | Auteur du document (500 caractères max.) |
 | subject | string | Non | - | Sujet du document (500 caractères max.) |
 | keywords | string | Non | - | Mots-clés du document (500 caractères max.) |
+| stripAll | boolean | Non | false | Supprime tout le dictionnaire Info (dates, Creator, Producer, clés personnalisées), tous les flux XMP (document, pages, images) et toutes les données d'application PieceInfo, puis écrit les champs indiqués ci-dessus |
+| removeAttachments | boolean | Non | false | Supprime aussi les fichiers incorporés : la liste des pièces jointes du document, les annotations de pièce jointe et les fichiers associés (`/AF`). Nécessite `stripAll` |
 
-Tous les paramètres sont facultatifs. Les champs omis restent inchangés.
+Tous les paramètres sont facultatifs. Les champs omis restent inchangés, sauf si `stripAll` est défini.
 
 ## Exemple de requête {#example-request}
 
@@ -59,3 +62,6 @@ curl -X POST http://localhost:1349/api/v1/tools/pdf/pdf-metadata \
 - Le champ `metadata` de la réponse contient les métadonnées résultantes après toute mise à jour.
 - Pour lire les métadonnées sans les modifier, omettez le champ `settings` ou envoyez un objet vide.
 - Chaque champ de métadonnées est limité à 500 caractères.
+- Avec `stripAll`, la réponse contient aussi `stripped` : les clés Info supprimées (`removed`), si le flux XMP du document a été supprimé (`xmpRemoved`), le niveau PDF/A déclaré par l'entrée (`pdfa`, ou `null`), le nombre de flux XMP retirés des pages, images et autres objets (`objectXmpRemoved`), le nombre de dictionnaires PieceInfo supprimés (`pieceInfoRemoved`) et le nombre de fichiers incorporés supprimés (`attachmentsRemoved`, toujours `0` sans `removeAttachments`). La suppression du XMP rompt la conformité PDF/A.
+- `stripAll` seul conserve les fichiers incorporés, car les supprimer modifie le contenu du document. Ajoutez `removeAttachments` pour les supprimer aussi. Cela retire le XML joint des factures électroniques ZUGFeRD et Factur-X et rompt la conformité PDF/A-3.
+- Envoyer `removeAttachments` sans `stripAll` renvoie 400.

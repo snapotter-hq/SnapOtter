@@ -1,8 +1,9 @@
 ---
 description: "KI-gestützter Generator für Pass- und Ausweisfotos mit Gesichtserkennung, Hintergrundentfernung und Kachelung für Druckbögen."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 46a8e22d1c3b
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: f719e5f6802b
+i18n_hash_version: 2
 ---
 
 # Passfoto {#passport-photo}
@@ -82,6 +83,8 @@ Wenn `clientJobId` angegeben ist, wird der Fortschritt gestreamt (0-30 % für di
 
 Schneidet das Foto zu, ändert die Größe und kachelt es optional auf einen Druckbogen. Verwendet zwischengespeicherte Bilder aus Phase 1 (kein erneuter KI-Durchlauf).
 
+Der Zuschnitt läuft als Job in einer Warteschlange. Wird er innerhalb des synchronen Wartefensters fertig, erhältst du das untenstehende Ergebnis mit `200`. Ein langsamerer antwortet mit `202` und `{"jobId":"...","async":true}`, und das Ergebnis kommt über den Fortschrittsstream des Jobs; folge ihm wie unter [Fortschrittsverfolgung](/de/api/rest#progress-tracking) beschrieben. Der Job kann mit `POST /api/v1/jobs/{jobId}/cancel` abgebrochen werden. Bis 2.3.0 wartete dieser Endpunkt immer und antwortete mit `200`, daher sollten Skripte, die nur `200` behandeln, auch `202` behandeln.
+
 #### Parameter (JSON-Body) {#parameters-json-body}
 
 | Parameter | Typ | Erforderlich | Standard | Beschreibung |
@@ -102,6 +105,7 @@ Schneidet das Foto zu, ändert die Größe und kachelt es optional auf einen Dru
 | landmarks | object | Ja | - | Merkmals-Objekt aus der Antwort von Phase 1 |
 | imageWidth | number | Ja | - | Bildbreite aus der Antwort von Phase 1 |
 | imageHeight | number | Ja | - | Bildhöhe aus der Antwort von Phase 1 |
+| clientJobId | string | Nein | (generiert) | Deine eigene Job-ID, damit du den Fortschrittsstream öffnen kannst, bevor die Antwort eintrifft |
 
 #### Beispielanfrage {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -150,7 +156,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 
 #### Fehler: Analyse abgelaufen (410) {#error-analysis-expired-410}
 
-Generate arbeitet mit dem von der Hintergrundentfernung befreiten Bild, das analyze für `jobId` gespeichert hat. Gespeicherte Ausgaben werden nach einiger Zeit bereinigt; vergeht also zu viel Zeit zwischen den beiden Aufrufen, ist dieses Bild nicht mehr vorhanden. analyze erneut mit demselben Foto aufrufen und die zurückgegebene `jobId` verwenden.
+Generate arbeitet mit dem von der Hintergrundentfernung befreiten Bild, das analyze für `jobId` gespeichert hat. Gespeicherte Ausgaben werden nach einiger Zeit bereinigt; vergeht also zu viel Zeit zwischen den beiden Aufrufen, ist dieses Bild nicht mehr vorhanden. Rufe analyze erneut mit demselben Foto auf und verwende die zurückgegebene `jobId`.
 
 ```json
 {
@@ -182,5 +188,5 @@ Gibt einen Hinweis zurück, den korrekten Unter-Endpunkt zu verwenden.
 - Merkmale werden als normalisierte Koordinaten zurückgegeben (Bereich 0-1 relativ zu den Bildabmessungen).
 - Das Feld `preview` in der Analyse-Antwort ist ein Base64-kodiertes PNG (maximal 800 px breit) für eine schnelle Anzeige.
 - Länderspezifikationen enthalten Dokumentabmessungen, Verhältnisse für die Kopfhöhe und die Positionierung der Augenlinie gemäß offiziellen Anforderungen an Passfotos.
-- Die Option `printLayout` erzeugt einen gekachelten Bogen auf 4x6\"- oder A4-Papier mit 2 mm Abstand zwischen den Fotos.
-- Wenn `maxFileSizeKb` gesetzt ist, wird die Ausgabe iterativ komprimiert, um innerhalb der Größenbeschränkung zu bleiben. Die JPEG-Qualität der Ausgabe wird dabei schrittweise gesenkt, bis sie passt. Die Pixelgröße ist durch die Länderspezifikation festgelegt, sodass `/generate` 422 mit einer entsprechenden Meldung zurückgibt, wenn das Foto auch bei der niedrigsten Qualität nicht passt, statt eine Datei über dem Limit.
+- Die Option `printLayout` erzeugt einen gekachelten Bogen auf 4x6"- oder A4-Papier mit 2 mm Abstand zwischen den Fotos.
+- Wenn `maxFileSizeKb` gesetzt ist, wird die JPEG-Qualität der Ausgabe schrittweise gesenkt, bis sie passt. Die Pixelgröße ist durch die Länderspezifikation festgelegt. Passt das Foto auch bei der niedrigsten Qualität nicht, gibt `/generate` daher 422 mit einer entsprechenden Meldung zurück, statt eine Datei über dem Limit.

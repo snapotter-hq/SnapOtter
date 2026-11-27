@@ -1,11 +1,12 @@
 ---
 layout: page
 title: "SnapOtter Docs"
-description: "Open-Source-Infrastruktur zur Dateiverarbeitung, selbst gehostet. Konvertiere, komprimiere, OCR, transkribiere und führe lokale KI über Bild, Video, Audio, PDF und Dokumente aus, per UI, REST-API und Pipelines. Selbst hosten mit einem einzigen Docker-Befehl. Deine Dateien verlassen niemals deinen Server."
+description: "Open-Source-Toolkit für PDFs, Bilder, Video und Audio. Komprimiere, konvertiere, nutze OCR, entferne Hintergründe und transkribiere auf deinem eigenen Server, statt Dateien auf Websites hochzuladen. Über 200 Werkzeuge und lokale KI, per Web-UI, REST-API und Pipelines. Selbst hosten mit einem einzigen Docker-Befehl."
 sidebar: false
-i18n_source_hash: 449a5b93eef1
-i18n_provenance: human
-i18n_output_hash: f7d4daca0081
+i18n_source_hash: 1998b76dbdcb
+i18n_provenance: machine
+i18n_output_hash: df6093621b24
+i18n_hash_version: 2
 ---
 
 <DocsHome />

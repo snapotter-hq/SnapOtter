@@ -1,8 +1,9 @@
 ---
 description: "将位图图像转换为 SVG，支持黑白（potrace）和全彩多层矢量化。"
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 9bd31316b327
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 381f430313f6
+i18n_hash_version: 2
 ---
 
 # 图像转 SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+较大或细节较多的彩色追踪可能超出同步等待窗口。此时路由会改为返回 `202` 和 `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`。请通过 SSE 跟踪 `progressUrl`（或轮询 `statusUrl`），并在任务完成后下载 SVG。参见 [进度跟踪](/zh-CN/api/rest#progress-tracking)。
 
 ## 说明 {#notes}
 

@@ -1,8 +1,9 @@
 ---
 description: "Rasterbilder mit Schwarz-Weiß-Vektorisierung (potrace) und vollfarbiger mehrschichtiger Vektorisierung in SVG umwandeln."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: b18b6c32c25e
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: e98591095775
+i18n_hash_version: 2
 ---
 
 # Bild zu SVG {#image-to-svg}
@@ -53,6 +54,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
 }
 ```
 
+Ein großer oder detailreicher Farb-Trace kann das synchrone Wartefenster überschreiten. Die Route antwortet dann stattdessen mit `202` und `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Folge `progressUrl` per SSE (oder frage `statusUrl` ab) und lade die SVG herunter, wenn der Job abgeschlossen ist. Siehe [Fortschrittsverfolgung](/de/api/rest#progress-tracking).
+
 ## Hinweise {#notes}
 
 - Die Ausgabe ist unabhängig vom Eingabeformat immer eine SVG-Datei.
@@ -61,4 +64,4 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
 - Der Farbmodus verwendet einen mehrschichtigen Ansatz: Das Bild wird in Farbebenen quantisiert, die jeweils separat getract und in der SVG-Ausgabe gestapelt werden.
 - Niedrigere `filterSpeckle`-Werte bewahren mehr Details, erzeugen aber größere SVG-Dateien mit mehr Pfaden.
 - Die Einstellung `pathMode` beeinflusst die Dateigröße erheblich: `none` erzeugt die meisten Pfade, `spline` erzeugt die glatteste (und meist kleinste) Ausgabe.
-- Für beste Ergebnisse bei Logos und Icons verwenden Sie den S/W-Modus mit einer sauberen, kontrastreichen Eingabe. Für Fotos oder Illustrationen verwenden Sie den Farbmodus mit höherer `colorPrecision`.
+- Für beste Ergebnisse bei Logos und Icons verwende den S/W-Modus mit einer sauberen, kontrastreichen Eingabe. Für Fotos oder Illustrationen verwende den Farbmodus mit höherer `colorPrecision`.

@@ -1,11 +1,12 @@
 ---
 layout: page
 title: "SnapOtter Docs"
-description: "Infrastructure de traitement de fichiers open source et auto-hébergée. Convertissez, compressez, OCRisez, transcrivez et exécutez de l'IA locale sur les images, vidéos, audios, PDF et documents, via une interface, une API REST et des pipelines. Auto-hébergez avec une seule commande Docker. Vos fichiers ne quittent jamais votre serveur."
+description: "Boîte à outils open source pour les PDF, images, vidéos et fichiers audio. Compressez, convertissez, OCRisez, supprimez les arrière-plans et transcrivez sur votre propre serveur au lieu de téléverser vos fichiers sur des sites web. Plus de 200 outils et de l'IA locale, via une interface web, une API REST et des pipelines. Auto-hébergez avec une seule commande Docker."
 sidebar: false
-i18n_source_hash: 449a5b93eef1
-i18n_provenance: human
-i18n_output_hash: 693fe3c716cc
+i18n_source_hash: 1998b76dbdcb
+i18n_provenance: machine
+i18n_output_hash: dc8d9bd7592a
+i18n_hash_version: 2
 ---
 
 <DocsHome />

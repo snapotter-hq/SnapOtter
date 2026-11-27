@@ -1,8 +1,9 @@
 ---
 description: "Raster görüntüleri siyah-beyaz (potrace) ve tam renkli çok katmanlı vektörleştirme ile SVG'ye dönüştürün."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: de604f654255
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 202753d25121
+i18n_hash_version: 2
 ---
 
 # Görüntüden SVG'ye {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Büyük veya ayrıntılı bir renkli izleme, eşzamanlı bekleme penceresini aşabilir. Bu durumda rota, bunun yerine `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` ile `202` yanıtı verir. `progressUrl` adresini SSE üzerinden izleyin (veya `statusUrl` adresini yoklayın) ve iş tamamlandığında SVG'yi indirin. Bkz. [İlerleme Takibi](/tr/api/rest#progress-tracking).
 
 ## Notlar {#notes}
 

@@ -1,8 +1,9 @@
 ---
 description: "Pembuat foto paspor dan ID bertenaga AI dengan deteksi wajah, penghapusan latar belakang, dan penataan lembar cetak."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 7f09f3917829
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 6aa8bce88475
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ Jika `clientJobId` disediakan, progres dialirkan (0-30% untuk deteksi wajah, 30-
 
 Memotong, mengubah ukuran, dan secara opsional menata foto ke lembar cetak. Menggunakan gambar yang di-cache dari Fase 1 (tanpa menjalankan ulang AI).
 
+Pemotongan berjalan sebagai job dalam antrean. Jika selesai dalam jendela tunggu sinkron, Anda mendapat hasil di bawah dengan `200`. Yang lebih lambat dijawab dengan `202` beserta `{"jobId":"...","async":true}`, dan hasilnya tiba di stream progres job; ikuti seperti dijelaskan di [Progress Tracking](/id/api/rest#progress-tracking). Job dapat dibatalkan dengan `POST /api/v1/jobs/{jobId}/cancel`. Hingga 2.3.0 endpoint ini selalu menunggu dan menjawab `200`, jadi skrip yang hanya menangani `200` sebaiknya juga menangani `202`.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ Memotong, mengubah ukuran, dan secara opsional menata foto ke lembar cetak. Meng
 | landmarks | object | Yes | - | Objek landmark dari respons Fase 1 |
 | imageWidth | number | Yes | - | Lebar gambar dari respons Fase 1 |
 | imageHeight | number | Yes | - | Tinggi gambar dari respons Fase 1 |
+| clientJobId | string | No | (generated) | ID job Anda sendiri, agar Anda bisa membuka stream progres sebelum jawaban tiba |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

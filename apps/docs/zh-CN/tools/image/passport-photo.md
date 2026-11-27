@@ -1,8 +1,9 @@
 ---
 description: "基于 AI 的护照和证件照生成器，具备人脸检测、背景去除和打印排版拼贴功能。"
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: aa0a2a733146
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: e5960bda0a15
+i18n_hash_version: 2
 ---
 
 # 护照照片 {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 裁剪、调整尺寸，并可选地将照片拼贴到打印排版上。使用阶段 1 的缓存图片（不重新运行 AI）。
 
+裁剪作为排队任务运行。如果在同步等待窗口内完成，会返回下面的结果和 `200`。较慢的任务则返回 `202` 和 `{"jobId":"...","async":true}`，结果会通过该任务的进度流送达，请按 [进度跟踪](/zh-CN/api/rest#progress-tracking) 中的说明跟踪。可以通过 `POST /api/v1/jobs/{jobId}/cancel` 取消任务。直到 2.3.0，此端点始终等待并返回 `200`，因此只处理 `200` 的脚本现在也应处理 `202`。
+
 #### 参数（JSON 请求体） {#parameters-json-body}
 
 | 参数 | 类型 | 是否必填 | 默认值 | 说明 |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | 是 | - | 来自阶段 1 响应的特征点对象 |
 | imageWidth | number | 是 | - | 来自阶段 1 响应的图片宽度 |
 | imageHeight | number | 是 | - | 来自阶段 1 响应的图片高度 |
+| clientJobId | string | 否 | （自动生成） | 你自己的任务 ID，这样可以在响应返回之前就打开进度流 |
 
 #### 请求示例 {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,

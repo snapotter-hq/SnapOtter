@@ -1,8 +1,9 @@
 ---
 description: "Yüz algılama, arka plan kaldırma ve baskı sayfası döşemesiyle yapay zeka destekli pasaport ve kimlik fotoğrafı oluşturucu."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 5067400f5ba0
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 1b62f2e104eb
+i18n_hash_version: 2
 ---
 
 # Pasaport Fotoğrafı {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 Fotoğrafı kırpar, yeniden boyutlandırır ve isteğe bağlı olarak bir baskı sayfasına döşer. Aşama 1'den önbelleğe alınmış görselleri kullanır (yapay zeka yeniden çalıştırılmaz).
 
+Kırpma, kuyruğa alınmış bir iş olarak çalışır. Eşzamanlı bekleme penceresi içinde biterse aşağıdaki sonucu `200` ile alırsınız. Daha yavaş olan `{"jobId":"...","async":true}` ile `202` yanıtı verir ve sonuç işin ilerleme akışına gelir; bunu [İlerleme Takibi](/tr/api/rest#progress-tracking) bölümünde anlatıldığı gibi izleyin. İş `POST /api/v1/jobs/{jobId}/cancel` ile iptal edilebilir. 2.3.0'a kadar bu uç nokta her zaman bekler ve `200` yanıtı verirdi; bu yüzden yalnızca `200` işleyen betikler `202` yanıtını da işlemelidir.
+
 #### Parametreler (JSON gövdesi) {#parameters-json-body}
 
 | Parametre | Tür | Zorunlu | Varsayılan | Açıklama |
@@ -102,6 +105,7 @@ Fotoğrafı kırpar, yeniden boyutlandırır ve isteğe bağlı olarak bir bask�
 | landmarks | object | Evet | - | Aşama 1 yanıtından noktalar nesnesi |
 | imageWidth | number | Evet | - | Aşama 1 yanıtından görsel genişliği |
 | imageHeight | number | Evet | - | Aşama 1 yanıtından görsel yüksekliği |
+| clientJobId | string | Hayır | (oluşturulur) | Yanıt gelmeden ilerleme akışını açabilmeniz için kendi iş kimliğiniz |
 
 #### Örnek İstek {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Doğru alt uç noktanın kullanılmasına yönelik yönlendirme döndürür.
 - Noktalar, normalleştirilmiş koordinatlar olarak döndürülür (görsel boyutlarına göre 0-1 aralığı).
 - Analiz yanıtındaki `preview` alanı, hızlı görüntüleme için base64 kodlamalı bir PNG'dir (en fazla 800px genişlik).
 - Ülke belirtimleri, resmi pasaport fotoğrafı gereksinimlerine dayalı belge boyutlarını, baş yüksekliği oranlarını ve göz çizgisi konumlandırmasını içerir.
-- `printLayout` seçeneği, fotoğraflar arasında 2mm boşlukla 4x6\" veya A4 kağıt üzerinde döşenmiş bir sayfa oluşturur.
+- `printLayout` seçeneği, fotoğraflar arasında 2mm boşlukla 4x6" veya A4 kağıt üzerinde döşenmiş bir sayfa oluşturur.
 - `maxFileSizeKb` ayarlandığında, çıktının JPEG kalitesi sığana kadar adım adım düşürülür. Piksel boyutu ülke belirtimiyle sabitlendiğinden, fotoğraf en düşük kalitede bile sığmıyorsa `/generate`, sınırı aşan bir dosya yerine bunu söyleyen bir mesajla 422 döndürür.

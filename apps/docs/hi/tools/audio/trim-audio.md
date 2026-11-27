@@ -1,13 +1,16 @@
 ---
 description: "प्रारंभ और समाप्ति समय निर्दिष्ट करके किसी ऑडियो फ़ाइल से एक खंड काटें।"
-i18n_source_hash: 8b80c5c8a711
-i18n_provenance: human
-i18n_output_hash: 3b2a9633270a
+i18n_source_hash: f8d0b6a84592
+i18n_provenance: machine
+i18n_output_hash: a30076ceb7e3
+i18n_hash_version: 2
 ---
 
 # Trim Audio {#trim-audio}
 
-सेकंड में प्रारंभ और समाप्ति समय निर्दिष्ट करके किसी ऑडियो फ़ाइल से एक खंड काटें।
+किसी ऑडियो फ़ाइल से एक खंड काटें। या तो प्रारंभ और समाप्ति समय के बीच का हिस्सा रखें, या शुरुआत और अंत से एक निश्चित अवधि काट दें।
+
+ऐप में समय वाले फ़ील्ड सादे सेकंड (`90`), `MM:SS` (`1:30`) या `HH:MM:SS` (`1:02:03.5`) स्वीकार करते हैं। API सेकंड स्वीकार करता है।
 
 ## API Endpoint {#api-endpoint}
 
@@ -19,8 +22,11 @@ i18n_output_hash: 3b2a9633270a
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| startS | number | No | `0` | सेकंड में प्रारंभ समय (न्यूनतम 0) |
-| endS | number | Yes | - | सेकंड में समाप्ति समय (प्रारंभ के बाद होना चाहिए) |
+| mode | string | No | `range` | `range` `startS` से `endS` तक का हिस्सा रखता है। `ends` शुरुआत से `cutStartS` और अंत से `cutEndS` हटाता है |
+| startS | number | No | `0` | Range मोड: सेकंड में प्रारंभ समय (न्यूनतम 0) |
+| endS | number | Range mode | - | Range मोड: सेकंड में समाप्ति समय (प्रारंभ के बाद होना चाहिए) |
+| cutStartS | number | No | `0` | Ends मोड: शुरुआत से हटाए जाने वाले सेकंड |
+| cutEndS | number | No | `0` | Ends मोड: अंत से हटाए जाने वाले सेकंड |
 
 ## Example Request {#example-request}
 
@@ -29,6 +35,15 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
   -H "Authorization: Bearer si_your-api-key" \
   -F "file=@audio.mp3" \
   -F 'settings={"startS": 10, "endS": 45}'
+```
+
+फ़ाइल की लंबाई चाहे जो हो, पहले 2 सेकंड और आख़िरी 3 सेकंड काटें:
+
+```bash
+curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
+  -H "Authorization: Bearer si_your-api-key" \
+  -F "file=@audio.mp3" \
+  -F 'settings={"mode": "ends", "cutStartS": 2, "cutEndS": 3}'
 ```
 
 ## Example Response {#example-response}
@@ -45,6 +60,6 @@ curl -X POST http://localhost:1349/api/v1/tools/audio/trim-audio \
 ## Notes {#notes}
 
 - समय सेकंड में निर्दिष्ट किए जाते हैं और इनमें दशमलव शामिल हो सकते हैं (जैसे `10.5`)।
-- `endS` मान `startS` से अधिक होना चाहिए।
-- यदि `endS` ऑडियो अवधि से अधिक है, तो फ़ाइल अंत तक ट्रिम की जाती है।
-- आउटपुट आमतौर पर इनपुट कंटेनर को बनाए रखता है। AAC इनपुट को M4A के रूप में लिखा जाता है, और असमर्थित decode-only इनपुट MP3 पर वापस चले जाते हैं।
+- Range मोड में `endS` का मान `startS` से अधिक होना चाहिए। यदि `endS` ऑडियो अवधि से अधिक है, तो फ़ाइल अंत तक ट्रिम की जाती है।
+- Ends मोड में `cutStartS` और `cutEndS` में से कम से कम एक शून्य से अधिक होना चाहिए, और दोनों मिलकर कम से कम 0.1 सेकंड का ऑडियो बचा रहने देना चाहिए। कटाई हर फ़ाइल की अपनी लंबाई के हिसाब से मापी जाती है, इसलिए अलग-अलग अवधि वाली फ़ाइलों के बैच में एक ही सेटिंग काम करती है।
+- आउटपुट आमतौर पर इनपुट का कंटेनर ही रखता है। AAC इनपुट M4A के रूप में लिखा जाता है, और केवल-डिकोड वाले असमर्थित इनपुट MP3 पर लौट आते हैं।

@@ -1,8 +1,9 @@
 ---
 description: "Supprime les métadonnées d'une vidéo et signale ce qui a été trouvé."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: 6dc127077d64
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: bbdf2133ad7f
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` liste les noms des balises de conteneur qui ont été supprimées. Les valeurs ne sont pas renvoyées. Un tableau vide signifie que rien n'a été supprimé.
 - Les métadonnées supprimées incluent les horodatages de création, les données GPS/de localisation, les informations sur l'appareil/le périphérique et les balises logicielles.
 - Les flux vidéo et audio sont copiés sans réencodage, il n'y a donc aucune perte de qualité.
 - Utile pour la confidentialité avant de partager des vidéos publiquement.

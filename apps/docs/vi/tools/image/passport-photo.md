@@ -1,8 +1,9 @@
 ---
 description: "Trình tạo ảnh hộ chiếu và ảnh thẻ do AI hỗ trợ với phát hiện khuôn mặt, xóa nền và ghép tấm để in."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: ff62c89911f0
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: aa75b902fda1
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ Nếu `clientJobId` được cung cấp, tiến trình sẽ được truyền ph
 
 Cắt, thay đổi kích thước và tùy chọn ghép ảnh lên một tấm in. Sử dụng ảnh đã lưu trong bộ nhớ đệm từ Phase 1 (không chạy lại AI).
 
+Việc cắt chạy dưới dạng một job trong hàng đợi. Nếu hoàn tất trong khoảng chờ đồng bộ, bạn nhận được kết quả bên dưới cùng `200`. Nếu chậm hơn, API trả về `202` kèm `{"jobId":"...","async":true}`, và kết quả đến qua luồng tiến trình của job; hãy theo dõi nó như mô tả trong [Progress Tracking](/vi/api/rest#progress-tracking). Có thể hủy job bằng `POST /api/v1/jobs/{jobId}/cancel`. Đến 2.3.0, endpoint này luôn chờ và trả về `200`, nên các script chỉ xử lý `200` cũng nên xử lý `202`.
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ Cắt, thay đổi kích thước và tùy chọn ghép ảnh lên một tấm i
 | landmarks | object | Yes | - | Đối tượng điểm mốc từ phản hồi Phase 1 |
 | imageWidth | number | Yes | - | Chiều rộng ảnh từ phản hồi Phase 1 |
 | imageHeight | number | Yes | - | Chiều cao ảnh từ phản hồi Phase 1 |
+| clientJobId | string | No | (generated) | ID job của riêng bạn, để có thể mở luồng tiến trình trước khi nhận phản hồi |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -182,5 +188,5 @@ Trả về hướng dẫn dùng đúng endpoint con.
 - Các điểm mốc được trả về dưới dạng tọa độ chuẩn hóa (khoảng 0-1 tương đối với kích thước ảnh).
 - Trường `preview` trong phản hồi phân tích là một PNG mã hóa base64 (tối đa rộng 800px) để hiển thị nhanh.
 - Thông số quốc gia bao gồm kích thước giấy tờ, tỷ lệ chiều cao đầu và vị trí đường mắt dựa trên yêu cầu ảnh hộ chiếu chính thức.
-- Tùy chọn `printLayout` tạo một tấm ghép trên giấy 4x6\" hoặc A4 với khoảng cách 2mm giữa các ảnh.
+- Tùy chọn `printLayout` tạo một tấm ghép trên giấy 4x6" hoặc A4 với khoảng cách 2mm giữa các ảnh.
 - Khi `maxFileSizeKb` được đặt, chất lượng JPEG của đầu ra được hạ từng bước cho đến khi vừa giới hạn. Kích thước điểm ảnh do thông số quốc gia cố định, nên nếu ảnh vẫn không vừa ở chất lượng thấp nhất, `/generate` trả về 422 kèm thông báo thay vì một tệp vượt giới hạn.

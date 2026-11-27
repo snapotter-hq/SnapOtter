@@ -1,8 +1,9 @@
 ---
 description: "Konvertera rasterbilder till SVG med svartvit (potrace) och fullfärgs flerlagersvektorisering."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: e341d3dc5c7b
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 6784dec92e84
+i18n_hash_version: 2
 ---
 
 # Bild till SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+En stor eller detaljrik färgspårning kan ta längre tid än det synkrona väntefönstret. Rutten svarar då `202` med `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` i stället. Följ `progressUrl` över SSE (eller polla `statusUrl`) och ladda ned SVG-filen när jobbet är klart. Se [Progress Tracking](/sv/api/rest#progress-tracking).
 
 ## Notes {#notes}
 

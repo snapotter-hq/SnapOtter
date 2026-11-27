@@ -1,8 +1,9 @@
 ---
 description: "Chuyển ảnh raster sang SVG với vector hóa đen trắng (potrace) và nhiều lớp toàn màu."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 240b5aa339e9
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 61cc238422e2
+i18n_hash_version: 2
 ---
 
 # Ảnh sang SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Một bản trace màu lớn hoặc nhiều chi tiết có thể vượt quá khoảng chờ đồng bộ. Khi đó route trả về `202` kèm `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Hãy theo dõi `progressUrl` qua SSE (hoặc poll `statusUrl`) và tải SVG về khi job hoàn tất. Xem [Progress Tracking](/vi/api/rest#progress-tracking).
 
 ## Ghi chú {#notes}
 

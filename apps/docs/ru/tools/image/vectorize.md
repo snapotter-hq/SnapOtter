@@ -1,8 +1,9 @@
 ---
 description: "Конвертация растровых изображений в SVG с чёрно-белой (potrace) и полноцветной многослойной векторизацией."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 89705cfd6d42
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: fbe896bbd97c
+i18n_hash_version: 2
 ---
 
 # Изображение в SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Крупная или детализированная цветная трассировка может занять больше времени, чем окно синхронного ожидания. Тогда маршрут возвращает `202` с `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Следите за `progressUrl` через SSE (или опрашивайте `statusUrl`) и скачайте SVG, когда задание завершится. См. [Отслеживание прогресса](/ru/api/rest#progress-tracking).
 
 ## Примечания {#notes}
 

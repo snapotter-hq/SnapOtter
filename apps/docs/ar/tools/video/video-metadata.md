@@ -1,8 +1,9 @@
 ---
 description: "إزالة البيانات الوصفية من الفيديو والإبلاغ عما عُثر عليه."
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: e2c4f2698237
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: 790b3723ca6d
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` يسرد أسماء وسوم الحاوية التي أُزيلت. لا تُعاد القيم. المصفوفة الفارغة تعني أنه لم يُزَل شيء.
 - تشمل البيانات الوصفية المُزالة طوابع وقت الإنشاء، وبيانات GPS/الموقع، ومعلومات الكاميرا/الجهاز، ووسوم البرامج.
 - يُنسَخ تدفقا الفيديو والصوت دون إعادة ترميز، لذا لا يوجد فقد في الجودة.
 - مفيدة للخصوصية قبل مشاركة مقاطع الفيديو علناً.

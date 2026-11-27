@@ -1,8 +1,9 @@
 ---
 description: "从视频中剥离元数据并报告发现的内容。"
-i18n_source_hash: 69621bfb98ca
-i18n_provenance: human
-i18n_output_hash: c93ff604aaa7
+i18n_source_hash: 9c0af022032a
+i18n_provenance: machine
+i18n_output_hash: cc7e4f347d0f
+i18n_hash_version: 2
 ---
 
 # Clean Video Metadata {#clean-video-metadata}
@@ -42,13 +43,15 @@ curl -X POST http://localhost:1349/api/v1/tools/video/video-metadata \
     "streams": [
       { "type": "video", "codec": "h264", "width": 1920, "height": 1080 },
       { "type": "audio", "codec": "aac", "sampleRate": 48000 }
-    ]
+    ],
+    "removed": ["title", "comment", "location", "creation_time"]
   }
 }
 ```
 
 ## Notes {#notes}
 
+- `metadata.removed` 列出了被移除的容器标签名称。不会返回其值。空数组表示没有移除任何内容。
 - 被剥离的元数据包括创建时间戳、GPS/位置数据、相机/设备信息和软件标记。
 - 视频流和音频流会被直接复制而不重新编码，因此没有质量损失。
 - 在公开分享视频前有助于保护隐私。

@@ -1,8 +1,9 @@
 ---
 description: "Konwertuj obrazy rastrowe do SVG z wektoryzacją czarno-białą (potrace) oraz pełnokolorową, wielowarstwową."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 9ebb92e9d5f9
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 4f221327238e
+i18n_hash_version: 2
 ---
 
 # Obraz do SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Duży lub szczegółowy ślad kolorowy może przekroczyć okno synchronicznego oczekiwania. Wtedy trasa zwraca `202` z `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Śledź `progressUrl` przez SSE (lub odpytuj `statusUrl`) i pobierz SVG po zakończeniu zadania. Zobacz [Progress Tracking](/pl/api/rest#progress-tracking).
 
 ## Uwagi {#notes}
 

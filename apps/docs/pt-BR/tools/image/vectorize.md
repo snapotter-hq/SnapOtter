@@ -1,8 +1,9 @@
 ---
 description: "Converte imagens raster em SVG com vetorização em preto e branco (potrace) e multicamadas em cores completas."
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: 0314e857b390
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: 67a6704cb04d
+i18n_hash_version: 2
 ---
 
 # Imagem para SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+Um traçado colorido grande ou detalhado pode passar da janela de espera síncrona. Nesse caso, a rota responde `202` com `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}`. Acompanhe `progressUrl` por SSE (ou consulte `statusUrl`) e baixe o SVG quando o job terminar. Veja [Acompanhamento de Progresso](/pt-BR/api/rest#progress-tracking).
 
 ## Notas {#notes}
 

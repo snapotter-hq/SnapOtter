@@ -1,8 +1,9 @@
 ---
 description: "แปลงภาพแรสเตอร์เป็น SVG ด้วยการทำเวกเตอร์แบบขาวดำ (potrace) และแบบหลายเลเยอร์เต็มสี"
-i18n_source_hash: f3e4777188ad
-i18n_provenance: human
-i18n_output_hash: aaac462449ae
+i18n_source_hash: 223bec15e889
+i18n_provenance: machine
+i18n_output_hash: a1d907c979d4
+i18n_hash_version: 2
 ---
 
 # Image to SVG {#image-to-svg}
@@ -52,6 +53,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/vectorize \
   "processedSize": 12345
 }
 ```
+
+การเทรซสีที่มีขนาดใหญ่หรือมีรายละเอียดมากอาจใช้เวลานานกว่าช่วงรอแบบซิงโครนัส เมื่อเป็นเช่นนั้นเส้นทางจะตอบ `202` พร้อม `{"jobId":"...","async":true,"statusUrl":"...","progressUrl":"..."}` แทน ให้ติดตาม `progressUrl` ผ่าน SSE (หรือโพล `statusUrl`) แล้วดาวน์โหลด SVG เมื่องานเสร็จ ดู [Progress Tracking](/th/api/rest#progress-tracking)
 
 ## Notes {#notes}
 

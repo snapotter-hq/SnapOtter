@@ -1,11 +1,12 @@
 ---
 layout: page
 title: "SnapOtter Docs"
-description: "Infrastruktur pemrosesan file open-source, self-hosted. Konversi, kompresi, OCR, transkripsi, dan jalankan AI lokal di gambar, video, audio, PDF, dan dokumen, melalui UI, REST API, dan pipeline. Self-host dengan satu perintah Docker. File Anda tidak pernah meninggalkan server Anda."
+description: "Toolkit file open-source untuk PDF, gambar, video, dan audio. Kompres, konversi, OCR, hapus latar belakang, dan transkripsi di server Anda sendiri, tanpa mengunggah file ke situs web. 200+ alat dan AI lokal, lewat UI web, REST API, dan pipeline. Self-host dengan satu perintah Docker."
 sidebar: false
-i18n_source_hash: 449a5b93eef1
-i18n_provenance: human
-i18n_output_hash: 02b65b4305e6
+i18n_source_hash: 1998b76dbdcb
+i18n_provenance: machine
+i18n_output_hash: c28b847d8a6a
+i18n_hash_version: 2
 ---
 
 <DocsHome />

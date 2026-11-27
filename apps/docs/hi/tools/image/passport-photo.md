@@ -1,8 +1,9 @@
 ---
 description: "फेस डिटेक्शन, बैकग्राउंड हटाने और प्रिंट शीट टाइलिंग के साथ AI-संचालित पासपोर्ट और ID फ़ोटो जनरेटर।"
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: a48fb5e654e0
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 1905b4dcf5ca
+i18n_hash_version: 2
 ---
 
 # Passport Photo {#passport-photo}
@@ -82,6 +83,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 
 फ़ोटो को क्रॉप, आकार बदलता है और वैकल्पिक रूप से एक प्रिंट शीट पर टाइल करता है। Phase 1 से कैश की गई इमेज का उपयोग करता है (कोई AI पुनः-रन नहीं)।
 
+क्रॉप एक कतारबद्ध जॉब के रूप में चलता है। यदि यह सिंक्रोनस प्रतीक्षा अवधि के भीतर पूरा हो जाता है, तो आपको नीचे दिया परिणाम `200` के साथ मिलता है। धीमा जॉब `{"jobId":"...","async":true}` के साथ `202` लौटाता है, और परिणाम जॉब की प्रगति स्ट्रीम पर आता है; इसे [Progress Tracking](/hi/api/rest#progress-tracking) में बताए अनुसार फ़ॉलो करें। जॉब को `POST /api/v1/jobs/{jobId}/cancel` से रद्द किया जा सकता है। 2.3.0 तक यह endpoint हमेशा प्रतीक्षा करता था और `200` लौटाता था, इसलिए जो स्क्रिप्ट केवल `200` को संभालती हैं, उन्हें `202` भी संभालना चाहिए।
+
 #### Parameters (JSON body) {#parameters-json-body}
 
 | Parameter | Type | Required | Default | Description |
@@ -102,6 +105,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/analyze \
 | landmarks | object | Yes | - | Phase 1 प्रतिक्रिया से लैंडमार्क ऑब्जेक्ट |
 | imageWidth | number | Yes | - | Phase 1 प्रतिक्रिया से इमेज चौड़ाई |
 | imageHeight | number | Yes | - | Phase 1 प्रतिक्रिया से इमेज ऊँचाई |
+| clientJobId | string | No | (generated) | आपकी अपनी जॉब ID, ताकि उत्तर आने से पहले ही आप प्रगति स्ट्रीम खोल सकें |
 
 #### Example Request {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -148,7 +154,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
-#### त्रुटि: विश्लेषण समाप्त (410) {#error-analysis-expired-410}
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
 
 Generate उस बैकग्राउंड-हटाई गई इमेज से काम करता है जिसे analyze ने `jobId` के लिए संग्रहीत किया था। संग्रहीत आउटपुट कुछ समय बाद साफ़ कर दिए जाते हैं, इसलिए यदि दोनों कॉलों के बीच बहुत अधिक समय बीत जाए, तो वह इमेज चली जाती है। उसी फ़ोटो के साथ analyze को फिर से कॉल करें और उसके द्वारा लौटाए गए `jobId` का उपयोग करें।
 
@@ -182,5 +188,5 @@ Generate उस बैकग्राउंड-हटाई गई इमेज 
 - लैंडमार्क सामान्यीकृत निर्देशांक के रूप में लौटाए जाते हैं (इमेज आयामों के सापेक्ष 0-1 रेंज)।
 - विश्लेषण प्रतिक्रिया में `preview` फ़ील्ड तेज़ प्रदर्शन के लिए एक base64-एन्कोडेड PNG (अधिकतम 800px चौड़ा) है।
 - देश स्पेक में आधिकारिक पासपोर्ट फ़ोटो आवश्यकताओं के आधार पर दस्तावेज़ आयाम, सिर की ऊँचाई अनुपात और आँख-रेखा स्थिति शामिल है।
-- `printLayout` विकल्प फ़ोटो के बीच 2mm गटर के साथ 4x6\" या A4 पेपर पर एक टाइल की गई शीट जनरेट करता है।
+- `printLayout` विकल्प फ़ोटो के बीच 2mm गटर के साथ 4x6" या A4 पेपर पर एक टाइल की गई शीट जनरेट करता है।
 - जब `maxFileSizeKb` सेट किया जाता है, तो आउटपुट की JPEG गुणवत्ता तब तक चरणबद्ध रूप से घटाई जाती है जब तक वह सीमा में फ़िट न हो जाए। पिक्सेल आकार देश स्पेक द्वारा तय होता है, इसलिए यदि फ़ोटो न्यूनतम गुणवत्ता पर भी फ़िट नहीं होती, तो `/generate` सीमा से बड़ी फ़ाइल के बजाय ऐसा बताने वाले संदेश के साथ 422 लौटाता है।

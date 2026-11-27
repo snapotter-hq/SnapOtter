@@ -1,8 +1,9 @@
 ---
 description: "AI-driven generator för pass- och ID-foton med ansiktsigenkänning, bakgrundsborttagning och plattläggning för utskriftsark."
-i18n_source_hash: 8258315ba894
-i18n_provenance: human
-i18n_output_hash: 9cd871bb7d15
+i18n_source_hash: 95ef3e208b62
+i18n_provenance: machine
+i18n_output_hash: 8661e8a81253
+i18n_hash_version: 2
 ---
 
 # Passfoto {#passport-photo}
@@ -82,6 +83,8 @@ Om `clientJobId` anges strömmas förloppet (0-30 % för ansiktsigenkänning, 30
 
 Beskär, ändrar storlek och lägger valfritt ut fotot på ett utskriftsark. Använder cachade bilder från fas 1 (ingen ny AI-körning).
 
+Beskärningen körs som ett köat jobb. Blir det klart inom det synkrona väntefönstret får du resultatet nedan med `200`. Ett långsammare jobb svarar `202` med `{"jobId":"...","async":true}`, och resultatet kommer på jobbets förloppsström. Följ den enligt beskrivningen i [Progress Tracking](/sv/api/rest#progress-tracking). Jobbet kan avbrytas med `POST /api/v1/jobs/{jobId}/cancel`. Till och med 2.3.0 väntade den här slutpunkten alltid och svarade `200`, så skript som bara hanterar `200` bör också hantera `202`.
+
 #### Parametrar (JSON-kropp) {#parameters-json-body}
 
 | Parameter | Typ | Obligatorisk | Standard | Beskrivning |
@@ -102,6 +105,7 @@ Beskär, ändrar storlek och lägger valfritt ut fotot på ett utskriftsark. Anv
 | landmarks | object | Ja | - | Landmärkesobjekt från svaret i fas 1 |
 | imageWidth | number | Ja | - | Bildbredd från svaret i fas 1 |
 | imageHeight | number | Ja | - | Bildhöjd från svaret i fas 1 |
+| clientJobId | string | Nej | (genereras) | Ditt eget jobb-ID, så att du kan öppna förloppsströmmen innan svaret kommer |
 
 #### Exempelförfrågan {#example-request-1}
 
@@ -131,6 +135,8 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "downloadUrl": "/api/v1/download/{jobId}/headshot_passport.jpg",
+  "originalSize": 1843200,
+  "processedSize": 48213,
   "dimensions": {
     "widthMm": 51,
     "heightMm": 51,
@@ -159,7 +165,7 @@ Generate arbetar från den bakgrundsborttagna bild som analyze sparade för `job
 }
 ```
 
-Ett `jobId` eller `filename` som inte kan peka ut en lagrad fil (ett sökvägsseparator, `..`, en tom sträng) svarar 400.
+Ett `jobId` eller `filename` som inte kan peka ut en lagrad fil (en sökvägsavgränsare, `..`, en tom sträng) svarar 400.
 
 ---
 
@@ -182,5 +188,5 @@ Returnerar vägledning om att använda rätt underslutpunkt.
 - Landmärken returneras som normaliserade koordinater (intervall 0-1 relativt bilddimensionerna).
 - Fältet `preview` i analyssvaret är en base64-kodad PNG (max 800 px bred) för snabb visning.
 - Landsspecifikationer inkluderar dokumentdimensioner, huvudhöjdsförhållanden och positionering av ögonlinjen baserat på officiella krav för passfoton.
-- Alternativet `printLayout` genererar ett plattlagt ark på 4x6\"- eller A4-papper med 2 mm mellanrum mellan fotona.
+- Alternativet `printLayout` genererar ett plattlagt ark på 4x6"- eller A4-papper med 2 mm mellanrum mellan fotona.
 - När `maxFileSizeKb` är satt sänks utdatans JPEG-kvalitet steg för steg tills den passar. Pixelstorleken är fastställd av landsspecifikationen, så om fotot fortfarande inte passar vid lägsta kvalitet returnerar `/generate` 422 med ett meddelande om det, i stället för en fil över gränsen.
