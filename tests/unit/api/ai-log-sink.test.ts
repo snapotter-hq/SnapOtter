@@ -68,4 +68,15 @@ describe("integration test app (#5186)", () => {
     expect(stopSpine).toBeGreaterThan(-1);
     expect(source.indexOf("shutdownDispatcher();", stopSpine)).toBeGreaterThan(stopSpine);
   });
+
+  it("stops the docs and OCR dispatchers alongside the main one (#5200)", () => {
+    // The real server shuts all three down on exit. The docs child and the
+    // OCR runtime managers otherwise outlive the fork.
+    const source = readFileSync(resolve(root, "tests/integration/test-server.ts"), "utf8");
+    const stopSpine = source.indexOf("async function stopSpine(");
+    const body = source.slice(stopSpine, source.indexOf("\n}\n", stopSpine));
+
+    expect(body).toContain("shutdownDocsDispatcher()");
+    expect(body).toContain("shutdownOcrDispatcher()");
+  });
 });
