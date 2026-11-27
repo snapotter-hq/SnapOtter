@@ -7,7 +7,7 @@
 //
 // It imports the SAME adapter registry the CLI uses (adapters/registry.mjs), so
 // the surface list is defined once and never drifts from translate.mjs.
-import { ADAPTERS } from "./adapters/registry.mjs";
+import { ADAPTERS, resolveSurfaces } from "./adapters/registry.mjs";
 import { hash } from "./lib/hash.mjs";
 import { localeCodes } from "./lib/shared-i18n.mjs";
 
@@ -49,12 +49,12 @@ export async function checkAdapter(adapter, locales) {
 }
 
 /**
- * Run the parity check across every registered adapter for every non-en locale.
- * @param {{ log?: (msg: string) => void }} [opts]
+ * Run the parity check across the registered adapters for every non-en locale.
+ * `surfaces` narrows the run to those keys; omitted, every surface is checked.
+ * @param {{ log?: (msg: string) => void, surfaces?: string[] }} [opts]
  * @returns {Promise<{ ok: boolean, problems: string[] }>}
  */
-export async function runParityCheck({ log = () => {} } = {}) {
-  const surfaces = Object.keys(ADAPTERS);
+export async function runParityCheck({ log = () => {}, surfaces = Object.keys(ADAPTERS) } = {}) {
   if (surfaces.length === 0) {
     log("No adapters registered yet. Parity check is a no-op until a surface adapter lands.");
     return { ok: true, problems: [] };
@@ -73,7 +73,18 @@ export async function runParityCheck({ log = () => {} } = {}) {
 
 // Only run the CLI body when invoked directly, not when imported by tests.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runParityCheck({ log: (m) => process.stdout.write(`${m}\n`) })
+  // --surface=api (or a comma list) gates one surface. An unknown key is an
+  // error, not a silent pass, so a typo in a workflow can't turn the gate off.
+  const flag = process.argv.slice(2).find((a) => a.startsWith("--surface="));
+  const requested = flag ? flag.slice("--surface=".length) : "all";
+  const surfaces = [...new Set(resolveSurfaces(requested))];
+  if (flag && surfaces.length !== new Set(requested.split(",").map((s) => s.trim())).size) {
+    process.stderr.write(
+      `Unknown --surface "${requested}". Known surfaces: ${Object.keys(ADAPTERS).join(", ")}\n`,
+    );
+    process.exit(2);
+  }
+  runParityCheck({ log: (m) => process.stdout.write(`${m}\n`), surfaces })
     .then((report) => {
       if (!report.ok) {
         process.stderr.write("\nTranslation parity check FAILED:\n");

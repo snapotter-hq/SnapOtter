@@ -1,4 +1,6 @@
 // tests/unit/scripts/i18n/check-parity.test.ts
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkAdapter } from "../../../../scripts/i18n/check-parity.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
@@ -74,5 +76,26 @@ describe("checkAdapter", () => {
     // en is never seeded; it must be ignored even if passed in.
     const report = await checkAdapter(adapter, ["en", "de"]);
     expect(report.ok).toBe(true);
+  });
+});
+
+describe("check-parity CLI --surface", () => {
+  const root = resolve(__dirname, "../../../..");
+  const run = (...args: string[]) =>
+    spawnSync(
+      resolve(root, "apps/api/node_modules/.bin/tsx"),
+      [resolve(root, "scripts/i18n/check-parity.mjs"), ...args],
+      { encoding: "utf8", cwd: root },
+    );
+
+  it("exits 2 on an unknown surface so a typo can't turn the gate off", () => {
+    const result = run("--surface=apii");
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("Unknown --surface");
+    expect(result.stdout).not.toContain("passed");
+  });
+
+  it("exits 2 when one name in a comma list is unknown", () => {
+    expect(run("--surface=api,nope").status).toBe(2);
   });
 });
