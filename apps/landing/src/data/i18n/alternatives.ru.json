@@ -44,15 +44,15 @@
   "alt:adobe-acrobat-online:intro": {
     "text": "Adobe Acrobat online это отточенный облачный рабочий процесс с PDF от компании, стоящей за форматом PDF. SnapOtter, самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы работа с PDF оставалась на их собственной инфраструктуре.",
     "_sourceHash": "ad9723443697",
-    "provenance": "machine",
-    "outputHash": "09427c28f3ba",
+    "provenance": "human",
+    "outputHash": "47e02dc499bb",
     "stale": false
   },
   "alt:adobe-acrobat-online:metaDescription": {
     "text": "Adobe Acrobat online это облачный набор инструментов PDF от Adobe. SnapOtter даёт командам самостоятельно размещаемые инструменты PDF и более широкие рабочие процессы с файлами при открытом развёртывании.",
     "_sourceHash": "4ffe8ac323d0",
-    "provenance": "machine",
-    "outputHash": "7421e8773795",
+    "provenance": "human",
+    "outputHash": "9a68832e0026",
     "stale": false
   },
   "alt:adobe-acrobat-online:pageTitle": {
@@ -219,8 +219,8 @@
   "alt:cloudconvert:faqs.0.a": {
     "text": "Да. SnapOtter это открытое ПО, работающее на Docker. Он конвертирует форматы изображений, видео, аудио, PDF и файлов локально, без оплаты за конвертацию со стороны SnapOtter.",
     "_sourceHash": "84f84023cec6",
-    "provenance": "machine",
-    "outputHash": "096ce3cee0a3",
+    "provenance": "human",
+    "outputHash": "326901afb7bb",
     "stale": false
   },
   "alt:cloudconvert:faqs.0.q": {
@@ -254,15 +254,15 @@
   "alt:cloudconvert:intro": {
     "text": "CloudConvert это зрелый облачный конвертер с API. SnapOtter, самостоятельно размещаемая альтернатива, когда конвертация должна происходить внутри вашей собственной инфраструктуры, с подконтрольными вам конвейерами.",
     "_sourceHash": "c4d5c586a3e2",
-    "provenance": "machine",
-    "outputHash": "6fd4a449d35f",
+    "provenance": "human",
+    "outputHash": "402099717a13",
     "stale": false
   },
   "alt:cloudconvert:metaDescription": {
     "text": "CloudConvert это облачная платформа конвертации с API. SnapOtter конвертирует изображения, видео, аудио, PDF и файлы на вашем собственном сервере с помощью открытых конвейеров.",
     "_sourceHash": "eade7e2c1ca2",
-    "provenance": "machine",
-    "outputHash": "569cdc2b6b1d",
+    "provenance": "human",
+    "outputHash": "3b9990407d78",
     "stale": false
   },
   "alt:cloudconvert:pageTitle": {
@@ -464,15 +464,15 @@
   "alt:convertio:intro": {
     "text": "Convertio это облачный конвертер для конвертации файлов во многих форматах в браузере. SnapOtter, самостоятельно размещаемая альтернатива, когда вы хотите, чтобы задачи конвертации оставались внутри вашей собственной инфраструктуры.",
     "_sourceHash": "c2aec92975d0",
-    "provenance": "machine",
-    "outputHash": "4c0496bcba97",
+    "provenance": "human",
+    "outputHash": "4cfcd73c6150",
     "stale": false
   },
   "alt:convertio:metaDescription": {
     "text": "Convertio это облачный конвертер файлов с браузерными инструментами и API. SnapOtter, самостоятельно размещаемая альтернатива для приватных сценариев конвертации и локальных конвейеров.",
     "_sourceHash": "a839f2245150",
-    "provenance": "machine",
-    "outputHash": "96e5da0ab96a",
+    "provenance": "human",
+    "outputHash": "43880a6a37df",
     "stale": false
   },
   "alt:convertio:pageTitle": {
@@ -506,8 +506,8 @@
   "alt:convertio:rows.1.competitor": {
     "text": "Облачная конвертация; по заявлению Convertio, загруженные файлы удаляются мгновенно, а сконвертированные, через 24 часа",
     "_sourceHash": "f1fd34e5bd98",
-    "provenance": "machine",
-    "outputHash": "f3c6c968b9d2",
+    "provenance": "human",
+    "outputHash": "7789543cd580",
     "stale": false
   },
   "alt:convertio:rows.1.feature": {
@@ -632,15 +632,15 @@
   "alt:convertx:breadth": {
     "text": "ConvertX это специализированный конвертер, который справляется с огромным списком форматов. SnapOtter тоже конвертирует, а затем добавляет сжатие, редактирование, сокрытие данных, OCR, транскрибацию и конвейеры, поэтому подходит, когда конвертация, лишь один из многих шагов.",
     "_sourceHash": "e7ab93bba8fd",
-    "provenance": "machine",
-    "outputHash": "1a8a99188cbe",
+    "provenance": "human",
+    "outputHash": "1b71b31f302b",
     "stale": false
   },
   "alt:convertx:faqs.0.a": {
     "text": "Если вам в основном нужна конвертация форматов из большого их множества, ConvertX это аккуратный, специализированный вариант. Если вы также редактируете, сжимаете, скрываете данные, применяете OCR или транскрибируете, SnapOtter делает всё это в одном стеке.",
     "_sourceHash": "27280f3096d6",
-    "provenance": "machine",
-    "outputHash": "20620f462972",
+    "provenance": "human",
+    "outputHash": "e7e433c77c91",
     "stale": false
   },
   "alt:convertx:faqs.0.q": {
@@ -681,8 +681,8 @@
   "alt:convertx:metaDescription": {
     "text": "ConvertX это самостоятельно размещаемый конвертер файлов для 1000+ форматов. SnapOtter тоже конвертирует и добавляет редактирование, сжатие, OCR и транскрибацию для пяти модальностей.",
     "_sourceHash": "674c8781223d",
-    "provenance": "machine",
-    "outputHash": "f68a97fbe20b",
+    "provenance": "human",
+    "outputHash": "df51c4c81edc",
     "stale": false
   },
   "alt:convertx:pageTitle": {
@@ -849,8 +849,8 @@
   "alt:freeconvert:faqs.0.a": {
     "text": "Для многих конвертаций изображений, видео, аудио, PDF, архивов и файлов, да. SnapOtter силён, когда вы хотите развернуть конвертер приватно, а не пользоваться облачным веб-сервисом.",
     "_sourceHash": "e68c7dbfbed7",
-    "provenance": "machine",
-    "outputHash": "58492b13f97b",
+    "provenance": "human",
+    "outputHash": "730f88dd33fe",
     "stale": false
   },
   "alt:freeconvert:faqs.0.q": {
@@ -884,15 +884,15 @@
   "alt:freeconvert:intro": {
     "text": "FreeConvert это широкий облачный конвертер для конвертации и сжатия файлов в браузере. SnapOtter, самостоятельно размещаемая альтернатива, когда вы хотите, чтобы эти операции с файлами выполнялись внутри вашего собственного развёртывания.",
     "_sourceHash": "c0f92d22b633",
-    "provenance": "machine",
-    "outputHash": "1ffb3dc971cd",
+    "provenance": "human",
+    "outputHash": "2e2f2f599147",
     "stale": false
   },
   "alt:freeconvert:metaDescription": {
     "text": "FreeConvert конвертирует и сжимает файлы онлайн. SnapOtter, самостоятельно размещаемая альтернатива для конвертации изображений, видео, аудио, PDF и файлов на вашем собственном сервере.",
     "_sourceHash": "ef01cd486fd0",
-    "provenance": "machine",
-    "outputHash": "eeb672f9fea7",
+    "provenance": "human",
+    "outputHash": "5ae09d606073",
     "stale": false
   },
   "alt:freeconvert:pageTitle": {
@@ -1094,15 +1094,15 @@
   "alt:ilovepdf:intro": {
     "text": "iLovePDF это облачный PDF-сервис для быстрой работы с документами в браузере. SnapOtter, самостоятельно размещаемая альтернатива, когда вы хотите, чтобы тот же тип работы с PDF выполнялся на вашем собственном сервере.",
     "_sourceHash": "1fb95fc026e6",
-    "provenance": "machine",
-    "outputHash": "f0ae5d402085",
+    "provenance": "human",
+    "outputHash": "ab29fbb650c9",
     "stale": false
   },
   "alt:ilovepdf:metaDescription": {
     "text": "iLovePDF это онлайн-сервис для работы с PDF. SnapOtter даёт командам самостоятельно размещаемые инструменты PDF плюс рабочие процессы для изображений, видео, аудио и файлов в едином открытом стеке.",
     "_sourceHash": "56861cf54b43",
-    "provenance": "machine",
-    "outputHash": "bf6bc869ab57",
+    "provenance": "human",
+    "outputHash": "086f216396b9",
     "stale": false
   },
   "alt:ilovepdf:pageTitle": {
@@ -1304,15 +1304,15 @@
   "alt:online-convert:intro": {
     "text": "Online-Convert это давно работающий облачный конвертер для многих категорий файлов. SnapOtter, самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы конвертация и обработка происходили на их собственном сервере.",
     "_sourceHash": "2a92a9864636",
-    "provenance": "machine",
-    "outputHash": "973b72f833c0",
+    "provenance": "human",
+    "outputHash": "aa9feeb600bf",
     "stale": false
   },
   "alt:online-convert:metaDescription": {
     "text": "Online-Convert конвертирует видео, изображения, аудио, документы, электронные книги и архивные файлы онлайн. SnapOtter, самостоятельно размещаемая альтернатива для приватных рабочих процессов с файлами.",
     "_sourceHash": "685f1d1bfa81",
-    "provenance": "machine",
-    "outputHash": "98033a2b5a40",
+    "provenance": "human",
+    "outputHash": "ddc7622d87e4",
     "stale": false
   },
   "alt:online-convert:pageTitle": {
@@ -1514,8 +1514,8 @@
   "alt:otter-ai:intro": {
     "text": "Otter.ai это облачная платформа для транскрибации встреч. SnapOtter, самостоятельно размещаемая альтернатива, когда вы хотите, чтобы транскрибация выполнялась на вашем собственном CPU или NVIDIA CUDA GPU с локальными моделями.",
     "_sourceHash": "42c55d0d0402",
-    "provenance": "machine",
-    "outputHash": "a2c9349ad5cd",
+    "provenance": "human",
+    "outputHash": "942210aff23e",
     "stale": false
   },
   "alt:otter-ai:metaDescription": {
@@ -1724,8 +1724,8 @@
   "alt:removebg:intro": {
     "text": "remove.bg это быстрый облачный сервис для удаления фона. SnapOtter это самостоятельно размещаемая альтернатива, которая запускает такой же ИИ на вашем собственном оборудовании, поэтому изображения товаров и людей никогда не попадают к стороннему сервису.",
     "_sourceHash": "3ce831680d32",
-    "provenance": "machine",
-    "outputHash": "9d1ab0976787",
+    "provenance": "human",
+    "outputHash": "4f9fb42946c6",
     "stale": false
   },
   "alt:removebg:metaDescription": {
@@ -1899,8 +1899,8 @@
   "alt:smallpdf:faqs.0.a": {
     "text": "Да. SnapOtter это открытое ПО под AGPLv3, которое работает на вашем собственном сервере через Docker. Он покрывает объединение, разделение, сжатие, конвертацию, защиту, редактирование с сокрытием, водяные знаки, нумерацию страниц и OCR, без платы за файл со стороны SnapOtter.",
     "_sourceHash": "0396abd0dab4",
-    "provenance": "machine",
-    "outputHash": "af8e24605c0e",
+    "provenance": "human",
+    "outputHash": "2ad8f6eb78c8",
     "stale": false
   },
   "alt:smallpdf:faqs.0.q": {
@@ -1948,15 +1948,15 @@
   "alt:smallpdf:intro": {
     "text": "Smallpdf это отточенный облачный набор для работы с PDF. SnapOtter, самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы инструменты PDF работали на подконтрольной им инфраструктуре, без отправки конфиденциальных документов в сторонний PDF-сервис.",
     "_sourceHash": "59d89e9a7965",
-    "provenance": "machine",
-    "outputHash": "7593512ac24d",
+    "provenance": "human",
+    "outputHash": "bfc62a4bb050",
     "stale": false
   },
   "alt:smallpdf:metaDescription": {
     "text": "Smallpdf это облачный набор инструментов для работы с PDF. SnapOtter выполняет объединение, разделение, сжатие, конвертацию, OCR и другие операции с PDF на вашем собственном сервере, плюс 200+ дополнительных инструментов для пяти типов файлов.",
     "_sourceHash": "d81a013a718d",
-    "provenance": "machine",
-    "outputHash": "67067c31dc33",
+    "provenance": "human",
+    "outputHash": "caa74588f78a",
     "stale": false
   },
   "alt:smallpdf:pageTitle": {
@@ -2116,8 +2116,8 @@
   "alt:stirling-pdf:faqs.0.a": {
     "text": "Может заменить, если вам нужен один стек не только для PDF. У SnapOtter широкое покрытие PDF, и он добавляет инструменты для изображений, видео, аудио и файлов. Для сценария только с PDF Stirling-PDF, солидный, специализированный выбор.",
     "_sourceHash": "fe786c82b18a",
-    "provenance": "machine",
-    "outputHash": "815ce61afa4f",
+    "provenance": "human",
+    "outputHash": "7bb4531d03f6",
     "stale": false
   },
   "alt:stirling-pdf:faqs.0.q": {
@@ -2284,8 +2284,8 @@
   "alt:tinypng:breadth": {
     "text": "TinyPNG отлично справляется, когда задача, сжатие изображений. SnapOtter сжимает PNG, JPEG, WebP и AVIF, а затем идёт дальше: изменение размера, обрезка, конвертация, водяные знаки, инструменты для метаданных, а также работа с видео, аудио, PDF и файлами.",
     "_sourceHash": "baf335e6d1e7",
-    "provenance": "machine",
-    "outputHash": "43f37499d421",
+    "provenance": "human",
+    "outputHash": "732f40817059",
     "stale": false
   },
   "alt:tinypng:faqs.0.a": {
@@ -2326,8 +2326,8 @@
   "alt:tinypng:intro": {
     "text": "TinyPNG это узкоспециализированный онлайн-компрессор изображений. SnapOtter, самостоятельно размещаемая альтернатива для команд, которым нужно, чтобы сжатие, конвертация, изменение размера, работа с метаданными и другие операции с изображениями выполнялись локально.",
     "_sourceHash": "13108e9c9f9f",
-    "provenance": "machine",
-    "outputHash": "b96f2e51a9bc",
+    "provenance": "human",
+    "outputHash": "6e254bf26d28",
     "stale": false
   },
   "alt:tinypng:metaDescription": {
@@ -2501,8 +2501,8 @@
   "alt:tinywow:faqs.0.a": {
     "text": "Нет. TinyWow это широкий облачный веб-набор инструментов. SnapOtter, самостоятельно размещаемый набор для обработки файлов для команд, которым нужны приватное развёртывание, доступ к исходному коду, API и конвейеры.",
     "_sourceHash": "2adcdbfb9aa9",
-    "provenance": "machine",
-    "outputHash": "e21eaf1b093b",
+    "provenance": "human",
+    "outputHash": "6c6d39ab8b80",
     "stale": false
   },
   "alt:tinywow:faqs.0.q": {
@@ -2550,15 +2550,15 @@
   "alt:tinywow:intro": {
     "text": "TinyWow это широкий облачный набор инструментов для быстрых задач с PDF, изображениями, видео, ИИ-письмом и файлами. SnapOtter, самостоятельно размещаемая альтернатива для команд, которым нужны повседневные утилиты для файлов на подконтрольной им инфраструктуре.",
     "_sourceHash": "15694143ff60",
-    "provenance": "machine",
-    "outputHash": "46e02b00cbe9",
+    "provenance": "human",
+    "outputHash": "d8ac36951ebc",
     "stale": false
   },
   "alt:tinywow:metaDescription": {
     "text": "TinyWow это широкий облачный набор инструментов для PDF, изображений, видео, ИИ-письма и работы с файлами. SnapOtter, самостоятельно размещаемая альтернатива для приватных рабочих процессов с файлами.",
     "_sourceHash": "5ab63ad9b614",
-    "provenance": "machine",
-    "outputHash": "08d8330bb4da",
+    "provenance": "human",
+    "outputHash": "7c6c626a7447",
     "stale": false
   },
   "alt:tinywow:pageTitle": {

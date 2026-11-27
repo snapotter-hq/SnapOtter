@@ -19,7 +19,7 @@ import { localeCodes } from "./lib/shared-i18n.mjs";
  * parity check should flag. `en` is always the source and never a target.
  *
  * An adapter opts into the edited-without-restamp check with
- * `verifiesOutputHash: true`; the landing surfaces have not been audited yet.
+ * `verifiesOutputHash: true`; the docs and landing adapters do, `api` has not been switched on.
  *
  * @param {{ name: string, verifiesOutputHash?: boolean, extract: () => Promise<any[]>, load: (l: string) => Promise<Map<string, any>> }} adapter
  * @param {string[]} locales

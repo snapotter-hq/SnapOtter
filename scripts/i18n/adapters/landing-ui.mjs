@@ -25,6 +25,7 @@ export function makeLandingUiAdapter({ dir = DEFAULT_DIR } = {}) {
   const enPath = join(dir, "en.json");
   return {
     name: "landing-ui",
+    verifiesOutputHash: true,
 
     async extract() {
       const en = (await readJson(enPath)) ?? {};

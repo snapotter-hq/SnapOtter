@@ -5,8 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createDocsAdapter } from "../../../../scripts/i18n/adapters/docs-md.mjs";
+import { adapter as landingSeo } from "../../../../scripts/i18n/adapters/landing-seo.mjs";
+import { adapter as landingUi } from "../../../../scripts/i18n/adapters/landing-ui.mjs";
 import { checkAdapter } from "../../../../scripts/i18n/check-parity.mjs";
 import { hash } from "../../../../scripts/i18n/lib/hash.mjs";
+import { localeCodes } from "../../../../scripts/i18n/lib/shared-i18n.mjs";
 import { makeFakeAdapter } from "./fake-adapter";
 
 // Seed a locale store on the fake adapter with a full, in-sync translation,
@@ -108,6 +111,27 @@ describe("checkAdapter output-hash check", () => {
   it("ignores output hashes for an adapter that has not opted in", async () => {
     const report = await checkAdapter(await editedAdapter(false), ["de"]);
     expect(report.ok).toBe(true);
+  });
+});
+
+describe.each([
+  ["landing-ui", landingUi],
+  ["landing-seo", landingSeo],
+])("%s committed catalogs", (_name, adapter) => {
+  it("opts into the output-hash check", () => {
+    expect(adapter.verifiesOutputHash).toBe(true);
+  });
+
+  it("holds no machine entry whose text was edited without restamping", async () => {
+    const edited: string[] = [];
+    for (const locale of localeCodes().filter((c: string) => c !== "en")) {
+      for (const [id, entry] of await adapter.load(locale)) {
+        if (entry.provenance === "machine" && hash(entry.text) !== entry.outputHash) {
+          edited.push(`${locale}/${id}`);
+        }
+      }
+    }
+    expect(edited).toEqual([]);
   });
 });
 
