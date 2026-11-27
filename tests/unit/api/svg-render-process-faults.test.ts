@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toolInputErrorCode } from "@snapotter/shared";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawnMock = vi.hoisted(() => vi.fn());
 
@@ -9,8 +10,9 @@ vi.mock("node:child_process", async (importOriginal) => ({
   spawn: spawnMock,
 }));
 
+import { env } from "../../../apps/api/src/config.js";
 import { isDecoderUnavailable } from "../../../apps/api/src/lib/format-decoders.js";
-import { renderSvgToPng } from "../../../apps/api/src/lib/svg-render.js";
+import { renderSvgToPng, svgRenderDeadlineMs } from "../../../apps/api/src/lib/svg-render.js";
 
 type FakeChild = EventEmitter & {
   stdin: PassThrough;
@@ -84,5 +86,75 @@ describe("renderSvgToPng process faults (#5153)", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe("renderSvgToPng hardening (#5321)", () => {
+  it("kills the child and answers ENGINE_UNAVAILABLE when stdout outgrows the pixel cap", async () => {
+    const pending = renderSvgToPng(SVG, { deadlineMs: 0, maxPixels: 1 });
+    child.stdout.write(Buffer.alloc(2 * 1024 * 1024));
+    await vi.waitFor(() => expect(child.kill).toHaveBeenCalledWith("SIGKILL"));
+    child.emit("close", null, "SIGKILL");
+
+    const err = await pending.catch((e: unknown) => e);
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(((err as Error).cause as Error).message).toContain("more than");
+  });
+
+  it("accepts output of exactly 5 bytes per pixel plus 1 MiB and rejects one byte more", async () => {
+    const cap = 5 * 1000 + 1024 * 1024;
+    const accepted = renderSvgToPng(SVG, { deadlineMs: 0, maxPixels: 1000 });
+    child.stdout.write(Buffer.alloc(cap));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    child.emit("close", 0, null);
+    expect((await accepted).length).toBe(cap);
+
+    child = fakeChild();
+    spawnMock.mockReturnValue(child);
+    const rejected = renderSvgToPng(SVG, { deadlineMs: 0, maxPixels: 1000 });
+    child.stdout.write(Buffer.alloc(cap + 1));
+    await vi.waitFor(() => expect(child.kill).toHaveBeenCalledWith("SIGKILL"));
+    child.emit("close", null, "SIGKILL");
+    expect(isDecoderUnavailable(await rejected.catch((e: unknown) => e))).toBe(true);
+  });
+
+  describe("deadline", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("returns the render when the deadline fires after the child already wrote its output", async () => {
+      const pending = renderSvgToPng(SVG, { deadlineMs: 1000 });
+      child.stdout.write(Buffer.from("png"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+      child.emit("close", 0, null);
+
+      expect((await pending).toString()).toBe("png");
+    });
+
+    it("answers SVG_TOO_COMPLEX when the deadline kills a child that hadn't finished", async () => {
+      const pending = renderSvgToPng(SVG, { deadlineMs: 1000 });
+      const settled = pending.catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(1000);
+      child.emit("close", null, "SIGKILL");
+
+      expect(toolInputErrorCode(await settled)).toBe("SVG_TOO_COMPLEX");
+    });
+  });
+
+  it("leaves part of the job timeout for work done before the render", () => {
+    expect(svgRenderDeadlineMs()).toBeLessThan(env.JOB_TIMEOUT_FAST_S * 1000);
+    expect(svgRenderDeadlineMs()).toBeGreaterThan(0);
+  });
+
+  it("kills the child when the abort signal fires", async () => {
+    const controller = new AbortController();
+    const pending = renderSvgToPng(SVG, { deadlineMs: 0, signal: controller.signal });
+    const settled = pending.catch((e: unknown) => e);
+    controller.abort(new Error("client gone"));
+    expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+    child.emit("close", null, "SIGKILL");
+
+    expect(((await settled) as Error).message).toBe("client gone");
   });
 });

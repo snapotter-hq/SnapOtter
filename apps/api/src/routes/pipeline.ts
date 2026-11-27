@@ -654,6 +654,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   if (!(firstConfig?.keepSvgVector && pipelineStepCount(pipelineRaw) === 1)) {
                     processBuffer = await rasterizeSvgInput(processBuffer, {
                       density: firstConfig?.svgDensity,
+                      signal: ingressAbort.signal,
                     });
                     filename = replaceExtWithPng(filename);
                   }
@@ -1963,6 +1964,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     if (!(firstConfig?.keepSvgVector && parsedSteps.length === 1)) {
                       processBuffer = await rasterizeSvgInput(processBuffer, {
                         density: firstConfig?.svgDensity,
+                        signal: ingressAbort.signal,
                       });
                       processFilename = replaceExtWithPng(processFilename);
                     }

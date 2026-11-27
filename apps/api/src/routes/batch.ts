@@ -712,6 +712,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     if (!toolConfig.keepSvgVector) {
                       processBuffer = await rasterizeSvgInput(processBuffer, {
                         density: toolConfig.svgDensity,
+                        signal: ingressAbort.signal,
                       });
                       processFilename = replaceExtWithPng(processFilename);
                     }

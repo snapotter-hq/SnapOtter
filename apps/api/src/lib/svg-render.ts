@@ -8,6 +8,14 @@ import { bakeSvgDensity } from "./svg-density.js";
 const SHARP_PATH = createRequire(import.meta.url).resolve("sharp");
 const CHILD_DEADLINE_GRACE_MS = 1000;
 const RENDER_FAILED_EXIT = 2;
+// Share of the job budget the render may use, so a job that spent time before
+// the render still reports SVG_TOO_COMPLEX instead of the generic job timeout.
+const DEADLINE_BUDGET_SHARE = 0.75;
+// sharp's default limitInputPixels, which applies when the caller sets no cap.
+const SHARP_DEFAULT_PIXEL_LIMIT = 0x3fff * 0x3fff;
+// An 8-bit RGBA PNG of incompressible pixels stays under 5 bytes per pixel.
+const OUTPUT_BYTES_PER_PIXEL = 5;
+const OUTPUT_SLACK_BYTES = 1024 * 1024;
 
 // Runs as `node -e` so it needs no file on disk next to the compiled module.
 // One libvips thread keeps a hostile file to a single core until the deadline.
@@ -29,7 +37,8 @@ process.stdin.on("end", async () => {
       limitInputPixels: options.limitInputPixels,
     });
     if (options.outputDensity !== undefined) image = image.withDensity(options.outputDensity);
-    process.stdout.write(await image.png().toBuffer());
+    // The tool re-encodes this PNG, so spend as little of the deadline on it as possible.
+    process.stdout.write(await image.png({ compressionLevel: 1 }).toBuffer());
   } catch (err) {
     process.stderr.write(String((err && err.message) || err));
     process.exitCode = ${RENDER_FAILED_EXIT};
@@ -42,13 +51,17 @@ export interface RenderSvgOptions {
   density?: number;
   /** sharp's limitInputPixels for the render. */
   maxPixels?: number;
-  /** Override the deadline; defaults to JOB_TIMEOUT_FAST_S, where 0 means none. */
+  /** Override the deadline; defaults to most of JOB_TIMEOUT_FAST_S, where 0 means none. */
   deadlineMs?: number;
   signal?: AbortSignal;
 }
 
 export function svgRenderDeadlineMs(): number {
-  return env.JOB_TIMEOUT_FAST_S * 1000;
+  return Math.round(env.JOB_TIMEOUT_FAST_S * 1000 * DEADLINE_BUDGET_SHARE);
+}
+
+function maxOutputBytes(maxPixels: number | undefined): number {
+  return (maxPixels ?? SHARP_DEFAULT_PIXEL_LIMIT) * OUTPUT_BYTES_PER_PIXEL + OUTPUT_SLACK_BYTES;
 }
 
 export function svgTooComplexError(deadlineMs: number): ToolInputError {
@@ -107,7 +120,10 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
       ["-e", CHILD_SOURCE, SHARP_PATH, JSON.stringify(childOptions)],
       { env: childEnv(), stdio: ["pipe", "pipe", "pipe"] },
     );
+    const outputLimit = maxOutputBytes(opts.maxPixels);
     const stdout: Buffer[] = [];
+    let stdoutBytes = 0;
+    let outputOverflow = false;
     const stderr: Buffer[] = [];
     let timedOut = false;
     let settled = false;
@@ -131,7 +147,18 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
       else resolve(value as Buffer);
     };
 
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (outputOverflow) return;
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > outputLimit) {
+        // Past what the pixel cap allows, so the child is misbehaving.
+        outputOverflow = true;
+        stdout.length = 0;
+        child.kill("SIGKILL");
+        return;
+      }
+      stdout.push(chunk);
+    });
     child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
     // The child can exit before reading all of stdin (killed, or a bad header).
     child.stdin.on("error", () => {});
@@ -139,7 +166,16 @@ export function renderSvgToPng(svg: Buffer, opts: RenderSvgOptions = {}): Promis
       finish(new DecoderUnavailableError(RENDERER_UNAVAILABLE_MESSAGE, err)),
     );
     child.on("close", (code, signal) => {
-      if (timedOut) return finish(svgTooComplexError(deadlineMs));
+      if (outputOverflow) {
+        return finish(
+          new DecoderUnavailableError(
+            RENDERER_UNAVAILABLE_MESSAGE,
+            new Error(`SVG render process wrote more than ${outputLimit} bytes`),
+          ),
+        );
+      }
+      // A deadline that fires after the child finished still leaves a complete result.
+      if (timedOut && code !== 0) return finish(svgTooComplexError(deadlineMs));
       if (opts.signal?.aborted) return finish(opts.signal.reason);
       if (code === 0) return finish(null, Buffer.concat(stdout));
       const message = Buffer.concat(stderr).toString("utf-8").trim();
