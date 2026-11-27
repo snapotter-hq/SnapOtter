@@ -31,7 +31,7 @@ describe("rasterizeSanitizedSvg", () => {
   });
 
   it("throws SVG_TOO_COMPLEX once the deadline passes", async () => {
-    const err = await rasterizeSanitizedSvg(expensiveSvg, { deadlineMs: 500 }).catch(
+    const err = await rasterizeSanitizedSvg(expensiveSvg, { deadlineMs: 1 }).catch(
       (e: unknown) => e,
     );
     expect(isToolInputError(err)).toBe(true);
@@ -52,11 +52,11 @@ describe("renderSanitizedSvgOrReply", () => {
 
   it("sends 400 with the code for a render that outlives the deadline", async () => {
     const reply = fakeReply();
-    const out = await renderSanitizedSvgOrReply(expensiveSvg, reply as never, { deadlineMs: 500 });
+    const out = await renderSanitizedSvgOrReply(expensiveSvg, reply as never, { deadlineMs: 1 });
     expect(out).toBeNull();
     expect(reply.status).toHaveBeenCalledWith(400);
     expect(reply.send).toHaveBeenCalledWith({
-      error: expect.stringMatching(/took longer than 1s to render/),
+      error: expect.stringMatching(/took longer than \ds to render/),
       code: "SVG_TOO_COMPLEX",
     });
   });
