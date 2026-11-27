@@ -230,8 +230,9 @@ export function registerInfo(app: FastifyInstance) {
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       const tooLarge = imageSizeLimitError(err);
       if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
-      if (err instanceof Error && toolInputErrorCode(err) === "SVG_TOO_COMPLEX") {
-        return reply.status(400).send({ error: err.message, code: "SVG_TOO_COMPLEX" });
+      const code = toolInputErrorCode(err);
+      if (err instanceof Error && (code === "SVG_TOO_COMPLEX" || code === "IMAGE_TOO_LARGE")) {
+        return reply.status(400).send({ error: err.message, code });
       }
       return reply.status(422).send({
         error: "Failed to read image metadata",

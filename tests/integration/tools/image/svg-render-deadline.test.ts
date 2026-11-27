@@ -129,6 +129,17 @@ describe("custom routes bound their SVG render", () => {
     expect(JSON.parse(res.body).error).toMatch(/took longer than 1s to render/);
   });
 
+  it("favicon still renders a very wide SVG instead of skipping it", async () => {
+    const wide = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="10"><rect width="1000" height="10" fill="#c60"/></svg>',
+    );
+    const res = await post("favicon", [
+      { name: "file", filename: "wide.svg", contentType: "image/svg+xml", content: wide },
+    ]);
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
   it("the file preview answers 400 SVG_TOO_COMPLEX", async () => {
     const { body, contentType } = createMultipartPayload([svgPart()]);
     const res = await app.inject({
