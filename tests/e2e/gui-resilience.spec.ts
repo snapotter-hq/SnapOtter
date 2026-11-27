@@ -1191,7 +1191,9 @@ test.describe("Server Error Handling", () => {
     await expect(page.getByText("[object Object]")).toHaveCount(0);
   });
 
-  test("compare shows the reason of a details-only failure", async ({ loggedInPage: page }) => {
+  test("compare shows the app's copy for a details-only failure, not the server's text", async ({
+    loggedInPage: page,
+  }) => {
     await page.goto("/image/compare");
     await page.route("**/api/v1/tools/image/compare", (route) =>
       route.fulfill({
@@ -1205,11 +1207,14 @@ test.describe("Server Error Handling", () => {
 
     await page.getByTestId("compare-submit").click();
 
+    // The server's English text is never shown (#1445); a failure with no
+    // error code gets the generic copy.
     await expect(
       page
         .locator("section[aria-label='Preview area']")
-        .getByText("Not enough memory", { exact: true }),
+        .getByText("We couldn't complete that request. Please try again.", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Not enough memory")).toHaveCount(0);
   });
 });
 
@@ -1499,16 +1504,17 @@ test.describe("Resize Extreme Dimensions", () => {
     }
   });
 
-  test("resize with fractional width does not crash", async ({ loggedInPage: page }) => {
+  test("resize with fractional width is refused without crashing", async ({
+    loggedInPage: page,
+  }) => {
     await page.goto("/image/resize");
     await uploadTestImage(page);
 
     await page.locator("input[placeholder='Auto']").first().fill("50.5");
 
-    const resizeBtn = page.getByRole("button", { name: "Resize" });
-    await resizeBtn.click();
-    await page.waitForTimeout(3000);
-
+    // Dimensions are whole pixels, so the form refuses a fraction instead of
+    // sending it (isDimensionWithinLimit).
+    await expect(page.getByTestId("resize-submit")).toBeDisabled();
     await expect(page.locator("main")).toBeVisible();
   });
 });
@@ -1691,7 +1697,9 @@ test.describe("Processing State Cleanup", () => {
     // #1698: every failure exit tears the run down before it fails the
     // entry. Both have to land: the entry at "failed" gates the failure card,
     // and the teardown takes down the progress card's armed cancel button.
-    const message = "Resize could not finish this image";
+    // The failed frame carries a code: the panel shows that code's translation,
+    // never the frame's English error (#4285).
+    const message = "This image is too large to process. Reduce its dimensions and try again.";
     await page.goto("/image/resize");
     await uploadTestImage(page);
 
@@ -1706,7 +1714,7 @@ test.describe("Processing State Cleanup", () => {
       await route.fulfill({
         status: 200,
         contentType: "text/event-stream",
-        body: `data: ${JSON.stringify({ type: "single", phase: "failed", percent: 0, error: message })}\n\n`,
+        body: `data: ${JSON.stringify({ type: "single", phase: "failed", percent: 0, error: "Resize could not finish this image", code: "IMAGE_TOO_LARGE" })}\n\n`,
       });
     });
     await page.route("**/api/v1/tools/image/resize", (route) =>

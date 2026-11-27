@@ -56,9 +56,9 @@ test.describe("search-miss tool request", () => {
     await expect(request).not.toHaveAttribute("href", /.+/);
     await request.click();
 
-    const dialog = page.getByRole("dialog");
+    // Scoped by name: the usage survey card is also a dialog once analytics is on.
+    const dialog = page.getByRole("dialog", { name: "Request a tool" });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("Request a tool");
     await expect(dialog).toContainText("zzxqwv nonexistent capability");
   });
 
