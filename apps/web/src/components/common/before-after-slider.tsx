@@ -26,6 +26,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// Matches the gap-3 between the frame and the size badges.
+const WRAPPER_GAP_PX = 12;
+
+const FRAME_BORDER_PX = 2;
+
 const CHECKERBOARD_STYLE: React.CSSProperties = {
   backgroundColor: "#ffffff",
   backgroundImage:
@@ -122,6 +127,23 @@ export function BeforeAfterSlider({
   }, []);
 
   const afterImgRef = useRef<HTMLImageElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // State, not a ref: the badge row mounts later and the observer must pick it up.
+  const [badgesEl, setBadgesEl] = useState<HTMLDivElement | null>(null);
+
+  // 70dvh is only the binding height on a tall pane. On a short one the frame
+  // shrinks through min-h-0 and the images letterbox sideways again, so the
+  // cap also needs the height the pane really leaves for the frame (#4946).
+  const [frameMaxHeight, setFrameMaxHeight] = useState<number | null>(null);
+
+  const measureFrameMaxHeight = useCallback(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const badgesHeight = badgesEl ? badgesEl.offsetHeight + WRAPPER_GAP_PX : 0;
+    // The frame's 1px border sits inside its max-width but outside the image.
+    const available = wrapper.clientHeight - badgesHeight - FRAME_BORDER_PX;
+    setFrameMaxHeight(available > 0 ? available : null);
+  }, [badgesEl]);
 
   const measureContentBox = useCallback(() => {
     const img = afterImgRef.current;
@@ -143,18 +165,24 @@ export function BeforeAfterSlider({
   }, []);
 
   // The frame resizes after load (the aspect cap above, a window resize), so
-  // re-measure whenever the after image's box changes, or the background
-  // layers drift off the image.
+  // re-measure whenever the after image's box or the pane changes, or the
+  // background layers drift off the image.
   useEffect(() => {
     const img = afterImgRef.current;
-    if (!img) return;
-    const observer = new ResizeObserver(measureContentBox);
+    const wrapper = wrapperRef.current;
+    if (!img || !wrapper) return;
+    const observer = new ResizeObserver(() => {
+      measureContentBox();
+      measureFrameMaxHeight();
+    });
     observer.observe(img);
+    observer.observe(wrapper);
+    if (badgesEl) observer.observe(badgesEl);
     return () => observer.disconnect();
-  }, [measureContentBox]);
+  }, [measureContentBox, measureFrameMaxHeight, badgesEl]);
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full h-full min-h-0">
+    <div ref={wrapperRef} className="flex flex-col items-center gap-3 w-full h-full min-h-0">
       {/* Slider container */}
       <div
         ref={containerRef}
@@ -167,7 +195,9 @@ export function BeforeAfterSlider({
         className="relative flex w-full min-h-0 overflow-hidden rounded-lg border border-border select-none touch-none"
         style={{
           cursor: isDragging ? (isMobile ? "ns-resize" : "ew-resize") : "default",
-          maxWidth: beforeAspect ? `calc(70dvh * ${beforeAspect})` : undefined,
+          maxWidth: beforeAspect
+            ? `calc(${frameMaxHeight ? `min(70dvh, ${frameMaxHeight}px)` : "70dvh"} * ${beforeAspect})`
+            : undefined,
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -328,7 +358,7 @@ export function BeforeAfterSlider({
 
       {/* Size comparison badges */}
       {beforeSize != null && afterSize != null && (
-        <div className="flex items-center gap-4 text-xs">
+        <div ref={setBadgesEl} className="flex items-center gap-4 text-xs">
           <span className="px-2 py-1 rounded bg-muted text-muted-foreground">
             {format(t.comparison.originalSize, { size: formatSize(beforeSize) })}
           </span>
