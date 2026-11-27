@@ -3618,7 +3618,7 @@ export const sv: TranslationKeys = {
       windowTooShort: "Lämna minst 0,1 sekund mellan start och slut",
       start: "Start",
       end: "Slut",
-      precise: "Bildruteexakt (omkodas)",
+      precise: "Exakt slutbildruta (omkodar hela klippet)",
       submit: "Trimma",
       submitBatch: "Trimma ({count} filer)",
       progressLabel: "Trimmar",

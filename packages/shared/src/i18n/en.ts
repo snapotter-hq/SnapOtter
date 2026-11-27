@@ -3561,7 +3561,7 @@ export const en = {
       windowTooShort: "Keep at least 0.1 seconds between start and end",
       start: "Start",
       end: "End",
-      precise: "Frame-accurate (re-encodes)",
+      precise: "Exact end frame (re-encodes the whole clip)",
       submit: "Trim",
       submitBatch: "Trim ({count} files)",
       progressLabel: "Trimming",

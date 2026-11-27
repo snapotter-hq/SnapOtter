@@ -3624,7 +3624,7 @@ export const id: TranslationKeys = {
       windowTooShort: "Beri jarak minimal 0,1 detik antara mulai dan akhir",
       start: "Mulai",
       end: "Akhir",
-      precise: "Akurat per frame (encoding ulang)",
+      precise: "Frame akhir yang tepat (encoding ulang seluruh klip)",
       submit: "Potong",
       submitBatch: "Potong ({count} file)",
       progressLabel: "Memotong",

@@ -3298,7 +3298,7 @@ export const zhTW: TranslationKeys = {
       windowTooShort: "開始和結束之間至少要留 0.1 秒",
       start: "開始",
       end: "結束",
-      precise: "逐幀精準（重新編碼）",
+      precise: "精準結束幀（重新編碼整個片段）",
       submit: "修剪",
       submitBatch: "修剪（{count} 個檔案）",
       progressLabel: "正在修剪",

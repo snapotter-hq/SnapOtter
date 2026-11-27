@@ -3628,7 +3628,7 @@ export const pl: TranslationKeys = {
       windowTooShort: "Między początkiem a końcem musi być co najmniej 0,1 sekundy",
       start: "Początek",
       end: "Koniec",
-      precise: "Dokładność klatkowa (ponowne kodowanie)",
+      precise: "Dokładna klatka końcowa (ponowne kodowanie całego klipu)",
       submit: "Przytnij",
       submitBatch: "Przytnij ({count} plików)",
       progressLabel: "Przycinanie",

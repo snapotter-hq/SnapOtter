@@ -3551,7 +3551,7 @@ export const ko: TranslationKeys = {
       windowTooShort: "시작과 끝 사이를 0.1초 이상으로 두세요",
       start: "시작",
       end: "끝",
-      precise: "프레임 정밀 (재인코딩)",
+      precise: "정확한 끝 프레임 (클립 전체 재인코딩)",
       submit: "트리밍",
       submitBatch: "트리밍 ({count}개 파일)",
       progressLabel: "트리밍 중",

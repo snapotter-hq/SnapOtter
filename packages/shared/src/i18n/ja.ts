@@ -3577,7 +3577,7 @@ export const ja: TranslationKeys = {
       windowTooShort: "開始と終了の間は 0.1 秒以上空けてください",
       start: "開始",
       end: "終了",
-      precise: "フレーム単位 (再エンコード)",
+      precise: "終了フレームを正確に (クリップ全体を再エンコード)",
       submit: "トリミング",
       submitBatch: "トリミング ({count} ファイル)",
       progressLabel: "トリミング中",

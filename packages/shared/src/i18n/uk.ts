@@ -3630,7 +3630,7 @@ export const uk: TranslationKeys = {
       windowTooShort: "Між початком і кінцем має бути щонайменше 0,1 секунди",
       start: "Початок",
       end: "Кінець",
-      precise: "Покадрова точність (перекодування)",
+      precise: "Точний кінцевий кадр (перекодовує весь кліп)",
       submit: "Обрізати",
       submitBatch: "Обрізати ({count} файлів)",
       progressLabel: "Обрізання",
