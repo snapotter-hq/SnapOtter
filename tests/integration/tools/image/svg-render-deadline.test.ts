@@ -4,6 +4,7 @@
  * of keeping libvips busy in the API process (#5274).
  */
 
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import sharp from "sharp";
@@ -25,12 +26,16 @@ const EXPENSIVE_SVG = Buffer.from(
 );
 // Distinct content per call: the timeout memory is keyed by content, so a
 // repeat of EXPENSIVE_SVG answers at once and would hide the per-file cost.
-const slowSvg = (n: number) =>
-  Buffer.from(
+// The filter id is random per call so a vitest retry (which would otherwise
+// hit the 60 s failure memory and pass untested) still runs the timeout path.
+const slowSvg = (n: number) => {
+  const id = `f${randomUUID().replaceAll("-", "")}`;
+  return Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000">' +
-      `<defs><filter id="f"><feTurbulence baseFrequency="0.0${50 + n}" numOctaves="8"/><feGaussianBlur stdDeviation="20"/></filter></defs>` +
-      `<rect id="r" width="2000" height="2000" filter="url(#f)"/>${'<use href="#r"/>'.repeat(40)}</svg>`,
+      `<defs><filter id="${id}"><feTurbulence baseFrequency="0.0${50 + n}" numOctaves="8"/><feGaussianBlur stdDeviation="20"/></filter></defs>` +
+      `<rect id="r" width="2000" height="2000" filter="url(#${id})"/>${'<use href="#r"/>'.repeat(40)}</svg>`,
   );
+};
 const PNG = readFixture(fixtures.image.base.png200);
 
 let testApp: TestApp;
