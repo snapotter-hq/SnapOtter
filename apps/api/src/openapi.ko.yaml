@@ -14205,7 +14205,7 @@ paths:
       tags:
         - PDF
       summary: PDF 자르기
-      description: 모든 페이지를 균일한 여백으로 자릅니다.
+      description: 여백 또는 지정한 영역으로 모든 페이지를 자릅니다.
       security:
         - bearerAuth: []
       requestBody:
@@ -14224,8 +14224,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    옵션이 담긴 JSON 문자열:
-                    - `margin` (숫자 0-2000, 기본값 20) - 포인트 단위 균일 자르기 여백
+                    옵션이 담긴 JSON 문자열(모든 값은 포인트 단위):
+                    - `mode` ("uniform" | "sides" | "region", 기본값 "uniform") - 자르는 방식. 각 모드는 자신의 필드만 읽습니다
+                    - `margin` (숫자 0-2000, 기본값 20) - `uniform`: 모든 가장자리의 자르기 여백
+                    - `top`, `right`, `bottom`, `left` (숫자 0-2000, 기본값 0) - `sides`: 각 가장자리별 자르기 여백
+                    - `x`, `y` (숫자 0-14400, 기본값 0) - `region`: 각 페이지의 왼쪽과 위쪽 가장자리에서의 오프셋
+                    - `width`, `height` (숫자 1-14400, 기본값 288 및 432) - `region`: 영역 크기. 모든 페이지 안에 들어가야 합니다
             example:
               file: photo.png
               settings: '{}'
@@ -30286,9 +30290,9 @@ x-i18n:
       provenance: machine
       outputHash: a68b0c203c80
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: e3f8bb620a98
+      outputHash: fb903303dc8e
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36946,9 +36950,9 @@ x-i18n:
       provenance: machine
       outputHash: 729b478f2f51
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: be905dc3b4ed
+      outputHash: 48eb66c98a1f
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

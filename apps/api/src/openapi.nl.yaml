@@ -14156,7 +14156,7 @@ paths:
       tags:
         - PDF
       summary: PDF bijsnijden
-      description: Snijd alle pagina's bij met een uniforme marge.
+      description: Snijd alle pagina's bij met marges of tot een gebied.
       security:
         - bearerAuth: []
       requestBody:
@@ -14175,8 +14175,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON-string met opties:
-                    - `margin` (number 0-2000, standaard 20) - Uniforme bijsnijdmarge in punten
+                    JSON-tekenreeks met opties (alle waarden in punten):
+                    - `mode` ("uniform" | "sides" | "region", standaard "uniform") - Hoe er wordt bijgesneden. Elke modus leest alleen zijn eigen velden
+                    - `margin` (getal 0-2000, standaard 20) - `uniform`: bijsnijdmarge voor elke rand
+                    - `top`, `right`, `bottom`, `left` (getal 0-2000, standaard 0) - `sides`: bijsnijdmarge voor elke rand afzonderlijk
+                    - `x`, `y` (getal 0-14400, standaard 0) - `region`: afstand tot de linker- en bovenrand van elke pagina
+                    - `width`, `height` (getal 1-14400, standaard 288 en 432) - `region`: grootte van het gebied, dat op elke pagina moet passen
             example:
               file: photo.png
               settings: '{}'
@@ -30222,9 +30226,9 @@ x-i18n:
       provenance: machine
       outputHash: e019860d89c3
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 506515538cc2
+      outputHash: ab9cf5e8aea3
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36882,9 +36886,9 @@ x-i18n:
       provenance: machine
       outputHash: fe03d766f8b3
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 4b385d194ece
+      outputHash: e550d95df212
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

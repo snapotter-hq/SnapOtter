@@ -14157,7 +14157,7 @@ paths:
       tags:
         - PDF
       summary: PDF の切り抜き
-      description: すべてのページを均一な余白で切り抜きます。
+      description: 余白または指定した領域ですべてのページを切り抜きます。
       security:
         - bearerAuth: []
       requestBody:
@@ -14176,8 +14176,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    オプションを含む JSON 文字列:
-                    - `margin` (number 0-2000, デフォルト 20) - 均一な切り抜きの余白（ポイント）
+                    オプションを指定する JSON 文字列(すべての値はポイント単位):
+                    - `mode` ("uniform" | "sides" | "region", デフォルト "uniform") - 切り抜き方法。各モードは自身のフィールドだけを読み取ります
+                    - `margin` (数値 0-2000, デフォルト 20) - `uniform`: すべての辺の切り抜き余白
+                    - `top`, `right`, `bottom`, `left` (数値 0-2000, デフォルト 0) - `sides`: 各辺ごとの切り抜き余白
+                    - `x`, `y` (数値 0-14400, デフォルト 0) - `region`: 各ページの左端と上端からのオフセット
+                    - `width`, `height` (数値 1-14400, デフォルト 288 および 432) - `region`: 領域のサイズ。すべてのページに収まる必要があります
             example:
               file: photo.png
               settings: '{}'
@@ -30223,9 +30227,9 @@ x-i18n:
       provenance: machine
       outputHash: 979b9cab87a1
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 0d4afefe5f77
+      outputHash: cdd6d7880c8b
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36883,9 +36887,9 @@ x-i18n:
       provenance: machine
       outputHash: 334d110da28a
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 3c2a085f3214
+      outputHash: 831fe7292d4b
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

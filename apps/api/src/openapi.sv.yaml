@@ -14207,7 +14207,7 @@ paths:
       tags:
         - PDF
       summary: Beskär PDF
-      description: Beskär alla sidor med en enhetlig marginal.
+      description: Beskär alla sidor med marginaler eller till en region.
       security:
         - bearerAuth: []
       requestBody:
@@ -14226,8 +14226,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON-sträng med alternativ:
-                    - `margin` (number 0-2000, standard 20) - Enhetlig beskärningsmarginal i punkter
+                    JSON-sträng med alternativ (alla värden i punkter):
+                    - `mode` ("uniform" | "sides" | "region", standard "uniform") - Hur beskärningen görs. Varje läge läser bara sina egna fält
+                    - `margin` (tal 0-2000, standard 20) - `uniform`: beskärningsmarginal för varje kant
+                    - `top`, `right`, `bottom`, `left` (tal 0-2000, standard 0) - `sides`: beskärningsmarginal för varje kant för sig
+                    - `x`, `y` (tal 0-14400, standard 0) - `region`: förskjutning från varje sidas vänstra och övre kant
+                    - `width`, `height` (tal 1-14400, standard 288 och 432) - `region`: regionens storlek, som måste rymmas på varje sida
             example:
               file: photo.png
               settings: '{}'
@@ -30287,9 +30291,9 @@ x-i18n:
       provenance: machine
       outputHash: 2b3569e464cd
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: d10def82e485
+      outputHash: f86f9076dbb8
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36947,9 +36951,9 @@ x-i18n:
       provenance: machine
       outputHash: de4dd32cc066
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: 7ebf408f3f55
+      outputHash: e0476e685cb4
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

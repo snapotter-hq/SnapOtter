@@ -14211,7 +14211,7 @@ paths:
       tags:
         - PDF
       summary: Обрізати PDF
-      description: Обрізати всі сторінки з рівномірним полем.
+      description: Обрізає всі сторінки за полями або до заданої області.
       security:
         - bearerAuth: []
       requestBody:
@@ -14230,8 +14230,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    JSON-рядок з параметрами:
-                    - `margin` (число 0-2000, за замовчуванням 20) - Рівномірний відступ обрізання в пунктах
+                    JSON-рядок із параметрами (усі значення в пунктах):
+                    - `mode` ("uniform" | "sides" | "region", за замовчуванням "uniform") - Спосіб обрізання. Кожен режим читає лише власні поля
+                    - `margin` (число 0-2000, за замовчуванням 20) - `uniform`: величина обрізання для кожного краю
+                    - `top`, `right`, `bottom`, `left` (число 0-2000, за замовчуванням 0) - `sides`: величина обрізання для кожного краю окремо
+                    - `x`, `y` (число 0-14400, за замовчуванням 0) - `region`: зсув від лівого та верхнього країв кожної сторінки
+                    - `width`, `height` (число 1-14400, за замовчуванням 288 і 432) - `region`: розмір області, яка має вміщатися на кожній сторінці
             example:
               file: photo.png
               settings: '{}'
@@ -30292,9 +30296,9 @@ x-i18n:
       provenance: machine
       outputHash: 7e0559e4e2e1
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: f3481992fd76
+      outputHash: c7cf1267d33b
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36952,9 +36956,9 @@ x-i18n:
       provenance: machine
       outputHash: b30e6d610f24
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: aff004fb55fe
+      outputHash: 7ac28f4fb654
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine

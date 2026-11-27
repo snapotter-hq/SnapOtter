@@ -14210,7 +14210,7 @@ paths:
       tags:
         - PDF
       summary: Cắt xén PDF
-      description: Cắt xén tất cả các trang với một lề đồng đều.
+      description: Cắt tất cả trang theo lề hoặc theo một vùng.
       security:
         - bearerAuth: []
       requestBody:
@@ -14229,8 +14229,12 @@ paths:
                 settings:
                   type: string
                   description: |
-                    Chuỗi JSON với các tùy chọn:
-                    - `margin` (số 0-2000, mặc định 20) - Lề cắt đồng đều tính bằng point
+                    Chuỗi JSON chứa các tùy chọn (mọi giá trị tính bằng điểm):
+                    - `mode` ("uniform" | "sides" | "region", mặc định "uniform") - Cách cắt. Mỗi chế độ chỉ đọc các trường của riêng nó
+                    - `margin` (số 0-2000, mặc định 20) - `uniform`: lề cắt cho mọi cạnh
+                    - `top`, `right`, `bottom`, `left` (số 0-2000, mặc định 0) - `sides`: lề cắt riêng cho từng cạnh
+                    - `x`, `y` (số 0-14400, mặc định 0) - `region`: độ lệch từ cạnh trái và cạnh trên của mỗi trang
+                    - `width`, `height` (số 1-14400, mặc định 288 và 432) - `region`: kích thước vùng, phải vừa với mọi trang
             example:
               file: photo.png
               settings: '{}'
@@ -30290,9 +30294,9 @@ x-i18n:
       provenance: machine
       outputHash: 291facd34a46
     paths./api/v1/tools/pdf/crop-pdf.post.description:
-      sourceHash: 94eb9575aecc
+      sourceHash: bf41f42bcf80
       provenance: machine
-      outputHash: 725d76794b8e
+      outputHash: a2eeeafaca06
     paths./api/v1/tools/pdf/nup-pdf.post.summary:
       sourceHash: dac1b895452a
       provenance: machine
@@ -36950,9 +36954,9 @@ x-i18n:
       provenance: machine
       outputHash: c05e61914160
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/requestBody/content/multipart~1form-data/schema/properties/settings/description:
-      sourceHash: 01bbd4284711
+      sourceHash: 3b5b767028c5
       provenance: machine
-      outputHash: b7b34af9c462
+      outputHash: 76c144a261a1
     ptr:/paths/~1api~1v1~1tools~1pdf~1crop-pdf/post/responses/200/description:
       sourceHash: 706685797cf2
       provenance: machine
