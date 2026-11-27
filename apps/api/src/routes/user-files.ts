@@ -46,6 +46,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { rasterizeSanitizedSvg } from "../lib/image-input-prep.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
 import {
@@ -949,7 +950,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           }
         }
         if (validation.format === "svg" || fallbackFormat === "svg") {
-          decoded = Buffer.from(sanitizeSvg(decompressSvgz(decoded)));
+          // The deadline-bound render; a too-slow SVG lands in the 422 below.
+          decoded = Buffer.from(
+            await rasterizeSanitizedSvg(Buffer.from(sanitizeSvg(decompressSvgz(decoded)))),
+          );
         }
         const fileBuffer = decoded;
 

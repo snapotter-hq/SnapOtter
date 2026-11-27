@@ -38,7 +38,7 @@ import {
   svgClientErrorFields,
 } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
-import { isPixelSafetyError } from "../../modality/image-input.js";
+import { isPixelSafetyError, rasterizeSvgInput } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 // ---------------------------------------------------------------------------
@@ -221,6 +221,7 @@ async function prepareMemeImage(
   }
   if (isSvg) {
     buf = sanitizeSvgInput(buf);
+    buf = await rasterizeSvgInput(buf, {});
   } else {
     buf = await autoOrient(buf, log);
   }
@@ -418,9 +419,12 @@ export function registerMemeGenerator(app: FastifyInstance) {
     try {
       imageBuffer = await prepareMemeImage(imageBuffer, filename, request.log);
     } catch (err) {
+      if (hasServerErrorStatus(err)) throw err;
       if (err instanceof InputValidationError) {
-        return reply.status(400).send({
+        return reply.status(err.statusCode).send({
           error: err.message,
+          ...(err.details && { details: err.details }),
+          ...(err.code && { code: err.code }),
         });
       }
       if (isToolInputError(err)) {

@@ -23,6 +23,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { rasterizeSanitizedSvg } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import {
@@ -377,6 +378,11 @@ export function registerEditMetadata(app: FastifyInstance) {
               } else {
                 throw rawDecodeErr;
               }
+            }
+            // A sanitized SVG stored under a CLI-decoded type reaches here
+            // undecoded; render it in the deadline-bound child, not in sharp.
+            if (previewInput && isSvg && previewInput === outputBuffer) {
+              previewInput = await rasterizeSanitizedSvg(previewInput);
             }
             if (previewInput) {
               const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();

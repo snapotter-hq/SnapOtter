@@ -22,6 +22,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { renderSanitizedSvgOrReply } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import {
@@ -292,6 +293,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
           }
           throw asDecoderOutOfMemory(err);
         }
+        const rendered = await renderSanitizedSvgOrReply(fileBuffer, reply);
+        if (!rendered) return reply;
+        fileBuffer = rendered;
       }
 
       let storing = false;

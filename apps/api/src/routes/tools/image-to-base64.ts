@@ -15,6 +15,7 @@ import {
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { rasterizeSanitizedSvg } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import {
@@ -187,6 +188,12 @@ export function registerImageToBase64(app: FastifyInstance) {
           }
           let width = metadata.width ?? 0;
           let height = metadata.height ?? 0;
+
+          // "original" hands the SVG text back untouched, so only a conversion
+          // renders it, and that render goes through the deadline-bound child.
+          if (isSvg && opts.outputFormat !== "original") {
+            pipeline = sharp(await rasterizeSanitizedSvg(decoded));
+          }
 
           // Apply resize if requested
           if (opts.maxWidth > 0 || opts.maxHeight > 0) {

@@ -5,7 +5,7 @@ import { open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
-import { hasServerErrorStatus, wrapWithMemoryLimit } from "@snapotter/shared";
+import { hasServerErrorStatus, toolInputErrorCode, wrapWithMemoryLimit } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -20,6 +20,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { imageSizeLimitError } from "../../lib/image-error.js";
+import { rasterizeSanitizedSvg } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import {
@@ -182,7 +183,11 @@ export function registerInfo(app: FastifyInstance) {
 
     try {
       const metadata = await sharp(metaBuffer).metadata();
-      const stats = await sharp(metaBuffer).stats();
+      // Metadata describes the SVG itself, so only the copy that stats() reads
+      // pixels from goes through the deadline-bound render.
+      const statsBuffer =
+        isSvg || fallbackFormat === "svg" ? await rasterizeSanitizedSvg(metaBuffer) : metaBuffer;
+      const stats = await sharp(statsBuffer).stats();
 
       // Build histogram data from stats
       const histogram = stats.channels.map((ch, i) => ({
@@ -225,6 +230,10 @@ export function registerInfo(app: FastifyInstance) {
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       const tooLarge = imageSizeLimitError(err);
       if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
+      const code = toolInputErrorCode(err);
+      if (err instanceof Error && (code === "SVG_TOO_COMPLEX" || code === "IMAGE_TOO_LARGE")) {
+        return reply.status(400).send({ error: err.message, code });
+      }
       return reply.status(422).send({
         error: "Failed to read image metadata",
         details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

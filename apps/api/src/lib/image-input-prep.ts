@@ -5,12 +5,14 @@ import {
   markToolInputError,
   pixelLimitImageError,
   ToolInputError,
+  toolInputErrorCode,
 } from "@snapotter/shared";
-import type { FastifyBaseLogger } from "fastify";
+import type { FastifyBaseLogger, FastifyReply } from "fastify";
 import sharp from "sharp";
 import { InputValidationError } from "../modality/contract.js";
 import { isPixelSafetyError, replaceExtWithPng } from "../modality/image-input.js";
 import { autoOrient } from "./auto-orient.js";
+import { stripInternalPaths } from "./errors.js";
 import {
   asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
@@ -21,7 +23,7 @@ import {
 import { decodeHeic } from "./heic-converter.js";
 import { asInputErrorIfUndecodable } from "./image-error.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
-import { renderSvgToPng } from "./svg-render.js";
+import { type RenderSvgOptions, renderSvgToPng } from "./svg-render.js";
 import {
   decompressSvgz,
   isSvgzClientError,
@@ -68,6 +70,54 @@ function svgRenderFailure(err: unknown): unknown {
   return err instanceof Error
     ? markToolInputError(err, "IMAGE_UNDECODABLE")
     : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
+}
+
+/**
+ * Rasterize an already sanitized SVG through the deadline-bound child render,
+ * for routes that run their own intake instead of `prepareRouteImage`. Throws
+ * what `prepareRouteImage` throws: SVG_TOO_COMPLEX past the deadline, a decoder
+ * fault when the renderer can't run, a pixel-limit 400, or IMAGE_UNDECODABLE
+ * (#5274).
+ */
+export async function rasterizeSanitizedSvg(
+  svg: Buffer,
+  opts: RenderSvgOptions = {},
+): Promise<Buffer> {
+  try {
+    return await renderSvgToPng(svg, opts);
+  } catch (err) {
+    throw svgRenderFailure(err);
+  }
+}
+
+/**
+ * `rasterizeSanitizedSvg` for routes that answer with `reply` directly. Sends
+ * the 400 (too slow to render, over the pixel cap) or the 422 (librsvg can't
+ * draw it) itself and returns null; a missing renderer is rethrown so the
+ * route's 503 handling sees it like any decoder gap.
+ */
+export async function renderSanitizedSvgOrReply(
+  svg: Buffer,
+  reply: FastifyReply,
+  opts: RenderSvgOptions = {},
+): Promise<Buffer | null> {
+  try {
+    return await rasterizeSanitizedSvg(svg, opts);
+  } catch (failure) {
+    if (isDecoderUnavailable(failure) || hasServerErrorStatus(failure)) throw failure;
+    const code = toolInputErrorCode(failure);
+    if (failure instanceof ToolInputError) {
+      reply.status(400).send({ error: failure.message, ...(code && { code }) });
+    } else {
+      const message = failure instanceof Error ? failure.message : String(failure);
+      reply.status(422).send({
+        error: "Failed to render SVG file",
+        details: stripInternalPaths(message),
+        ...(code && { code }),
+      });
+    }
+    return null;
+  }
 }
 
 /**
