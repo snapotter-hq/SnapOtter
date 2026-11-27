@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { qoiEncode } from "@snapotter/image-engine";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   asDecoderOutOfMemory,
@@ -85,9 +86,10 @@ export async function encodeJp2(inputBuffer: Buffer, quality?: number): Promise<
     await writeFile(inputPath, pngBuffer);
     try {
       const rate = quality ? String(Math.max(1, Math.round(quality / 10))) : "5";
-      await execFileAsync("opj_compress", ["-i", inputPath, "-o", outputPath, "-r", rate], {
-        timeout: 60_000,
-      });
+      await execFileAsync(
+        ...wrapWithMemoryLimit("opj_compress", ["-i", inputPath, "-o", outputPath, "-r", rate]),
+        { timeout: 60_000 },
+      );
       return await readFile(outputPath);
     } catch {
       /* fall back to ImageMagick */
@@ -210,7 +212,7 @@ export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<
     await writeFile(inputPath, pngBuffer);
     try {
       const q = String(cjxlQuality(quality));
-      await execFileAsync("cjxl", [inputPath, outputPath, "-q", q], {
+      await execFileAsync(...wrapWithMemoryLimit("cjxl", [inputPath, outputPath, "-q", q]), {
         timeout: 120_000,
       }).catch((err: unknown) => {
         throw asDecoderUnavailable(asDecoderOutOfMemory(err));

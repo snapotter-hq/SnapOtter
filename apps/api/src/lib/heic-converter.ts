@@ -5,6 +5,7 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { wrapWithMemoryLimit } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   asDecoderOutOfMemory,
@@ -244,7 +245,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
 
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync(cmd, [inputPath, outputPath], {
+    await execFileAsync(...wrapWithMemoryLimit(cmd, [inputPath, outputPath]), {
       timeout: 120_000,
       signal: options.signal,
     }).catch((err: unknown) => {
@@ -320,9 +321,10 @@ export async function encodeHeic(buffer: Buffer, quality = 80): Promise<Buffer> 
 
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync("heif-enc", ["-q", String(quality), "-o", outputPath, inputPath], {
-      timeout: 120_000,
-    }).catch((err: unknown) => {
+    await execFileAsync(
+      ...wrapWithMemoryLimit("heif-enc", ["-q", String(quality), "-o", outputPath, inputPath]),
+      { timeout: 120_000 },
+    ).catch((err: unknown) => {
       throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
     return await readFile(outputPath).catch((err: unknown) => {

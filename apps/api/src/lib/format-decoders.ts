@@ -790,8 +790,7 @@ export function buildImageMagickResourceLimitArgs(options: DecodeSafetyOptions =
 // ImageMagick stays outside SUBPROCESS_MEMORY_LIMIT_MB (#5204): these -limit
 // flags bound it already, and its OpenMP threads reserve far more address
 // space than they use, so a `ulimit -v` cap sized for the other decoders could
-// fail ordinary decodes. dcraw_emu (LibRaw, also built with OpenMP) stays out
-// for the same reason until it's checked under the cap.
+// fail ordinary decodes.
 function magickArgs(cmd: string, args: string[], options: DecodeSafetyOptions = {}): string[] {
   const limits = buildImageMagickResourceLimitArgs(options);
   const convertArgs = [...limits, ...args];
@@ -867,8 +866,7 @@ async function decodeRaw(
     let dcrawFailure: unknown;
     try {
       await execFileAsync(
-        "dcraw_emu",
-        ["-T", "-w", "-o", "1", inputPath],
+        ...wrapWithMemoryLimit("dcraw_emu", ["-T", "-w", "-o", "1", inputPath]),
         commandOptions(options, 120_000),
       );
       const tiffBuf = await readFile(dcrawOutput);

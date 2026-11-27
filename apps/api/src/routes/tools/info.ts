@@ -5,7 +5,7 @@ import { open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
-import { hasServerErrorStatus } from "@snapotter/shared";
+import { hasServerErrorStatus, wrapWithMemoryLimit } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -306,8 +306,7 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
       throw normalizeOperationalWriteError(writeErr);
     }
     const { stdout } = await execFileAsync(
-      "exiftool",
-      [
+      ...wrapWithMemoryLimit("exiftool", [
         "-j",
         "-G",
         "-ImageWidth",
@@ -320,7 +319,7 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
         "-EXIF:all",
         "-XMP:XMPToolkit",
         tmpPath,
-      ],
+      ]),
       { timeout: 10_000, maxBuffer: 10 * 1024 * 1024 },
     );
     const [data] = JSON.parse(stdout) as Array<Record<string, unknown> | undefined>;
