@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 asset_name="snapotter-v${VERSION}-${PLATFORM_PAIR}.digest"
 # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
 persist_release_id="$(
@@ -15,8 +18,8 @@ persist_release_id="$(
 }
 gh api "repos/${GITHUB_REPOSITORY}/releases/${persist_release_id}" \
   --jq ".assets[] | select(.name == \"${asset_name}\") | .id" \
-  > /tmp/platform-digest-asset-ids
-mapfile -t asset_ids < /tmp/platform-digest-asset-ids
+  > "${scratch}/platform-digest-asset-ids"
+mapfile -t asset_ids < "${scratch}/platform-digest-asset-ids"
 [[ ${#asset_ids[@]} -le 1 ]] || {
   echo "::error::GitHub release contains duplicate ${asset_name} assets"
   exit 1
@@ -24,8 +27,8 @@ mapfile -t asset_ids < /tmp/platform-digest-asset-ids
 if [[ ${#asset_ids[@]} -eq 1 ]]; then
   gh api -H "Accept: application/octet-stream" \
     "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_ids[0]}" \
-    > "/tmp/existing-${asset_name}"
-  cmp --silent "/tmp/existing-${asset_name}" "/tmp/release-digests/${asset_name}" || {
+    > "${scratch}/existing-${asset_name}"
+  cmp --silent "${scratch}/existing-${asset_name}" "/tmp/release-digests/${asset_name}" || {
     echo "::error::Existing GitHub release platform digest differs for ${PLATFORM_PAIR}"
     exit 1
   }

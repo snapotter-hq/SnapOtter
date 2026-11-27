@@ -5,6 +5,9 @@
 # shellcheck disable=SC2154
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 REPOSITORY="snapotter-hq/SnapOtter"
 # By id, not by tag: /releases/tags/{tag} 404s while the release is a draft.
 release_id="$(
@@ -16,7 +19,7 @@ release_id="$(
   exit 1
 }
 asset_list="$(mktemp)"
-trap 'rm -f "${asset_list}" /tmp/existing-release-asset-*' EXIT
+trap 'rm -f "${asset_list}" "${scratch}"/existing-release-asset-*' EXIT
 
 refresh_assets() {
   gh api --paginate \
@@ -36,7 +39,7 @@ compare_asset() {
   local asset_name
   local downloaded
   asset_name="$(basename "${asset_path}")"
-  downloaded="/tmp/existing-release-asset-${asset_id}"
+  downloaded="${scratch}/existing-release-asset-${asset_id}"
   gh api \
     -H "Accept: application/octet-stream" \
     "repos/${REPOSITORY}/releases/assets/${asset_id}" \

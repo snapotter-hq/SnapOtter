@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 valid_action_digests=true
 mapfile -t digest_files < <(find /tmp/digests -maxdepth 1 -type f -print 2>/dev/null)
 [[ ${#digest_files[@]} -eq 2 ]] || valid_action_digests=false
@@ -13,21 +16,21 @@ if [[ "${valid_action_digests}" == true ]]; then
   done
 fi
 if [[ "${valid_action_digests}" != true ]]; then
-  rm -rf /tmp/digests /tmp/release-digest-assets
-  mkdir -p /tmp/digests /tmp/release-digest-assets
+  rm -rf /tmp/digests "${scratch}/release-digest-assets"
+  mkdir -p /tmp/digests "${scratch}/release-digest-assets"
   gh release download "v${VERSION}" \
     --pattern "snapotter-v${VERSION}-linux-*.digest" \
-    --dir /tmp/release-digest-assets \
+    --dir "${scratch}/release-digest-assets" \
     --repo snapotter-hq/SnapOtter
   mapfile -t release_assets < <(
-    find /tmp/release-digest-assets -mindepth 1 -maxdepth 1 -type f -print
+    find "${scratch}/release-digest-assets" -mindepth 1 -maxdepth 1 -type f -print
   )
   [[ ${#release_assets[@]} -eq 2 ]] || {
     echo "::error::Expected exactly two immutable platform digest release assets"
     exit 1
   }
   for platform in linux-amd64 linux-arm64; do
-    asset="/tmp/release-digest-assets/snapotter-v${VERSION}-${platform}.digest"
+    asset="${scratch}/release-digest-assets/snapotter-v${VERSION}-${platform}.digest"
     [[ -f "${asset}" && ! -L "${asset}" ]] || {
       echo "::error::Missing immutable ${platform} digest release asset"
       exit 1

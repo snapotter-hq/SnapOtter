@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 mapfile -t digest_files < <(find . -maxdepth 1 -type f -exec basename {} \;)
 [[ ${#digest_files[@]} -eq 2 ]] || {
   echo "::error::Recovered platform digest closure is invalid"
@@ -22,7 +25,7 @@ for digest_sha in "${digest_files[@]}"; do
   for reference in \
     ghcr.io/snapotter-hq/snapotter \
     snapotter/snapotter; do
-    manifest="/tmp/publish-platform-manifest-${digest_sha}-${registry_index}.json"
+    manifest="${scratch}/publish-platform-manifest-${digest_sha}-${registry_index}.json"
     error="${manifest}.error"
     if ! docker buildx imagetools inspect "${reference}@${digest}" --raw \
       > "${manifest}" 2> "${error}"; then

@@ -139,9 +139,12 @@ class StepHarness {
   readonly bin = path.join(this.dir, "bin");
   readonly log = path.join(this.dir, "calls.log");
   readonly output = path.join(this.dir, "github-output");
+  /** The job's own temp dir; scratch files must land here, not in a shared /tmp (#5155). */
+  readonly runnerTemp = path.join(this.dir, "runner-temp");
 
   constructor(stubs: Record<string, string>) {
     mkdirSync(this.bin);
+    mkdirSync(this.runnerTemp);
     for (const [name, body] of Object.entries(stubs)) {
       writeFileSync(
         path.join(this.bin, name),
@@ -159,6 +162,7 @@ class StepHarness {
         PATH: `${this.bin}:${process.env.PATH ?? ""}`,
         GITHUB_OUTPUT: this.output,
         GITHUB_REPOSITORY: "snapotter-hq/SnapOtter",
+        RUNNER_TEMP: this.runnerTemp,
         STUB_DIR: this.dir,
         STUB_LOG: this.log,
         ...env,
@@ -272,7 +276,8 @@ describe.runIf(releaseShellReady || inCI)("release step script behaviour", () =>
     const version = "9.8.7";
     const assetName = `snapotter-v${version}-linux-amd64.digest`;
     const localDigest = `/tmp/release-digests/${assetName}`;
-    const scratch = [localDigest, `/tmp/existing-${assetName}`, "/tmp/platform-digest-asset-ids"];
+    // Only the handed-off digest stays in /tmp; the other scratch files live in RUNNER_TEMP.
+    const scratch = [localDigest];
     let harness: StepHarness;
     beforeEach(() => {
       mkdirSync("/tmp/release-digests", { recursive: true });
@@ -315,6 +320,8 @@ describe.runIf(releaseShellReady || inCI)("release step script behaviour", () =>
       expect(result.stdout).toContain(
         `Verified existing immutable GitHub release asset ${assetName}.`,
       );
+      expect(existsSync(path.join(harness.runnerTemp, "platform-digest-asset-ids"))).toBe(true);
+      expect(existsSync(path.join(harness.runnerTemp, `existing-${assetName}`))).toBe(true);
       expect(result.calls).not.toContain("release upload");
     });
 
@@ -339,9 +346,7 @@ describe.runIf(releaseShellReady || inCI)("release step script behaviour", () =>
     // The step owns these fixed runner paths, so each test resets them.
     const version = "9.8.7";
     const resetPaths = () => {
-      for (const dir of ["/tmp/digests", "/tmp/release-digest-assets"]) {
-        rmSync(dir, { recursive: true, force: true });
-      }
+      rmSync("/tmp/digests", { recursive: true, force: true });
     };
     let harness: StepHarness;
     beforeEach(() => {
@@ -388,10 +393,11 @@ describe.runIf(releaseShellReady || inCI)("release step script behaviour", () =>
       const result = run();
       expect(result.status).toBe(0);
       expect(result.calls).toContain(
-        `gh release download v${version} --pattern snapotter-v${version}-linux-*.digest --dir /tmp/release-digest-assets --repo snapotter-hq/SnapOtter`,
+        `gh release download v${version} --pattern snapotter-v${version}-linux-*.digest --dir ${harness.runnerTemp}/release-digest-assets --repo snapotter-hq/SnapOtter`,
       );
       expect(result.output).toBe(`platform_digests=${amd64},${arm64}\n`);
       expect(readdirSync("/tmp/digests").sort()).toEqual([amd64, arm64]);
+      expect(readdirSync(path.join(harness.runnerTemp, "release-digest-assets"))).toHaveLength(2);
     });
 
     it("replaces a partial artifact download with the release checkpoints", () => {

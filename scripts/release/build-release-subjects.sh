@@ -3,6 +3,9 @@
 # A run step without a shell runs as `bash -e`, so this keeps -e and nothing more.
 set -e
 
+# Scratch files go in the job's own temp dir (#5155, see reuse-platform-digest.sh).
+scratch="${RUNNER_TEMP:-/tmp}"
+
 [[ "${GITHUB_REPOSITORY}" == "snapotter-hq/SnapOtter" ]] || {
   echo "::error::Release subjects can only be created by the canonical repository"
   exit 1
@@ -26,8 +29,8 @@ release_id="$(
 }
 gh api --paginate --slurp \
   "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
-  > /tmp/release-asset-pages.json
-RELEASE_ID="${release_id}" python3 <<'PY'
+  > "${scratch}/release-asset-pages.json"
+SCRATCH="${scratch}" RELEASE_ID="${release_id}" python3 <<'PY'
 import hashlib
 import json
 import os
@@ -44,13 +47,13 @@ workflow_trigger_commit = os.environ["WORKFLOW_TRIGGER_COMMIT"]
 manifest_digest = os.environ["MANIFEST_DIGEST"]
 release_subjects_name = f"snapotter-v{version}-release-subjects.json"
 output = Path("/tmp") / release_subjects_name
-published_root = Path("/tmp/published-release-subjects")
+published_root = Path(os.environ["SCRATCH"]) / "published-release-subjects"
 prebuilt_root = Path("/tmp/prebuilt-subjects")
 published_root.mkdir(mode=0o700, exist_ok=False)
 
 if not re.fullmatch(r"[0-9]+", release_id):
     raise SystemExit("invalid release ID")
-pages = json.loads(Path("/tmp/release-asset-pages.json").read_text())
+pages = json.loads((Path(os.environ["SCRATCH"]) / "release-asset-pages.json").read_text())
 if not isinstance(pages, list) or not all(isinstance(page, list) for page in pages):
     raise SystemExit("GitHub release asset response is not paginated JSON")
 assets = [asset for page in pages for asset in page]
