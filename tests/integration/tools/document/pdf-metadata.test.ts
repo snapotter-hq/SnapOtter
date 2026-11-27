@@ -65,6 +65,8 @@ describe.skipIf(!hasPikepdf)("pdf-metadata (requires pikepdf)", () => {
       removed: expect.arrayContaining(["Creator", "Producer", "CreationDate"]),
       xmpRemoved: false,
       pdfa: null,
+      objectXmpRemoved: 0,
+      pieceInfoRemoved: 0,
     });
 
     const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });

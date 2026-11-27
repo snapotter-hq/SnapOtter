@@ -53,7 +53,13 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfFlattenPy: vi.fn(),
   pdfMetadataGetPy: vi.fn(async () => ({ Title: "Updated" })),
   pdfMetadataSetPy: vi.fn(),
-  pdfMetadataStripPy: vi.fn(async () => ({ removed: ["Author"], xmpRemoved: true, pdfa: null })),
+  pdfMetadataStripPy: vi.fn(async () => ({
+    removed: ["Author"],
+    xmpRemoved: true,
+    pdfa: null,
+    objectXmpRemoved: 2,
+    pieceInfoRemoved: 1,
+  })),
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfScrubProducerPy: vi.fn(),
   pdfSignPy: vi.fn(async () => ({ placed: 1 })),
@@ -810,7 +816,13 @@ describe("document route processors", () => {
       expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Removing metadata");
       expect(result?.resultPayload).toEqual({
         metadata: { Title: "Updated" },
-        stripped: { removed: ["Author"], xmpRemoved: true, pdfa: null },
+        stripped: {
+          removed: ["Author"],
+          xmpRemoved: true,
+          pdfa: null,
+          objectXmpRemoved: 2,
+          pieceInfoRemoved: 1,
+        },
       });
     });
   });

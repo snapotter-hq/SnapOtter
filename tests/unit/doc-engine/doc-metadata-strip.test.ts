@@ -1,6 +1,6 @@
 // Runs doc_metadata.py's "strip" mode against PDFs built with pikepdf, then
 // reads the output back with pikepdf. Gated on pikepdf because the script
-// needs it to open the file at all (#4837).
+// needs it to open the file at all (#4837, #4972).
 
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -79,6 +79,81 @@ function inspect(path: string): { info: Record<string, string>; xmp: boolean } {
   );
 }
 
+/**
+ * Write a PDF the way InDesign or Illustrator leaves one: XMP on the catalog,
+ * the page, a placed image and an inline annotation, plus PieceInfo on the
+ * catalog, the page and an inline resource dictionary, and a structure tree
+ * (#4972).
+ */
+function makeLayeredPdf(name: string): string {
+  const path = join(dir, name);
+  python(
+    [
+      "import sys, pikepdf",
+      "pdf = pikepdf.new()",
+      "pdf.add_blank_page()",
+      "xmp = lambda who: pdf.make_stream(",
+      "    ('<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><dc:creator>' + who + '</dc:creator></x:xmpmeta>').encode(),",
+      "    Type=pikepdf.Name.Metadata, Subtype=pikepdf.Name.XML)",
+      "piece = lambda: pikepdf.Dictionary(Illustrator=pikepdf.Dictionary(",
+      "    LastModified=pikepdf.String('D:20200101000000Z'), Private=pikepdf.String('layers')))",
+      "img = pdf.make_stream(b'\\xff\\x00\\x00', Type=pikepdf.Name.XObject, Subtype=pikepdf.Name.Image,",
+      "    Width=1, Height=1, ColorSpace=pikepdf.Name.DeviceRGB, BitsPerComponent=8)",
+      "img.Metadata = xmp('Photoshop user')",
+      "page = pdf.pages[0]",
+      "page.Resources = pikepdf.Dictionary(XObject=pikepdf.Dictionary(Im0=img))",
+      "page.Contents = pdf.make_stream(b'q 10 0 0 10 0 0 cm /Im0 Do Q')",
+      "page.Metadata = xmp('Page author')",
+      "page.PieceInfo = piece()",
+      "page.Annots = pikepdf.Array([pikepdf.Dictionary(Type=pikepdf.Name.Annot, Subtype=pikepdf.Name.Text,",
+      "    Rect=[0, 0, 10, 10], Metadata=xmp('Reviewer'))])",
+      "page.Resources.Properties = pikepdf.Dictionary(MC0=pikepdf.Dictionary(PieceInfo=piece()))",
+      "pdf.Root.Metadata = xmp('Catalog author')",
+      "pdf.Root.PieceInfo = piece()",
+      "pdf.Root.StructTreeRoot = pdf.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.StructTreeRoot))",
+      "pdf.save(sys.argv[1])",
+    ].join("\n"),
+    path,
+  );
+  return path;
+}
+
+/** Every /Metadata and /PieceInfo key a reader could still find, and what must survive. */
+function inspectDeep(path: string): {
+  metadata: number;
+  pieceInfo: number;
+  structTree: boolean;
+  image: boolean;
+} {
+  return JSON.parse(
+    python(
+      [
+        "import sys, json, pikepdf",
+        "pdf = pikepdf.open(sys.argv[1])",
+        "dicts, stack = [], list(pdf.objects)",
+        "while stack:",
+        "    o = stack.pop()",
+        "    if isinstance(o, pikepdf.Array):",
+        "        kids = list(o)",
+        "    elif isinstance(o, (pikepdf.Dictionary, pikepdf.Stream)):",
+        "        dicts.append(o)",
+        "        kids = [o[k] for k in o.keys()]",
+        "    else:",
+        "        continue",
+        "    stack += [k for k in kids if isinstance(k, (pikepdf.Array, pikepdf.Dictionary)) and not k.is_indirect]",
+        "xobjects = pdf.pages[0].Resources.get('/XObject', {})",
+        "print(json.dumps({",
+        "    'metadata': sum('/Metadata' in o for o in dicts),",
+        "    'pieceInfo': sum('/PieceInfo' in o for o in dicts),",
+        "    'structTree': '/StructTreeRoot' in pdf.Root,",
+        "    'image': '/Im0' in xobjects,",
+        "}))",
+      ].join("\n"),
+      path,
+    ),
+  );
+}
+
 describe.skipIf(!hasPikepdf)("doc_metadata.py strip mode (requires pikepdf)", () => {
   it("removes the whole Info dictionary and the XMP stream", () => {
     const input = makePdf("full.pdf", { xmp: true });
@@ -147,5 +222,33 @@ describe.skipIf(!hasPikepdf)("doc_metadata.py strip mode (requires pikepdf)", ()
     runScript({ path: input, out, mode: "strip", metadata: { Title: "Public title", Author: "" } });
 
     expect(inspect(out)).toEqual({ info: { "/Title": "Public title" }, xmp: false });
+  });
+
+  it("removes page, image and inline-dict XMP and PieceInfo but keeps the structure tree and the image", () => {
+    const input = makeLayeredPdf("layered.pdf");
+    expect(inspectDeep(input)).toEqual({
+      metadata: 4,
+      pieceInfo: 3,
+      structTree: true,
+      image: true,
+    });
+    const out = join(dir, "layered-out.pdf");
+
+    const result = runScript({ path: input, out, mode: "strip" });
+
+    expect(inspectDeep(out)).toEqual({ metadata: 0, pieceInfo: 0, structTree: true, image: true });
+    expect(result.xmpRemoved).toBe(true);
+    expect(result.objectXmpRemoved).toBe(3);
+    expect(result.pieceInfoRemoved).toBe(3);
+  });
+
+  it("reports zero object XMP and PieceInfo for a plain PDF", () => {
+    const input = makePdf("plain.pdf", { xmp: true });
+    const out = join(dir, "plain-out.pdf");
+
+    const result = runScript({ path: input, out, mode: "strip" });
+
+    expect(result.objectXmpRemoved).toBe(0);
+    expect(result.pieceInfoRemoved).toBe(0);
   });
 });
