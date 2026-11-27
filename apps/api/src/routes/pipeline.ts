@@ -17,12 +17,9 @@ import {
   isSafeMessageError,
   isToolInputError,
   MODALITY_POOL,
-  type Modality,
-  modalityForExtension,
+  pipelineStepMismatch,
   TOOLS,
   toolInputErrorCode,
-  toolInputModality,
-  toolOutputModality,
 } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -196,11 +193,7 @@ function resolvePipelineSteps(
  * Reject a step that can't read what the previous step produces, before any
  * step runs. Without this an image-to-audio chain ran the image step and then
  * failed with a misleading duration error (#4343). Steps whose tool has no
- * shared metadata, or that accept any extension, are not judged here.
- *
- * Document and file tools count as one family: their output format follows
- * their settings (csv-excel writes .xlsx, excel-to-csv writes .csv, ocr writes
- * .txt), so the declared modality can't tell a valid chain from a broken one.
+ * shared metadata are not judged here; the rule itself is pipelineStepMismatch.
  */
 export function pipelineStepModalityError(
   steps: Array<{ toolId: string; resolvedToolId: string }>,
@@ -209,13 +202,10 @@ export function pipelineStepModalityError(
   if (index === 0) return null;
   const prev = TOOLS.find((t) => t.id === steps[index - 1].resolvedToolId);
   const tool = TOOLS.find((t) => t.id === steps[index].resolvedToolId);
-  if (!prev || !tool || tool.acceptedInputs.length === 0) return null;
-  const receives = toolOutputModality(prev);
-  const family = (m: Modality | null) => (m === "file" ? "document" : m);
-  if (tool.acceptedInputs.some((ext) => family(modalityForExtension(ext)) === family(receives))) {
-    return null;
-  }
-  return `Step ${index + 1} (${steps[index].toolId}): expects ${toolInputModality(tool)} input, but step ${index} (${steps[index - 1].toolId}) outputs ${receives}`;
+  if (!prev || !tool) return null;
+  const mismatch = pipelineStepMismatch(prev, tool);
+  if (!mismatch) return null;
+  return `Step ${index + 1} (${steps[index].toolId}): expects ${mismatch.expects} input, but step ${index} (${steps[index - 1].toolId}) outputs ${mismatch.receives}`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────

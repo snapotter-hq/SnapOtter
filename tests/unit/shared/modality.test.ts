@@ -3,6 +3,7 @@ import {
   MODALITIES,
   MODALITY_POOL,
   PYTHON_SIDECAR_TOOLS,
+  pipelineStepMismatch,
   TOOLS,
 } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
@@ -78,5 +79,40 @@ describe("modality metadata", () => {
     expect(detectModalityFromMime("application/pdf")).toBe("document");
     expect(detectModalityFromMime("text/csv")).toBe("file");
     expect(detectModalityFromMime("")).toBe("file");
+  });
+});
+
+describe("pipelineStepMismatch (#4932)", () => {
+  const audio = { modality: "audio" as const };
+
+  it("accepts output matching any accepted extension, not only the first", () => {
+    expect(
+      pipelineStepMismatch(audio, { modality: "video", acceptedInputs: [".mp4", ".mp3"] }),
+    ).toBeNull();
+  });
+
+  it("reports the first-listed input modality when nothing matches", () => {
+    expect(pipelineStepMismatch(audio, { modality: "image", acceptedInputs: [".png"] })).toEqual({
+      expects: "image",
+      receives: "audio",
+    });
+  });
+
+  it("uses the declared output modality over the tool modality", () => {
+    const toImage = { modality: "document" as const, outputModality: "image" as const };
+    expect(
+      pipelineStepMismatch(toImage, { modality: "image", acceptedInputs: [".png"] }),
+    ).toBeNull();
+  });
+
+  it("treats document and file as one family", () => {
+    const file = { modality: "file" as const };
+    expect(
+      pipelineStepMismatch(file, { modality: "document", acceptedInputs: [".pdf"] }),
+    ).toBeNull();
+  });
+
+  it("never judges a tool that accepts any input", () => {
+    expect(pipelineStepMismatch(audio, { modality: "file", acceptedInputs: [] })).toBeNull();
   });
 });

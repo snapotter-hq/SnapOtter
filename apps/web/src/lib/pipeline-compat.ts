@@ -1,12 +1,13 @@
-import { type Modality, TOOLS, toolInputModality, toolOutputModality } from "@snapotter/shared";
+import { type Modality, pipelineStepMismatch, TOOLS, toolInputModality } from "@snapotter/shared";
 
 export interface StepWarning {
   expects: Modality;
   receives: Modality;
 }
 
-/** For each step, a warning if its expected input modality does not match its source
- * (previous step's output, or the uploaded file for step 0). null = compatible / unknown. */
+/** For each step, a warning if it can't read its source (previous step's output, or the
+ * uploaded file for step 0). Later steps use the server's own rule, pipelineStepMismatch.
+ * null = compatible / unknown. */
 export function computeStepWarnings(
   toolIds: string[],
   uploadedModality: Modality | null,
@@ -14,14 +15,13 @@ export function computeStepWarnings(
   return toolIds.map((id, i) => {
     const tool = TOOLS.find((t) => t.id === id);
     if (!tool) return null;
-    const expects = toolInputModality(tool);
-    let receives: Modality | null;
     if (i === 0) {
-      receives = uploadedModality;
-    } else {
-      const prev = TOOLS.find((t) => t.id === toolIds[i - 1]);
-      receives = prev ? toolOutputModality(prev) : null;
+      const expects = toolInputModality(tool);
+      return uploadedModality && uploadedModality !== expects
+        ? { expects, receives: uploadedModality }
+        : null;
     }
-    return receives && receives !== expects ? { expects, receives } : null;
+    const prev = TOOLS.find((t) => t.id === toolIds[i - 1]);
+    return prev ? pipelineStepMismatch(prev, tool) : null;
   });
 }
