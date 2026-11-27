@@ -2,7 +2,7 @@
 description: "使用 Docker 将 SnapOtter 部署到生产环境。包含硬件要求、GPU 设置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: cb1d9f41ad17
+i18n_output_hash: 18e231e99240
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**绑定挂载**：由你自己管理权限。请将 `PUID`/`PGID` 设置为与宿主机用户一致：
+**绑定挂载**：由你自己管理权限。请将 [`PUID`](/zh-CN/guide/configuration#env-puid)/[`PGID`](/zh-CN/guide/configuration#env-pgid) 设置为与宿主机用户一致：
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | 启用/禁用登录要求 |
-| `DEFAULT_USERNAME` | `admin` | 初始管理员用户名 |
-| `DEFAULT_PASSWORD` | `admin` | 初始管理员密码（首次登录时强制修改） |
-| `MAX_UPLOAD_SIZE_MB` | `0`（无限制） | 单文件上传限制，单位为 MB。镜像默认为 `0`；源码构建从 100 开始 |
-| `MAX_BATCH_SIZE` | `0`（无限制） | 每个批量请求的最大文件数。镜像默认为 `0`；源码构建从 100 开始 |
-| `RATE_LIMIT_PER_MIN` | `1000` | 每个 IP 每分钟的 API 请求数（设为 0 可禁用） |
-| `MAX_USERS` | `0`（无限制） | 最大用户账户数 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认仅限私有网络 |
+| [`AUTH_ENABLED`](/zh-CN/guide/configuration#env-auth-enabled) | `true` | 启用/禁用登录要求 |
+| [`DEFAULT_USERNAME`](/zh-CN/guide/configuration#env-default-username) | `admin` | 初始管理员用户名 |
+| [`DEFAULT_PASSWORD`](/zh-CN/guide/configuration#env-default-password) | `admin` | 初始管理员密码（首次登录时强制修改） |
+| [`MAX_UPLOAD_SIZE_MB`](/zh-CN/guide/configuration#env-max-upload-size-mb) | `0`（无限制） | 单文件上传限制，单位为 MB。镜像默认为 `0`；源码构建从 100 开始 |
+| [`MAX_BATCH_SIZE`](/zh-CN/guide/configuration#env-max-batch-size) | `0`（无限制） | 每个批量请求的最大文件数。镜像默认为 `0`；源码构建从 100 开始 |
+| [`RATE_LIMIT_PER_MIN`](/zh-CN/guide/configuration#env-rate-limit-per-min) | `1000` | 每个 IP 每分钟的 API 请求数（设为 0 可禁用） |
+| [`MAX_USERS`](/zh-CN/guide/configuration#env-max-users) | `0`（无限制） | 最大用户账户数 |
+| [`TRUST_PROXY`](/zh-CN/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认仅限私有网络 |
 | `PUID` | `999` | 以该 UID 运行（用于绑定挂载权限） |
 | `PGID` | `999` | 以该 GID 运行（用于绑定挂载权限） |
-| `LOG_LEVEL` | `info` | 日志详细程度：fatal、error、warn、info、debug、trace |
-| `CONCURRENT_JOBS` | `0`（自动） | 最大并行 AI 处理任务数 |
-| `SESSION_DURATION_HOURS` | `168` | 登录会话有效期（7 天） |
-| `CORS_ORIGIN` | （空） | 以逗号分隔的允许来源，留空表示仅限同源 |
+| [`LOG_LEVEL`](/zh-CN/guide/configuration#env-log-level) | `info` | 日志详细程度：fatal、error、warn、info、debug、trace |
+| [`CONCURRENT_JOBS`](/zh-CN/guide/configuration#env-concurrent-jobs) | `0`（自动） | 最大并行 AI 处理任务数 |
+| [`SESSION_DURATION_HOURS`](/zh-CN/guide/configuration#env-session-duration-hours) | `168` | 登录会话有效期（7 天） |
+| [`CORS_ORIGIN`](/zh-CN/guide/configuration#env-cors-origin) | （空） | 以逗号分隔的允许来源，留空表示仅限同源 |
 
 ### 出站代理与私有 CA {#outbound-proxy-and-private-ca}
 
@@ -579,7 +579,7 @@ server {
 ### 部署在子路径下 {#subpath}
 
 要在 `https://example.com/snapotter` 提供服务，请在
-SnapOtter 容器环境中设置 `BASE_PATH=/snapotter` 并重启。官方的 CPU 和 GPU Compose
+SnapOtter 容器环境中设置 [`BASE_PATH=/snapotter`](/zh-CN/guide/configuration#env-base-path) 并重启。官方的 CPU 和 GPU Compose
 文件也接受来自你的 shell 或 Compose `.env` 文件的 `BASE_PATH`。同一个
 镜像可以在任意路径下工作，无需重新构建前端。
 
@@ -608,7 +608,7 @@ location /snapotter/ {
 
 此示例保留了前缀。在转发之前剥离 `/snapotter` 的代理同样受支持。内部健康检查可以继续使用
 `/api/v1/health`。对于 OIDC 或 SAML，还需要设置
-`EXTERNAL_URL=https://example.com/snapotter`，并更新身份提供商的
+[`EXTERNAL_URL=https://example.com/snapotter`](/zh-CN/guide/oidc#env-external-url)，并更新身份提供商的
 回调 URL，分别包含 `/snapotter/api/auth/oidc/callback` 或
 `/snapotter/api/auth/saml/callback`。
 

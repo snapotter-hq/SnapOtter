@@ -140,9 +140,18 @@ function documentedRows(): Row[] {
   const rows: Row[] = [];
   for (const doc of DOCS) {
     for (const line of readFileSync(path.join(ROOT, doc), "utf8").split("\n")) {
-      const match = line.match(/^\|\s*`([A-Z][A-Z0-9_]*)`\s*\|([^|]*)\|(.*)\|\s*$/);
+      // deployment.md links each name to its Configuration row (#5095); a
+      // parser that missed the link form would drop those rows unchecked.
+      const match = line.match(
+        /^\|\s*(?:\[`([A-Z][A-Z0-9_]*)`\]\([^)]*\)|`([A-Z][A-Z0-9_]*)`)\s*\|([^|]*)\|(.*)\|\s*$/,
+      );
       if (match) {
-        rows.push({ doc, name: match[1], defaultCell: match[2], description: match[3] });
+        rows.push({
+          doc,
+          name: match[1] ?? match[2],
+          defaultCell: match[3],
+          description: match[4],
+        });
       }
     }
   }

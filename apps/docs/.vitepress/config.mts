@@ -4,6 +4,7 @@ import { pagefindPlugin } from "vitepress-plugin-pagefind";
 import pkg from "../../../package.json";
 import { publicSiteAnalyticsScript } from "../../../packages/shared/src/analytics/public-site.ts";
 import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.ts";
+import { envAnchors } from "./env-anchors.mts";
 import { t } from "./i18n/ui.mjs";
 import { buildJsonLd } from "./jsonld.mts";
 import {
@@ -169,6 +170,9 @@ export default defineConfig({
   // with shiki already. Dark mode was never the failing side.
   markdown: {
     theme: { light: "github-light-high-contrast", dark: "github-dark" },
+    config: (md) => {
+      envAnchors(md);
+    },
   },
 
   head: [

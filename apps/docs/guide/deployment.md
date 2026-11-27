@@ -436,7 +436,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts**: you manage permissions. Set `PUID`/`PGID` to match your host user:
+**Bind mounts**: you manage permissions. Set [`PUID`](/guide/configuration#env-puid)/[`PGID`](/guide/configuration#env-pgid) to match your host user:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -481,20 +481,20 @@ The startup error names the exact UID to use, so the quickest path is to start t
 
 | Variable | Default | Description |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Enable/disable login requirement |
-| `DEFAULT_USERNAME` | `admin` | Initial admin username |
-| `DEFAULT_PASSWORD` | `admin` | Initial admin password (forced change on first login) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (unlimited) | Per-file upload limit in MB. The image ships `0`; a source build starts at 100 |
-| `MAX_BATCH_SIZE` | `0` (unlimited) | Max files per batch request. The image ships `0`; a source build starts at 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP (set 0 to disable) |
-| `MAX_USERS` | `0` (unlimited) | Maximum user accounts |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. Private networks only by default |
+| [`AUTH_ENABLED`](/guide/configuration#env-auth-enabled) | `true` | Enable/disable login requirement |
+| [`DEFAULT_USERNAME`](/guide/configuration#env-default-username) | `admin` | Initial admin username |
+| [`DEFAULT_PASSWORD`](/guide/configuration#env-default-password) | `admin` | Initial admin password (forced change on first login) |
+| [`MAX_UPLOAD_SIZE_MB`](/guide/configuration#env-max-upload-size-mb) | `0` (unlimited) | Per-file upload limit in MB. The image ships `0`; a source build starts at 100 |
+| [`MAX_BATCH_SIZE`](/guide/configuration#env-max-batch-size) | `0` (unlimited) | Max files per batch request. The image ships `0`; a source build starts at 100 |
+| [`RATE_LIMIT_PER_MIN`](/guide/configuration#env-rate-limit-per-min) | `1000` | API requests per minute per IP (set 0 to disable) |
+| [`MAX_USERS`](/guide/configuration#env-max-users) | `0` (unlimited) | Maximum user accounts |
+| [`TRUST_PROXY`](/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Which peers may set the client IP through `X-Forwarded-For`. Private networks only by default |
 | `PUID` | `999` | Run as this UID (for bind mount permissions). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set) |
 | `PGID` | `999` | Run as this GID (for bind mount permissions). Needs a writable root filesystem; see the [security guide](/guide/security#why-read-only-is-not-set) |
-| `LOG_LEVEL` | `info` | Log verbosity: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (auto) | Max parallel AI processing jobs |
-| `SESSION_DURATION_HOURS` | `168` | Login session lifetime (7 days) |
-| `CORS_ORIGIN` | (empty) | Comma-separated allowed origins, or empty for same-origin |
+| [`LOG_LEVEL`](/guide/configuration#env-log-level) | `info` | Log verbosity: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/guide/configuration#env-concurrent-jobs) | `0` (auto) | Max parallel AI processing jobs |
+| [`SESSION_DURATION_HOURS`](/guide/configuration#env-session-duration-hours) | `168` | Login session lifetime (7 days) |
+| [`CORS_ORIGIN`](/guide/configuration#env-cors-origin) | (empty) | Comma-separated allowed origins, or empty for same-origin |
 
 ### Outbound proxy and private CA {#outbound-proxy-and-private-ca}
 
@@ -576,7 +576,7 @@ server {
 
 ### Deploying under a subpath {#subpath}
 
-To serve `https://example.com/snapotter`, set `BASE_PATH=/snapotter` in the
+To serve `https://example.com/snapotter`, set [`BASE_PATH=/snapotter`](/guide/configuration#env-base-path) in the
 SnapOtter container environment and restart it. The official CPU and GPU Compose
 files also accept `BASE_PATH` from your shell or Compose `.env` file. The same
 image works at any path; no frontend rebuild is needed.
@@ -607,7 +607,7 @@ location /snapotter/ {
 This example preserves the prefix. Proxies that strip `/snapotter` before
 forwarding are supported too. Internal health checks can keep using
 `/api/v1/health`. For OIDC or SAML, also set
-`EXTERNAL_URL=https://example.com/snapotter` and update the identity provider's
+[`EXTERNAL_URL=https://example.com/snapotter`](/guide/oidc#env-external-url) and update the identity provider's
 callback URLs to include `/snapotter/api/auth/oidc/callback` or
 `/snapotter/api/auth/saml/callback` respectively.
 

@@ -20,7 +20,7 @@ Then open [http://localhost:1349](http://localhost:1349) and sign in with `admin
 
 Now open a tool. Pick one from the sidebar, or go straight to [Resize](http://localhost:1349/image/resize), drop in an image, and download the result.
 
-That's the whole install. This single container runs everything it needs: with no `DATABASE_URL` set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It's the fastest way to try SnapOtter or self-host on a homelab. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`. For production, use the [Docker Compose stack](#docker-compose), which keeps PostgreSQL and Redis in their own containers.
+That's the whole install. This single container runs everything it needs: with no [`DATABASE_URL`](/guide/configuration#env-database-url) set, it starts its own PostgreSQL and Redis on the loopback interface (embedded mode) and keeps all data in the `SnapOtter-data` volume. It's the fastest way to try SnapOtter or self-host on a homelab. Embedded mode runs as root (the default) and turns off automatically as soon as you set `DATABASE_URL`. For production, use the [Docker Compose stack](#docker-compose), which keeps PostgreSQL and Redis in their own containers.
 
 Job results are not kept in the data volume, so they disappear when the container is replaced (an image upgrade, for example) and their download links stop working. [Keeping job output](/guide/deployment#keeping-job-output) in the Deployment guide shows how to keep them.
 
@@ -152,13 +152,13 @@ Chain tools into multi-step workflows and apply them to one image or a whole bat
 3. Run on a single file - or an entire batch at once.
 4. Save the pipeline for later reuse.
 
-Pipelines allow 20 steps by default. Set `MAX_PIPELINE_STEPS=0` to make the limit unlimited.
+Pipelines allow 20 steps by default. Set [`MAX_PIPELINE_STEPS=0`](/guide/configuration#env-max-pipeline-steps) to make the limit unlimited.
 
 ### File Library {#file-library}
 
 Every file you process can be saved to your **Files** library. SnapOtter tracks the full version history so you can trace every processing step from the original upload to the final output.
 
-Saving is explicit: results you save to the library are kept until you delete them, while results you process and leave unsaved are cleared automatically after 72 hours (configurable via `FILE_MAX_AGE_HOURS`).
+Saving is explicit: results you save to the library are kept until you delete them, while results you process and leave unsaved are cleared automatically after 72 hours (configurable via [`FILE_MAX_AGE_HOURS`](/guide/configuration#env-file-max-age-hours)).
 
 ### REST API & API Keys {#rest-api-api-keys}
 
@@ -182,7 +182,7 @@ Enable multiple users with role-based access control:
 
 Create teams under **Settings → Teams** to group users.
 
-Set `AUTH_ENABLED=true` (or `false` for single-user/self-use without login).
+Set [`AUTH_ENABLED=true`](/guide/configuration#env-auth-enabled) (or `false` for single-user/self-use without login).
 
 ## Use It From Your Phone {#use-it-from-your-phone}
 

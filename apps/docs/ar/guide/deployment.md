@@ -2,7 +2,7 @@
 description: "انشر SnapOtter في بيئة الإنتاج باستخدام Docker. متطلبات العتاد، وإعداد GPU، وإعدادات الوكيل العكسي لكل من Nginx وTraefik وCloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 8f6a0286441e
+i18n_output_hash: c5a9a55f5e9d
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**نقاط الربط (Bind mounts)**: أنت تدير الأذونات. اضبط `PUID`/`PGID` لتطابق مستخدم المضيف لديك:
+**نقاط الربط (Bind mounts)**: أنت تدير الأذونات. اضبط [`PUID`](/ar/guide/configuration#env-puid)/[`PGID`](/ar/guide/configuration#env-pgid) لتطابق مستخدم المضيف لديك:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | المتغير | الافتراضي | الوصف |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | تفعيل/تعطيل اشتراط تسجيل الدخول |
-| `DEFAULT_USERNAME` | `admin` | اسم مستخدم المسؤول الأولي |
-| `DEFAULT_PASSWORD` | `admin` | كلمة مرور المسؤول الأولية (يُفرض تغييرها عند أول تسجيل دخول) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (غير محدود) | حد الرفع لكل ملف بوحدة MB. تأتي الصورة بالقيمة `0`؛ وتبدأ النسخة المبنية من المصدر عند 100 |
-| `MAX_BATCH_SIZE` | `0` (غير محدود) | الحد الأقصى للملفات في طلب الدفعة الواحد. تأتي الصورة بالقيمة `0`؛ وتبدأ النسخة المبنية من المصدر عند 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | طلبات API في الدقيقة لكل عنوان IP (اضبطه على 0 للتعطيل) |
-| `MAX_USERS` | `0` (غير محدود) | الحد الأقصى لحسابات المستخدمين |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | الأقران المسموح لهم بتحديد عنوان IP للعميل عبر `X-Forwarded-For`. الشبكات الخاصة فقط افتراضيًا |
+| [`AUTH_ENABLED`](/ar/guide/configuration#env-auth-enabled) | `true` | تفعيل/تعطيل اشتراط تسجيل الدخول |
+| [`DEFAULT_USERNAME`](/ar/guide/configuration#env-default-username) | `admin` | اسم مستخدم المسؤول الأولي |
+| [`DEFAULT_PASSWORD`](/ar/guide/configuration#env-default-password) | `admin` | كلمة مرور المسؤول الأولية (يُفرض تغييرها عند أول تسجيل دخول) |
+| [`MAX_UPLOAD_SIZE_MB`](/ar/guide/configuration#env-max-upload-size-mb) | `0` (غير محدود) | حد الرفع لكل ملف بوحدة MB. تأتي الصورة بالقيمة `0`؛ وتبدأ النسخة المبنية من المصدر عند 100 |
+| [`MAX_BATCH_SIZE`](/ar/guide/configuration#env-max-batch-size) | `0` (غير محدود) | الحد الأقصى للملفات في طلب الدفعة الواحد. تأتي الصورة بالقيمة `0`؛ وتبدأ النسخة المبنية من المصدر عند 100 |
+| [`RATE_LIMIT_PER_MIN`](/ar/guide/configuration#env-rate-limit-per-min) | `1000` | طلبات API في الدقيقة لكل عنوان IP (اضبطه على 0 للتعطيل) |
+| [`MAX_USERS`](/ar/guide/configuration#env-max-users) | `0` (غير محدود) | الحد الأقصى لحسابات المستخدمين |
+| [`TRUST_PROXY`](/ar/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | الأقران المسموح لهم بتحديد عنوان IP للعميل عبر `X-Forwarded-For`. الشبكات الخاصة فقط افتراضيًا |
 | `PUID` | `999` | التشغيل بهذا UID (لأذونات نقاط الربط) |
 | `PGID` | `999` | التشغيل بهذا GID (لأذونات نقاط الربط) |
-| `LOG_LEVEL` | `info` | مستوى تفصيل السجلات: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (تلقائي) | الحد الأقصى لمهام معالجة الذكاء الاصطناعي المتوازية |
-| `SESSION_DURATION_HOURS` | `168` | مدة صلاحية جلسة تسجيل الدخول (7 أيام) |
-| `CORS_ORIGIN` | (فارغ) | الأصول المسموح بها مفصولة بفواصل، أو فارغ للأصل نفسه فقط |
+| [`LOG_LEVEL`](/ar/guide/configuration#env-log-level) | `info` | مستوى تفصيل السجلات: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/ar/guide/configuration#env-concurrent-jobs) | `0` (تلقائي) | الحد الأقصى لمهام معالجة الذكاء الاصطناعي المتوازية |
+| [`SESSION_DURATION_HOURS`](/ar/guide/configuration#env-session-duration-hours) | `168` | مدة صلاحية جلسة تسجيل الدخول (7 أيام) |
+| [`CORS_ORIGIN`](/ar/guide/configuration#env-cors-origin) | (فارغ) | الأصول المسموح بها مفصولة بفواصل، أو فارغ للأصل نفسه فقط |
 
 ### الوكيل الصادر وهيئة التصديق الخاصة {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### النشر تحت مسار فرعي {#subpath}
 
-للخدمة على `https://example.com/snapotter`، اضبط `BASE_PATH=/snapotter` في
+للخدمة على `https://example.com/snapotter`، اضبط [`BASE_PATH=/snapotter`](/ar/guide/configuration#env-base-path) في
 بيئة حاوية SnapOtter وأعد تشغيلها. تقبل ملفات Compose الرسمية لـ CPU وGPU
 أيضًا `BASE_PATH` من الصدفة لديك أو من ملف Compose `.env`. الصورة نفسها
 تعمل على أي مسار؛ ولا حاجة إلى إعادة بناء الواجهة الأمامية.
@@ -609,7 +609,7 @@ location /snapotter/ {
 يحافظ هذا المثال على البادئة. والوكلاء الذين يزيلون `/snapotter` قبل
 التمرير مدعومون أيضًا. يمكن لفحوصات السلامة الداخلية الاستمرار في استخدام
 `/api/v1/health`. بالنسبة إلى OIDC أو SAML، اضبط أيضًا
-`EXTERNAL_URL=https://example.com/snapotter` وحدّث عناوين
+[`EXTERNAL_URL=https://example.com/snapotter`](/ar/guide/oidc#env-external-url) وحدّث عناوين
 رد النداء لدى موفر الهوية لتتضمن `/snapotter/api/auth/oidc/callback` أو
 `/snapotter/api/auth/saml/callback` على التوالي.
 

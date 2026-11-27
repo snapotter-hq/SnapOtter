@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 7e436ba9e7e4
+i18n_output_hash: b7c5df4adf0d
 i18n_hash_version: 2
 ---
 # Ressourcenschonende Setups {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Hinweise für Rechner der Pi-Klasse:
 
 - **Bevorzugen Sie eine USB-SSD gegenüber einer SD-Karte** für das Datenvolume und Postgres. Job-Arbeitsbereiche verursachen echte Festplatten-E/A, und SD-Karten sind sowohl langsam als auch schnell verschlissen.
-- **Der All-in-One-Einzelcontainer funktioniert hier ebenfalls** (eingebettetes Postgres und Redis, wenn `DATABASE_URL`/`REDIS_URL` nicht gesetzt sind). Auf einem speicherbegrenzten Host sollten Sie sein eingebettetes Redis-Limit mit `REDIS_MAXMEMORY` senken (siehe [Konfiguration](/de/guide/configuration)). Compose bietet feinere Kontrolle pro Dienst, weshalb diese Anleitung es verwendet.
+- **Der All-in-One-Einzelcontainer funktioniert hier ebenfalls** (eingebettetes Postgres und Redis, wenn [`DATABASE_URL`](/de/guide/configuration#env-database-url)/[`REDIS_URL`](/de/guide/configuration#env-redis-url) nicht gesetzt sind). Auf einem speicherbegrenzten Host sollten Sie sein eingebettetes Redis-Limit mit [`REDIS_MAXMEMORY`](/de/guide/configuration#env-redis-maxmemory) senken (siehe [Konfiguration](/de/guide/configuration)). Compose bietet feinere Kontrolle pro Dienst, weshalb diese Anleitung es verwendet.
 - **Fügen Sie auf Geräten mit 2 GB Swap hinzu.** Das verhindert, dass gelegentliche Spitzen (ein großes PDF, ein Batch, den Sie nicht begrenzt haben) in einem Out-of-Memory-Kill enden. zram ist die SD-karten-schonende Option.
 - Das arm64-Image ist reines CPU-Image; auf ARM-Boards gibt es kein CUDA.
 
@@ -86,15 +86,15 @@ Alle Limits sind Umgebungsvariablen, die vollständig in der [Konfiguration](/de
 
 | Variable | Vorschlag für kleine Systeme | Was sie schützt |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Wie viele Aufträge parallel laufen. Die automatische Erkennung verwendet die CPU-Kerne minus eins, was auf großen Rechnern passt, auf einem System mit 2 Kernen unter Speicherdruck aber zu eifrig ist. |
-| `MAX_WORKER_THREADS` | `2` | Thread-Pool der Bildverarbeitung. |
-| `MAX_BATCH_SIZE` | `5` | Bei Batches geht Rechnern mit 1-2 GB zuerst der Speicher aus. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Verhindert, dass eine einzelne riesige Datei den gesamten Arbeitsbereich belegt. |
-| `MAX_MEGAPIXELS` | `50` | Das Dekodieren eines Bildes mit 100+ MP kostet unabhängig von der Dateigröße RAM. |
+| [`CONCURRENT_JOBS`](/de/guide/configuration#env-concurrent-jobs) | `1` | Wie viele Aufträge parallel laufen. Die automatische Erkennung verwendet die CPU-Kerne minus eins, was auf großen Rechnern passt, auf einem System mit 2 Kernen unter Speicherdruck aber zu eifrig ist. |
+| [`MAX_WORKER_THREADS`](/de/guide/configuration#env-max-worker-threads) | `2` | Thread-Pool der Bildverarbeitung. |
+| [`MAX_BATCH_SIZE`](/de/guide/configuration#env-max-batch-size) | `5` | Bei Batches geht Rechnern mit 1-2 GB zuerst der Speicher aus. |
+| [`MAX_UPLOAD_SIZE_MB`](/de/guide/configuration#env-max-upload-size-mb) | `100` | Verhindert, dass eine einzelne riesige Datei den gesamten Arbeitsbereich belegt. |
+| [`MAX_MEGAPIXELS`](/de/guide/configuration#env-max-megapixels) | `50` | Das Dekodieren eines Bildes mit 100+ MP kostet unabhängig von der Dateigröße RAM. |
 | `MAX_VIDEO_DURATION_S` | `300` | Lange Transkodierungen blockieren eine kleine CPU für Minuten bis Stunden. |
-| `PROCESSING_TIMEOUT_S` | `600` | Harte Obergrenze, damit ein außer Kontrolle geratener Auftrag den Rechner irgendwann wieder freigibt. |
+| [`PROCESSING_TIMEOUT_S`](/de/guide/configuration#env-processing-timeout-s) | `600` | Harte Obergrenze, damit ein außer Kontrolle geratener Auftrag den Rechner irgendwann wieder freigibt. |
 
-Diese Limits gelten für das, was der Server annimmt. Stellen Sie sie daher passend zu dem ein, was Sie tatsächlich nutzen, und nicht so klein wie möglich. Wenn Sie nie mit Video arbeiten, kostet ein Limit `MAX_VIDEO_DURATION_S` nichts; wenn Sie täglich Dokumente scannen, begrenzen Sie `MAX_PDF_PAGES` nicht.
+Diese Limits gelten für das, was der Server annimmt. Stellen Sie sie daher passend zu dem ein, was Sie tatsächlich nutzen, und nicht so klein wie möglich. Wenn Sie nie mit Video arbeiten, kostet ein Limit `MAX_VIDEO_DURATION_S` nichts; wenn Sie täglich Dokumente scannen, begrenzen Sie [`MAX_PDF_PAGES`](/de/guide/configuration#env-max-pdf-pages) nicht.
 
 ## Was Sie weglassen sollten {#what-to-skip}
 

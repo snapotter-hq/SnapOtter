@@ -2,7 +2,7 @@
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 2b582c621e3e
+i18n_output_hash: e08538c3fd89
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**바인드 마운트**: 권한은 직접 관리해야 합니다. 호스트 사용자에 맞게 `PUID`/`PGID`를 설정하세요.
+**바인드 마운트**: 권한은 직접 관리해야 합니다. 호스트 사용자에 맞게 [`PUID`](/ko/guide/configuration#env-puid)/[`PGID`](/ko/guide/configuration#env-pgid)를 설정하세요.
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | 로그인 필수 여부 활성화/비활성화 |
-| `DEFAULT_USERNAME` | `admin` | 초기 관리자 사용자 이름 |
-| `DEFAULT_PASSWORD` | `admin` | 초기 관리자 비밀번호 (첫 로그인 시 변경 강제) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (무제한) | 파일당 업로드 제한(MB). 이미지는 `0`로 제공되며, 소스 빌드는 100에서 시작합니다 |
-| `MAX_BATCH_SIZE` | `0` (무제한) | 배치 요청당 최대 파일 수. 이미지는 `0`로 제공되며, 소스 빌드는 100에서 시작합니다 |
-| `RATE_LIMIT_PER_MIN` | `1000` | IP당 분당 API 요청 수 (0으로 설정하면 비활성화) |
-| `MAX_USERS` | `0` (무제한) | 최대 사용자 계정 수 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어입니다. 기본값은 사설 네트워크만 허용 |
+| [`AUTH_ENABLED`](/ko/guide/configuration#env-auth-enabled) | `true` | 로그인 필수 여부 활성화/비활성화 |
+| [`DEFAULT_USERNAME`](/ko/guide/configuration#env-default-username) | `admin` | 초기 관리자 사용자 이름 |
+| [`DEFAULT_PASSWORD`](/ko/guide/configuration#env-default-password) | `admin` | 초기 관리자 비밀번호 (첫 로그인 시 변경 강제) |
+| [`MAX_UPLOAD_SIZE_MB`](/ko/guide/configuration#env-max-upload-size-mb) | `0` (무제한) | 파일당 업로드 제한(MB). 이미지는 `0`로 제공되며, 소스 빌드는 100에서 시작합니다 |
+| [`MAX_BATCH_SIZE`](/ko/guide/configuration#env-max-batch-size) | `0` (무제한) | 배치 요청당 최대 파일 수. 이미지는 `0`로 제공되며, 소스 빌드는 100에서 시작합니다 |
+| [`RATE_LIMIT_PER_MIN`](/ko/guide/configuration#env-rate-limit-per-min) | `1000` | IP당 분당 API 요청 수 (0으로 설정하면 비활성화) |
+| [`MAX_USERS`](/ko/guide/configuration#env-max-users) | `0` (무제한) | 최대 사용자 계정 수 |
+| [`TRUST_PROXY`](/ko/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 설정할 수 있는 피어입니다. 기본값은 사설 네트워크만 허용 |
 | `PUID` | `999` | 이 UID로 실행 (바인드 마운트 권한용) |
 | `PGID` | `999` | 이 GID로 실행 (바인드 마운트 권한용) |
-| `LOG_LEVEL` | `info` | 로그 상세 수준: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (자동) | 최대 병렬 AI 처리 작업 수 |
-| `SESSION_DURATION_HOURS` | `168` | 로그인 세션 유지 시간 (7일) |
-| `CORS_ORIGIN` | (비어 있음) | 허용할 출처를 쉼표로 구분한 목록, 비워 두면 동일 출처 |
+| [`LOG_LEVEL`](/ko/guide/configuration#env-log-level) | `info` | 로그 상세 수준: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/ko/guide/configuration#env-concurrent-jobs) | `0` (자동) | 최대 병렬 AI 처리 작업 수 |
+| [`SESSION_DURATION_HOURS`](/ko/guide/configuration#env-session-duration-hours) | `168` | 로그인 세션 유지 시간 (7일) |
+| [`CORS_ORIGIN`](/ko/guide/configuration#env-cors-origin) | (비어 있음) | 허용할 출처를 쉼표로 구분한 목록, 비워 두면 동일 출처 |
 
 ### 아웃바운드 프록시와 사설 CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### 하위 경로에 배포하기 {#subpath}
 
-`https://example.com/snapotter`에서 서비스하려면 SnapOtter 컨테이너 환경에 `BASE_PATH=/snapotter`를 설정하고 다시 시작하세요. 공식 CPU 및 GPU Compose 파일은 셸이나 Compose `.env` 파일에서 `BASE_PATH`도 받을 수 있습니다. 같은 이미지가 어떤 경로에서도 작동하며 프런트엔드를 다시 빌드할 필요가 없습니다.
+`https://example.com/snapotter`에서 서비스하려면 SnapOtter 컨테이너 환경에 [`BASE_PATH=/snapotter`](/ko/guide/configuration#env-base-path)를 설정하고 다시 시작하세요. 공식 CPU 및 GPU Compose 파일은 셸이나 Compose `.env` 파일에서 `BASE_PATH`도 받을 수 있습니다. 같은 이미지가 어떤 경로에서도 작동하며 프런트엔드를 다시 빌드할 필요가 없습니다.
 
 `BASE_PATH`는 문자, 숫자, `_` 또는 `-`를 포함하는 슬래시로 구분된 세그먼트를 받으며, `/apps/snapotter` 같은 중첩 경로도 가능합니다. 마지막 슬래시는 선택 사항입니다. 루트 배포에서는 비워 두거나(기본값) `/`로 설정하세요.
 
@@ -601,7 +601,7 @@ location /snapotter/ {
 }
 ```
 
-이 예시는 접두사를 유지합니다. 전달하기 전에 `/snapotter`를 제거하는 프록시도 지원됩니다. 내부 상태 확인은 계속 `/api/v1/health`를 사용할 수 있습니다. OIDC 또는 SAML의 경우 `EXTERNAL_URL=https://example.com/snapotter`도 설정하고, ID 공급자의 콜백 URL을 각각 `/snapotter/api/auth/oidc/callback` 또는 `/snapotter/api/auth/saml/callback`를 포함하도록 업데이트하세요.
+이 예시는 접두사를 유지합니다. 전달하기 전에 `/snapotter`를 제거하는 프록시도 지원됩니다. 내부 상태 확인은 계속 `/api/v1/health`를 사용할 수 있습니다. OIDC 또는 SAML의 경우 [`EXTERNAL_URL=https://example.com/snapotter`](/ko/guide/oidc#env-external-url)도 설정하고, ID 공급자의 콜백 URL을 각각 `/snapotter/api/auth/oidc/callback` 또는 `/snapotter/api/auth/saml/callback`를 포함하도록 업데이트하세요.
 
 API 스크립트는 변경 없이 계속 작동합니다. 도구의 `downloadUrl` 같은 API 응답의 URL은 `BASE_PATH` 값과 관계없이 `/api/`로 시작합니다. 이를 도메인 루트를 기준으로 해석하지 말고 인스턴스의 기본 URL(`https://example.com/snapotter` + `/api/v1/download/...`)에 이어 붙이세요.
 

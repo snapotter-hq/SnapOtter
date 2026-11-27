@@ -24,7 +24,7 @@ Ouvrez ensuite [http://localhost:1349](http://localhost:1349) et connectez-vous 
 
 Ouvrez maintenant un outil. Choisissez-en un dans la barre latérale, ou allez directement à [Redimensionner](http://localhost:1349/image/resize), déposez une image et téléchargez le résultat.
 
-Voilà toute l'installation. Ce conteneur unique exécute tout ce dont il a besoin : sans `DATABASE_URL` défini, il démarre son propre PostgreSQL et son propre Redis sur l'interface de bouclage (mode embarqué) et conserve toutes les données dans le volume `SnapOtter-data`. C'est le moyen le plus rapide d'essayer SnapOtter ou de l'auto-héberger sur un homelab. Le mode embarqué s'exécute en tant que root (comportement par défaut) et se désactive automatiquement dès que vous définissez `DATABASE_URL`. Pour la production, utilisez la [pile Docker Compose](#docker-compose), qui garde PostgreSQL et Redis dans leurs propres conteneurs.
+Voilà toute l'installation. Ce conteneur unique exécute tout ce dont il a besoin : sans [`DATABASE_URL`](/fr/guide/configuration#env-database-url) défini, il démarre son propre PostgreSQL et son propre Redis sur l'interface de bouclage (mode embarqué) et conserve toutes les données dans le volume `SnapOtter-data`. C'est le moyen le plus rapide d'essayer SnapOtter ou de l'auto-héberger sur un homelab. Le mode embarqué s'exécute en tant que root (comportement par défaut) et se désactive automatiquement dès que vous définissez `DATABASE_URL`. Pour la production, utilisez la [pile Docker Compose](#docker-compose), qui garde PostgreSQL et Redis dans leurs propres conteneurs.
 
 Les résultats des tâches ne sont pas conservés dans le volume de données : ils disparaissent quand le conteneur est remplacé (lors d'une mise à jour de l'image, par exemple) et leurs liens de téléchargement cessent de fonctionner. [Conserver les résultats des tâches](/fr/guide/deployment#keeping-job-output) dans le guide de déploiement explique comment les garder.
 
@@ -156,13 +156,13 @@ Enchaînez des outils en flux de travail à plusieurs étapes et appliquez-les �
 3. Exécutez sur un seul fichier, ou sur un lot entier d'un coup.
 4. Enregistrez le pipeline pour le réutiliser plus tard.
 
-Les pipelines acceptent 20 étapes par défaut. Définissez `MAX_PIPELINE_STEPS=0` pour rendre la limite illimitée.
+Les pipelines acceptent 20 étapes par défaut. Définissez [`MAX_PIPELINE_STEPS=0`](/fr/guide/configuration#env-max-pipeline-steps) pour rendre la limite illimitée.
 
 ### Bibliothèque de fichiers {#file-library}
 
 Chaque fichier que vous traitez peut être enregistré dans votre bibliothèque **Fichiers**. SnapOtter conserve l'historique complet des versions afin que vous puissiez retracer chaque étape de traitement, du téléversement d'origine au résultat final.
 
-L'enregistrement est explicite : les résultats que vous enregistrez dans la bibliothèque sont conservés jusqu'à ce que vous les supprimiez, tandis que les résultats traités et non enregistrés sont effacés automatiquement après 72 heures (configurable via `FILE_MAX_AGE_HOURS`).
+L'enregistrement est explicite : les résultats que vous enregistrez dans la bibliothèque sont conservés jusqu'à ce que vous les supprimiez, tandis que les résultats traités et non enregistrés sont effacés automatiquement après 72 heures (configurable via [`FILE_MAX_AGE_HOURS`](/fr/guide/configuration#env-file-max-age-hours)).
 
 ### API REST et clés d'API {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Activez plusieurs utilisateurs avec un contrôle d'accès basé sur les rôles :
 
 Créez des équipes dans **Paramètres → Équipes** pour regrouper les utilisateurs.
 
-Définissez `AUTH_ENABLED=true` (ou `false` pour un usage personnel ou mono-utilisateur sans connexion).
+Définissez [`AUTH_ENABLED=true`](/fr/guide/configuration#env-auth-enabled) (ou `false` pour un usage personnel ou mono-utilisateur sans connexion).
 
 ## L'utiliser depuis votre téléphone {#use-it-from-your-phone}
 

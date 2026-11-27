@@ -2,7 +2,7 @@
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse proxy-configuraties voor Nginx, Traefik en Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: 703398796717
+i18n_output_hash: 5d8a8964e066
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts**: u beheert de rechten zelf. Stel `PUID`/`PGID` in op uw hostgebruiker:
+**Bind mounts**: u beheert de rechten zelf. Stel [`PUID`](/nl/guide/configuration#env-puid)/[`PGID`](/nl/guide/configuration#env-pgid) in op uw hostgebruiker:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ De opstartfout noemt de exacte te gebruiken UID, dus de snelste weg is de app é
 
 | Variabele | Standaard | Beschrijving |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Inlogvereiste in- of uitschakelen |
-| `DEFAULT_USERNAME` | `admin` | Gebruikersnaam van de eerste beheerder |
-| `DEFAULT_PASSWORD` | `admin` | Wachtwoord van de eerste beheerder (wijziging afgedwongen bij eerste login) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (onbeperkt) | Uploadlimiet per bestand in MB. De image levert `0`; een build vanuit de broncode begint op 100 |
-| `MAX_BATCH_SIZE` | `0` (onbeperkt) | Max. aantal bestanden per batchverzoek. De image levert `0`; een build vanuit de broncode begint op 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | API-verzoeken per minuut per IP (stel 0 in om uit te schakelen) |
-| `MAX_USERS` | `0` (onbeperkt) | Maximaal aantal gebruikersaccounts |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. Standaard alleen privénetwerken |
+| [`AUTH_ENABLED`](/nl/guide/configuration#env-auth-enabled) | `true` | Inlogvereiste in- of uitschakelen |
+| [`DEFAULT_USERNAME`](/nl/guide/configuration#env-default-username) | `admin` | Gebruikersnaam van de eerste beheerder |
+| [`DEFAULT_PASSWORD`](/nl/guide/configuration#env-default-password) | `admin` | Wachtwoord van de eerste beheerder (wijziging afgedwongen bij eerste login) |
+| [`MAX_UPLOAD_SIZE_MB`](/nl/guide/configuration#env-max-upload-size-mb) | `0` (onbeperkt) | Uploadlimiet per bestand in MB. De image levert `0`; een build vanuit de broncode begint op 100 |
+| [`MAX_BATCH_SIZE`](/nl/guide/configuration#env-max-batch-size) | `0` (onbeperkt) | Max. aantal bestanden per batchverzoek. De image levert `0`; een build vanuit de broncode begint op 100 |
+| [`RATE_LIMIT_PER_MIN`](/nl/guide/configuration#env-rate-limit-per-min) | `1000` | API-verzoeken per minuut per IP (stel 0 in om uit te schakelen) |
+| [`MAX_USERS`](/nl/guide/configuration#env-max-users) | `0` (onbeperkt) | Maximaal aantal gebruikersaccounts |
+| [`TRUST_PROXY`](/nl/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Welke peers het client-IP mogen instellen via `X-Forwarded-For`. Standaard alleen privénetwerken |
 | `PUID` | `999` | Draai onder deze UID (voor rechten van bind mounts) |
 | `PGID` | `999` | Draai onder deze GID (voor rechten van bind mounts) |
-| `LOG_LEVEL` | `info` | Uitgebreidheid van logs: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (auto) | Max. aantal parallelle AI-verwerkingstaken |
-| `SESSION_DURATION_HOURS` | `168` | Levensduur van de inlogsessie (7 dagen) |
-| `CORS_ORIGIN` | (leeg) | Kommagescheiden toegestane origins, of leeg voor same-origin |
+| [`LOG_LEVEL`](/nl/guide/configuration#env-log-level) | `info` | Uitgebreidheid van logs: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/nl/guide/configuration#env-concurrent-jobs) | `0` (auto) | Max. aantal parallelle AI-verwerkingstaken |
+| [`SESSION_DURATION_HOURS`](/nl/guide/configuration#env-session-duration-hours) | `168` | Levensduur van de inlogsessie (7 dagen) |
+| [`CORS_ORIGIN`](/nl/guide/configuration#env-cors-origin) | (leeg) | Kommagescheiden toegestane origins, of leeg voor same-origin |
 
 ### Uitgaande proxy en privé-CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Implementeren onder een subpad {#subpath}
 
-Om `https://example.com/snapotter` te serveren, stelt u `BASE_PATH=/snapotter` in in de omgeving van de
+Om `https://example.com/snapotter` te serveren, stelt u [`BASE_PATH=/snapotter`](/nl/guide/configuration#env-base-path) in in de omgeving van de
 SnapOtter-container en start u die opnieuw. De officiële CPU- en GPU-Compose-bestanden
 accepteren ook `BASE_PATH` vanuit uw shell of uw Compose-bestand `.env`. Dezelfde
 image werkt op elk pad; een frontend-rebuild is niet nodig.
@@ -608,7 +608,7 @@ location /snapotter/ {
 
 Dit voorbeeld behoudt het voorvoegsel. Proxy's die `/snapotter` verwijderen voordat ze doorsturen,
 worden ook ondersteund. Interne health checks kunnen `/api/v1/health` blijven gebruiken. Stel voor OIDC of SAML ook
-`EXTERNAL_URL=https://example.com/snapotter` in en werk de callback-URL's van de identiteitsprovider bij zodat ze `/snapotter/api/auth/oidc/callback` respectievelijk
+[`EXTERNAL_URL=https://example.com/snapotter`](/nl/guide/oidc#env-external-url) in en werk de callback-URL's van de identiteitsprovider bij zodat ze `/snapotter/api/auth/oidc/callback` respectievelijk
 `/snapotter/api/auth/saml/callback` bevatten.
 
 API-scripts blijven ongewijzigd werken: URL's in API-antwoorden, zoals de

@@ -2,7 +2,7 @@
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: d7039e8cda27
+i18n_output_hash: 0ce6d49d02b8
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**バインドマウント**: 権限は自分で管理します。`PUID`/`PGID` をホストのユーザーに合わせて設定してください。
+**バインドマウント**: 権限は自分で管理します。[`PUID`](/ja/guide/configuration#env-puid)/[`PGID`](/ja/guide/configuration#env-pgid) をホストのユーザーに合わせて設定してください。
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ securityContext:
 
 | 変数 | デフォルト | 説明 |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | ログイン必須の有効 / 無効 |
-| `DEFAULT_USERNAME` | `admin` | 初期管理者のユーザー名 |
-| `DEFAULT_PASSWORD` | `admin` | 初期管理者のパスワード (初回ログイン時に変更を強制) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (無制限) | ファイルごとのアップロード上限 (MB)。イメージは `0` で出荷され、ソースビルドは 100 から始まります |
-| `MAX_BATCH_SIZE` | `0` (無制限) | バッチリクエストあたりの最大ファイル数。イメージは `0` で出荷され、ソースビルドは 100 から始まります |
-| `RATE_LIMIT_PER_MIN` | `1000` | IP ごとの 1 分あたりの API リクエスト数 (0 にすると無効) |
-| `MAX_USERS` | `0` (無制限) | ユーザーアカウントの最大数 |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` を通じてクライアント IP を設定できるピア。デフォルトではプライベートネットワークのみ |
+| [`AUTH_ENABLED`](/ja/guide/configuration#env-auth-enabled) | `true` | ログイン必須の有効 / 無効 |
+| [`DEFAULT_USERNAME`](/ja/guide/configuration#env-default-username) | `admin` | 初期管理者のユーザー名 |
+| [`DEFAULT_PASSWORD`](/ja/guide/configuration#env-default-password) | `admin` | 初期管理者のパスワード (初回ログイン時に変更を強制) |
+| [`MAX_UPLOAD_SIZE_MB`](/ja/guide/configuration#env-max-upload-size-mb) | `0` (無制限) | ファイルごとのアップロード上限 (MB)。イメージは `0` で出荷され、ソースビルドは 100 から始まります |
+| [`MAX_BATCH_SIZE`](/ja/guide/configuration#env-max-batch-size) | `0` (無制限) | バッチリクエストあたりの最大ファイル数。イメージは `0` で出荷され、ソースビルドは 100 から始まります |
+| [`RATE_LIMIT_PER_MIN`](/ja/guide/configuration#env-rate-limit-per-min) | `1000` | IP ごとの 1 分あたりの API リクエスト数 (0 にすると無効) |
+| [`MAX_USERS`](/ja/guide/configuration#env-max-users) | `0` (無制限) | ユーザーアカウントの最大数 |
+| [`TRUST_PROXY`](/ja/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` を通じてクライアント IP を設定できるピア。デフォルトではプライベートネットワークのみ |
 | `PUID` | `999` | この UID で実行 (バインドマウントの権限用) |
 | `PGID` | `999` | この GID で実行 (バインドマウントの権限用) |
-| `LOG_LEVEL` | `info` | ログの詳細度: fatal、error、warn、info、debug、trace |
-| `CONCURRENT_JOBS` | `0` (自動) | 並列 AI 処理ジョブの最大数 |
-| `SESSION_DURATION_HOURS` | `168` | ログインセッションの有効期間 (7 日) |
-| `CORS_ORIGIN` | (空) | 許可するオリジンのカンマ区切りリスト。空の場合は同一オリジン |
+| [`LOG_LEVEL`](/ja/guide/configuration#env-log-level) | `info` | ログの詳細度: fatal、error、warn、info、debug、trace |
+| [`CONCURRENT_JOBS`](/ja/guide/configuration#env-concurrent-jobs) | `0` (自動) | 並列 AI 処理ジョブの最大数 |
+| [`SESSION_DURATION_HOURS`](/ja/guide/configuration#env-session-duration-hours) | `168` | ログインセッションの有効期間 (7 日) |
+| [`CORS_ORIGIN`](/ja/guide/configuration#env-cors-origin) | (空) | 許可するオリジンのカンマ区切りリスト。空の場合は同一オリジン |
 
 ### アウトバウンドプロキシとプライベート CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### サブパスでのデプロイ {#subpath}
 
-`https://example.com/snapotter` で提供するには、SnapOtter コンテナの環境に `BASE_PATH=/snapotter` を設定して再起動します。公式の CPU 用および GPU 用 Compose ファイルでも、シェルまたは Compose の `.env` ファイルから `BASE_PATH` を指定できます。同じイメージがどのパスでも動作し、フロントエンドの再ビルドは不要です。
+`https://example.com/snapotter` で提供するには、SnapOtter コンテナの環境に [`BASE_PATH=/snapotter`](/ja/guide/configuration#env-base-path) を設定して再起動します。公式の CPU 用および GPU 用 Compose ファイルでも、シェルまたは Compose の `.env` ファイルから `BASE_PATH` を指定できます。同じイメージがどのパスでも動作し、フロントエンドの再ビルドは不要です。
 
 `BASE_PATH` には、英字、数字、`_`、または `-` を含む、スラッシュ区切りのセグメントを指定できます。`/apps/snapotter` のようなネストしたパスも使えます。末尾のスラッシュは省略できます。ルートでのデプロイでは、空のまま (デフォルト) にするか、`/` を設定してください。
 
@@ -601,7 +601,7 @@ location /snapotter/ {
 }
 ```
 
-この例ではプレフィックスを保持します。転送前に `/snapotter` を取り除くプロキシにも対応しています。内部のヘルスチェックは引き続き `/api/v1/health` を使えます。OIDC または SAML を使う場合は、`EXTERNAL_URL=https://example.com/snapotter` も設定し、IdP のコールバック URL を、それぞれ `/snapotter/api/auth/oidc/callback` または `/snapotter/api/auth/saml/callback` を含むように更新してください。
+この例ではプレフィックスを保持します。転送前に `/snapotter` を取り除くプロキシにも対応しています。内部のヘルスチェックは引き続き `/api/v1/health` を使えます。OIDC または SAML を使う場合は、[`EXTERNAL_URL=https://example.com/snapotter`](/ja/guide/oidc#env-external-url) も設定し、IdP のコールバック URL を、それぞれ `/snapotter/api/auth/oidc/callback` または `/snapotter/api/auth/saml/callback` を含むように更新してください。
 
 API スクリプトはそのまま動作し続けます。ツールの `downloadUrl` など、API レスポンス内の URL は、`BASE_PATH` の値に関係なく `/api/` で始まります。これらはドメインのルートに対して解決するのではなく、インスタンスのベース URL (`https://example.com/snapotter` + `/api/v1/download/...`) に付け足してください。
 

@@ -70,7 +70,7 @@ services:
 Notes for Pi-class machines:
 
 - **Prefer a USB SSD over an SD card** for the data volume and Postgres. Job workspaces do real disk IO, and SD cards are both slow and quick to wear out.
-- **The all-in-one single container also works here** (embedded Postgres and Redis when `DATABASE_URL`/`REDIS_URL` are unset), and on a memory-constrained host you should lower its embedded Redis cap with `REDIS_MAXMEMORY` (see [Configuration](/guide/configuration)). Compose gives you finer per-service control, which is why this walkthrough uses it.
+- **The all-in-one single container also works here** (embedded Postgres and Redis when [`DATABASE_URL`](/guide/configuration#env-database-url)/[`REDIS_URL`](/guide/configuration#env-redis-url) are unset), and on a memory-constrained host you should lower its embedded Redis cap with [`REDIS_MAXMEMORY`](/guide/configuration#env-redis-maxmemory) (see [Configuration](/guide/configuration)). Compose gives you finer per-service control, which is why this walkthrough uses it.
 - **Add swap on 2 GB devices.** It keeps the occasional spike (a large PDF, a batch you forgot to cap) from ending in an out-of-memory kill. zram is the SD-card-friendly option.
 - The arm64 image is CPU-only; there is no CUDA on ARM boards.
 
@@ -80,16 +80,16 @@ All caps are environment variables, documented fully in [Configuration](/guide/c
 
 | Variable | Small-box suggestion | What it protects |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | How many jobs run in parallel. Auto-detect uses CPU cores minus one, which is fine on big machines and too eager on a 2-core box under memory pressure. |
-| `MAX_WORKER_THREADS` | `2` | Image-processing thread pool. |
-| `AI_SIDECAR_IDLE_TIMEOUT` | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower `AI_SESSION_IDLE_TIMEOUT` too, since the process exit discards cached models. |
-| `MAX_BATCH_SIZE` | `5` | Batches are where 1-2 GB machines run out of memory first. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Keeps a single huge file from occupying the whole workspace. |
-| `MAX_MEGAPIXELS` | `50` | Decoding a 100+ MP image costs RAM regardless of file size. Images above about 268 MP are refused even at `0`. |
+| [`CONCURRENT_JOBS`](/guide/configuration#env-concurrent-jobs) | `1` | How many jobs run in parallel. Auto-detect uses CPU cores minus one, which is fine on big machines and too eager on a 2-core box under memory pressure. |
+| [`MAX_WORKER_THREADS`](/guide/configuration#env-max-worker-threads) | `2` | Image-processing thread pool. |
+| [`AI_SIDECAR_IDLE_TIMEOUT`](/guide/configuration#env-ai-sidecar-idle-timeout) | `120` | How long the AI Python process and the OCR runtime stay loaded after the last request. They hold 1-2 GB while warm, so a shorter window gives the memory back sooner at the cost of a few seconds on the next AI call. Lower `AI_SESSION_IDLE_TIMEOUT` too, since the process exit discards cached models. |
+| [`MAX_BATCH_SIZE`](/guide/configuration#env-max-batch-size) | `5` | Batches are where 1-2 GB machines run out of memory first. |
+| [`MAX_UPLOAD_SIZE_MB`](/guide/configuration#env-max-upload-size-mb) | `100` | Keeps a single huge file from occupying the whole workspace. |
+| [`MAX_MEGAPIXELS`](/guide/configuration#env-max-megapixels) | `50` | Decoding a 100+ MP image costs RAM regardless of file size. Images above about 268 MP are refused even at `0`. |
 | `MAX_VIDEO_DURATION_S` | `300` | Long transcodes monopolize a small CPU for minutes to hours. |
-| `JOB_TIMEOUT_LONG_S` | `3600` | Hard ceiling on AI and media jobs, so a runaway job frees the box eventually. The default is two hours. Image and document jobs already stop at `JOB_TIMEOUT_FAST_S` (120 seconds by default). |
+| [`JOB_TIMEOUT_LONG_S`](/guide/configuration#env-job-timeout-long-s) | `3600` | Hard ceiling on AI and media jobs, so a runaway job frees the box eventually. The default is two hours. Image and document jobs already stop at [`JOB_TIMEOUT_FAST_S`](/guide/configuration#env-job-timeout-fast-s) (120 seconds by default). |
 
-These caps apply to what the server accepts, so set them to match what you actually use rather than as small as possible. If you never touch video, a `MAX_VIDEO_DURATION_S` cap costs nothing; if you scan documents daily, do not cap `MAX_PDF_PAGES`.
+These caps apply to what the server accepts, so set them to match what you actually use rather than as small as possible. If you never touch video, a `MAX_VIDEO_DURATION_S` cap costs nothing; if you scan documents daily, do not cap [`MAX_PDF_PAGES`](/guide/configuration#env-max-pdf-pages).
 
 ## What to skip {#what-to-skip}
 

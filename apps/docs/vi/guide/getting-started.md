@@ -24,7 +24,7 @@ Sau đó mở [http://localhost:1349](http://localhost:1349) và đăng nhập b
 
 Giờ hãy mở một công cụ. Chọn một công cụ từ thanh bên, hoặc vào thẳng [Resize](http://localhost:1349/image/resize), thả một ảnh vào và tải kết quả về.
 
-Vậy là xong phần cài đặt. Container duy nhất này chạy mọi thứ cần thiết: khi không đặt `DATABASE_URL`, nó tự khởi động PostgreSQL và Redis riêng trên giao diện loopback (chế độ nhúng) và lưu toàn bộ dữ liệu trong volume `SnapOtter-data`. Đây là cách nhanh nhất để thử SnapOtter hoặc tự lưu trữ trên homelab. Chế độ nhúng chạy với quyền root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`. Với môi trường production, hãy dùng [stack Docker Compose](#docker-compose), nơi PostgreSQL và Redis chạy trong các container riêng.
+Vậy là xong phần cài đặt. Container duy nhất này chạy mọi thứ cần thiết: khi không đặt [`DATABASE_URL`](/vi/guide/configuration#env-database-url), nó tự khởi động PostgreSQL và Redis riêng trên giao diện loopback (chế độ nhúng) và lưu toàn bộ dữ liệu trong volume `SnapOtter-data`. Đây là cách nhanh nhất để thử SnapOtter hoặc tự lưu trữ trên homelab. Chế độ nhúng chạy với quyền root (mặc định) và tự động tắt ngay khi bạn đặt `DATABASE_URL`. Với môi trường production, hãy dùng [stack Docker Compose](#docker-compose), nơi PostgreSQL và Redis chạy trong các container riêng.
 
 Kết quả của các job không được lưu trong volume dữ liệu, nên chúng biến mất khi container được thay thế (ví dụ khi nâng cấp image) và liên kết tải xuống của chúng ngừng hoạt động. Mục [Giữ lại kết quả job](/vi/guide/deployment#keeping-job-output) trong hướng dẫn Triển khai giải thích cách giữ lại chúng.
 
@@ -156,13 +156,13 @@ Nối các công cụ thành quy trình nhiều bước và áp dụng cho một
 3. Chạy trên một tệp đơn lẻ - hoặc cả một lô cùng lúc.
 4. Lưu pipeline để dùng lại sau.
 
-Mặc định pipeline cho phép 20 bước. Đặt `MAX_PIPELINE_STEPS=0` để bỏ giới hạn này.
+Mặc định pipeline cho phép 20 bước. Đặt [`MAX_PIPELINE_STEPS=0`](/vi/guide/configuration#env-max-pipeline-steps) để bỏ giới hạn này.
 
 ### Thư viện tệp {#file-library}
 
 Mọi tệp bạn xử lý đều có thể được lưu vào thư viện **Files** của bạn. SnapOtter theo dõi toàn bộ lịch sử phiên bản để bạn có thể lần lại từng bước xử lý, từ tệp tải lên ban đầu đến kết quả cuối cùng.
 
-Việc lưu là chủ động: kết quả bạn lưu vào thư viện được giữ cho đến khi bạn xóa, còn kết quả đã xử lý mà không lưu sẽ tự động bị xóa sau 72 giờ (có thể cấu hình qua `FILE_MAX_AGE_HOURS`).
+Việc lưu là chủ động: kết quả bạn lưu vào thư viện được giữ cho đến khi bạn xóa, còn kết quả đã xử lý mà không lưu sẽ tự động bị xóa sau 72 giờ (có thể cấu hình qua [`FILE_MAX_AGE_HOURS`](/vi/guide/configuration#env-file-max-age-hours)).
 
 ### REST API và khóa API {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Bật nhiều người dùng với kiểm soát truy cập theo vai trò:
 
 Tạo nhóm tại **Settings → Teams** để gom người dùng.
 
-Đặt `AUTH_ENABLED=true` (hoặc `false` cho trường hợp một người dùng/tự dùng, không cần đăng nhập).
+Đặt [`AUTH_ENABLED=true`](/vi/guide/configuration#env-auth-enabled) (hoặc `false` cho trường hợp một người dùng/tự dùng, không cần đăng nhập).
 
 ## Dùng trên điện thoại {#use-it-from-your-phone}
 

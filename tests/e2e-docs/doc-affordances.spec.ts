@@ -37,4 +37,13 @@ test.describe("Docs click affordances", () => {
     ).toBeGreaterThan(0);
     await expect(page).not.toHaveURL(/#gpu-acceleration$/);
   });
+
+  // #5095: readers also clicked env var names expecting their definition.
+  test("an env var mention links to its row in Configuration", async ({ page }) => {
+    await page.goto("/guide/low-resource");
+    await waitForHydration(page);
+    await page.locator(".vp-doc a[href$='#env-max-worker-threads']").first().click();
+    await expect(page).toHaveURL(/\/guide\/configuration#env-max-worker-threads$/);
+    await expect(page.locator(".vp-doc td#env-max-worker-threads")).toBeInViewport();
+  });
 });

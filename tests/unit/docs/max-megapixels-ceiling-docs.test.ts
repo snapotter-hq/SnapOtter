@@ -10,7 +10,8 @@ const read = (p: string) => readFileSync(join(root, p), "utf8");
 function row(doc: string, name: string): string {
   const line = read(doc)
     .split("\n")
-    .find((l) => l.startsWith(`| \`${name}\` |`));
+    // Guide tables may link the name to its Configuration row (#5095).
+    .find((l) => l.startsWith(`| \`${name}\` |`) || l.startsWith(`| [\`${name}\`](`));
   expect(line, `${doc} has no ${name} row`).toBeDefined();
   return line ?? "";
 }

@@ -24,7 +24,7 @@ Ardından [http://localhost:1349](http://localhost:1349) adresini açın ve `adm
 
 Şimdi bir araç açın. Kenar çubuğundan birini seçin ya da doğrudan [Resize](http://localhost:1349/image/resize) aracına gidin, bir görsel bırakın ve sonucu indirin.
 
-Kurulum bu kadar. Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: `DATABASE_URL` ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [Docker Compose yığınını](#docker-compose) kullanın.
+Kurulum bu kadar. Bu tek kapsayıcı ihtiyaç duyduğu her şeyi çalıştırır: [`DATABASE_URL`](/tr/guide/configuration#env-database-url) ayarlanmadığında kendi PostgreSQL ve Redis'ini loopback arayüzünde başlatır (gömülü mod) ve tüm verileri `SnapOtter-data` biriminde tutar. SnapOtter'ı denemenin ya da bir homelab'da kendi sunucunuzda barındırmanın en hızlı yoludur. Gömülü mod root olarak çalışır (varsayılan) ve `DATABASE_URL` ayarlandığı anda otomatik olarak kapanır. Üretim için PostgreSQL ve Redis'i kendi kapsayıcılarında tutan [Docker Compose yığınını](#docker-compose) kullanın.
 
 İş sonuçları veri biriminde tutulmaz, bu yüzden kapsayıcı değiştirildiğinde (örneğin bir imaj yükseltmesinde) kaybolur ve indirme bağlantıları çalışmaz hale gelir. Dağıtım kılavuzundaki [İş çıktısını saklama](/tr/guide/deployment#keeping-job-output) bölümü bunları nasıl koruyacağınızı açıklar.
 
@@ -156,13 +156,13 @@ Araçları çok adımlı iş akışlarında zincirleyin ve tek bir görsele ya d
 3. Tek bir dosyada ya da tüm toplu işte bir seferde çalıştırın.
 4. İş hattını daha sonra yeniden kullanmak için kaydedin.
 
-İş hatları varsayılan olarak 20 adıma izin verir. Sınırı kaldırmak için `MAX_PIPELINE_STEPS=0` ayarlayın.
+İş hatları varsayılan olarak 20 adıma izin verir. Sınırı kaldırmak için [`MAX_PIPELINE_STEPS=0`](/tr/guide/configuration#env-max-pipeline-steps) ayarlayın.
 
 ### Dosya Kitaplığı {#file-library}
 
 İşlediğiniz her dosya **Files** kitaplığınıza kaydedilebilir. SnapOtter, ilk yüklemeden son çıktıya kadar her işleme adımını izleyebilmeniz için tüm sürüm geçmişini tutar.
 
-Kaydetme açıkça yapılır: kitaplığa kaydettiğiniz sonuçlar siz silene kadar saklanır; işleyip kaydetmediğiniz sonuçlar ise 72 saat sonra otomatik olarak temizlenir (`FILE_MAX_AGE_HOURS` ile yapılandırılabilir).
+Kaydetme açıkça yapılır: kitaplığa kaydettiğiniz sonuçlar siz silene kadar saklanır; işleyip kaydetmediğiniz sonuçlar ise 72 saat sonra otomatik olarak temizlenir ([`FILE_MAX_AGE_HOURS`](/tr/guide/configuration#env-file-max-age-hours) ile yapılandırılabilir).
 
 ### REST API ve API Anahtarları {#rest-api-api-keys}
 
@@ -186,7 +186,7 @@ Rol tabanlı erişim denetimiyle birden çok kullanıcıyı etkinleştirin:
 
 Kullanıcıları gruplamak için **Ayarlar → Ekipler** altında ekipler oluşturun.
 
-`AUTH_ENABLED=true` ayarlayın (oturum açmadan tek kullanıcılı/kişisel kullanım için `false`).
+[`AUTH_ENABLED=true`](/tr/guide/configuration#env-auth-enabled) ayarlayın (oturum açmadan tek kullanıcılı/kişisel kullanım için `false`).
 
 ## Telefonunuzdan Kullanın {#use-it-from-your-phone}
 

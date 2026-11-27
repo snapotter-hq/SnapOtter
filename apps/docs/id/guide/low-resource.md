@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: ba961b404945
+i18n_output_hash: 944777e013b8
 i18n_hash_version: 2
 ---
 # Setup Sumber Daya Rendah {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Catatan untuk mesin kelas Pi:
 
 - **Pilih SSD USB dibanding kartu SD** untuk volume data dan Postgres. Workspace job melakukan IO disk yang nyata, dan kartu SD lambat sekaligus cepat aus.
-- **Container tunggal all-in-one juga berfungsi di sini** (Postgres dan Redis tertanam ketika `DATABASE_URL`/`REDIS_URL` tidak diatur), dan pada host dengan memori terbatas Anda sebaiknya menurunkan batas Redis tertanamnya dengan `REDIS_MAXMEMORY` (lihat [Konfigurasi](/id/guide/configuration)). Compose memberi Anda kontrol per layanan yang lebih halus, itulah sebabnya panduan ini menggunakannya.
+- **Container tunggal all-in-one juga berfungsi di sini** (Postgres dan Redis tertanam ketika [`DATABASE_URL`](/id/guide/configuration#env-database-url)/[`REDIS_URL`](/id/guide/configuration#env-redis-url) tidak diatur), dan pada host dengan memori terbatas Anda sebaiknya menurunkan batas Redis tertanamnya dengan [`REDIS_MAXMEMORY`](/id/guide/configuration#env-redis-maxmemory) (lihat [Konfigurasi](/id/guide/configuration)). Compose memberi Anda kontrol per layanan yang lebih halus, itulah sebabnya panduan ini menggunakannya.
 - **Tambahkan swap pada perangkat 2 GB.** Swap mencegah lonjakan sesekali (PDF besar, batch yang lupa Anda batasi) berakhir dengan penghentian karena kehabisan memori. zram adalah opsi yang ramah kartu SD.
 - Image arm64 hanya CPU; tidak ada CUDA di board ARM.
 
@@ -86,15 +86,15 @@ Semua batas adalah variabel lingkungan, yang didokumentasikan lengkap di [Konfig
 
 | Variabel | Saran untuk mesin kecil | Yang dilindungi |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | Berapa banyak job yang berjalan secara paralel. Deteksi otomatis menggunakan jumlah core CPU dikurangi satu, yang cocok untuk mesin besar tetapi terlalu agresif pada mesin 2 core di bawah tekanan memori. |
-| `MAX_WORKER_THREADS` | `2` | Thread pool pemrosesan gambar. |
-| `MAX_BATCH_SIZE` | `5` | Batch adalah tempat mesin 1-2 GB pertama kali kehabisan memori. |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Mencegah satu file raksasa menempati seluruh workspace. |
-| `MAX_MEGAPIXELS` | `50` | Men-decode gambar 100+ MP memakan RAM terlepas dari ukuran file. |
+| [`CONCURRENT_JOBS`](/id/guide/configuration#env-concurrent-jobs) | `1` | Berapa banyak job yang berjalan secara paralel. Deteksi otomatis menggunakan jumlah core CPU dikurangi satu, yang cocok untuk mesin besar tetapi terlalu agresif pada mesin 2 core di bawah tekanan memori. |
+| [`MAX_WORKER_THREADS`](/id/guide/configuration#env-max-worker-threads) | `2` | Thread pool pemrosesan gambar. |
+| [`MAX_BATCH_SIZE`](/id/guide/configuration#env-max-batch-size) | `5` | Batch adalah tempat mesin 1-2 GB pertama kali kehabisan memori. |
+| [`MAX_UPLOAD_SIZE_MB`](/id/guide/configuration#env-max-upload-size-mb) | `100` | Mencegah satu file raksasa menempati seluruh workspace. |
+| [`MAX_MEGAPIXELS`](/id/guide/configuration#env-max-megapixels) | `50` | Men-decode gambar 100+ MP memakan RAM terlepas dari ukuran file. |
 | `MAX_VIDEO_DURATION_S` | `300` | Transcode yang panjang memonopoli CPU kecil selama menit hingga jam. |
-| `PROCESSING_TIMEOUT_S` | `600` | Batas keras agar job yang lepas kendali pada akhirnya membebaskan mesin. |
+| [`PROCESSING_TIMEOUT_S`](/id/guide/configuration#env-processing-timeout-s) | `600` | Batas keras agar job yang lepas kendali pada akhirnya membebaskan mesin. |
 
-Batas-batas ini berlaku untuk apa yang diterima server, jadi atur agar sesuai dengan yang benar-benar Anda gunakan, bukan sekecil mungkin. Jika Anda tidak pernah menyentuh video, batas `MAX_VIDEO_DURATION_S` tidak merugikan apa pun; jika Anda memindai dokumen setiap hari, jangan batasi `MAX_PDF_PAGES`.
+Batas-batas ini berlaku untuk apa yang diterima server, jadi atur agar sesuai dengan yang benar-benar Anda gunakan, bukan sekecil mungkin. Jika Anda tidak pernah menyentuh video, batas `MAX_VIDEO_DURATION_S` tidak merugikan apa pun; jika Anda memindai dokumen setiap hari, jangan batasi [`MAX_PDF_PAGES`](/id/guide/configuration#env-max-pdf-pages).
 
 ## Yang sebaiknya dilewati {#what-to-skip}
 

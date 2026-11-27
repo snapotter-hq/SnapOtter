@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: e373edfd9537
+i18n_output_hash: 3d653714c39b
 i18n_hash_version: 2
 ---
 # 低リソース環境のセットアップ {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Pi クラスのマシンに関する注意点:
 
 - データボリュームと Postgres には、SD カードよりも **USB SSD を使うことをお勧めします**。ジョブのワークスペースでは実際にディスク IO が発生し、SD カードは遅い上に摩耗も早いためです。
-- **オールインワンの単一コンテナもここで動作します**（`DATABASE_URL`/`REDIS_URL` が未設定の場合は、組み込みの Postgres と Redis を使用）。メモリが限られたホストでは、`REDIS_MAXMEMORY` で組み込み Redis の上限を下げてください（[設定](/ja/guide/configuration)を参照）。Compose ならサービスごとにきめ細かく制御できるため、この手順では Compose を使っています。
+- **オールインワンの単一コンテナもここで動作します**（[`DATABASE_URL`](/ja/guide/configuration#env-database-url)/[`REDIS_URL`](/ja/guide/configuration#env-redis-url) が未設定の場合は、組み込みの Postgres と Redis を使用）。メモリが限られたホストでは、[`REDIS_MAXMEMORY`](/ja/guide/configuration#env-redis-maxmemory) で組み込み Redis の上限を下げてください（[設定](/ja/guide/configuration)を参照）。Compose ならサービスごとにきめ細かく制御できるため、この手順では Compose を使っています。
 - **2 GB のデバイスではスワップを追加してください。** 大きな PDF や上限を設定し忘れたバッチなどで一時的に負荷が急増しても、メモリ不足によるキルを避けられます。SD カードに優しい方法は zram です。
 - arm64 イメージは CPU のみです。ARM ボードでは CUDA は使えません。
 
@@ -86,15 +86,15 @@ Pi クラスのマシンに関する注意点:
 
 | 変数 | 小規模マシン向けの推奨値 | 保護する対象 |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | 並列で実行するジョブの数。自動検出では CPU コア数から 1 を引いた値を使います。大きなマシンでは問題ありませんが、メモリに余裕のない 2 コアのマシンでは過剰です。 |
-| `MAX_WORKER_THREADS` | `2` | 画像処理のスレッドプール。 |
-| `MAX_BATCH_SIZE` | `5` | 1 から 2 GB のマシンでは、まずバッチでメモリが不足します。 |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 巨大なファイル 1 つがワークスペース全体を占有するのを防ぎます。 |
-| `MAX_MEGAPIXELS` | `50` | 100 MP を超える画像のデコードは、ファイルサイズにかかわらず RAM を消費します。 |
+| [`CONCURRENT_JOBS`](/ja/guide/configuration#env-concurrent-jobs) | `1` | 並列で実行するジョブの数。自動検出では CPU コア数から 1 を引いた値を使います。大きなマシンでは問題ありませんが、メモリに余裕のない 2 コアのマシンでは過剰です。 |
+| [`MAX_WORKER_THREADS`](/ja/guide/configuration#env-max-worker-threads) | `2` | 画像処理のスレッドプール。 |
+| [`MAX_BATCH_SIZE`](/ja/guide/configuration#env-max-batch-size) | `5` | 1 から 2 GB のマシンでは、まずバッチでメモリが不足します。 |
+| [`MAX_UPLOAD_SIZE_MB`](/ja/guide/configuration#env-max-upload-size-mb) | `100` | 巨大なファイル 1 つがワークスペース全体を占有するのを防ぎます。 |
+| [`MAX_MEGAPIXELS`](/ja/guide/configuration#env-max-megapixels) | `50` | 100 MP を超える画像のデコードは、ファイルサイズにかかわらず RAM を消費します。 |
 | `MAX_VIDEO_DURATION_S` | `300` | 長時間のトランスコードは、小さな CPU を数分から数時間占有します。 |
-| `PROCESSING_TIMEOUT_S` | `600` | 暴走したジョブがいずれマシンを解放するための厳格な上限。 |
+| [`PROCESSING_TIMEOUT_S`](/ja/guide/configuration#env-processing-timeout-s) | `600` | 暴走したジョブがいずれマシンを解放するための厳格な上限。 |
 
-これらの上限はサーバーが受け付ける内容に適用されます。できるだけ小さくするのではなく、実際の使い方に合わせて設定してください。動画をまったく使わないなら `MAX_VIDEO_DURATION_S` の上限は問題になりませんが、毎日ドキュメントをスキャンするなら `MAX_PDF_PAGES` に上限を設けないでください。
+これらの上限はサーバーが受け付ける内容に適用されます。できるだけ小さくするのではなく、実際の使い方に合わせて設定してください。動画をまったく使わないなら `MAX_VIDEO_DURATION_S` の上限は問題になりませんが、毎日ドキュメントをスキャンするなら [`MAX_PDF_PAGES`](/ja/guide/configuration#env-max-pdf-pages) に上限を設けないでください。
 
 ## スキップすべきもの {#what-to-skip}
 

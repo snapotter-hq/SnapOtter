@@ -2,7 +2,7 @@
 description: "Driftsätt SnapOtter i produktion med Docker. Maskinvarukrav, GPU-konfiguration och reverse proxy-konfigurationer för Nginx, Traefik och Cloudflare."
 i18n_source_hash: 524ec02adde3
 i18n_provenance: machine
-i18n_output_hash: d1157512cbd3
+i18n_output_hash: 0ef3c1cd2679
 i18n_hash_version: 2
 ---
 
@@ -440,7 +440,7 @@ volumes:
   - SnapOtter-data:/data
 ```
 
-**Bind mounts** - Du hanterar behörigheterna. Ange `PUID`/`PGID` så att de motsvarar din värdanvändare:
+**Bind mounts** - Du hanterar behörigheterna. Ange [`PUID`](/sv/guide/configuration#env-puid)/[`PGID`](/sv/guide/configuration#env-pgid) så att de motsvarar din värdanvändare:
 ```yaml
 volumes:
   - ./SnapOtter-data:/data
@@ -485,20 +485,20 @@ Startfelet anger exakt vilket UID som ska användas, så den snabbaste vägen ä
 
 | Variabel | Standard | Beskrivning |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Aktivera/inaktivera inloggningskrav |
-| `DEFAULT_USERNAME` | `admin` | Första administratörens användarnamn |
-| `DEFAULT_PASSWORD` | `admin` | Första administratörens lösenord (byte krävs vid första inloggningen) |
-| `MAX_UPLOAD_SIZE_MB` | `0` (obegränsat) | Uppladdningsgräns per fil i MB. Avbilden levereras med `0`, ett bygge från källkod börjar på 100 |
-| `MAX_BATCH_SIZE` | `0` (obegränsat) | Max antal filer per batchbegäran. Avbilden levereras med `0`, ett bygge från källkod börjar på 100 |
-| `RATE_LIMIT_PER_MIN` | `1000` | API-förfrågningar per minut och IP (sätt 0 för att inaktivera) |
-| `MAX_USERS` | `0` (obegränsat) | Maximalt antal användarkonton |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Som standard endast privata nätverk |
+| [`AUTH_ENABLED`](/sv/guide/configuration#env-auth-enabled) | `true` | Aktivera/inaktivera inloggningskrav |
+| [`DEFAULT_USERNAME`](/sv/guide/configuration#env-default-username) | `admin` | Första administratörens användarnamn |
+| [`DEFAULT_PASSWORD`](/sv/guide/configuration#env-default-password) | `admin` | Första administratörens lösenord (byte krävs vid första inloggningen) |
+| [`MAX_UPLOAD_SIZE_MB`](/sv/guide/configuration#env-max-upload-size-mb) | `0` (obegränsat) | Uppladdningsgräns per fil i MB. Avbilden levereras med `0`, ett bygge från källkod börjar på 100 |
+| [`MAX_BATCH_SIZE`](/sv/guide/configuration#env-max-batch-size) | `0` (obegränsat) | Max antal filer per batchbegäran. Avbilden levereras med `0`, ett bygge från källkod börjar på 100 |
+| [`RATE_LIMIT_PER_MIN`](/sv/guide/configuration#env-rate-limit-per-min) | `1000` | API-förfrågningar per minut och IP (sätt 0 för att inaktivera) |
+| [`MAX_USERS`](/sv/guide/configuration#env-max-users) | `0` (obegränsat) | Maximalt antal användarkonton |
+| [`TRUST_PROXY`](/sv/guide/configuration#env-trust-proxy) | `loopback,linklocal,uniquelocal` | Vilka peers som får ange klientens IP via `X-Forwarded-For`. Som standard endast privata nätverk |
 | `PUID` | `999` | Kör som detta UID (för behörigheter på bind mounts) |
 | `PGID` | `999` | Kör som detta GID (för behörigheter på bind mounts) |
-| `LOG_LEVEL` | `info` | Loggdetaljnivå: fatal, error, warn, info, debug, trace |
-| `CONCURRENT_JOBS` | `0` (auto) | Max antal parallella AI-bearbetningsjobb |
-| `SESSION_DURATION_HOURS` | `168` | Inloggningssessionens livslängd (7 dagar) |
-| `CORS_ORIGIN` | (tom) | Kommaseparerade tillåtna ursprung, eller tom för samma ursprung |
+| [`LOG_LEVEL`](/sv/guide/configuration#env-log-level) | `info` | Loggdetaljnivå: fatal, error, warn, info, debug, trace |
+| [`CONCURRENT_JOBS`](/sv/guide/configuration#env-concurrent-jobs) | `0` (auto) | Max antal parallella AI-bearbetningsjobb |
+| [`SESSION_DURATION_HOURS`](/sv/guide/configuration#env-session-duration-hours) | `168` | Inloggningssessionens livslängd (7 dagar) |
+| [`CORS_ORIGIN`](/sv/guide/configuration#env-cors-origin) | (tom) | Kommaseparerade tillåtna ursprung, eller tom för samma ursprung |
 
 ### Utgående proxy och privat CA {#outbound-proxy-and-private-ca}
 
@@ -578,7 +578,7 @@ server {
 
 ### Driftsättning under en undersökväg {#subpath}
 
-För att servera `https://example.com/snapotter`, ange `BASE_PATH=/snapotter` i
+För att servera `https://example.com/snapotter`, ange [`BASE_PATH=/snapotter`](/sv/guide/configuration#env-base-path) i
 SnapOtter-containerns miljö och starta om den. De officiella Compose-filerna för CPU och GPU
 accepterar också `BASE_PATH` från ditt skal eller din Compose-fil `.env`. Samma
 avbild fungerar på vilken sökväg som helst, ingen ombyggnad av frontend behövs.
@@ -609,7 +609,7 @@ location /snapotter/ {
 Exemplet bevarar prefixet. Proxyer som tar bort `/snapotter` innan de
 vidarebefordrar stöds också. Interna hälsokontroller kan fortsätta använda
 `/api/v1/health`. För OIDC eller SAML, ange också
-`EXTERNAL_URL=https://example.com/snapotter` och uppdatera identitetsleverantörens
+[`EXTERNAL_URL=https://example.com/snapotter`](/sv/guide/oidc#env-external-url) och uppdatera identitetsleverantörens
 callback-URL:er så att de innehåller `/snapotter/api/auth/oidc/callback` respektive
 `/snapotter/api/auth/saml/callback`.
 

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 9a540920f13d
+i18n_output_hash: 2d50caa50660
 i18n_hash_version: 2
 ---
 # 低資源環境設定 {#low-resource-setups}
@@ -76,7 +76,7 @@ services:
 Pi 等級機器的注意事項：
 
 - **資料磁碟區與 Postgres 建議使用 USB SSD，而非 SD 卡。** 工作區會進行實際的磁碟 IO，而 SD 卡不僅慢，也很容易磨損。
-- **單一容器的一體式部署在這裡同樣可行**（未設定 `DATABASE_URL`/`REDIS_URL` 時使用內嵌的 Postgres 與 Redis），在記憶體受限的主機上，您應該用 `REDIS_MAXMEMORY` 降低其內嵌 Redis 的上限（請參閱[設定](/zh-TW/guide/configuration)）。Compose 能提供更細緻的各服務控制，因此本操作步驟採用它。
+- **單一容器的一體式部署在這裡同樣可行**（未設定 [`DATABASE_URL`](/zh-TW/guide/configuration#env-database-url)/[`REDIS_URL`](/zh-TW/guide/configuration#env-redis-url) 時使用內嵌的 Postgres 與 Redis），在記憶體受限的主機上，您應該用 [`REDIS_MAXMEMORY`](/zh-TW/guide/configuration#env-redis-maxmemory) 降低其內嵌 Redis 的上限（請參閱[設定](/zh-TW/guide/configuration)）。Compose 能提供更細緻的各服務控制，因此本操作步驟採用它。
 - **2 GB 的裝置請加上 swap。** 它能避免偶發的尖峰（較大的 PDF、忘了設上限的批次）以記憶體不足被終止收場。zram 是對 SD 卡友善的選項。
 - arm64 映像檔僅支援 CPU，ARM 開發板上沒有 CUDA。
 
@@ -86,15 +86,15 @@ Pi 等級機器的注意事項：
 
 | 變數 | 小型機器建議值 | 保護對象 |
 |---|---|---|
-| `CONCURRENT_JOBS` | `1` | 同時平行執行的工作數量。自動偵測使用 CPU 核心數減一，這對大型機器沒問題，但對承受記憶體壓力的 2 核心機器而言太過積極。 |
-| `MAX_WORKER_THREADS` | `2` | 圖片處理執行緒池。 |
-| `MAX_BATCH_SIZE` | `5` | 批次是 1-2 GB 機器最先耗盡記憶體的地方。 |
-| `MAX_UPLOAD_SIZE_MB` | `100` | 避免單一巨大檔案佔滿整個工作區。 |
-| `MAX_MEGAPIXELS` | `50` | 無論檔案大小，解碼 100+ MP 的圖片都會消耗 RAM。 |
+| [`CONCURRENT_JOBS`](/zh-TW/guide/configuration#env-concurrent-jobs) | `1` | 同時平行執行的工作數量。自動偵測使用 CPU 核心數減一，這對大型機器沒問題，但對承受記憶體壓力的 2 核心機器而言太過積極。 |
+| [`MAX_WORKER_THREADS`](/zh-TW/guide/configuration#env-max-worker-threads) | `2` | 圖片處理執行緒池。 |
+| [`MAX_BATCH_SIZE`](/zh-TW/guide/configuration#env-max-batch-size) | `5` | 批次是 1-2 GB 機器最先耗盡記憶體的地方。 |
+| [`MAX_UPLOAD_SIZE_MB`](/zh-TW/guide/configuration#env-max-upload-size-mb) | `100` | 避免單一巨大檔案佔滿整個工作區。 |
+| [`MAX_MEGAPIXELS`](/zh-TW/guide/configuration#env-max-megapixels) | `50` | 無論檔案大小，解碼 100+ MP 的圖片都會消耗 RAM。 |
 | `MAX_VIDEO_DURATION_S` | `300` | 長時間轉碼會讓小型 CPU 被獨佔數分鐘到數小時。 |
-| `PROCESSING_TIMEOUT_S` | `600` | 硬性上限，讓失控的工作最終能釋放機器。 |
+| [`PROCESSING_TIMEOUT_S`](/zh-TW/guide/configuration#env-processing-timeout-s) | `600` | 硬性上限，讓失控的工作最終能釋放機器。 |
 
-這些上限作用於伺服器接受的內容，因此請依照您實際的使用情況設定，而不是越小越好。如果您從不處理影片，設定 `MAX_VIDEO_DURATION_S` 上限不會有任何代價；如果您每天掃描文件，就不要限制 `MAX_PDF_PAGES`。
+這些上限作用於伺服器接受的內容，因此請依照您實際的使用情況設定，而不是越小越好。如果您從不處理影片，設定 `MAX_VIDEO_DURATION_S` 上限不會有任何代價；如果您每天掃描文件，就不要限制 [`MAX_PDF_PAGES`](/zh-TW/guide/configuration#env-max-pdf-pages)。
 
 ## 建議略過的項目 {#what-to-skip}
 
