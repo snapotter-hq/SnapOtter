@@ -637,3 +637,44 @@ describe("upstream ECONNRESET vs client abort in logAndReportRequestError (#3697
     expect(classifyError(strippedWorkerErr, "http")).toBe("expected");
   });
 });
+
+describe("registerErrorHandler client disconnects (#5363)", () => {
+  it("drops an AbortError quietly once the client has hung up", async () => {
+    const { request: httpRequest } = await import("node:http");
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    let settled!: () => void;
+    const errorHandled = new Promise<void>((resolve) => {
+      settled = resolve;
+    });
+    app.addHook("onError", async () => settled());
+    const handlerStarted = new Promise<void>((started) => {
+      app.post("/gone", async (_request, reply) => {
+        started();
+        await new Promise<void>((closed) => reply.raw.once("close", () => closed()));
+        throw new DOMException("This operation was aborted", "AbortError");
+      });
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const req = httpRequest({
+      port: (app.server.address() as { port: number }).port,
+      host: "127.0.0.1",
+      method: "POST",
+      path: "/gone",
+      headers: { "content-type": "text/plain" },
+    });
+    req.on("error", () => {});
+    req.end("body");
+    await handlerStarted;
+    req.destroy();
+    await errorHandled;
+    await app.close();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("still answers an AbortError with a 500 while the client is connected", async () => {
+    const app = await appThrowing(() => new DOMException("aborted", "AbortError") as Error);
+    const res = await app.inject({ method: "GET", url: "/boom" });
+    expect(res.statusCode).toBe(500);
+  });
+});

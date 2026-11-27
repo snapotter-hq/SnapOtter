@@ -19,7 +19,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { assertSingleFrameFor } from "../../lib/animated-image.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -279,6 +279,7 @@ export function registerEraseObject(app: FastifyInstance) {
           );
           maskBuffer = preparedMask.buffer;
         } catch (rawErr) {
+          if (dropIfClientGone(request, reply, rawErr, "erase-object")) return reply;
           const err = normalizeOperationalWriteError(rawErr);
           if (err instanceof InputValidationError) {
             return reply.status(400).send({ error: err.message });

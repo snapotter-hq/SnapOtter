@@ -10,7 +10,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { reportError } from "../../lib/error-report.js";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -289,6 +289,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
         });
         fileBuffer = prepared.buffer;
       } catch (rawErr) {
+        if (dropIfClientGone(request, reply, rawErr, "image-enhancement")) return reply;
         const err = normalizeOperationalWriteError(rawErr);
         if (err instanceof InputValidationError) {
           return reply.status(400).send({ error: err.message });

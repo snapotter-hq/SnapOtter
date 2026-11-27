@@ -513,6 +513,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     };
     const reply = {
       statusCode: 200,
+      raw: { destroyed: false, writableFinished: false, once: vi.fn() },
       payload: undefined as unknown,
       log: request.log,
       status(code: number) {

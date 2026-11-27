@@ -1,4 +1,4 @@
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 
 /**
  * Aborts when the client's connection closes before the reply finishes, so a
@@ -16,4 +16,22 @@ export function clientDisconnectSignal(reply: FastifyReply): AbortSignal {
     if (!reply.raw.writableFinished) abort();
   });
   return controller.signal;
+}
+
+/**
+ * True when `err` is the abort `clientDisconnectSignal` raised and the client
+ * really is gone. A route's decode `catch` calls this first and returns the
+ * reply untouched: the 422 and the error log are for faults, and a hang-up is
+ * neither. Logs at debug so the cancel stays traceable.
+ */
+export function dropIfClientGone(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  err: unknown,
+  toolId: string,
+): boolean {
+  if ((err as { name?: string } | null)?.name !== "AbortError") return false;
+  if (!reply.raw.destroyed || reply.raw.writableFinished) return false;
+  request.log.debug({ toolId }, "Client disconnected while the input was being decoded");
+  return true;
 }

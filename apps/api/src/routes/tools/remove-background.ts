@@ -31,7 +31,7 @@ import {
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
 } from "../../lib/bg-effects.js";
-import { clientDisconnectSignal } from "../../lib/client-disconnect-signal.js";
+import { clientDisconnectSignal, dropIfClientGone } from "../../lib/client-disconnect-signal.js";
 import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -415,6 +415,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           fileBuffer = prepared.buffer;
           filename = prepared.filename;
         } catch (rawErr) {
+          if (dropIfClientGone(request, reply, rawErr, "remove-background")) return reply;
           const err = normalizeOperationalWriteError(rawErr);
           if (err instanceof InputValidationError) {
             return reply.status(400).send({ error: err.message });
@@ -684,6 +685,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           autoSaveError: autoSaveResult.error,
         });
       } catch (rawErr) {
+        if (dropIfClientGone(request, reply, rawErr, "remove-background")) return reply;
         const err = normalizeOperationalWriteError(rawErr);
         if (err instanceof InputValidationError) {
           return reply.status(400).send({ error: err.message });

@@ -1,5 +1,6 @@
 import { isSafeMessageError, toolInputErrorCode } from "@snapotter/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { dropIfClientGone } from "../lib/client-disconnect-signal.js";
 import { markUpstreamError, reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
@@ -123,6 +124,9 @@ export function addResponseEnvelope(app: FastifyInstance): void {
 export function registerErrorHandler(app: FastifyInstance): void {
   addResponseEnvelope(app);
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+    // A render aborted because its client hung up is a cancel, not a fault: no
+    // error log, no Sentry, no reply to a closed socket (#5363).
+    if (dropIfClientGone(request, reply, error, request.routeOptions?.url ?? request.url)) return;
     const statusCode = logAndReportRequestError(error, request);
     // A send that raced one already answered lands here as ERR_HTTP_HEADERS_SENT
     // after the client has its response; sending again only adds a warning (#4348).
