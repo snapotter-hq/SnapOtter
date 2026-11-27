@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -103,6 +104,7 @@ async function callRoute(path: string, settings: Record<string, unknown>) {
   const handler = handlers[path];
   if (!handler) throw new Error(`Route ${path} was not registered`);
   const reply = {
+    raw: new EventEmitter(),
     statusCode: 200,
     payload: undefined as unknown,
     status(code: number) {
