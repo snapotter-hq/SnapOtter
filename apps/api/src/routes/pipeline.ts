@@ -104,7 +104,11 @@ import {
   svgClientErrorFields,
 } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
-import { engineUnavailable } from "../modality/image-input.js";
+import {
+  engineUnavailable,
+  rasterizeSvgInput,
+  replaceExtWithPng,
+} from "../modality/image-input.js";
 import { inputHandlerForInput } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
@@ -220,6 +224,14 @@ interface ParsedStep {
   resolvedToolId: string;
   parsedSettings: unknown;
   pool: Pool;
+}
+
+function pipelineStepCount(raw: string | null): number {
+  try {
+    return (JSON.parse(raw ?? "{}") as { steps?: unknown[] }).steps?.length ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 function firstPipelineToolId(raw: string | null): string | undefined {
@@ -634,6 +646,24 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     return reply.status(unavailable.statusCode).send(body);
                   }
                   throw err;
+                }
+                try {
+                  const firstConfig = getToolConfig(firstToolId ?? "");
+                  // Later steps would hand the kept SVG to sharp in-process, so
+                  // only a single-step pipeline may skip the deadline render.
+                  if (!(firstConfig?.keepSvgVector && pipelineStepCount(pipelineRaw) === 1)) {
+                    processBuffer = await rasterizeSvgInput(processBuffer, {
+                      density: firstConfig?.svgDensity,
+                    });
+                    filename = replaceExtWithPng(filename);
+                  }
+                } catch (err) {
+                  if (!(err instanceof InputValidationError)) throw err;
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
                 }
               } else {
                 try {
@@ -1926,6 +1956,26 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       continue;
                     }
                     throw err;
+                  }
+                  const firstStepToolId = parsedSteps[0]?.resolvedToolId;
+                  try {
+                    const firstConfig = getToolConfig(firstStepToolId ?? "");
+                    if (!(firstConfig?.keepSvgVector && parsedSteps.length === 1)) {
+                      processBuffer = await rasterizeSvgInput(processBuffer, {
+                        density: firstConfig?.svgDensity,
+                      });
+                      processFilename = replaceExtWithPng(processFilename);
+                    }
+                  } catch (err) {
+                    if (!(err instanceof InputValidationError)) throw err;
+                    reportEngineUnavailable(err, firstStepToolId ?? "pipeline", request.log);
+                    preFailures.push({
+                      originalIndex: fi,
+                      filename: file.filename,
+                      error: err.message,
+                      ...preFailureFaultFields(err),
+                    });
+                    continue;
                   }
                 } else {
                   try {

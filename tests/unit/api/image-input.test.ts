@@ -1,4 +1,3 @@
-import { ToolInputError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -10,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   decompressSvgz: vi.fn(),
   metadata: vi.fn(),
   raw: vi.fn(),
+  renderSvgToPng: vi.fn(),
   resize: vi.fn(),
   sanitizeSvg: vi.fn(),
   toBuffer: vi.fn(),
@@ -68,6 +68,12 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../apps/api/src/lib/svg-render.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-render.js")>();
+  return { ...actual, renderSvgToPng: mocks.renderSvgToPng };
+});
+
+import { ToolInputError } from "@snapotter/shared";
 import {
   DecoderOutOfMemoryError,
   DecoderUnavailableError,
@@ -79,6 +85,7 @@ import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js
 const RAW = Buffer.from("raw");
 const DECODED = Buffer.from("decoded");
 const ORIENTED = Buffer.from("oriented");
+const RENDERED = Buffer.from("rendered png");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -88,6 +95,7 @@ beforeEach(() => {
   mocks.decodeToSharpCompat.mockResolvedValue(DECODED);
   mocks.decompressSvgz.mockImplementation((value) => value);
   mocks.sanitizeSvg.mockImplementation((value) => value);
+  mocks.renderSvgToPng.mockResolvedValue(RENDERED);
   mocks.metadata.mockResolvedValue({ width: 1_000, height: 1_000 });
   mocks.resize.mockReturnValue({ raw: mocks.raw });
   mocks.raw.mockReturnValue({ toBuffer: mocks.toBuffer });
@@ -423,7 +431,8 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     expect(mocks.decompressSvgz).toHaveBeenCalledWith(RAW);
     expect(mocks.sanitizeSvg).toHaveBeenCalledWith(RAW);
     expect(mocks.autoOrient).not.toHaveBeenCalled();
-    expect(result).toEqual({ buffer: sanitized, filename: "padded.dng" });
+    expect(mocks.renderSvgToPng).toHaveBeenCalledWith(sanitized, expect.any(Object));
+    expect(result).toEqual({ buffer: RENDERED, filename: "padded.png" });
   });
 
   it("turns a CLI decoder out-of-memory error into 503 even when Sharp can read the header (#1453)", async () => {
@@ -786,6 +795,83 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
         name: "DecoderOutOfMemoryError",
         cause: v8Oom,
       }),
+    });
+  });
+});
+
+describe("ImageInputHandler SVG rasterization (#5153)", () => {
+  function prepareSvg(
+    opts: { svgDensity?: number; maxPixels?: number; keepSvgVector?: boolean } = {},
+  ) {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 10,
+      height: 10,
+    });
+    return new ImageInputHandler().prepare(RAW, "icon.svg", { scratchDir: "/tmp/in", ...opts });
+  }
+
+  it("hands the tool the child-rendered PNG, at the tool's density, under a .png name", async () => {
+    const result = await prepareSvg({ svgDensity: 300, maxPixels: 4_000_000 });
+
+    expect(mocks.renderSvgToPng).toHaveBeenCalledWith(RAW, {
+      density: 300,
+      maxPixels: 4_000_000,
+      signal: undefined,
+    });
+    expect(result).toEqual({ buffer: RENDERED, filename: "icon.png" });
+  });
+
+  it("keeps the sanitized SVG and its name for a tool that opts out of rasterizing", async () => {
+    mocks.renderSvgToPng.mockClear();
+
+    const result = await prepareSvg({ keepSvgVector: true });
+
+    expect(mocks.renderSvgToPng).not.toHaveBeenCalled();
+    expect(result).toEqual({ buffer: RAW, filename: "icon.svg" });
+  });
+
+  it("answers 400 SVG_TOO_COMPLEX when the render outlives its deadline", async () => {
+    mocks.renderSvgToPng.mockRejectedValue(
+      new ToolInputError("This SVG took longer than 1s to render.", { code: "SVG_TOO_COMPLEX" }),
+    );
+
+    await expect(prepareSvg()).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      code: "SVG_TOO_COMPLEX",
+    });
+  });
+
+  it("answers 400 when the render trips the pixel limit", async () => {
+    mocks.renderSvgToPng.mockRejectedValue(new Error("Input image exceeds pixel limit"));
+
+    await expect(prepareSvg()).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+    });
+  });
+
+  it("answers 503 when the render process can't run", async () => {
+    mocks.renderSvgToPng.mockRejectedValue(
+      new DecoderUnavailableError("The SVG renderer couldn't run. Try again shortly."),
+    );
+
+    await expect(prepareSvg()).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
+  it("answers 422 for an SVG librsvg can't draw", async () => {
+    mocks.renderSvgToPng.mockRejectedValue(new Error("svgload_buffer: SVG rendering failed"));
+
+    await expect(prepareSvg()).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 422,
+      message: "Failed to render SVG file",
     });
   });
 });

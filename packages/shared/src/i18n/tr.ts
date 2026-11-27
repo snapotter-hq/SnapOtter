@@ -6180,6 +6180,8 @@ export const tr: TranslationKeys = {
       PDF_DAMAGED: "Bu PDF hasarlı. PDF Onar aracından geçirip tekrar deneyin.",
       PDF_PASSWORD_PROTECTED:
         "Bu PDF parola korumalı. PDF Kilidini Aç aracıyla kilidini açıp tekrar deneyin.",
+      SVG_TOO_COMPLEX:
+        "Bu SVG'nin işlenmesi çok uzun sürüyor. Filtrelerini veya tekrarlanan şekillerini sadeleştirip tekrar deneyin.",
       IMAGE_TOO_LARGE: "Bu görüntü işlenemeyecek kadar büyük. Boyutlarını küçültüp tekrar deneyin.",
       RESULT_TOO_LARGE:
         "Bu ayarların üreteceği sonuç çok büyük. Daha küçük bir görüntü veya daha küçük sonuç veren ayarlar kullanın.",

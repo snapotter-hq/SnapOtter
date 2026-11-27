@@ -6170,6 +6170,8 @@ export const sv: TranslationKeys = {
         "Den här PDF-filen är skadad. Kör den genom verktyget Reparera PDF och försök sedan igen.",
       PDF_PASSWORD_PROTECTED:
         "Den här PDF-filen är lösenordsskyddad. Lås upp den med verktyget Lås upp PDF och försök sedan igen.",
+      SVG_TOO_COMPLEX:
+        "Den här SVG-filen tar för lång tid att rendera. Förenkla dess filter eller upprepade former och försök igen.",
       IMAGE_TOO_LARGE:
         "Bilden är för stor för att bearbetas. Minska dess dimensioner och försök igen.",
       RESULT_TOO_LARGE:

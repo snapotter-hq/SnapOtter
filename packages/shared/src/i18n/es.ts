@@ -6192,6 +6192,8 @@ export const es: TranslationKeys = {
         "Este PDF está dañado. Pásalo por la herramienta Reparar PDF y vuelve a intentarlo.",
       PDF_PASSWORD_PROTECTED:
         "Este PDF está protegido con contraseña. Desbloquéalo con la herramienta Desbloquear PDF y vuelve a intentarlo.",
+      SVG_TOO_COMPLEX:
+        "Este SVG tarda demasiado en renderizarse. Simplifica sus filtros o formas repetidas y vuelve a intentarlo.",
       IMAGE_TOO_LARGE:
         "Esta imagen es demasiado grande para procesarla. Reduce sus dimensiones y vuelve a intentarlo.",
       RESULT_TOO_LARGE:

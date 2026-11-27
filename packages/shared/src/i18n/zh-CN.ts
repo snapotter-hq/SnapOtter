@@ -5781,6 +5781,7 @@ export const zhCN: TranslationKeys = {
         "无法打开此文档。它可能已损坏、受密码保护，或者不是其扩展名所表示的格式。",
       PDF_DAMAGED: "此 PDF 已损坏。请先用修复 PDF 工具处理，然后重试。",
       PDF_PASSWORD_PROTECTED: "此 PDF 受密码保护。请先用解锁 PDF 工具解锁，然后重试。",
+      SVG_TOO_COMPLEX: "此 SVG 渲染时间过长。请简化其滤镜或重复的图形后重试。",
       IMAGE_TOO_LARGE: "此图片太大，无法处理。请缩小尺寸后重试。",
       RESULT_TOO_LARGE: "这些设置生成的结果太大。请使用更小的图片，或使用能生成更小结果的设置。",
       NO_AUDIO_TRACK: "此文件没有音轨。请选择包含音频的文件后重试。",

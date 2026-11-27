@@ -6199,6 +6199,8 @@ export const nl: TranslationKeys = {
         "Deze PDF is beschadigd. Haal hem door de tool PDF repareren en probeer het opnieuw.",
       PDF_PASSWORD_PROTECTED:
         "Deze PDF is met een wachtwoord beveiligd. Ontgrendel hem met de tool PDF ontgrendelen en probeer het opnieuw.",
+      SVG_TOO_COMPLEX:
+        "Deze SVG doet te lang over het renderen. Vereenvoudig de filters of herhaalde vormen en probeer het opnieuw.",
       IMAGE_TOO_LARGE:
         "Deze afbeelding is te groot om te verwerken. Verklein de afmetingen en probeer het opnieuw.",
       RESULT_TOO_LARGE:

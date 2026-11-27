@@ -496,7 +496,9 @@ describe("remove-background effects: reading the stored mask and original", () =
       const sanitizedSvg = sanitizeSpy.mock.results[0]?.value as Buffer;
       expect(sanitizedSvg.toString("utf-8")).not.toContain("<script");
       expect(sanitizedSvg.toString("utf-8")).not.toContain("127.0.0.1");
-      expect(applySpy.mock.calls[0]?.[2]?.backgroundImageBuffer).toEqual(sanitizedSvg);
+      // Composited from the child-rendered PNG, never the SVG itself (#5153).
+      const background = applySpy.mock.calls[0]?.[2]?.backgroundImageBuffer as Buffer;
+      expect(background.subarray(1, 4).toString("latin1")).toBe("PNG");
 
       const resSvgz = await app.inject(
         effectsRequest(

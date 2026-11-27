@@ -1154,8 +1154,9 @@ describe("batch route spooled multipart ingress (#1239)", () => {
 
     expect(reply.statusCode).toBe(202);
     expect(uploadedPayloads).toHaveLength(2);
+    // Stored as the child-rendered PNG, never as SVG text (#5153).
     for (const stored of uploadedPayloads) {
-      expect(stored).toContain("<svg");
+      expect(stored.slice(1, 4)).toBe("PNG");
       expect(stored).not.toContain("<script");
       expect(stored).not.toContain("alert(1)");
     }
@@ -1172,9 +1173,48 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     });
     expect(metaReply.statusCode).toBe(202);
     expect(uploadedPayloads).toHaveLength(1);
-    expect(uploadedPayloads[0]).toContain("<svg");
+    expect(uploadedPayloads[0].slice(1, 4)).toBe("PNG");
     expect(uploadedPayloads[0]).not.toContain("<script");
     expect(mocks.autoOrient).not.toHaveBeenCalled();
+  });
+
+  it("keeps sanitized SVG source for optimize-svg batch uploads (keepSvgVector)", async () => {
+    const uploadedPayloads: string[] = [];
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "svg" });
+    mocks.putObject.mockImplementation(async (_key: string, data: Buffer) => {
+      uploadedPayloads.push(data.toString("utf-8"));
+    });
+    mocks.getToolConfig.mockImplementation(() => ({
+      settingsSchema: z.record(z.unknown()),
+      keepSvgVector: true,
+    }));
+
+    try {
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "optimize-svg",
+        parts: [
+          {
+            type: "file",
+            filename: "a.svg",
+            content: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+              "utf-8",
+            ),
+          },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      });
+
+      expect(reply.statusCode).toBe(202);
+      expect(uploadedPayloads).toHaveLength(1);
+      expect(uploadedPayloads[0]).toContain("<svg");
+      expect(uploadedPayloads[0]).not.toContain("<script");
+    } finally {
+      mocks.getToolConfig.mockImplementation((_toolId?: string) => ({
+        settingsSchema: z.record(z.unknown()),
+      }));
+    }
   });
 
   it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /batch (#3749)", async () => {
@@ -1218,7 +1258,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       expect(resizeSpy).not.toHaveBeenCalled();
       expect(mocks.autoOrient).not.toHaveBeenCalled();
       expect(uploadedPayloads).toHaveLength(1);
-      expect(uploadedPayloads[0]).toContain("<svg");
+      expect(uploadedPayloads[0].slice(1, 4)).toBe("PNG");
       expect(uploadedPayloads[0]).not.toContain("<script");
       expect(uploadedPayloads[0]).not.toContain("169.254.169.254");
       expect(mocks.recordChildOutcome).toHaveBeenCalledWith(

@@ -106,6 +106,7 @@ export function registerConvert(app: FastifyInstance) {
     toolId: "convert",
     settingsSchema,
     outputFormat: async (_input, settings) => settings.format,
+    svgDensity: 300,
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "Image conversion failed",
       (s) => s.format,

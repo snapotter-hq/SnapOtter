@@ -257,7 +257,6 @@ export function registerEraseObject(app: FastifyInstance) {
             {
               log: request.log,
               rewriteFilenameToPng: true,
-              rasterizeSvg: true,
             },
           );
           imageBuffer = preparedImage.buffer;
@@ -273,7 +272,6 @@ export function registerEraseObject(app: FastifyInstance) {
             maskValidation.format,
             {
               log: request.log,
-              rasterizeSvg: true,
             },
           );
           maskBuffer = preparedMask.buffer;

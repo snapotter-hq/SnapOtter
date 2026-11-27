@@ -5783,6 +5783,7 @@ export const zhTW: TranslationKeys = {
       DOCUMENT_UNREADABLE: "無法開啟此文件。它可能已損壞、受密碼保護，或不是其副檔名所表示的格式。",
       PDF_DAMAGED: "此 PDF 已損壞。請先用修復 PDF 工具處理，然後再試一次。",
       PDF_PASSWORD_PROTECTED: "此 PDF 受密碼保護。請先用解鎖 PDF 工具解鎖，然後再試一次。",
+      SVG_TOO_COMPLEX: "此 SVG 算繪時間過長。請簡化其濾鏡或重複的圖形後再試一次。",
       IMAGE_TOO_LARGE: "此圖片太大，無法處理。請縮小尺寸後再試一次。",
       RESULT_TOO_LARGE: "這些設定產生的結果太大。請使用較小的圖片，或使用能產生較小結果的設定。",
       NO_AUDIO_TRACK: "此檔案沒有音軌。請選擇包含音訊的檔案後再試一次。",

@@ -6221,6 +6221,8 @@ export const fr: TranslationKeys = {
       PDF_DAMAGED: "Ce PDF est endommagé. Passez-le dans l'outil Réparer un PDF, puis réessayez.",
       PDF_PASSWORD_PROTECTED:
         "Ce PDF est protégé par mot de passe. Déverrouillez-le avec l'outil Déverrouiller un PDF, puis réessayez.",
+      SVG_TOO_COMPLEX:
+        "Le rendu de ce SVG prend trop de temps. Simplifiez ses filtres ou ses formes répétées et réessayez.",
       IMAGE_TOO_LARGE:
         "Cette image est trop grande pour être traitée. Réduisez ses dimensions et réessayez.",
       RESULT_TOO_LARGE:

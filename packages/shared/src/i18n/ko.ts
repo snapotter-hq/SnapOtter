@@ -6076,6 +6076,8 @@ export const ko: TranslationKeys = {
       PDF_DAMAGED: "이 PDF가 손상되었습니다. PDF 복구 도구로 복구한 다음 다시 시도하세요.",
       PDF_PASSWORD_PROTECTED:
         "이 PDF는 비밀번호로 보호되어 있습니다. PDF 잠금 해제 도구로 잠금을 해제한 다음 다시 시도하세요.",
+      SVG_TOO_COMPLEX:
+        "이 SVG는 렌더링하는 데 시간이 너무 오래 걸립니다. 필터나 반복되는 도형을 단순하게 만든 뒤 다시 시도하세요.",
       IMAGE_TOO_LARGE: "이 이미지는 너무 커서 처리할 수 없습니다. 크기를 줄이고 다시 시도하세요.",
       RESULT_TOO_LARGE:
         "이 설정으로 만들어질 결과가 너무 큽니다. 더 작은 이미지나 더 작은 결과를 만드는 설정을 사용하세요.",

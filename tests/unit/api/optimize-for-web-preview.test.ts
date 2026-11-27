@@ -142,7 +142,7 @@ describe("POST /api/v1/tools/image/optimize-for-web/preview SVG/SVGZ handling (#
     expect((reply.payload as Buffer).length).toBeGreaterThan(0);
     expect(openAnimated).toHaveBeenCalledTimes(1);
     const passedSvg = vi.mocked(openAnimated).mock.calls[0]?.[0]?.toString("utf-8") ?? "";
-    expect(passedSvg).toContain("<svg");
+    expect(passedSvg.slice(1, 4)).toBe("PNG");
     expect(passedSvg).not.toContain("<script");
     expect(passedSvg).not.toContain("alert(1)");
   });

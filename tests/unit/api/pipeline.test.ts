@@ -2233,7 +2233,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       const firstStored = (firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0)).toString(
         "utf-8",
       );
-      expect(firstStored).toContain("<svg");
+      expect(firstStored.slice(1, 4)).toBe("PNG");
       expect(firstStored).not.toContain("<script");
       expect(secondCall ? String(secondCall[0]) : "").toBe(
         `uploads/${lastBatchParentId()}-f1-s0/good.png`,
@@ -3688,11 +3688,61 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     const firstCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
     const storedBuf = firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0);
     const storedSvg = storedBuf.toString("utf-8");
-    expect(storedSvg).toContain("<svg");
+    expect(storedSvg.slice(1, 4)).toBe("PNG");
     expect(storedSvg).not.toContain("<script");
     expect(storedSvg).not.toContain("alert(1)");
     expect(autoOrient).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { steps: 1, stored: "<svg" },
+    { steps: 2, stored: "PNG" },
+  ])(
+    "keeps SVG source for a keepSvgVector first step only when it is the sole step ($steps steps)",
+    async ({ steps, stored }) => {
+      vi.clearAllMocks();
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "svg",
+        width: 0,
+        height: 0,
+      });
+      const baseConfig = getToolConfig(executeTestToolId);
+      getToolConfigSpy.mockImplementation((toolId: string) =>
+        toolId === executeTestToolId ? { ...baseConfig, keepSvgVector: true } : baseConfig,
+      );
+      try {
+        const reply = await invokePipelineExecuteRoute([
+          {
+            type: "file",
+            filename: "icon.svg",
+            content: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+              "utf-8",
+            ),
+          },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: Array.from({ length: steps }, () => ({
+                toolId: executeTestToolId,
+                settings: {},
+              })),
+            }),
+          },
+        ]);
+
+        expect(reply.statusCode).toBe(202);
+        const call = putObjectMock.mock.calls[0] as unknown[] | undefined;
+        const body = (call ? (call[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
+        expect(stored === "PNG" ? body.slice(1, 4) : body).toContain(stored);
+        expect(body).not.toContain("<script");
+      } finally {
+        getToolConfigSpy.mockReset();
+      }
+    },
+  );
 
   it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /api/v1/pipeline/execute and /api/v1/pipeline/batch (#3749)", async () => {
     vi.clearAllMocks();
@@ -3739,7 +3789,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(putObjectMock).toHaveBeenCalledTimes(1);
       const execCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
       const execStored = (execCall ? (execCall[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
-      expect(execStored).toContain("<svg");
+      expect(execStored.slice(1, 4)).toBe("PNG");
       expect(execStored).not.toContain("<script");
       expect(execStored).not.toContain("169.254.169.254");
 
@@ -3806,7 +3856,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       const batchStored = (batchCall ? (batchCall[1] as Buffer) : Buffer.alloc(0)).toString(
         "utf-8",
       );
-      expect(batchStored).toContain("<svg");
+      expect(batchStored.slice(1, 4)).toBe("PNG");
       expect(batchStored).not.toContain("<script");
       expect(batchStored).not.toContain("169.254.169.254");
     } finally {

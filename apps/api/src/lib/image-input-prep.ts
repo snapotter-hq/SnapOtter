@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import {
   hasServerErrorStatus,
+  isToolInputError,
   markToolInputError,
   pixelLimitImageError,
   ToolInputError,
@@ -8,7 +9,7 @@ import {
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { InputValidationError } from "../modality/contract.js";
-import { isPixelSafetyError } from "../modality/image-input.js";
+import { isPixelSafetyError, replaceExtWithPng } from "../modality/image-input.js";
 import { autoOrient } from "./auto-orient.js";
 import {
   asDecoderOutOfMemory,
@@ -20,6 +21,7 @@ import {
 import { decodeHeic } from "./heic-converter.js";
 import { asInputErrorIfUndecodable } from "./image-error.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
+import { renderSvgToPng } from "./svg-render.js";
 import {
   decompressSvgz,
   isSvgzClientError,
@@ -39,11 +41,6 @@ export interface PrepareRouteImageOptions {
    */
   rewriteFilenameToPng?: boolean;
   /**
-   * When true, rasterize sanitized SVG buffers to PNG via Sharp so Python
-   * sidecar scripts and raster-only consumers receive a PNG buffer.
-   */
-  rasterizeSvg?: boolean;
-  /**
    * When true, re-encode non-SVG inputs to PNG after `autoOrient` (used when
    * staging a background image for Python's Pillow, which lacks AVIF/JXL/ICO
    * plugins).
@@ -57,9 +54,18 @@ export interface PreparedRouteImage {
   isSvg: boolean;
 }
 
-function replaceExtWithPng(filename: string): string {
-  const ext = filename.match(/\.[^.]+$/)?.[0];
-  return ext ? `${filename.slice(0, -ext.length)}.png` : filename;
+/**
+ * Classify a failed child render without touching the SVG again: the generic
+ * undecodable probe would render it in-process, which is the hang #5153 fixes.
+ */
+function svgRenderFailure(err: unknown): unknown {
+  if (isToolInputError(err)) return err;
+  const fault = asDecoderOutOfMemory(err);
+  if (isDecoderUnavailable(fault)) return fault;
+  if (isPixelSafetyError(err)) return pixelLimitImageError(err);
+  return err instanceof Error
+    ? markToolInputError(err, "IMAGE_UNDECODABLE")
+    : new ToolInputError(String(err), { code: "IMAGE_UNDECODABLE" });
 }
 
 /**
@@ -75,7 +81,8 @@ function replaceExtWithPng(filename: string): string {
  * 3. Detects SVG/SVGZ inputs (including comment-padded SVGs disguised with
  *    `.apng` or CLI-decoded extensions), runs `decompressSvgz` and
  *    `sanitizeSvg` (throwing `InputValidationError` on 400 client SVG errors),
- *    and optionally rasterizes the sanitized SVG to PNG.
+ *    and rasterizes the sanitized SVG to PNG in a deadline-bound child
+ *    process, so no route renders an SVG in-process (#5153).
  * 4. Runs `autoOrient(buf, opts.log)` on non-SVG inputs and optionally
  *    rasterizes the result to PNG for sidecars that only read PNG/JPEG.
  */
@@ -175,15 +182,11 @@ export async function prepareRouteImage(
       }
       throw asDecoderOutOfMemory(err);
     }
-    if (opts.rasterizeSvg || opts.rasterizeToPng) {
-      try {
-        buf = await sharp(buf).png().toBuffer();
-        convertedToPng = true;
-      } catch (rawErr) {
-        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
-        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-        throw await asInputErrorIfUndecodable(buf, err);
-      }
+    try {
+      buf = await renderSvgToPng(buf);
+      convertedToPng = true;
+    } catch (err) {
+      throw svgRenderFailure(err);
     }
   } else {
     buf = await autoOrient(buf, opts.log);
