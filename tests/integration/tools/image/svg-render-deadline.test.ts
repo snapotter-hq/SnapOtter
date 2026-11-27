@@ -4,6 +4,8 @@
  * of keeping libvips busy in the API process (#5274).
  */
 
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
@@ -21,6 +23,14 @@ const EXPENSIVE_SVG = Buffer.from(
     '<defs><filter id="f"><feTurbulence baseFrequency="0.05" numOctaves="8"/><feGaussianBlur stdDeviation="20"/></filter></defs>' +
     `<rect id="r" width="2000" height="2000" filter="url(#f)"/>${'<use href="#r"/>'.repeat(40)}</svg>`,
 );
+// Distinct content per call: the timeout memory is keyed by content, so a
+// repeat of EXPENSIVE_SVG answers at once and would hide the per-file cost.
+const slowSvg = (n: number) =>
+  Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000">' +
+      `<defs><filter id="f"><feTurbulence baseFrequency="0.0${50 + n}" numOctaves="8"/><feGaussianBlur stdDeviation="20"/></filter></defs>` +
+      `<rect id="r" width="2000" height="2000" filter="url(#f)"/>${'<use href="#r"/>'.repeat(40)}</svg>`,
+  );
 const PNG = readFixture(fixtures.image.base.png200);
 
 let testApp: TestApp;
@@ -191,5 +201,82 @@ describe("custom routes bound their SVG render", () => {
 
     expect(res.statusCode).toBe(422);
     expect(JSON.parse(res.body).error).toBe("Could not generate thumbnail");
+  });
+});
+
+describe("one request pays the SVG render deadline once (#5354)", () => {
+  const DEADLINE_MS = 750; // 0.75 of JOB_TIMEOUT_FAST_S=1
+
+  it("find-duplicates with three distinct slow SVGs takes about one deadline", async () => {
+    const slow = [1, 2, 3].map(
+      (n): Part => ({
+        name: `f${n}`,
+        filename: `slow-${n}.svg`,
+        contentType: "image/svg+xml",
+        content: slowSvg(n),
+      }),
+    );
+    const started = Date.now();
+    const res = await post("find-duplicates", [slow[0], slow[1], slow[2]]);
+    const elapsed = Date.now() - started;
+
+    expect(res.statusCode).toBe(400);
+    const { skippedFiles } = JSON.parse(res.body);
+    expect(skippedFiles).toHaveLength(3);
+    for (const skipped of skippedFiles) {
+      expect(skipped.reason).toMatch(/took longer than 1s to render/);
+    }
+    // Unbudgeted, three files cost three deadlines (2250 ms or more).
+    expect(elapsed).toBeLessThan(DEADLINE_MS * 2);
+  });
+
+  it("gives the next request on a keep-alive connection a fresh budget", async () => {
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const { port } = app.server.address() as AddressInfo;
+    const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    const send = (parts: Part[]) =>
+      new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const { body, contentType } = createMultipartPayload(parts);
+        const req = http.request(
+          {
+            agent,
+            port,
+            host: "127.0.0.1",
+            method: "POST",
+            path: "/api/v1/tools/image/favicon",
+            headers: {
+              authorization: `Bearer ${adminToken}`,
+              "content-type": contentType,
+              "content-length": body.length,
+            },
+          },
+          (res) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (c: Buffer) => chunks.push(c));
+            res.on("end", () =>
+              resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString() }),
+            );
+          },
+        );
+        req.on("error", reject);
+        req.end(body);
+      });
+    try {
+      const timedOut = await send([
+        { name: "file", filename: "slow.svg", contentType: "image/svg+xml", content: slowSvg(4) },
+      ]);
+      expect(timedOut.status).toBe(400);
+      expect(timedOut.body).toMatch(/took longer than 1s to render/);
+
+      const cheap = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#c60"/></svg>',
+      );
+      const next = await send([
+        { name: "file", filename: "cheap.svg", contentType: "image/svg+xml", content: cheap },
+      ]);
+      expect(next.status, next.body).toBe(200);
+    } finally {
+      agent.destroy();
+    }
   });
 });
