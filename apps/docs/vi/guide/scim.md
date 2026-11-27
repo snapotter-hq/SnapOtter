@@ -2,7 +2,7 @@
 description: "Thiết lập cung cấp tài khoản SCIM 2.0 để đồng bộ người dùng và nhóm từ nhà cung cấp danh tính của bạn sang SnapOtter. Bao gồm Okta, Azure AD / Entra ID, và các tích hợp tùy chỉnh."
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: b712eae4eaec
+i18n_output_hash: 4f3288085da4
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Ba endpoint này có sẵn mà không cần xác thực và mô tả các khả 
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-Giấy phép của bạn không bao gồm tính năng `scim`, hoặc không có giấy phép nào được cấu hình. SCIM yêu cầu một giấy phép gói enterprise. Hãy xác minh `SNAPOTTER_LICENSE_KEY` đã được đặt và giấy phép bao gồm tính năng `scim`.
+Giấy phép của bạn không bao gồm tính năng `scim`, hoặc không có giấy phép nào được cấu hình. SCIM yêu cầu một giấy phép gói enterprise. Hãy xác minh [`SNAPOTTER_LICENSE_KEY`](/vi/guide/configuration#env-snapotter-license-key) đã được đặt và giấy phép bao gồm tính năng `scim`.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

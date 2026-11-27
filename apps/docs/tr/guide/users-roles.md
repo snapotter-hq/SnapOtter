@@ -2,7 +2,7 @@
 description: "SnapOtter'da kullanıcıları, yerleşik ve özel rolleri, izinleri, API anahtarlarını, ekipleri, oturumları ve denetim günlüğünü yönetin."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 83a5fd5e9c61
+i18n_output_hash: ac05d2c5bd6d
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Etkinleştirildiğinde, her denetim günlüğü girdisi `DATA_ENCRYPTION_KEY` de
 
 ### Saklama {#retention}
 
-Eski girdileri otomatik olarak temizlemek için `AUDIT_RETENTION_DAYS` ayarını yapın. Varsayılan değer `0`'tir; bu, girdilerin süresiz olarak saklandığı anlamına gelir.
+Eski girdileri otomatik olarak temizlemek için [`AUDIT_RETENTION_DAYS`](/tr/guide/configuration#env-audit-retention-days) ayarını yapın. Varsayılan değer `0`'tir; bu, girdilerin süresiz olarak saklandığı anlamına gelir.
 
 ### Olay referansı {#event-reference}
 

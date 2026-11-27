@@ -2,7 +2,7 @@
 description: "Todas as variáveis de ambiente do SnapOtter com seus valores padrão. Configure autenticação, armazenamento, modelos de IA, análises e mais."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: aae3030ecb46
+i18n_output_hash: b4f61c4b1e49
 i18n_hash_version: 2
 ---
 
@@ -20,6 +20,7 @@ Toda a configuração é feita por meio de variáveis de ambiente. Cada variáve
 | `HOST` | `0.0.0.0` | Endereço IP em que o servidor escuta. Em uma rede bridge (o padrão para `docker run` e Compose), mantenha `0.0.0.0` (ou `::`), ou as portas publicadas param de funcionar. Em uma instalação nativa ou em um contêiner na rede do host, `127.0.0.1` mantém a API fora da rede; coloque um proxy reverso à frente para acesso remoto. O [modo embutido](#embedded-mode) funciona apenas com `0.0.0.0`, `::` ou `127.0.0.1`, porque a verificação de inicialização dele chama `127.0.0.1`. Com qualquer outro endereço, incluindo `::1`, o contêiner nunca é considerado iniciado, e uma falha posterior o para em vez de reiniciar o servidor. Qualquer coisa que não seja um endereço IP, incluindo `localhost`, encerra o servidor na inicialização. |
 | `BASE_PATH` | (vazio) | Caminho público da implantação, por exemplo `/snapotter`. Vazio ou `/` serve na raiz do domínio. Aplicado em tempo de execução; não é preciso recompilar a imagem. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Máximo de requisições por minuto por IP. Defina como 0 para desativar o limite de taxa. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Máximo de requisições por minuto por IP para os endpoints de gerenciamento de chaves de API (listar, criar, revogar). Chaves em uso em chamadas de ferramentas não são afetadas. Não existe valor ilimitado: `0` recusa todas as requisições a esses endpoints. |
 | `CORS_ORIGIN` | (vazio) | Origens permitidas para CORS, separadas por vírgula, ou vazio para aceitar apenas a mesma origem. |
 | `LOG_LEVEL` | `info` | Nível de detalhe dos logs. Um entre: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quais peers podem definir o IP do cliente por meio de `X-Forwarded-For`. O padrão confia apenas em um peer de rede privada, então um proxy reverso em uma rede Docker ou LAN é confiável e o cabeçalho forjado de um cliente público não é. Defina `true` somente quando um proxy sob seu controle estiver à frente, em um endereço público. |
@@ -37,6 +38,9 @@ Os dois booleanos abaixo aceitam apenas `true` e `false`. Qualquer outro valor, 
 | `MAX_USERS` | `0` (ilimitado) | Número máximo de contas de usuário registradas. Defina como 0 para ilimitado. |
 | `SESSION_DURATION_HOURS` | `168` | Duração da sessão de login em horas (o padrão é 7 dias). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Defina como `true` para pular o aviso obrigatório de troca de senha no primeiro login. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Máximo de requisições de login por minuto por IP. Novas tentativas recebem `429` até o minuto terminar. Falhas repetidas para um mesmo nome de usuário geralmente atingem `LOGIN_THROTTLE_MAX_FAILURES` primeiro. Um administrador pode substituí-lo em Configurações > Sistema. Não existe valor ilimitado: `0` recusa todos os logins. Uma compilação a partir do código-fonte começa em 10. |
+| `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Logins com senha que falham que um nome de usuário pode ter dentro de `LOGIN_THROTTLE_WINDOW_S` antes que novas tentativas para ele recebam `429`, seja qual for o IP de origem. Elas voltam a ser aceitas conforme as falhas mais antigas saem da janela. Defina como 0 para desativar o limite. |
+| `LOGIN_THROTTLE_WINDOW_S` | `900` | Duração dessa janela, em segundos. Deve ser pelo menos 1; o servidor se recusa a iniciar com 0. |
 
 ### Armazenamento {#storage}
 
@@ -48,6 +52,7 @@ Os dois booleanos abaixo aceitam apenas `true` e `false`. Qualquer outro valor, 
 | `REDIS_URL` | `redis://localhost:6379` | String de conexão do Redis (usada para as filas de jobs do BullMQ). O Compose a aponta para o serviço `redis`. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Diretório de arquivos temporários durante o processamento. Limpo automaticamente. A imagem define `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Diretório de arquivos persistentes do usuário (imagens enviadas, resultados salvos). A imagem define `/data/files`. |
+| `MAX_STORAGE_PER_USER_MB` | `5000` | Limite em megabytes do que cada usuário mantém na biblioteca de Arquivos. Um salvamento que ultrapassaria o limite é recusado, informando o valor usado e o limite. Uma cota definida para o usuário tem prioridade. Defina como 0 para ilimitado. |
 
 ### Armazenamento de objetos S3 {#s3-object-storage}
 
@@ -96,17 +101,32 @@ Nota sobre telemetria: o modo embutido herda o padrão de análises da imagem co
 | `MAX_BATCH_SIZE` | `0` (ilimitado) | Número máximo de arquivos em uma única requisição em lote. Defina como 0 para ilimitado. A imagem publicada vem com `0`; uma compilação a partir do código-fonte começa em 100. |
 | `CONCURRENT_JOBS` | `0` (auto) | Número de jobs em lote executados em paralelo. Defina como 0 para detectar automaticamente com base nos núcleos de CPU disponíveis. |
 | `MAX_MEGAPIXELS` | `0` (ilimitado) | Resolução máxima de imagem permitida, em megapixels. Defina como 0 para ilimitado. |
+| `MAX_CPU_UPSCALE_MP` | `4` | Maior entrada, em megapixels, que a ampliação com IA aceita em um host sem GPU. A saída ampliada também é limitada a 16 vezes esse valor (64 MP por padrão), então um fator de escala alto reduz ainda mais o limite de entrada. Uma imagem maior é reduzida para caber antes da ampliação; se isso deixasse o resultado sem ser maior que o original, a requisição é recusada. O Lanczos ignora o limite de entrada, mas não o de saída. Defina como 0 para não ter limite, o que exige muita RAM: o RealESRGAN sempre cria internamente um buffer 4x. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` (ilimitado) | Limite em GB do tamanho combinado de uploads e resultados armazenados no workspace. Depois de atingido, uploads e requisições de ferramentas recebem 503 até que os arquivos expirem após `FILE_MAX_AGE_HOURS`. Defina como 0 para ilimitado; o armazenamento local ainda recusa gravações com 503 quando o disco tem menos de 0,5 GB livres. A imagem publicada vem com `0`; uma compilação a partir do código-fonte começa em 10. |
 | `MAX_WORKER_THREADS` | `0` (auto) | Máximo de threads de trabalho para processamento de imagens. Defina como 0 para detectar automaticamente com base nos núcleos de CPU disponíveis. |
 | `PROCESSING_TIMEOUT_S` | `0` (sem limite) | Tempo limite de cada chamada ao sidecar Python que executa as ferramentas de IA, em segundos. Defina como 0 para não ter tempo limite. Não limita jobs de imagem, PDF ou mídia; isso é feito por `JOB_TIMEOUT_FAST_S` e `JOB_TIMEOUT_LONG_S`. |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Segundos que o sidecar Python de IA e o runtime do OCR preciso ficam ociosos antes de encerrar e liberar a memória (cerca de 1,3 GB e 0,7 GB depois de aquecidos). Ambos iniciam novamente na próxima requisição, então a primeira chamada de IA após um encerramento por ociosidade paga o custo de inicialização das bibliotecas, alguns segundos. Defina como 0 para mantê-los em execução. O padrão é igual a `AI_SESSION_IDLE_TIMEOUT`, para que os modelos carregados não sejam descartados antes do que essa configuração determina. Se você aumentar `AI_SESSION_IDLE_TIMEOUT`, aumente este valor para corresponder. |
+| `AI_SESSION_IDLE_TIMEOUT` | `0` (auto) | Segundos que um modelo de IA carregado permanece em cache no sidecar após o último uso. O automático é 600. Lido pelo sidecar Python, que também descarta todos os modelos em cache ao encerrar após `AI_SIDECAR_IDLE_TIMEOUT`. |
+| `AI_SESSION_CACHE_BYTES` | `0` (auto) | Orçamento de memória para modelos de IA em cache, em bytes. O automático é 40% da memória da GPU, e nenhum cache em um host somente com CPU. Defina em um host com CPU para manter modelos em cache na RAM; defina como 1 para desativar o cache em um host com GPU. Lido pelo sidecar Python. |
+| `MAX_AI_JOBS_PER_USER` | `5` | Jobs de IA de arquivo único que um usuário pode ter na fila ou em execução ao mesmo tempo. Os excedentes recebem `429` até que um termine. O pool de IA executa um job por vez, então isso impede que um usuário o monopolize. Execuções de IA em lote e em pipeline não contam. Defina como 0 para ilimitado. |
 | `JOB_TIMEOUT_FAST_S` | `120` | Prazo para um job nos pools rápidos (ferramentas de imagem e de documentos), em segundos. Um job que demora mais falha com um erro de tempo limite. Defina como 0 para não ter limite. |
 | `JOB_TIMEOUT_LONG_S` | `7200` | Prazo para um job nos pools longos (ferramentas de IA e de mídia, além de qualquer ferramenta marcada como de longa duração), em segundos. Defina como 0 para não ter limite. O OCR de PDF nos modos Balanced e Best estende o próprio prazo de acordo com o número de páginas (2 e 5 minutos por página), até 6 horas, então um PDF grande não exige aumentar este valor. |
 | `SYNC_WAIT_MS` | `8000` | Quanto tempo uma requisição de ferramenta espera pelo seu job antes que a API pare de esperar e retorne `202` com um ID de job para acompanhar via SSE, em milissegundos. Isso não interrompe o job. Defina como 0 para esperar pelo job o tempo que for necessário. |
 | `MAX_PIPELINE_STEPS` | `20` | Número máximo de etapas em um pipeline. Defina como 0 para não ter limite. |
+| `MAX_PIPELINE_STEP_PIXELS` | `67108864` | Maior saída que uma etapa do pipeline pode pedir, como largura vezes altura em pixels (o padrão é 8192 x 8192). Uma etapa cujas configurações pedem mais é rejeitada antes de o pipeline rodar. Defina como 0 para não ter limite. |
 | `MAX_CANVAS_PIXELS` | `0` (sem limite) | Tamanho máximo do canvas em pixels para imagens de saída. Defina como 0 para não ter limite. |
 | `MAX_SVG_SIZE_MB` | `50` | Maior SVG aceito antes da sanitização, em megabytes. `0` se comporta de forma diferente aqui do que nas linhas ao redor. Ele remove por completo o limite de tamanho anterior à análise, em vez de elevá-lo, então deixe este definido. |
 | `MAX_PDF_PAGES` | `0` (ilimitado) | Número máximo de páginas de PDF para a conversão de PDF em imagem. Defina como 0 para ilimitado. |
+| `MAX_VIDEO_DURATION_S` | `0` (ilimitado) | Vídeo mais longo que as ferramentas de vídeo aceitam, em segundos. Arquivos mais longos são rejeitados antes do processamento, com a duração e o limite no erro. Defina como 0 para ilimitado. |
+| `MAX_AUDIO_DURATION_S` | `0` (ilimitado) | O mesmo, para as ferramentas de áudio. |
+| `MAX_VIDEO_BITRATE_KBPS` | `0` (ilimitado) | Maior taxa de bits total que as ferramentas de vídeo aceitam, em quilobits por segundo. Defina como 0 para ilimitado. |
+| `PREVIEW_TIMEOUT_S` | `300` | Tempo limite para codificar um clipe de prévia no navegador de um arquivo de vídeo ou áudio, em segundos. As prévias de documentos usam `LIBREOFFICE_TIMEOUT_S`. Defina como 0 para não ter limite. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Tempo limite de uma conversão do LibreOffice (Word, Excel e PowerPoint para PDF, os conversores de documentos e as prévias de documentos), em segundos. Aqui `0` não significa ilimitado; volta para 120. |
+| `GIF_BG_MAX_FRAMES` | `150` | Máximo de quadros que o Remover Fundo de GIF aceita em uma animação. Animações mais longas recebem `400` com o número de quadros. Defina como 0 para não ter limite de quadros; um orçamento de pixels separado continua valendo. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (desligado) | Limite de espaço de endereçamento, em megabytes, para cada processo de ffmpeg, Ghostscript, qpdf, LibreOffice, pandoc e pdfcpu iniciado pelos mecanismos de mídia e de documentos. Os decodificadores que leem imagens enviadas (ImageMagick, exiftool e o fallback para ffmpeg) não têm limite. Um processo que o ultrapassa é encerrado em vez de levar o contêiner inteiro ao encerramento por falta de memória. Ele limita a memória virtual, não a residente, então deixe folga. O sidecar de IA nunca é limitado. Defina como 0 para desativar e depender do limite de memória do contêiner. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Maior campo `settings` que uma requisição de ferramenta pode conter, em kilobytes, contados em bytes UTF-8. Requisições acima do limite recebem `400`. Defina como 0 para não ter limite. As configurações reais das ferramentas são bem menores que 64 KB, então aumente este valor apenas se um cliente enviar configurações excepcionalmente grandes. |
+| `MAX_SUBTITLE_SIZE_MB` | `1` | Maior arquivo de legendas (`.srt`, `.vtt`, `.ass`) que Gravar Legendas e Incorporar Legendas aceitam, em megabytes. Arquivos maiores recebem `400` com o tamanho do arquivo e o limite. Defina como 0 para não ter limite. Um arquivo de legendas de um longa-metragem costuma ter bem menos de 1 MB. |
+| `MAX_METADATA_TAG_LENGTH` | `10000` | Maior valor que Editar Metadados grava em uma única tag (artista, descrição, palavras-chave etc.), em caracteres. Valores mais longos recebem `400` com o nome da tag e o limite. Defina como 0 para não ter limite. Aumente se você guarda legendas ou descrições longas. O valor de uma tag também precisa caber em `MAX_SETTINGS_PAYLOAD_KB` e no limite por argumento do sistema operacional (128 KB no Linux). |
 
 ### Engines {#engines}
 
@@ -135,6 +155,9 @@ Os arquivos Compose publicados repassam todas elas a partir de `.env`, então de
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | Por quanto tempo os resultados de processamento não salvos (uploads brutos e saídas de ferramentas) são mantidos antes da exclusão automática. Os arquivos que você salva explicitamente na biblioteca de Arquivos não são afetados e persistem até você excluí-los. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Com que frequência o job de limpeza é executado. |
+| `JOBS_RETENTION_DAYS` | `30` | Dias que o registro de um job concluído (finalizado, com falha ou cancelado) é mantido antes de a varredura de retenção, que roda a cada 6 horas, excluí-lo. Um administrador pode substituí-lo em Configurações > Sistema. Usuários e equipes sob retenção legal mantêm os seus. Defina como 0 para mantê-los para sempre. |
+| `AUDIT_RETENTION_DAYS` | `0` (para sempre) | Dias que as entradas do log de auditoria são mantidas. Mesmas regras de substituição e de retenção legal. Nada é excluído enquanto o registro de auditoria à prova de adulteração estiver ativo. Defina como 0 para mantê-las para sempre. |
+| `SNAPOTTER_LICENSE_KEY` | (vazio) | Chave de licença que libera os recursos enterprise, como SAML, SCIM e armazenamento S3. Lida na inicialização, então reinicie após alterá-la. Uma chave inválida ou expirada registra um aviso e o servidor roda sem eles. No contêiner você pode montá-la em vez disso, por meio de `SNAPOTTER_LICENSE_KEY_FILE` (veja [Docker secrets](/guide/security#docker-secrets)). |
 
 ### Aparência {#appearance}
 

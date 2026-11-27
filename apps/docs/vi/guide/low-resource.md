@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 04aec804fd9b
+i18n_output_hash: 33b435ebab8d
 i18n_hash_version: 2
 ---
 # Thiết lập cho tài nguyên thấp {#low-resource-setups}
@@ -91,7 +91,7 @@ Mọi giới hạn đều là biến môi trường, được mô tả đầy đ
 | [`MAX_BATCH_SIZE`](/vi/guide/configuration#env-max-batch-size) | `5` | Xử lý lô là nơi máy 1-2 GB hết bộ nhớ đầu tiên. |
 | [`MAX_UPLOAD_SIZE_MB`](/vi/guide/configuration#env-max-upload-size-mb) | `100` | Ngăn một tệp khổng lồ chiếm toàn bộ không gian làm việc. |
 | [`MAX_MEGAPIXELS`](/vi/guide/configuration#env-max-megapixels) | `50` | Giải mã ảnh trên 100 MP tốn RAM bất kể dung lượng tệp. |
-| `MAX_VIDEO_DURATION_S` | `300` | Các lần transcode dài chiếm dụng CPU nhỏ từ vài phút đến vài giờ. |
+| [`MAX_VIDEO_DURATION_S`](/vi/guide/configuration#env-max-video-duration-s) | `300` | Các lần transcode dài chiếm dụng CPU nhỏ từ vài phút đến vài giờ. |
 | [`PROCESSING_TIMEOUT_S`](/vi/guide/configuration#env-processing-timeout-s) | `600` | Trần cứng để một job chạy mất kiểm soát cuối cùng cũng giải phóng máy. |
 
 Các giới hạn này áp dụng cho những gì máy chủ chấp nhận, nên hãy đặt chúng khớp với những gì bạn thực sự dùng thay vì đặt nhỏ nhất có thể. Nếu bạn không bao giờ dùng video, giới hạn `MAX_VIDEO_DURATION_S` không gây tốn kém gì; nếu bạn quét tài liệu hằng ngày, đừng giới hạn [`MAX_PDF_PAGES`](/vi/guide/configuration#env-max-pdf-pages).

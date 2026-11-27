@@ -2,7 +2,7 @@
 description: "Gestisci utenti, ruoli integrati e personalizzati, permessi, chiavi API, team, sessioni e il log di audit in SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 317e535b9400
+i18n_output_hash: c8c63a327ad8
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Quando è abilitata, ogni voce del log di audit viene firmata con un HMAC deriva
 
 ### Conservazione {#retention}
 
-Imposta `AUDIT_RETENTION_DAYS` per eliminare automaticamente le voci vecchie. Il valore predefinito è `0`, il che significa che le voci vengono conservate a tempo indeterminato.
+Imposta [`AUDIT_RETENTION_DAYS`](/it/guide/configuration#env-audit-retention-days) per eliminare automaticamente le voci vecchie. Il valore predefinito è `0`, il che significa che le voci vengono conservate a tempo indeterminato.
 
 ### Riferimento degli eventi {#event-reference}
 

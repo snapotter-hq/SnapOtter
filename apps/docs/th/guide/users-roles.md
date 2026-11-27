@@ -2,7 +2,7 @@
 description: "จัดการผู้ใช้ บทบาทในตัวและบทบาทกำหนดเอง สิทธิ์ API key ทีม เซสชัน และบันทึกการตรวจสอบใน SnapOtter"
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 0e3f6328f403
+i18n_output_hash: ca6bbe7b7d38
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### การเก็บรักษา {#retention}
 
-ตั้งค่า `AUDIT_RETENTION_DAYS` เพื่อล้างรายการเก่าโดยอัตโนมัติ ค่าเริ่มต้นคือ `0` ซึ่งหมายความว่ารายการจะถูกเก็บไว้อย่างไม่มีกำหนด
+ตั้งค่า [`AUDIT_RETENTION_DAYS`](/th/guide/configuration#env-audit-retention-days) เพื่อล้างรายการเก่าโดยอัตโนมัติ ค่าเริ่มต้นคือ `0` ซึ่งหมายความว่ารายการจะถูกเก็บไว้อย่างไม่มีกำหนด
 
 ### การอ้างอิงเหตุการณ์ {#event-reference}
 

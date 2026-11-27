@@ -2,7 +2,7 @@
 description: "在 SnapOtter 中管理用户、内置角色与自定义角色、权限、API 密钥、团队、会话以及审计日志。"
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 586307e9d95e
+i18n_output_hash: 92bd76988717
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### 保留 {#retention}
 
-设置 `AUDIT_RETENTION_DAYS` 以自动清除旧条目。默认值为 `0`，表示条目会无限期保留。
+设置 [`AUDIT_RETENTION_DAYS`](/zh-CN/guide/configuration#env-audit-retention-days) 以自动清除旧条目。默认值为 `0`，表示条目会无限期保留。
 
 ### 事件参考 {#event-reference}
 

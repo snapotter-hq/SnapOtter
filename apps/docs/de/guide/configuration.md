@@ -2,7 +2,7 @@
 description: "Alle SnapOtter-Umgebungsvariablen mit Standardwerten. Konfigurieren Sie Authentifizierung, Speicher, KI-Modelle, Analytics und mehr."
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: d3903824532d
+i18n_output_hash: 4d0d57767cd2
 i18n_hash_version: 2
 ---
 
@@ -20,6 +20,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen. Jede Variable hat ei
 | `HOST` | `0.0.0.0` | IP-Adresse, auf der der Server lauscht. In einem Bridge-Netzwerk (dem Standard für `docker run` und Compose) behalten Sie `0.0.0.0` (oder `::`) bei, sonst funktionieren veröffentlichte Ports nicht mehr. Bei einer nativen Installation oder einem Container im Host-Netzwerk hält `127.0.0.1` die API vom Netzwerk fern; schalten Sie für den Fernzugriff einen Reverse Proxy davor. Der [eingebettete Modus](#embedded-mode) funktioniert nur mit `0.0.0.0`, `::` oder `127.0.0.1`, weil seine Startprüfung `127.0.0.1` aufruft. Mit jeder anderen Adresse, einschließlich `::1`, gilt der Container nie als gestartet, und ein späterer Absturz hält ihn an, statt den Server neu zu starten. Alles, was keine IP-Adresse ist, einschließlich `localhost`, stoppt den Server beim Start. |
 | `BASE_PATH` | (leer) | Öffentlicher Bereitstellungspfad, z. B. `/snapotter`. Leer oder `/` liefert die App im Stammverzeichnis der Domain aus. Wird zur Laufzeit angewendet; kein erneutes Bauen des Images erforderlich. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximale Anfragen pro Minute und IP. Auf 0 setzen, um die Ratenbegrenzung zu deaktivieren. |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | Maximale Anfragen pro Minute und IP an die Endpunkte zur Verwaltung von API-Schlüsseln (auflisten, erstellen, widerrufen). Schlüssel, die für Tool-Aufrufe verwendet werden, sind davon nicht betroffen. Es gibt keinen Wert für unbegrenzt: `0` weist jede Anfrage an diese Endpunkte ab. |
 | `CORS_ORIGIN` | (leer) | Durch Kommas getrennte erlaubte Origins für CORS, oder leer für ausschließlich denselben Origin. |
 | `LOG_LEVEL` | `info` | Ausführlichkeit der Protokollierung. Eines von: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Welche Peers die Client-IP über `X-Forwarded-For` setzen dürfen. Der Standard vertraut nur einem Peer aus einem privaten Netzwerk, sodass ein Reverse Proxy in einem Docker-Netzwerk oder LAN als vertrauenswürdig gilt, der gefälschte Header eines öffentlichen Clients dagegen nicht. Setzen Sie `true` nur, wenn ein von Ihnen kontrollierter Proxy auf einer öffentlichen Adresse vorgeschaltet ist. |
@@ -37,6 +38,9 @@ Die beiden folgenden booleschen Werte akzeptieren nur `true` und `false`. Alles 
 | `MAX_USERS` | `0` (unbegrenzt) | Maximale Anzahl registrierter Benutzerkonten. Auf 0 setzen für unbegrenzt. |
 | `SESSION_DURATION_HOURS` | `168` | Lebensdauer der Anmeldesitzung in Stunden (Standard sind 7 Tage). |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | Auf `true` setzen, um die erzwungene Passwortänderung bei der ersten Anmeldung zu überspringen. |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | Maximale Anmeldeanfragen pro Minute und IP. Weitere Versuche erhalten bis zum Ablauf der Minute ein `429`. Wiederholte Fehlversuche für einen Benutzernamen erreichen meist zuerst `LOGIN_THROTTLE_MAX_FAILURES`. Ein Administrator kann den Wert unter Einstellungen > System überschreiben. Es gibt keinen Wert für unbegrenzt: `0` weist jede Anmeldung ab. Ein Build aus dem Quellcode beginnt bei 10. |
+| `LOGIN_THROTTLE_MAX_FAILURES` | `10` | Fehlgeschlagene Passwort-Anmeldungen, die ein Benutzername innerhalb von `LOGIN_THROTTLE_WINDOW_S` haben darf, bevor weitere Versuche dafür ein `429` erhalten, unabhängig von der IP, von der sie kommen. Sie werden wieder durchgelassen, sobald die ältesten Fehlversuche aus dem Zeitfenster fallen. Auf 0 setzen, um die Drosselung auszuschalten. |
+| `LOGIN_THROTTLE_WINDOW_S` | `900` | Länge dieses Zeitfensters in Sekunden. Muss mindestens 1 sein; der Server startet bei 0 nicht. |
 
 ### Speicher {#storage}
 
@@ -48,6 +52,7 @@ Die beiden folgenden booleschen Werte akzeptieren nur `true` und `false`. Alles 
 | `REDIS_URL` | `redis://localhost:6379` | Redis-Verbindungszeichenfolge (für die BullMQ-Job-Warteschlangen). Compose verweist damit auf seinen `redis`-Dienst. |
 | `WORKSPACE_PATH` | `./tmp/workspace` | Verzeichnis für temporäre Dateien während der Verarbeitung. Wird automatisch bereinigt. Das Image setzt `/tmp/workspace`. |
 | `FILES_STORAGE_PATH` | `./data/files` | Verzeichnis für dauerhafte Benutzerdateien (hochgeladene Bilder, gespeicherte Ergebnisse). Das Image setzt `/data/files`. |
+| `MAX_STORAGE_PER_USER_MB` | `5000` | Obergrenze in Megabyte für das, was jeder Benutzer in der Dateibibliothek behält. Ein Speichervorgang, der sie überschreiten würde, wird mit der belegten Menge und dem Limit abgelehnt. Ein für den Benutzer festgelegtes Kontingent überschreibt den Wert. Auf 0 setzen für unbegrenzt. |
 
 ### S3-Objektspeicher {#s3-object-storage}
 
@@ -96,17 +101,32 @@ Hinweis zur Telemetrie: Der eingebettete Modus übernimmt den Analytics-Standard
 | `MAX_BATCH_SIZE` | `0` (unbegrenzt) | Maximale Anzahl von Dateien in einer einzelnen Batch-Anfrage. Auf 0 setzen für unbegrenzt. Das veröffentlichte Image liefert `0` aus; ein Build aus dem Quellcode beginnt bei 100. |
 | `CONCURRENT_JOBS` | `0` (automatisch) | Anzahl der Batch-Jobs, die parallel laufen. Auf 0 setzen, um sie anhand der verfügbaren CPU-Kerne automatisch zu ermitteln. |
 | `MAX_MEGAPIXELS` | `0` (unbegrenzt) | Maximal zulässige Bildauflösung in Megapixeln. Auf 0 setzen für unbegrenzt. |
+| `MAX_CPU_UPSCALE_MP` | `4` | Größte Eingabe in Megapixeln, die die KI-Hochskalierung auf einem Host ohne GPU annimmt. Die hochskalierte Ausgabe ist zudem auf das 16-Fache dieses Werts begrenzt (standardmäßig 64 MP), sodass ein hoher Skalierungsfaktor das Eingabelimit weiter senkt. Ein größeres Bild wird vor dem Hochskalieren verkleinert, bis es passt; wenn das Ergebnis dadurch nicht größer als das Original wäre, wird die Anfrage stattdessen abgelehnt. Lanczos überspringt das Eingabelimit, nicht aber die Ausgabegrenze. Auf 0 setzen für kein Limit, was viel RAM benötigt: RealESRGAN baut intern immer einen 4x-Puffer auf. |
+| `MAX_WORKSPACE_SIZE_GB` | `0` (unbegrenzt) | Obergrenze in GB für die Gesamtgröße von Uploads und gespeicherten Ergebnissen im Workspace. Ist sie überschritten, erhalten Uploads und Tool-Anfragen ein 503, bis Dateien nach `FILE_MAX_AGE_HOURS` ablaufen. Auf 0 setzen für unbegrenzt; lokaler Speicher lehnt Schreibvorgänge weiterhin mit einem 503 ab, sobald auf dem Datenträger weniger als 0,5 GB frei sind. Das veröffentlichte Image liefert `0` aus; ein Build aus dem Quellcode beginnt bei 10. |
 | `MAX_WORKER_THREADS` | `0` (automatisch) | Maximale Anzahl an Worker-Threads für die Bildverarbeitung. Auf 0 setzen, um sie anhand der verfügbaren CPU-Kerne automatisch zu ermitteln. |
 | `PROCESSING_TIMEOUT_S` | `0` (kein Limit) | Timeout für jeden Aufruf des Python-Sidecars, der die KI-Tools ausführt, in Sekunden. Auf 0 setzen für kein Timeout. Es begrenzt keine Bild-, PDF- oder Medienjobs; das übernehmen `JOB_TIMEOUT_FAST_S` und `JOB_TIMEOUT_LONG_S`. |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Sekunden, die der Python-KI-Sidecar und die Laufzeitumgebung für präzises OCR untätig bleiben, bevor sie sich beenden und ihren Speicher freigeben (etwa 1,3 GB und 0,7 GB im aufgewärmten Zustand). Beide starten bei der nächsten Anfrage erneut, sodass der erste KI-Aufruf nach einem Beenden wegen Leerlaufs die Startkosten der Bibliotheken trägt, einige Sekunden. Auf 0 setzen, damit sie weiterlaufen. Der Standard entspricht `AI_SESSION_IDLE_TIMEOUT`, sodass geladene Modelle nicht früher verworfen werden, als diese Einstellung vorgibt. Wenn Sie `AI_SESSION_IDLE_TIMEOUT` erhöhen, erhöhen Sie diesen Wert entsprechend. |
+| `AI_SESSION_IDLE_TIMEOUT` | `0` (automatisch) | Sekunden, die ein geladenes KI-Modell nach der letzten Verwendung im Sidecar zwischengespeichert bleibt. Automatisch sind 600. Wird vom Python-Sidecar gelesen, der beim Beenden nach `AI_SIDECAR_IDLE_TIMEOUT` auch alle zwischengespeicherten Modelle verwirft. |
+| `AI_SESSION_CACHE_BYTES` | `0` (automatisch) | Speicherbudget für zwischengespeicherte KI-Modelle in Byte. Automatisch sind 40 % des GPU-Speichers, auf einem reinen CPU-Host gar kein Caching. Auf einem CPU-Host setzen, um Modelle im RAM zwischenzuspeichern; auf einem GPU-Host auf 1 setzen, um das Caching auszuschalten. Wird vom Python-Sidecar gelesen. |
+| `MAX_AI_JOBS_PER_USER` | `5` | Einzeldatei-KI-Jobs, die ein Benutzer gleichzeitig in der Warteschlange oder in Ausführung haben darf. Weitere erhalten ein `429`, bis einer abgeschlossen ist. Der KI-Pool führt jeweils einen Job aus, daher verhindert dies, dass ein Benutzer ihn blockiert. KI-Läufe im Batch und in Pipelines zählen nicht mit. Auf 0 setzen für unbegrenzt. |
 | `JOB_TIMEOUT_FAST_S` | `120` | Frist für einen Job in den schnellen Pools (Bild- und Dokumenttools), in Sekunden. Ein Job, der länger läuft, schlägt mit einem Timeout-Fehler fehl. Auf 0 setzen für kein Limit. |
 | `JOB_TIMEOUT_LONG_S` | `7200` | Frist für einen Job in den langen Pools (KI- und Medientools sowie jedes als lang laufend markierte Tool), in Sekunden. Auf 0 setzen für kein Limit. PDF-OCR in den Modi Balanced und Best verlängert seine eigene Frist anhand der Seitenzahl (2 bzw. 5 Minuten pro Seite), bis zu 6 Stunden, sodass Sie diesen Wert für ein großes PDF nicht erhöhen müssen. |
 | `SYNC_WAIT_MS` | `8000` | Wie lange eine Tool-Anfrage auf ihren Job wartet, bevor die API das Warten beendet und `202` mit einer Job-ID zurückgibt, der Sie über SSE folgen können, in Millisekunden. Den Job selbst stoppt das nicht. Auf 0 setzen, um auf den Job zu warten, egal wie lange er dauert. |
 | `MAX_PIPELINE_STEPS` | `20` | Maximale Anzahl von Schritten in einer Pipeline. Auf 0 setzen für kein Limit. |
+| `MAX_PIPELINE_STEP_PIXELS` | `67108864` | Größte Ausgabe, die ein Pipeline-Schritt anfordern darf, als Breite mal Höhe in Pixeln (der Standardwert entspricht 8192 x 8192). Ein Schritt, dessen Einstellungen mehr verlangen, wird abgelehnt, bevor die Pipeline läuft. Auf 0 setzen für kein Limit. |
 | `MAX_CANVAS_PIXELS` | `0` (kein Limit) | Maximale Canvas-Größe in Pixeln für Ausgabebilder. Auf 0 setzen für kein Limit. |
 | `MAX_SVG_SIZE_MB` | `50` | Größte vor dem Bereinigen akzeptierte SVG-Datei in Megabyte. `0` verhält sich hier anders als in den Zeilen darum herum. Es hebt die Größenobergrenze vor dem Parsen vollständig auf, statt sie anzuheben, also lassen Sie diesen Wert gesetzt. |
 | `MAX_PDF_PAGES` | `0` (unbegrenzt) | Maximale Anzahl von PDF-Seiten für die Konvertierung von PDF in Bilder. Auf 0 setzen für unbegrenzt. |
+| `MAX_VIDEO_DURATION_S` | `0` (unbegrenzt) | Längstes Video, das die Video-Tools akzeptieren, in Sekunden. Längere Dateien werden vor der Verarbeitung abgelehnt, wobei der Fehler die Dauer und das Limit nennt. Auf 0 setzen für unbegrenzt. |
+| `MAX_AUDIO_DURATION_S` | `0` (unbegrenzt) | Dasselbe für die Audio-Tools. |
+| `MAX_VIDEO_BITRATE_KBPS` | `0` (unbegrenzt) | Höchste Gesamtbitrate, die die Video-Tools akzeptieren, in Kilobit pro Sekunde. Auf 0 setzen für unbegrenzt. |
+| `PREVIEW_TIMEOUT_S` | `300` | Zeitlimit für das Kodieren eines Vorschauclips einer Video- oder Audiodatei im Browser, in Sekunden. Dokumentvorschauen verwenden stattdessen `LIBREOFFICE_TIMEOUT_S`. Auf 0 setzen für kein Limit. |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | Zeitlimit für eine LibreOffice-Konvertierung (Word, Excel und PowerPoint nach PDF, die Dokumentkonverter und Dokumentvorschauen) in Sekunden. `0` bedeutet hier nicht unbegrenzt; es fällt auf 120 zurück. |
+| `GIF_BG_MAX_FRAMES` | `150` | Maximale Anzahl an Frames, die GIF-Hintergrund entfernen in einer Animation akzeptiert. Längere Animationen erhalten ein `400`, das die Frame-Anzahl nennt. Auf 0 setzen für kein Frame-Limit; ein separates Pixelbudget gilt weiterhin. |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0` (aus) | Obergrenze des Adressraums in Megabyte für jeden ffmpeg-, Ghostscript-, qpdf-, LibreOffice-, pandoc- und pdfcpu-Prozess, den die Medien- und Dokument-Engines starten. Die Decoder, die hochgeladene Bilder lesen (ImageMagick, exiftool und deren ffmpeg-Fallback), sind nicht begrenzt. Ein Prozess, der die Grenze überschreitet, wird beendet, statt den gesamten Container in den Out-of-Memory-Killer zu treiben. Begrenzt wird der virtuelle, nicht der residente Speicher, lassen Sie also Spielraum. Der KI-Sidecar wird nie begrenzt. Auf 0 setzen, um die Grenze auszuschalten und sich auf das Speicherlimit des Containers zu verlassen. |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Größtes `settings`-Feld, das eine Tool-Anfrage enthalten darf, in Kilobyte, gezählt in UTF-8-Bytes. Anfragen über dem Limit erhalten ein `400`. Auf 0 setzen für kein Limit. Echte Tool-Einstellungen sind weit kleiner als 64 KB, erhöhen Sie diesen Wert also nur, wenn ein Client ungewöhnlich große Einstellungen sendet. |
+| `MAX_SUBTITLE_SIZE_MB` | `1` | Größte Untertiteldatei (`.srt`, `.vtt`, `.ass`), die Untertitel einbrennen und Untertitel einbetten akzeptieren, in Megabyte. Größere Dateien erhalten ein `400`, das Dateigröße und Limit nennt. Auf 0 setzen für kein Limit. Eine Untertiteldatei in Spielfilmlänge liegt meist deutlich unter 1 MB. |
+| `MAX_METADATA_TAG_LENGTH` | `10000` | Längster Wert, den Metadaten bearbeiten in ein einzelnes Tag schreibt (Künstler, Beschreibung, Schlüsselwörter usw.), in Zeichen. Längere Werte erhalten ein `400`, das Tag und Limit nennt. Auf 0 setzen für kein Limit. Erhöhen Sie ihn, wenn Sie lange Bildunterschriften oder Beschreibungen speichern. Ein Tag-Wert muss außerdem in `MAX_SETTINGS_PAYLOAD_KB` und in das Argumentlimit des Betriebssystems pro Argument passen (128 KB unter Linux). |
 
 ### Engines {#engines}
 
@@ -135,6 +155,9 @@ Die veröffentlichten Compose-Dateien reichen sie alle aus `.env` durch, es gen�
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | Wie lange nicht gespeicherte Verarbeitungsergebnisse (rohe Uploads und Tool-Ausgaben) aufbewahrt werden, bevor sie automatisch gelöscht werden. Dateien, die Sie ausdrücklich in der Dateibibliothek speichern, sind davon nicht betroffen und bleiben bestehen, bis Sie sie löschen. |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | Wie oft der Bereinigungsjob läuft. |
+| `JOBS_RETENTION_DAYS` | `30` | Tage, die ein abgeschlossener Job-Eintrag (erfolgreich, fehlgeschlagen oder abgebrochen) aufbewahrt wird, bevor die Aufbewahrungsbereinigung, die alle 6 Stunden läuft, ihn löscht. Ein Administrator kann den Wert unter Einstellungen > System überschreiben. Benutzer und Teams mit Legal Hold behalten ihre Einträge. Auf 0 setzen, um sie für immer aufzubewahren. |
+| `AUDIT_RETENTION_DAYS` | `0` (für immer) | Tage, die Einträge des Audit-Protokolls aufbewahrt werden. Es gelten dieselben Überschreibungs- und Legal-Hold-Regeln. Solange manipulationssichere Audit-Protokollierung aktiv ist, wird nichts gelöscht. Auf 0 setzen, um sie für immer aufzubewahren. |
+| `SNAPOTTER_LICENSE_KEY` | (leer) | Lizenzschlüssel, der die Enterprise-Funktionen freischaltet, etwa SAML, SCIM und S3-Speicher. Wird beim Start gelesen, starten Sie also nach einer Änderung neu. Ein ungültiger oder abgelaufener Schlüssel protokolliert eine Warnung, und der Server läuft ohne diese Funktionen. Im Container können Sie ihn stattdessen über `SNAPOTTER_LICENSE_KEY_FILE` einbinden (siehe [Docker-Secrets](/guide/security#docker-secrets)). |
 
 ### Darstellung {#appearance}
 

@@ -233,7 +233,7 @@ When enabled, each audit log entry is signed with an HMAC derived from `DATA_ENC
 
 ### Retention {#retention}
 
-Set `AUDIT_RETENTION_DAYS` to automatically purge old entries. The default is `0`, which means entries are kept indefinitely.
+Set [`AUDIT_RETENTION_DAYS`](/guide/configuration#env-audit-retention-days) to automatically purge old entries. The default is `0`, which means entries are kept indefinitely.
 
 ### Event reference {#event-reference}
 

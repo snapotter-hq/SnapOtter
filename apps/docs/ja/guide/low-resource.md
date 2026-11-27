@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 3d653714c39b
+i18n_output_hash: d5137b522771
 i18n_hash_version: 2
 ---
 # 低リソース環境のセットアップ {#low-resource-setups}
@@ -91,7 +91,7 @@ Pi クラスのマシンに関する注意点:
 | [`MAX_BATCH_SIZE`](/ja/guide/configuration#env-max-batch-size) | `5` | 1 から 2 GB のマシンでは、まずバッチでメモリが不足します。 |
 | [`MAX_UPLOAD_SIZE_MB`](/ja/guide/configuration#env-max-upload-size-mb) | `100` | 巨大なファイル 1 つがワークスペース全体を占有するのを防ぎます。 |
 | [`MAX_MEGAPIXELS`](/ja/guide/configuration#env-max-megapixels) | `50` | 100 MP を超える画像のデコードは、ファイルサイズにかかわらず RAM を消費します。 |
-| `MAX_VIDEO_DURATION_S` | `300` | 長時間のトランスコードは、小さな CPU を数分から数時間占有します。 |
+| [`MAX_VIDEO_DURATION_S`](/ja/guide/configuration#env-max-video-duration-s) | `300` | 長時間のトランスコードは、小さな CPU を数分から数時間占有します。 |
 | [`PROCESSING_TIMEOUT_S`](/ja/guide/configuration#env-processing-timeout-s) | `600` | 暴走したジョブがいずれマシンを解放するための厳格な上限。 |
 
 これらの上限はサーバーが受け付ける内容に適用されます。できるだけ小さくするのではなく、実際の使い方に合わせて設定してください。動画をまったく使わないなら `MAX_VIDEO_DURATION_S` の上限は問題になりませんが、毎日ドキュメントをスキャンするなら [`MAX_PDF_PAGES`](/ja/guide/configuration#env-max-pdf-pages) に上限を設けないでください。

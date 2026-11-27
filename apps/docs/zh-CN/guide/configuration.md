@@ -2,7 +2,7 @@
 description: "SnapOtter 的所有环境变量及其默认值。可配置认证、存储、AI 模型、分析等。"
 i18n_source_hash: 02edb8bd70e5
 i18n_provenance: machine
-i18n_output_hash: f9ff4bcd36de
+i18n_output_hash: 59a0b9e5fbd9
 i18n_hash_version: 2
 ---
 
@@ -20,6 +20,7 @@ i18n_hash_version: 2
 | `HOST` | `0.0.0.0` | 服务器监听的 IP 地址。在桥接网络上（`docker run` 和 Compose 的默认网络），请保持 `0.0.0.0`（或 `::`），否则发布的端口将无法工作。在原生安装或使用主机网络的容器中，`127.0.0.1` 可让 API 不暴露在网络上；如需远程访问，请在前面放置反向代理。[内置模式](#embedded-mode)仅适用于 `0.0.0.0`、`::` 或 `127.0.0.1`，因为它的启动检查会调用 `127.0.0.1`。使用任何其他地址（包括 `::1`）时，容器永远不会被视为已启动，之后发生的崩溃会停止容器，而不是重启服务器。任何不是 IP 地址的值（包括 `localhost`）都会使服务器在启动时停止。 |
 | `BASE_PATH` | （空） | 公开的部署路径，例如 `/snapotter`。留空或设为 `/` 时在域名根路径提供服务。在运行时生效，无需重新构建镜像。 |
 | `RATE_LIMIT_PER_MIN` | `1000` | 每个 IP 每分钟的最大请求数。设为 0 可禁用速率限制。 |
+| `API_KEYS_RATE_LIMIT_PER_MIN` | `30` | 每个 IP 每分钟对 API 密钥管理端点（列出、创建、吊销）的最大请求数。用于工具调用的密钥不受影响。没有无限制的取值：`0` 会拒绝对这些端点的所有请求。 |
 | `CORS_ORIGIN` | （空） | 以逗号分隔的 CORS 允许来源，留空则仅允许同源。 |
 | `LOG_LEVEL` | `info` | 日志详细程度。可选值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些对端可以通过 `X-Forwarded-For` 设置客户端 IP。默认值只信任私有网络中的对端，因此 Docker 网络或局域网上的反向代理会被信任，而公网客户端伪造的请求头不会。仅当你控制的代理位于公网地址之前时，才设置 `true`。 |
@@ -37,6 +38,9 @@ i18n_hash_version: 2
 | `MAX_USERS` | `0`（无限制） | 已注册用户账户的最大数量。设为 0 表示无限制。 |
 | `SESSION_DURATION_HOURS` | `168` | 登录会话的有效期，单位为小时（默认 7 天）。 |
 | `SKIP_MUST_CHANGE_PASSWORD` | `false` | 设为 `true` 可跳过首次登录时强制修改密码的提示。 |
+| `LOGIN_ATTEMPT_LIMIT` | `30` | 每个 IP 每分钟的最大登录请求数。超出后的尝试会收到 `429`，直到这一分钟结束。同一用户名的反复失败通常会先触发 `LOGIN_THROTTLE_MAX_FAILURES`。管理员可以在 Settings > System 中覆盖它。没有无限制的取值：`0` 会拒绝所有登录。从源码构建则从 10 开始。 |
+| `LOGIN_THROTTLE_MAX_FAILURES` | `10` | 一个用户名在 `LOGIN_THROTTLE_WINDOW_S` 内允许的密码登录失败次数，超过后该用户名的后续尝试会收到 `429`，无论来自哪个 IP。随着最早的失败记录移出窗口，它们会重新被放行。设为 0 可关闭该限制。 |
+| `LOGIN_THROTTLE_WINDOW_S` | `900` | 该窗口的长度，单位为秒。必须至少为 1；设为 0 时服务器拒绝启动。 |
 
 ### 存储 {#storage}
 
@@ -48,6 +52,7 @@ i18n_hash_version: 2
 | `REDIS_URL` | `redis://localhost:6379` | Redis 连接字符串（用于 BullMQ 作业队列）。Compose 将其指向其 `redis` 服务。 |
 | `WORKSPACE_PATH` | `./tmp/workspace` | 处理期间用于存放临时文件的目录。会自动清理。镜像将其设置为 `/tmp/workspace`。 |
 | `FILES_STORAGE_PATH` | `./data/files` | 用于存放持久用户文件（上传的图片、保存的结果）的目录。镜像将其设置为 `/data/files`。 |
+| `MAX_STORAGE_PER_USER_MB` | `5000` | 每个用户在文件库中可保留内容的上限，单位为 MB。超过上限的保存会被拒绝，并提示已用量和上限。为用户设置的配额会覆盖该值。设为 0 表示无限制。 |
 
 ### S3 对象存储 {#s3-object-storage}
 
@@ -96,17 +101,32 @@ i18n_hash_version: 2
 | `MAX_BATCH_SIZE` | `0`（无限制） | 单个批处理请求中的最大文件数。设为 0 表示无限制。发布的镜像默认为 `0`；从源码构建则从 100 开始。 |
 | `CONCURRENT_JOBS` | `0`（自动） | 并行运行的批处理作业数。设为 0 则根据可用 CPU 核心数自动检测。 |
 | `MAX_MEGAPIXELS` | `0`（无限制） | 允许的最大图像分辨率，单位为百万像素。设为 0 表示无限制。 |
+| `MAX_CPU_UPSCALE_MP` | `4` | 在没有 GPU 的主机上，AI 放大接受的最大输入，单位为百万像素。放大后的输出也被限制在该值的 16 倍以内（默认 64 MP），因此较高的放大倍数会进一步降低输入上限。更大的图像会先缩小到合适尺寸再放大；如果缩小后结果不会比原图更大，则该请求会被拒绝。Lanczos 会跳过输入上限，但不会跳过输出上限。设为 0 表示不设上限，这需要大量内存：RealESRGAN 内部始终会构建一个 4x 缓冲区。 |
+| `MAX_WORKSPACE_SIZE_GB` | `0`（无限制） | 工作区中上传文件和已存储结果的总大小上限，单位为 GB。超过后，上传和工具请求会收到 503，直到文件在 `FILE_MAX_AGE_HOURS` 之后过期。设为 0 表示无限制；当磁盘可用空间不足 0.5 GB 时，本地存储仍会以 503 拒绝写入。发布的镜像默认为 `0`；从源码构建则从 10 开始。 |
 | `MAX_WORKER_THREADS` | `0`（自动） | 图像处理的最大工作线程数。设为 0 则根据可用 CPU 核心数自动检测。 |
 | `PROCESSING_TIMEOUT_S` | `0`（无限制） | 对运行 AI 工具的 Python sidecar 的每次调用的超时时间，单位为秒。设为 0 表示不设超时。它不限制图像、PDF 或媒体作业；这些由 `JOB_TIMEOUT_FAST_S` 和 `JOB_TIMEOUT_LONG_S` 负责。 |
 | `AI_SIDECAR_IDLE_TIMEOUT` | `600` | Python AI sidecar 和精确 OCR 运行时空闲多少秒后退出并释放内存（预热后分别约 1.3 GB 和 0.7 GB）。两者都会在下一个请求到来时重新启动，因此空闲退出后的第一次 AI 调用需要承担几秒钟的库启动开销。设为 0 可让它们保持运行。默认值与 `AI_SESSION_IDLE_TIMEOUT` 一致，因此已加载的模型不会早于该设置规定的时间被释放。如果你调高 `AI_SESSION_IDLE_TIMEOUT`，请将此值也调高到相同数值。 |
+| `AI_SESSION_IDLE_TIMEOUT` | `0`（自动） | 已加载的 AI 模型在最后一次使用后保留在 sidecar 缓存中的秒数。自动值为 600。由 Python sidecar 读取，该 sidecar 在 `AI_SIDECAR_IDLE_TIMEOUT` 之后退出时也会丢弃所有缓存的模型。 |
+| `AI_SESSION_CACHE_BYTES` | `0`（自动） | 已缓存 AI 模型的内存预算，单位为字节。自动值为 GPU 内存的 40%，在仅有 CPU 的主机上则完全不缓存。在 CPU 主机上设置它可将模型缓存在内存中；在 GPU 主机上设为 1 可关闭缓存。由 Python sidecar 读取。 |
+| `MAX_AI_JOBS_PER_USER` | `5` | 一个用户可同时排队或运行的单文件 AI 作业数。超出的请求会收到 `429`，直到有一个作业完成。AI 池一次只运行一个作业，因此该限制可避免单个用户独占它。批量和流水线中的 AI 运行不计入。设为 0 表示无限制。 |
 | `JOB_TIMEOUT_FAST_S` | `120` | 快速作业池（图像和文档工具）中单个作业的截止时间，单位为秒。运行时间更长的作业会因超时错误而失败。设为 0 表示不设限制。 |
 | `JOB_TIMEOUT_LONG_S` | `7200` | 长时作业池（AI 和媒体工具，以及任何标记为长时间运行的工具）中单个作业的截止时间，单位为秒。设为 0 表示不设限制。均衡和最佳 PDF OCR 会按页数自行延长截止时间（每页 2 分钟和 5 分钟），最长 6 小时，因此大型 PDF 无需调高此值。 |
 | `SYNC_WAIT_MS` | `8000` | 工具请求等待其作业的时长，单位为毫秒；超过该时长后，API 停止等待并返回 `202` 和一个可通过 SSE 跟踪的作业 ID。这不会停止作业。设为 0 则无论作业耗时多久都一直等待。 |
 | `MAX_PIPELINE_STEPS` | `20` | 管道中的最大步骤数。设为 0 表示不设限制。 |
+| `MAX_PIPELINE_STEP_PIXELS` | `67108864` | 流水线步骤可请求的最大输出，以宽乘高的像素数表示（默认为 8192 x 8192）。设置要求超出该值的步骤会在流水线运行前被拒绝。设为 0 表示不设上限。 |
 | `MAX_CANVAS_PIXELS` | `0`（无限制） | 输出图像的最大画布尺寸，单位为像素。设为 0 表示不设限制。 |
 | `MAX_SVG_SIZE_MB` | `50` | 清理之前接受的最大 SVG，单位为 MB。`0` 在这里的行为与周围各行不同。它会完全移除解析前的大小上限，而不是将其调高，所以请保持设置此项。 |
 | `MAX_PDF_PAGES` | `0`（无限制） | PDF 转图片时的最大 PDF 页数。设为 0 表示无限制。 |
+| `MAX_VIDEO_DURATION_S` | `0`（无限制） | 视频工具接受的最长视频，单位为秒。更长的文件会在处理前被拒绝，错误信息中会包含时长和上限。设为 0 表示无限制。 |
+| `MAX_AUDIO_DURATION_S` | `0`（无限制） | 同上，针对音频工具。 |
+| `MAX_VIDEO_BITRATE_KBPS` | `0`（无限制） | 视频工具接受的最高总比特率，单位为千比特每秒。设为 0 表示无限制。 |
+| `PREVIEW_TIMEOUT_S` | `300` | 为视频或音频文件编码一个浏览器内预览片段的时间上限，单位为秒。文档预览改用 `LIBREOFFICE_TIMEOUT_S`。设为 0 表示不设上限。 |
+| `LIBREOFFICE_TIMEOUT_S` | `120` | 一次 LibreOffice 转换（Word、Excel 和 PowerPoint 转 PDF、文档转换器以及文档预览）的时间上限，单位为秒。这里的 `0` 并不表示无限制；它会回退到 120。 |
+| `GIF_BG_MAX_FRAMES` | `150` | 移除 GIF 背景在一个动画中接受的最大帧数。更长的动画会收到 `400`，其中包含帧数。设为 0 表示不限制帧数；另有独立的像素预算仍然适用。 |
+| `SUBPROCESS_MEMORY_LIMIT_MB` | `0`（关闭） | 媒体和文档引擎启动的每个 ffmpeg、Ghostscript、qpdf、LibreOffice、pandoc 和 pdfcpu 进程的地址空间上限，单位为 MB。读取上传图像的解码器（ImageMagick、exiftool 及其 ffmpeg 回退）不受限制。超出上限的进程会被终止，而不是把整个容器推向内存不足（OOM）终止器。它限制的是虚拟内存而不是常驻内存，所以请留出余量。AI sidecar 从不受限。设为 0 可关闭该限制，转而依靠容器内存上限。 |
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | 工具请求可携带的 `settings` 字段的最大大小，单位为 KB，按 UTF-8 字节计算。超过限制的请求会收到 `400`。设为 0 表示不设限制。实际的工具设置远小于 64 KB，因此仅当客户端发送异常大的设置时才需要调高此值。 |
+| `MAX_SUBTITLE_SIZE_MB` | `1` | 烧录字幕和嵌入字幕接受的最大字幕文件（`.srt`、`.vtt`、`.ass`），单位为 MB。更大的文件会收到 `400`，其中包含文件大小和上限。设为 0 表示不设上限。一部长片的字幕文件通常远小于 1 MB。 |
+| `MAX_METADATA_TAG_LENGTH` | `10000` | 编辑元数据写入单个标签（艺术家、描述、关键词等）的最长值，单位为字符。更长的值会收到 `400`，其中包含标签和上限。设为 0 表示不设上限。如果你存储较长的说明或描述，请调高它。标签值还必须能放入 `MAX_SETTINGS_PAYLOAD_KB` 和操作系统的单个参数上限（Linux 上为 128 KB）。 |
 
 ### 引擎 {#engines}
 
@@ -135,6 +155,9 @@ SnapOtter 会在容器内的 `$PATH` 上查找每个处理用的二进制文件�
 |---|---|---|
 | `FILE_MAX_AGE_HOURS` | `72` | 未保存的处理结果（原始上传文件和工具输出）在被自动删除之前保留多长时间。你明确保存到文件库的文件不受影响，会一直保留到你删除为止。 |
 | `CLEANUP_INTERVAL_MINUTES` | `60` | 清理作业的运行频率。 |
+| `JOBS_RETENTION_DAYS` | `30` | 已完成的作业记录（完成、失败或取消）在每 6 小时运行一次的保留清理将其删除之前保留的天数。管理员可以在 Settings > System 中覆盖它。处于法律保留状态的用户和团队会保留其记录。设为 0 可永久保留。 |
+| `AUDIT_RETENTION_DAYS` | `0`（永久） | 审计日志条目的保留天数。覆盖和法律保留规则相同。开启防篡改审计日志时不会删除任何内容。设为 0 可永久保留。 |
+| `SNAPOTTER_LICENSE_KEY` | （空） | 用于解锁企业功能（如 SAML、SCIM 和 S3 存储）的许可证密钥。在启动时读取，因此更改后请重启。无效或已过期的密钥会记录一条警告，服务器将在没有这些功能的情况下运行。在容器中，你也可以改为通过 `SNAPOTTER_LICENSE_KEY_FILE` 挂载它（参见 [Docker secrets](/guide/security#docker-secrets)）。 |
 
 ### 外观 {#appearance}
 

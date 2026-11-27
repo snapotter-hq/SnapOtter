@@ -2,7 +2,7 @@
 description: "إدارة المستخدمين، والأدوار المدمجة والمخصصة، والأذونات، ومفاتيح API، والفرق، والجلسات، وسجل التدقيق في SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 07065d77a8f0
+i18n_output_hash: 81189a078fea
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### الاحتفاظ {#retention}
 
-اضبط `AUDIT_RETENTION_DAYS` لتطهير الإدخالات القديمة تلقائياً. الافتراضي هو `0`، مما يعني الاحتفاظ بالإدخالات إلى أجل غير مسمى.
+اضبط [`AUDIT_RETENTION_DAYS`](/ar/guide/configuration#env-audit-retention-days) لتطهير الإدخالات القديمة تلقائياً. الافتراضي هو `0`، مما يعني الاحتفاظ بالإدخالات إلى أجل غير مسمى.
 
 ### مرجع الأحداث {#event-reference}
 

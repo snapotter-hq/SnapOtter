@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 70d8b17aa420
+i18n_output_hash: 901d2e21cacf
 i18n_hash_version: 2
 ---
 # Configurazioni a risorse limitate {#low-resource-setups}
@@ -91,7 +91,7 @@ Tutti i limiti sono variabili d'ambiente, documentate per intero in [Configurazi
 | [`MAX_BATCH_SIZE`](/it/guide/configuration#env-max-batch-size) | `5` | I batch sono il punto in cui le macchine da 1-2 GB esauriscono per prime la memoria. |
 | [`MAX_UPLOAD_SIZE_MB`](/it/guide/configuration#env-max-upload-size-mb) | `100` | Evita che un singolo file enorme occupi l'intero workspace. |
 | [`MAX_MEGAPIXELS`](/it/guide/configuration#env-max-megapixels) | `50` | Decodificare un'immagine da 100+ MP costa RAM indipendentemente dalla dimensione del file. |
-| `MAX_VIDEO_DURATION_S` | `300` | Le transcodifiche lunghe monopolizzano una piccola CPU per minuti o ore. |
+| [`MAX_VIDEO_DURATION_S`](/it/guide/configuration#env-max-video-duration-s) | `300` | Le transcodifiche lunghe monopolizzano una piccola CPU per minuti o ore. |
 | [`PROCESSING_TIMEOUT_S`](/it/guide/configuration#env-processing-timeout-s) | `600` | Tetto rigido, così un job fuori controllo libera prima o poi la macchina. |
 
 Questi limiti si applicano a ciò che il server accetta, quindi li imposti in base a ciò che usa davvero e non al valore più basso possibile. Se non tocca mai i video, un limite `MAX_VIDEO_DURATION_S` non costa nulla; se scansiona documenti ogni giorno, non limiti [`MAX_PDF_PAGES`](/it/guide/configuration#env-max-pdf-pages).

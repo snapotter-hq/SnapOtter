@@ -2,7 +2,7 @@
 description: "ตั้งค่าการจัดสรร SCIM 2.0 เพื่อซิงก์ผู้ใช้และกลุ่มจากผู้ให้บริการข้อมูลประจำตัว (identity provider) ของคุณไปยัง SnapOtter ครอบคลุม Okta, Azure AD / Entra ID และการผสานรวมแบบกำหนดเอง"
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 37eed53c701f
+i18n_output_hash: 4f3b836f075a
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azure จัดสรรผู้ใช้และกลุ่มตามร�
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-ไลเซนส์ของคุณไม่มีคุณสมบัติ `scim` หรือไม่มีการกำหนดค่าไลเซนส์ SCIM ต้องใช้ไลเซนส์แผน enterprise ตรวจสอบว่าตั้งค่า `SNAPOTTER_LICENSE_KEY` ไว้แล้วและไลเซนส์รวมคุณสมบัติ `scim` ด้วย
+ไลเซนส์ของคุณไม่มีคุณสมบัติ `scim` หรือไม่มีการกำหนดค่าไลเซนส์ SCIM ต้องใช้ไลเซนส์แผน enterprise ตรวจสอบว่าตั้งค่า [`SNAPOTTER_LICENSE_KEY`](/th/guide/configuration#env-snapotter-license-key) ไว้แล้วและไลเซนส์รวมคุณสมบัติ `scim` ด้วย
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: a790667c5a1c
+i18n_output_hash: 45ddcb0c25f0
 i18n_hash_version: 2
 ---
 # Setups met weinig resources {#low-resource-setups}
@@ -91,7 +91,7 @@ Alle limieten zijn omgevingsvariabelen, volledig beschreven in [Configuratie](/n
 | [`MAX_BATCH_SIZE`](/nl/guide/configuration#env-max-batch-size) | `5` | Bij batches loopt het geheugen van machines met 1-2 GB het eerst vol. |
 | [`MAX_UPLOAD_SIZE_MB`](/nl/guide/configuration#env-max-upload-size-mb) | `100` | Voorkomt dat één enorm bestand de hele werkruimte bezet. |
 | [`MAX_MEGAPIXELS`](/nl/guide/configuration#env-max-megapixels) | `50` | Het decoderen van een afbeelding van 100+ MP kost RAM, ongeacht de bestandsgrootte. |
-| `MAX_VIDEO_DURATION_S` | `300` | Lange transcodes monopoliseren een kleine CPU gedurende minuten tot uren. |
+| [`MAX_VIDEO_DURATION_S`](/nl/guide/configuration#env-max-video-duration-s) | `300` | Lange transcodes monopoliseren een kleine CPU gedurende minuten tot uren. |
 | [`PROCESSING_TIMEOUT_S`](/nl/guide/configuration#env-processing-timeout-s) | `600` | Harde bovengrens zodat een op hol geslagen job de machine uiteindelijk vrijgeeft. |
 
 Deze limieten gelden voor wat de server accepteert, dus stel ze in op wat u daadwerkelijk gebruikt in plaats van zo klein mogelijk. Als u nooit video gebruikt, kost een limiet van `MAX_VIDEO_DURATION_S` niets; scant u dagelijks documenten, beperk [`MAX_PDF_PAGES`](/nl/guide/configuration#env-max-pdf-pages) dan niet.

@@ -2,7 +2,7 @@
 description: "คู่มือการเสริมความปลอดภัยสำหรับ SnapOtter ครอบคลุมความปลอดภัยของคอนเทนเนอร์ การแยกเครือข่าย Docker secrets การติดตั้งบน Kubernetes และเอกสารด้านการปฏิบัติตามข้อกำหนด"
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: a466b34ec0a4
+i18n_output_hash: abf15f43bf34
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ SnapOtter ประมวลผลไฟล์ทั้งหมดบนโค�
 
 ### เหตุใดจึงไม่ตั้งค่า `read_only` {#why-read-only-is-not-set}
 
-`read_only: true` ไม่ได้ถูกตั้งค่า เพราะการแมป PUID/PGID ใหม่เขียนลงใน `/etc/passwd` และ `/etc/group` ตอนเริ่มต้น หากคุณใช้แฟล็ก `--user` ของ Docker หรือ `runAsUser` ของ Kubernetes แทน PUID/PGID คุณสามารถเปิดใช้ระบบไฟล์ root แบบอ่านอย่างเดียวได้อย่างปลอดภัย
+`read_only: true` ไม่ได้ถูกตั้งค่า เพราะการแมป [PUID](/th/guide/configuration#env-puid)/[PGID](/th/guide/configuration#env-pgid) ใหม่เขียนลงใน `/etc/passwd` และ `/etc/group` ตอนเริ่มต้น หากคุณใช้แฟล็ก `--user` ของ Docker หรือ `runAsUser` ของ Kubernetes แทน PUID/PGID คุณสามารถเปิดใช้ระบบไฟล์ root แบบอ่านอย่างเดียวได้อย่างปลอดภัย
 
 ## การแยกเครือข่าย {#network-isolation}
 
@@ -62,7 +62,7 @@ SnapOtter ประมวลผลไฟล์ทั้งหมดบนโค�
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/th/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **ตัวอย่างการใช้ Docker Compose secrets:**
 

@@ -2,7 +2,7 @@
 description: "SnapOtter でユーザー、組み込みおよびカスタムロール、権限、API キー、チーム、セッション、監査ログを管理します。"
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 714dea2a8e1f
+i18n_output_hash: ce9daf49463a
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### 保持 {#retention}
 
-古いエントリを自動的に削除するには `AUDIT_RETENTION_DAYS` を設定します。デフォルトは `0` で、エントリを無期限に保持することを意味します。
+古いエントリを自動的に削除するには [`AUDIT_RETENTION_DAYS`](/ja/guide/configuration#env-audit-retention-days) を設定します。デフォルトは `0` で、エントリを無期限に保持することを意味します。
 
 ### イベントリファレンス {#event-reference}
 

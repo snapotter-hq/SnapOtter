@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: c675d29992dc
+i18n_output_hash: 7c74d8fe848e
 i18n_hash_version: 2
 ---
 # कम-संसाधन वाले सेटअप {#low-resource-setups}
@@ -91,7 +91,7 @@ Pi-स्तर की मशीनों के लिए नोट्स:
 | [`MAX_BATCH_SIZE`](/hi/guide/configuration#env-max-batch-size) | `5` | 1-2 GB की मशीनों में सबसे पहले batches में ही मेमोरी खत्म होती है। |
 | [`MAX_UPLOAD_SIZE_MB`](/hi/guide/configuration#env-max-upload-size-mb) | `100` | एक अकेली विशाल फ़ाइल को पूरे workspace पर कब्ज़ा करने से रोकता है। |
 | [`MAX_MEGAPIXELS`](/hi/guide/configuration#env-max-megapixels) | `50` | 100+ MP की image decode करने में फ़ाइल के आकार से स्वतंत्र रूप से RAM लगती है। |
-| `MAX_VIDEO_DURATION_S` | `300` | लंबे transcodes छोटे CPU को मिनटों से घंटों तक घेरे रखते हैं। |
+| [`MAX_VIDEO_DURATION_S`](/hi/guide/configuration#env-max-video-duration-s) | `300` | लंबे transcodes छोटे CPU को मिनटों से घंटों तक घेरे रखते हैं। |
 | [`PROCESSING_TIMEOUT_S`](/hi/guide/configuration#env-processing-timeout-s) | `600` | कठोर सीमा, ताकि भागा हुआ job अंततः बॉक्स को मुक्त कर दे। |
 
 ये सीमाएँ उस पर लागू होती हैं जो server स्वीकार करता है, इसलिए इन्हें जितना हो सके उतना छोटा रखने के बजाय अपने वास्तविक उपयोग के अनुसार सेट करें। यदि आप कभी video नहीं छूते, तो `MAX_VIDEO_DURATION_S` की सीमा कुछ नहीं बिगाड़ती; यदि आप रोज़ documents स्कैन करते हैं, तो [`MAX_PDF_PAGES`](/hi/guide/configuration#env-max-pdf-pages) को सीमित न करें।

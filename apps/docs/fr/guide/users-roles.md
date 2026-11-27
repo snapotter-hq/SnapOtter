@@ -2,7 +2,7 @@
 description: "Gérez les utilisateurs, les rôles intégrés et personnalisés, les permissions, les clés API, les équipes, les sessions et le journal d'audit dans SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 500026917981
+i18n_output_hash: e02644adf585
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Lorsqu'elle est activée, chaque entrée du journal d'audit est signée avec un 
 
 ### Rétention {#retention}
 
-Définissez `AUDIT_RETENTION_DAYS` pour purger automatiquement les anciennes entrées. La valeur par défaut est `0`, ce qui signifie que les entrées sont conservées indéfiniment.
+Définissez [`AUDIT_RETENTION_DAYS`](/fr/guide/configuration#env-audit-retention-days) pour purger automatiquement les anciennes entrées. La valeur par défaut est `0`, ce qui signifie que les entrées sont conservées indéfiniment.
 
 ### Référence des événements {#event-reference}
 

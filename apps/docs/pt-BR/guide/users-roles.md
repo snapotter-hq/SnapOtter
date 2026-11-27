@@ -2,7 +2,7 @@
 description: "Gerencie usuários, papéis integrados e personalizados, permissões, chaves de API, times, sessões e o log de auditoria no SnapOtter."
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 4146f4acdfc0
+i18n_output_hash: 8397291a318d
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ Quando habilitado, cada entrada do log de auditoria é assinada com um HMAC deri
 
 ### Retenção {#retention}
 
-Defina `AUDIT_RETENTION_DAYS` para eliminar automaticamente entradas antigas. O padrão é `0`, o que significa que as entradas são mantidas indefinidamente.
+Defina [`AUDIT_RETENTION_DAYS`](/pt-BR/guide/configuration#env-audit-retention-days) para eliminar automaticamente entradas antigas. O padrão é `0`, o que significa que as entradas são mantidas indefinidamente.
 
 ### Referência de eventos {#event-reference}
 

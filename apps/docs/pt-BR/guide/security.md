@@ -2,7 +2,7 @@
 description: "Guia de hardening de segurança do SnapOtter. Segurança de contêineres, isolamento de rede, Docker secrets, implantação em Kubernetes e artefatos de conformidade."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: f0bfc66d34be
+i18n_output_hash: 2b2336231b76
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Em uma implantação exposta à internet, associe a porta 1349 ao loopback e enc
 
 ### Por que `read_only` não está definido {#why-read-only-is-not-set}
 
-`read_only: true` não está definido porque o remapeamento de PUID/PGID grava em `/etc/passwd` e `/etc/group` na inicialização. Se você usa a flag `--user` do Docker ou `runAsUser` do Kubernetes em vez de PUID/PGID, pode ativar com segurança um sistema de arquivos raiz somente leitura.
+`read_only: true` não está definido porque o remapeamento de [PUID](/pt-BR/guide/configuration#env-puid)/[PGID](/pt-BR/guide/configuration#env-pgid) grava em `/etc/passwd` e `/etc/group` na inicialização. Se você usa a flag `--user` do Docker ou `runAsUser` do Kubernetes em vez de PUID/PGID, pode ativar com segurança um sistema de arquivos raiz somente leitura.
 
 ## Isolamento de rede {#network-isolation}
 
@@ -62,7 +62,7 @@ Em implantações de produção, evite passar segredos como variáveis de ambien
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/pt-BR/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Exemplo com secrets do Docker Compose:**
 

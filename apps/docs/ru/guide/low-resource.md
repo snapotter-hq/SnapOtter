@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 47daca912bca
+i18n_output_hash: a88034c3301d
 i18n_hash_version: 2
 ---
 # Настройки для слабого оборудования {#low-resource-setups}
@@ -91,7 +91,7 @@ services:
 | [`MAX_BATCH_SIZE`](/ru/guide/configuration#env-max-batch-size) | `5` | Именно на пакетах у машин с 1-2 ГБ память заканчивается в первую очередь. |
 | [`MAX_UPLOAD_SIZE_MB`](/ru/guide/configuration#env-max-upload-size-mb) | `100` | Не даёт одному огромному файлу занять всё рабочее пространство. |
 | [`MAX_MEGAPIXELS`](/ru/guide/configuration#env-max-megapixels) | `50` | Декодирование изображения более 100 Мпикс требует памяти независимо от размера файла. |
-| `MAX_VIDEO_DURATION_S` | `300` | Долгие перекодирования занимают слабый CPU на минуты и часы. |
+| [`MAX_VIDEO_DURATION_S`](/ru/guide/configuration#env-max-video-duration-s) | `300` | Долгие перекодирования занимают слабый CPU на минуты и часы. |
 | [`PROCESSING_TIMEOUT_S`](/ru/guide/configuration#env-processing-timeout-s) | `600` | Жёсткий предел, чтобы зависшая задача рано или поздно освободила машину. |
 
 Эти ограничения применяются к тому, что принимает сервер, поэтому задавайте их по реальному использованию, а не как можно меньше. Если вы не работаете с видео, предел `MAX_VIDEO_DURATION_S` ничего не стоит; если вы ежедневно сканируете документы, не ограничивайте [`MAX_PDF_PAGES`](/ru/guide/configuration#env-max-pdf-pages).

@@ -1,7 +1,7 @@
 ---
 i18n_source_hash: b859c4f3b301
 i18n_provenance: machine
-i18n_output_hash: 9bc1ee4ba2fa
+i18n_output_hash: bea861458d7b
 i18n_hash_version: 2
 ---
 # Configurations à faibles ressources {#low-resource-setups}
@@ -91,7 +91,7 @@ Tous les plafonds sont des variables d'environnement, entièrement documentées 
 | [`MAX_BATCH_SIZE`](/fr/guide/configuration#env-max-batch-size) | `5` | Les lots sont ce qui épuise en premier la mémoire des machines de 1 à 2 Go. |
 | [`MAX_UPLOAD_SIZE_MB`](/fr/guide/configuration#env-max-upload-size-mb) | `100` | Empêche un seul fichier énorme d'occuper tout l'espace de travail. |
 | [`MAX_MEGAPIXELS`](/fr/guide/configuration#env-max-megapixels) | `50` | Décoder une image de plus de 100 MP consomme de la RAM quelle que soit la taille du fichier. |
-| `MAX_VIDEO_DURATION_S` | `300` | Les longs transcodages monopolisent un petit CPU pendant des minutes, voire des heures. |
+| [`MAX_VIDEO_DURATION_S`](/fr/guide/configuration#env-max-video-duration-s) | `300` | Les longs transcodages monopolisent un petit CPU pendant des minutes, voire des heures. |
 | [`PROCESSING_TIMEOUT_S`](/fr/guide/configuration#env-processing-timeout-s) | `600` | Plafond strict pour qu'une tâche incontrôlée finisse par libérer la machine. |
 
 Ces plafonds s'appliquent à ce que le serveur accepte : réglez-les donc en fonction de ce que vous utilisez réellement plutôt que le plus bas possible. Si vous ne touchez jamais à la vidéo, un plafond `MAX_VIDEO_DURATION_S` ne coûte rien ; si vous numérisez des documents tous les jours, ne plafonnez pas [`MAX_PDF_PAGES`](/fr/guide/configuration#env-max-pdf-pages).

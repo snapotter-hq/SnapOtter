@@ -2,7 +2,7 @@
 description: "SnapOtter 安全性強化指南。涵蓋容器安全、網路隔離、Docker secrets、Kubernetes 部署，以及合規文件。"
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 7b23763c311d
+i18n_output_hash: fd656fdc997b
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進�
 
 ### 為什麼未設定 `read_only` {#why-read-only-is-not-set}
 
-未設定 `read_only: true`，是因為 PUID/PGID 重新對應會在啟動時寫入 `/etc/passwd` 與 `/etc/group`。如果您改用 Docker 的 `--user` 旗標或 Kubernetes 的 `runAsUser`，而不使用 PUID/PGID，就可以安全地啟用唯讀的根檔案系統。
+未設定 `read_only: true`，是因為 [PUID](/zh-TW/guide/configuration#env-puid)/[PGID](/zh-TW/guide/configuration#env-pgid) 重新對應會在啟動時寫入 `/etc/passwd` 與 `/etc/group`。如果您改用 Docker 的 `--user` 旗標或 Kubernetes 的 `runAsUser`，而不使用 PUID/PGID，就可以安全地啟用唯讀的根檔案系統。
 
 ## 網路隔離 {#network-isolation}
 
@@ -62,7 +62,7 @@ SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進�
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/zh-TW/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **使用 Docker Compose secrets 的範例：**
 

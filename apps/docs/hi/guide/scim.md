@@ -2,7 +2,7 @@
 description: "अपने identity provider से SnapOtter में users और groups को sync करने के लिए SCIM 2.0 provisioning सेट करें। Okta, Azure AD / Entra ID, और custom integrations को कवर करता है।"
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 82eb73ef0eaa
+i18n_output_hash: 2a9ea8703d77
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azure एक निश्चित sync cycle पर users और groups को 
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-आपकी license में `scim` feature शामिल नहीं है, या कोई license configure नहीं है। SCIM के लिए एक enterprise plan license आवश्यक है। सत्यापित करें कि `SNAPOTTER_LICENSE_KEY` सेट है और license में `scim` feature शामिल है।
+आपकी license में `scim` feature शामिल नहीं है, या कोई license configure नहीं है। SCIM के लिए एक enterprise plan license आवश्यक है। सत्यापित करें कि [`SNAPOTTER_LICENSE_KEY`](/hi/guide/configuration#env-snapotter-license-key) सेट है और license में `scim` feature शामिल है।
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

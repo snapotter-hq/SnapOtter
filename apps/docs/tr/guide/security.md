@@ -2,7 +2,7 @@
 description: "SnapOtter için güvenlik sıkılaştırma rehberi. Kapsayıcı güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk çıktıları."
 i18n_source_hash: 630381c08cde
 i18n_provenance: machine
-i18n_output_hash: 6bc38c978150
+i18n_output_hash: 1625c6891f7a
 i18n_hash_version: 2
 ---
 
@@ -28,7 +28,7 @@ Her iki yığın da aşağıdaki denetimleri uygular:
 
 ### `read_only` Neden Ayarlanmaz {#why-read-only-is-not-set}
 
-PUID/PGID yeniden eşlemesi başlangıçta `/etc/passwd` ve `/etc/group` dosyalarına yazdığı için `read_only: true` ayarlanmaz. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser` ayarını kullanırsanız salt okunur bir kök dosya sistemini güvenle etkinleştirebilirsiniz.
+[PUID](/tr/guide/configuration#env-puid)/[PGID](/tr/guide/configuration#env-pgid) yeniden eşlemesi başlangıçta `/etc/passwd` ve `/etc/group` dosyalarına yazdığı için `read_only: true` ayarlanmaz. PUID/PGID yerine Docker'ın `--user` bayrağını veya Kubernetes `runAsUser` ayarını kullanırsanız salt okunur bir kök dosya sistemini güvenle etkinleştirebilirsiniz.
 
 ## Ağ Yalıtımı {#network-isolation}
 
@@ -62,7 +62,7 @@ Ters vekil sunucu yapılandırması için (Nginx, Traefik, Caddy, Cloudflare Tun
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/tr/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Docker Compose secrets ile örnek:**
 

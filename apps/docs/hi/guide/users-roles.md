@@ -2,7 +2,7 @@
 description: "SnapOtter में उपयोगकर्ता, बिल्ट-इन और कस्टम roles, permissions, API keys, teams, sessions, और ऑडिट लॉग प्रबंधित करें।"
 i18n_source_hash: bea8955f3aff
 i18n_provenance: human
-i18n_output_hash: 0a6bb028b980
+i18n_output_hash: 3ce20dd0d46b
 i18n_hash_version: 2
 ---
 
@@ -228,7 +228,7 @@ GET /api/v1/enterprise/audit/export?format=csv&from=2026-01-01T00:00:00Z
 
 ### रिटेंशन {#retention}
 
-पुरानी एंट्रियों को स्वचालित रूप से हटाने के लिए `AUDIT_RETENTION_DAYS` सेट करें। डिफ़ॉल्ट `0` है, जिसका अर्थ है कि एंट्रियाँ अनिश्चित काल तक रखी जाती हैं।
+पुरानी एंट्रियों को स्वचालित रूप से हटाने के लिए [`AUDIT_RETENTION_DAYS`](/hi/guide/configuration#env-audit-retention-days) सेट करें। डिफ़ॉल्ट `0` है, जिसका अर्थ है कि एंट्रियाँ अनिश्चित काल तक रखी जाती हैं।
 
 ### घटना संदर्भ {#event-reference}
 

@@ -2,7 +2,7 @@
 description: "إعداد توفير SCIM 2.0 لمزامنة المستخدمين والمجموعات من موفّر الهوية لديك إلى SnapOtter. يغطي Okta وAzure AD / Entra ID والتكاملات المخصّصة."
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 2c19bdc8e58c
+i18n_output_hash: c6a6d2b3b916
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ curl -X POST https://photos.example.com/api/v1/enterprise/scim/token \
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-ترخيصك لا يتضمّن ميزة `scim`، أو لا يوجد ترخيص مضبوط. يتطلّب SCIM ترخيص خطة enterprise. تأكّد من ضبط `SNAPOTTER_LICENSE_KEY` ومن أن الترخيص يتضمّن ميزة `scim`.
+ترخيصك لا يتضمّن ميزة `scim`، أو لا يوجد ترخيص مضبوط. يتطلّب SCIM ترخيص خطة enterprise. تأكّد من ضبط [`SNAPOTTER_LICENSE_KEY`](/ar/guide/configuration#env-snapotter-license-key) ومن أن الترخيص يتضمّن ميزة `scim`.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

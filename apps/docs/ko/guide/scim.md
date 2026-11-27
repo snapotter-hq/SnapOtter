@@ -2,7 +2,7 @@
 description: "SCIM 2.0 프로비저닝을 설정하여 사용자와 그룹을 아이덴티티 공급자에서 SnapOtter로 동기화합니다. Okta, Azure AD / Entra ID, 사용자 지정 통합을 다룹니다."
 i18n_source_hash: 77ea64b4082e
 i18n_provenance: human
-i18n_output_hash: 3a19d9cfc6ce
+i18n_output_hash: a350e8957173
 i18n_hash_version: 2
 ---
 
@@ -276,7 +276,7 @@ Azure는 고정된 동기화 주기(일반적으로 40분마다)로 사용자와
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-라이선스에 `scim` 기능이 포함되어 있지 않거나 라이선스가 구성되지 않았습니다. SCIM에는 엔터프라이즈 플랜 라이선스가 필요합니다. `SNAPOTTER_LICENSE_KEY` 가 설정되어 있고 라이선스에 `scim` 기능이 포함되어 있는지 확인하세요.
+라이선스에 `scim` 기능이 포함되어 있지 않거나 라이선스가 구성되지 않았습니다. SCIM에는 엔터프라이즈 플랜 라이선스가 필요합니다. [`SNAPOTTER_LICENSE_KEY`](/ko/guide/configuration#env-snapotter-license-key) 가 설정되어 있고 라이선스에 `scim` 기능이 포함되어 있는지 확인하세요.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 

@@ -24,7 +24,7 @@ For an internet-facing deployment, bind port 1349 to loopback and terminate TLS 
 
 ### Why `read_only` Is Not Set {#why-read-only-is-not-set}
 
-`read_only: true` is not set because PUID/PGID remapping writes to `/etc/passwd` and `/etc/group` at startup. If you use Docker's `--user` flag or Kubernetes `runAsUser` instead of PUID/PGID, you can safely enable a read-only root filesystem. If you set PUID or PGID to anything other than 999 on a read-only root, the container stops at startup with a message saying so, before it changes the owner of anything already in /data. The all-in-one image also runs with a read-only root when PUID and PGID are unset, as long as /run and /tmp are tmpfs mounts and /run allows exec, because s6-overlay starts its supervisor from there.
+`read_only: true` is not set because [PUID](/guide/configuration#env-puid)/[PGID](/guide/configuration#env-pgid) remapping writes to `/etc/passwd` and `/etc/group` at startup. If you use Docker's `--user` flag or Kubernetes `runAsUser` instead of PUID/PGID, you can safely enable a read-only root filesystem. If you set PUID or PGID to anything other than 999 on a read-only root, the container stops at startup with a message saying so, before it changes the owner of anything already in /data. The all-in-one image also runs with a read-only root when PUID and PGID are unset, as long as /run and /tmp are tmpfs mounts and /run allows exec, because s6-overlay starts its supervisor from there.
 
 ## Network Isolation {#network-isolation}
 
@@ -58,7 +58,7 @@ For production deployments, avoid passing secrets as plain-text environment vari
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET_FILE` |
 | `S3_ACCESS_KEY_ID` | `S3_ACCESS_KEY_ID_FILE` |
 | `S3_SECRET_ACCESS_KEY` | `S3_SECRET_ACCESS_KEY_FILE` |
-| `SNAPOTTER_LICENSE_KEY` | `SNAPOTTER_LICENSE_KEY_FILE` |
+| [`SNAPOTTER_LICENSE_KEY`](/guide/configuration#env-snapotter-license-key) | `SNAPOTTER_LICENSE_KEY_FILE` |
 
 **Example with Docker Compose secrets:**
 
