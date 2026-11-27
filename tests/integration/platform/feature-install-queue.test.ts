@@ -1774,33 +1774,93 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       expect((await postCancel("definitely-not-a-bundle")).statusCode).toBe(404);
     });
 
-    it("refuses to cancel an Accurate OCR install that has started", async () => {
-      let finishDownload: (() => void) | undefined;
-      hoisted.downloadVerifiedRuntimeReleaseMock.mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishDownload = () =>
-              resolve({
-                artifact: { target: "linux-amd64-cpu-py312" },
-                canonicalIndex: Buffer.from("index"),
-                archiveFile: "ocr.tar.gz",
-                archiveSha256: "a".repeat(64),
-                archiveSize: 1,
-                archiveExpandedSize: 1,
-                indexPath: "/tmp/index.json",
-                archivePath: "/tmp/archive.tar.gz",
-              });
+    async function holdOcrDownloadUntilAborted(): Promise<{
+      signal: () => AbortSignal | undefined;
+    }> {
+      const { downloadVerifiedRuntimeRelease } = await import(
+        "../../../apps/api/src/lib/ocr-runtime-install.js"
+      );
+      let signal: AbortSignal | undefined;
+      vi.mocked(downloadVerifiedRuntimeRelease).mockImplementationOnce(
+        (options) =>
+          new Promise((_resolve, reject) => {
+            signal = options.signal;
+            signal?.addEventListener("abort", () => reject(signal?.reason), { once: true });
           }),
       );
-      await postInstall("ocr");
-      await waitFor(() => finishDownload !== undefined);
+      return { signal: () => signal };
+    }
+
+    it("stops a running Accurate OCR install mid-download, purges it, and starts the next (#4979)", async () => {
+      const { purgeOcrRuntimeDownloads } = await import(
+        "../../../apps/api/src/lib/ocr-runtime-install.js"
+      );
+      vi.mocked(purgeOcrRuntimeDownloads).mockClear();
+      // A host without an OCR runtime target (macOS) reports that as the
+      // bundle's error before any install, so compare against it.
+      const errorBeforeInstall = (await getFeatureDetail("ocr"))?.error ?? null;
+      const download = await holdOcrDownloadUntilAborted();
+      const r1 = await postInstall("ocr");
+      const { jobId } = JSON.parse(r1.body) as { jobId: string };
+      await waitFor(() => download.signal() !== undefined);
+      const r2 = await postInstall("face-detection");
+      expect(JSON.parse(r2.body).queued).toBe(true);
+
+      const res = await postCancel("ocr");
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({ canceled: true, jobId });
+      expect(download.signal()?.aborted).toBe(true);
+
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("canceled"));
+      expect(purgeOcrRuntimeDownloads).toHaveBeenCalledOnce();
+      expect(hoisted.runOcrRuntimeInstallerMock).not.toHaveBeenCalled();
+      const detail = await getFeatureDetail("ocr");
+      expect(detail?.error ?? null).toBe(errorBeforeInstall);
+      expect(hoisted.reportErrorMock).not.toHaveBeenCalled();
+      expect(
+        hoisted.trackEventMock.mock.calls.some(
+          (c) => c[1]?.bundle_id === "ocr" && c[1]?.action === "install_failed",
+        ),
+      ).toBe(false);
+
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      expect(hoisted.spawnCalls[0].bundleId).toBe("face-detection");
+      hoisted.spawnCalls[0].emit("close", 0);
+      await waitFor(() => queue.getActiveBundleId() === null);
+    });
+
+    it("cancels a running Accurate OCR install through the generic jobs cancel (#4979)", async () => {
+      const { requestCancel } = await import("../../../apps/api/src/jobs/cancel.js");
+      const download = await holdOcrDownloadUntilAborted();
+      const res = await postInstall("ocr");
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await waitFor(() => download.signal() !== undefined);
+
+      expect(await requestCancel(jobId)).toBe(true);
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("canceled"));
+      await waitFor(() => queue.getActiveBundleId() === null);
+      expect(await requestCancel(jobId)).toBe(false);
+    });
+
+    it("refuses to cancel an Accurate OCR install once it is activating the runtime (#4979)", async () => {
+      let finishActivation: (() => void) | undefined;
+      hoisted.runOcrRuntimeInstallerMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishActivation = () => resolve({ family: "ocr", generation: "test-generation" });
+          }),
+      );
+      const install = await postInstall("ocr");
+      const { jobId } = JSON.parse(install.body) as { jobId: string };
+      await waitFor(() => finishActivation !== undefined);
 
       const res = await postCancel("ocr");
       expect(res.statusCode).toBe(409);
-      expect(JSON.parse(res.body).error).toMatch(/Accurate OCR/);
+      expect(JSON.parse(res.body).code).toBe("FEATURE_INSTALL_BUSY");
 
-      finishDownload?.();
+      finishActivation?.();
       await waitFor(() => queue.getActiveBundleId() === null);
+      await vi.waitFor(async () => expect(await jobStatus(jobId)).toBe("completed"));
     });
   });
 });

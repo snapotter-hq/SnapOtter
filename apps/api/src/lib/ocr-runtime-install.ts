@@ -105,6 +105,8 @@ export interface DownloadOcrRuntimeReleaseOptions {
   memoryOptions?: OcrRuntimeMemoryOptions;
   /** Bounded transient-download retry policy and deterministic test seams. */
   retry?: OcrRuntimeDownloadRetryOptions;
+  /** Caller cancel. The download rejects with this signal's reason, not a timeout. */
+  signal?: AbortSignal;
   onProgress?: (percent: number, stage: string) => void;
 }
 
@@ -1903,9 +1905,14 @@ async function downloadVerifiedRuntimeReleaseUnderLease(
   const controller = new AbortController();
   const retryBudget: RetryBudget = { totalDelayMs: 0 };
   const timeout = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  const callerSignal = options.signal;
+  const abortForCaller = () => controller.abort(callerSignal?.reason);
+  callerSignal?.addEventListener("abort", abortForCaller, { once: true });
   let downloadCache: OpenDownloadCache | undefined;
   timeout?.unref();
   try {
+    if (callerSignal?.aborted) abortForCaller();
+    throwIfAborted(controller.signal);
     downloadCache = await ensureDownloadsDirectory(options.aiDataDir);
     throwIfAborted(controller.signal);
     options.onProgress?.(2, "Downloading signed OCR runtime index");
@@ -1979,12 +1986,14 @@ async function downloadVerifiedRuntimeReleaseUnderLease(
     await assertDownloadCacheAttached(downloadCache);
     return { ...verified, indexPath, archivePath };
   } catch (error) {
+    if (callerSignal?.aborted) throw abortReason(callerSignal);
     if (controller.signal.aborted) {
       throw new Error(`OCR runtime download timed out after ${timeoutMs}ms`, { cause: error });
     }
     throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
+    callerSignal?.removeEventListener("abort", abortForCaller);
     await downloadCache?.trashHandle.close().catch(() => {});
     await downloadCache?.handle.close().catch(() => {});
   }

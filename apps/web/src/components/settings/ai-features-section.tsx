@@ -473,8 +473,7 @@ function BundleCard({
   );
   const [now, setNow] = useState(Date.now());
   const status = isQueued ? "queued" : isInstalling ? "installing" : bundle.status;
-  // A started Accurate OCR install has no cancel path on the server.
-  const cancelable = status === "queued" || (status === "installing" && bundle.id !== "ocr");
+  const cancelable = status === "queued" || status === "installing";
 
   useEffect(() => {
     if (!isInstalling) return;

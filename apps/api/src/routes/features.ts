@@ -59,7 +59,6 @@ import {
   enqueue,
   getActiveAndQueuedInstalls,
   getActiveBundleId,
-  getActiveInstallJobId,
   peekQueue,
   removeQueued,
   setActive,
@@ -244,12 +243,25 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
   const installStartTime = Date.now();
   const installDeadline =
     env.INSTALL_MAX_MS > 0 ? performance.now() + env.INSTALL_MAX_MS : undefined;
+  const cancelRequest = new AbortController();
+  // Activation extracts, tests, and hands the new runtime generation over; a
+  // stop mid-handoff is what the rollback machinery recovers from, so that
+  // phase has to finish.
+  let activating = false;
+  activeInstallCancels.set(jobId, {
+    cancel: () => {
+      if (activating) return { canceled: false, reason: "ocr-activating" };
+      cancelRequest.abort();
+      return { canceled: true };
+    },
+  });
   void (async () => {
     setInstallProgress(bundleId, { percent: 0, stage: "Preparing OCR runtime" }, null);
     let finalized = false;
     const finalize = () => {
       if (finalized) return false;
       finalized = true;
+      activeInstallCancels.delete(jobId);
       releaseInstallLock();
       clearActive();
       return true;
@@ -271,11 +283,15 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         trustKeys,
         timeoutMs: env.INSTALL_MAX_MS,
         stallTimeoutMs: env.INSTALL_STALL_MS,
+        signal: cancelRequest.signal,
         onProgress: (percent, stage) => {
           setInstallProgress(bundleId, { percent, stage }, null);
           void updateSingleFileProgress({ jobId, phase: "processing", percent, stage });
         },
       });
+      // A cancel accepted while the finished download was settling still wins.
+      cancelRequest.signal.throwIfAborted();
+      activating = true;
       const activationStage = "Activating OCR runtime: extracting, verifying, and testing";
       const reportActivation = () => {
         setInstallProgress(bundleId, { percent: 92, stage: activationStage }, null);
@@ -322,6 +338,10 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         duration_ms: Date.now() - installStartTime,
       });
     } catch (error) {
+      if (cancelRequest.signal.aborted && !finalized) {
+        await settleCanceledOcrInstall(bundleId, jobId, installLockFd, finalize);
+        return;
+      }
       if (!finalize()) {
         // Only the success path finalizes first, so the runtime is installed
         // and active; what failed is the bookkeeping after it.
@@ -373,18 +393,53 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
 }
 
 /**
+ * A canceled OCR install stopped before activation, so nothing was installed;
+ * drop the partial download while the install lease is still held, then free
+ * the queue. It settles as canceled, not failed, so a user's cancel never
+ * reaches the failure analytics or Sentry.
+ */
+async function settleCanceledOcrInstall(
+  bundleId: string,
+  jobId: string,
+  installLockFd: number,
+  finalize: () => boolean,
+): Promise<void> {
+  try {
+    await purgeOcrRuntimeDownloads(getAiDir(), installLockFd);
+  } catch (error) {
+    logger.warn(
+      { err: error, bundleId, jobId },
+      "[ocr-runtime] Unable to purge the canceled OCR runtime download",
+    );
+  }
+  finalize();
+  setInstallProgress(bundleId, null, null);
+  try {
+    await cancelSingleJobGuarded({ jobId });
+  } catch (error) {
+    // Nothing awaits the install, so a rejection here would go unhandled.
+    logErrorWithCauses(
+      logger,
+      { err: error, bundleId, jobId },
+      "[ocr-runtime] Recording the canceled OCR install failed",
+    );
+  }
+}
+
+/**
  * Why a cancel left an install running. "venv-write": the installer holds the
  * venv writer lock, and a kill mid-write tears the shared venv every AI tool
- * loads from, so that phase has to finish. "ocr": the OCR runtime installer
- * has no cancel path yet.
+ * loads from, so that phase has to finish. "ocr-activating": the OCR runtime
+ * is being extracted and handed over, which has to finish for the same reason.
  */
-export type InstallCancelRefusal = "venv-write" | "ocr" | "not-found";
+export type InstallCancelRefusal = "venv-write" | "ocr-activating" | "not-found";
 export type InstallCancelResult =
   | { canceled: true }
   | { canceled: false; reason: InstallCancelRefusal };
 
-// Cancel hooks for running venv installers, keyed by job id. startInstall
-// registers one per child and finalizeOnce removes it.
+// Cancel hooks for running installs, keyed by job id. startInstall registers
+// one per venv child and startOcrInstall one per OCR install; each removes its
+// own when it finalizes.
 const activeInstallCancels = new Map<string, { cancel: () => InstallCancelResult }>();
 
 /**
@@ -400,7 +455,6 @@ export async function cancelFeatureInstall(jobId: string): Promise<InstallCancel
   }
   const activeInstall = activeInstallCancels.get(jobId);
   if (activeInstall) return activeInstall.cancel();
-  if (getActiveInstallJobId() === jobId) return { canceled: false, reason: "ocr" };
   return { canceled: false, reason: "not-found" };
 }
 
@@ -1317,19 +1371,14 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         : ({ canceled: false, reason: "not-found" } as const);
       if (result.canceled) return reply.send({ canceled: true, jobId: install?.jobId });
 
-      if (result.reason === "venv-write") {
+      if (result.reason === "venv-write" || result.reason === "ocr-activating") {
         return reply.status(409).send({
           error:
             "The install is updating the AI environment and can't be stopped right now. It will finish shortly.",
           code: "FEATURE_INSTALL_BUSY",
         });
       }
-      return reply.status(409).send({
-        error:
-          result.reason === "ocr"
-            ? "An Accurate OCR install can't be canceled once it has started."
-            : `Bundle "${bundleId}" is not installing`,
-      });
+      return reply.status(409).send({ error: `Bundle "${bundleId}" is not installing` });
     },
   );
 
