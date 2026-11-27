@@ -49,6 +49,7 @@ jobs:
     runs-on: ${{ (vars.FLEET_RUNNERS != 'off' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' && ((vars.FLEET_PR_SHARE || 'even') == 'all' || ((vars.FLEET_PR_SHARE || 'even') == 'even' && (endsWith(format('{0}', github.event.pull_request.number), '0') || endsWith(format('{0}', github.event.pull_request.number), '2') || endsWith(format('{0}', github.event.pull_request.number), '4') || endsWith(format('{0}', github.event.pull_request.number), '6') || endsWith(format('{0}', github.event.pull_request.number), '8'))))))) && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      unit: ${{ steps.filter.outputs.unit }}
       landing: ${{ steps.filter.outputs.landing }}
       docs: ${{ steps.filter.outputs.docs }}
       aipython: ${{ steps.filter.outputs.aipython }}
@@ -87,8 +88,13 @@ jobs:
           # main pipeline). `landing` and `docs`: that surface's own files changed
           # (gates its e2e job). `aipython`: the Python sidecar or its rembg test
           # changed (gates the AI Sidecar (rembg) job). All fail open to true
-          # when the base is unknown.
+          # when the base is unknown. `unit`: anything a unit test can read
+          # changed. Unit tests read apps/docs, apps/landing, README.md and
+          # CONTRIBUTING.md, so only branding and root docs/ (local scratch)
+          # skip it; without this a docs-only commit read green while a docs
+          # contract test was failing on main (#5365).
           code=true
+          unit=true
           landing=true
           docs=true
           aipython=true
@@ -103,6 +109,13 @@ jobs:
                 case "$f" in
                   README.md|CONTRIBUTING.md|branding/*|apps/docs/*|apps/landing/*|docs/*) ;;
                   *) code=true; break ;;
+                esac
+              done
+              unit=false
+              for f in $changed; do
+                case "$f" in
+                  branding/*|docs/*) ;;
+                  *) unit=true; break ;;
                 esac
               done
               landing=false
@@ -136,6 +149,7 @@ jobs:
             echo "No usable base (dispatch, force push, or new branch); running the full pipeline"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "unit=$unit" >> "$GITHUB_OUTPUT"
           echo "landing=$landing" >> "$GITHUB_OUTPUT"
           echo "docs=$docs" >> "$GITHUB_OUTPUT"
           echo "aipython=$aipython" >> "$GITHUB_OUTPUT"
@@ -200,7 +214,7 @@ jobs:
     # on a real degraded day. Re-derive this if the ladder's budgets change.
     timeout-minutes: 50
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.unit == 'true'
     strategy:
       fail-fast: false
       matrix:
