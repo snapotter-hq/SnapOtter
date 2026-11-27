@@ -192,7 +192,11 @@ export function registerImageToBase64(app: FastifyInstance) {
           // "original" hands the SVG text back untouched, so only a conversion
           // renders it, and that render goes through the deadline-bound child.
           if (isSvg && opts.outputFormat !== "original") {
-            pipeline = sharp(await rasterizeSanitizedSvg(decoded));
+            const rendered = await rasterizeSanitizedSvg(decoded);
+            pipeline = sharp(rendered);
+            const renderedMeta = await pipeline.metadata();
+            width = renderedMeta.width ?? width;
+            height = renderedMeta.height ?? height;
           }
 
           // Apply resize if requested

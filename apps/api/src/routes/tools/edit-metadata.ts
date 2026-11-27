@@ -336,14 +336,17 @@ export function registerEditMetadata(app: FastifyInstance) {
         if (!BROWSER_PREVIEWABLE.has(contentType)) {
           try {
             let previewInput: Buffer | null = outputBuffer;
+            let svgUndecoded = isSvg;
             const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
             try {
               if (contentType === "image/heif" || contentType === "image/heic") {
                 previewInput = await decodeHeic(outputBuffer);
+                svgUndecoded = false;
               } else if (cliFormat) {
                 const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
                 try {
                   previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
+                  svgUndecoded = false;
                 } catch (rawDecodeErr) {
                   const decodeErr = normalizeOperationalWriteError(
                     asDecoderOutOfMemory(rawDecodeErr),
@@ -381,7 +384,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             }
             // A sanitized SVG stored under a CLI-decoded type reaches here
             // undecoded; render it in the deadline-bound child, not in sharp.
-            if (previewInput && isSvg && previewInput === outputBuffer) {
+            if (previewInput && svgUndecoded) {
               previewInput = await rasterizeSanitizedSvg(previewInput);
             }
             if (previewInput) {
