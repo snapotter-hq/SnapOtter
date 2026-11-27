@@ -315,6 +315,16 @@ export async function ensureSharpCompat(
   return buffer;
 }
 
+// x265 sizes its worker pool to the CPU count, and most of the address space a
+// capped 24 MP encode needs is per-thread reservation (#5266). Pinned only
+// under SUBPROCESS_MEMORY_LIMIT_MB so an uncapped install keeps full speed.
+export const CAPPED_HEIF_ENC_THREADS = 2;
+
+function heifEncThreadArgs(): string[] {
+  const mb = Number.parseInt(process.env.SUBPROCESS_MEMORY_LIMIT_MB ?? "", 10);
+  return mb > 0 ? ["-p", `x265:pools=${CAPPED_HEIF_ENC_THREADS}`] : [];
+}
+
 export async function encodeHeic(buffer: Buffer, quality = 80): Promise<Buffer> {
   const id = `${process.pid}-${randomUUID()}`;
   const inputPath = join(tmpdir(), `heic-in-${id}.png`);
@@ -323,7 +333,14 @@ export async function encodeHeic(buffer: Buffer, quality = 80): Promise<Buffer> 
   try {
     await writeTempExclusive(inputPath, buffer);
     await execFileAsync(
-      ...wrapWithMemoryLimit("heif-enc", ["-q", String(quality), "-o", outputPath, inputPath]),
+      ...wrapWithMemoryLimit("heif-enc", [
+        "-q",
+        String(quality),
+        ...heifEncThreadArgs(),
+        "-o",
+        outputPath,
+        inputPath,
+      ]),
       { timeout: 120_000 },
     ).catch((err: unknown) => {
       throw asDecoderUnavailable(asEncoderOutOfMemory(err));

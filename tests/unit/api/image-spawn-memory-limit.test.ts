@@ -147,7 +147,7 @@ for a; do last=$a; done
   });
 
   it("caps heif-enc", async () => {
-    shim("heif-enc", `/bin/cp "${PNG_PATH}" "$4"`);
+    shim("heif-enc", `/bin/cp "${PNG_PATH}" "$6"`);
 
     const out = await encodeHeic(PNG, 80);
 
