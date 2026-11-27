@@ -40,19 +40,43 @@ function effectiveTarget(u: URL): string {
   return JSON.stringify([normalizedHost, port, u.pathname]);
 }
 
-// node-postgres takes ?user= and ?password= over the userinfo. WHATWG URL keeps
-// userinfo percent-encoded (a password like "p@ss" arrives as "p%40ss"), while
-// searchParams are already decoded.
-function effectiveUser(u: URL): string {
-  return lastParam(u, "user") || decodeURIComponent(u.username);
-}
-
-function effectivePassword(u: URL): string {
-  return lastParam(u, "password") || decodeURIComponent(u.password);
-}
-
 function sameTarget(a: URL, b: URL): boolean {
   return effectiveTarget(a) === effectiveTarget(b);
+}
+
+// node-postgres (pg-connection-string's parse) re-encodes the whole string
+// before handing it to WHATWG URL when it holds a space or a % that isn't a
+// valid escape. Parse the same way, or a password like "p%zzw" or "p%2aw x"
+// gets provisioned differently from what the pool later logs in with.
+function parseAsNodePostgres(url: string): URL {
+  const normalized = / |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(url)
+    ? encodeURI(url).replace(/%25(\d\d)/g, "%$1")
+    : url;
+  return new URL(normalized);
+}
+
+// WHATWG URL keeps userinfo percent-encoded, so a password like "p@ss" arrives
+// as "p%40ss" and has to be decoded before it can be used to log in. An escape
+// that isn't valid UTF-8 (say "%ff") would otherwise surface as a bare URIError.
+function decodeUserinfo(value: string, envVar: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new SafeError(
+      `${envVar} has a percent-encoded username or password that is not valid UTF-8.`,
+      { kind: "operational", statusCode: 500 },
+    );
+  }
+}
+
+// node-postgres takes ?user= and ?password= over the userinfo. searchParams are
+// already decoded, so only the userinfo needs decodeUserinfo.
+function effectiveUser(u: URL, envVar: string): string {
+  return lastParam(u, "user") || decodeUserinfo(u.username, envVar);
+}
+
+function effectivePassword(u: URL, envVar: string): string {
+  return lastParam(u, "password") || decodeUserinfo(u.password, envVar);
 }
 
 export function resolveRoleSplit(runtimeUrl: string, migrationUrl: string): RoleSplit {
@@ -64,11 +88,11 @@ export function resolveRoleSplit(runtimeUrl: string, migrationUrl: string): Role
     return { active: false, reason: "not-configured", migrationUrl: runtimeUrl };
   }
 
-  const runtime = new URL(runtimeUrl);
-  const runtimeRole = effectiveUser(runtime);
-  const runtimePassword = effectivePassword(runtime);
+  const runtime = parseAsNodePostgres(runtimeUrl);
+  const runtimeRole = effectiveUser(runtime, "DATABASE_URL");
+  const runtimePassword = effectivePassword(runtime, "DATABASE_URL");
 
-  const migration = new URL(migrationUrl);
+  const migration = parseAsNodePostgres(migrationUrl);
   if (!sameTarget(runtime, migration)) {
     throw new SafeError(
       "DATABASE_URL and DATABASE_MIGRATION_URL must point at the same database (host, port, and database name). Migrating one database while serving another would silently diverge.",
@@ -76,7 +100,7 @@ export function resolveRoleSplit(runtimeUrl: string, migrationUrl: string): Role
     );
   }
 
-  if (effectiveUser(migration) === runtimeRole) {
+  if (effectiveUser(migration, "DATABASE_MIGRATION_URL") === runtimeRole) {
     return { active: false, reason: "same-role", migrationUrl };
   }
 
