@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, bunların ne zaman gönderildiği, ilk çalıştırma seçiminin nasıl işlediği ve örnek genelindeki ürün analizinin nasıl kapatılacağı."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 62ffb1f8c988
+i18n_output_hash: 66c302d1d3ab
 i18n_hash_version: 2
 ---
 
@@ -22,7 +22,7 @@ Bu istem gelmeden önce zaten çalışmakta olan bir örneğe sorulmaz. Sahip ol
 
 - tool_used: araç kimliği, durum, süre, kategori, AI aracı olup olmadığı, başarısızlıkta bir hata kodu ve bir aşamayı ayrı bildiren araçlar için adım adı (Passport Photo'nun analiz adımı).
 - pipeline_executed: adım sayısı, araç kimlikleri, toplu işlem bayrağı, dosya sayısı, süre, durum.
-- ai_bundle_action: paket kimliği, eylem (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment`, `imported`), süre ve başarısız bir kurulumda sabit bir listeden hata kategorisi (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout`, `other`). Yükleyici çıktısı, yollar ve hata mesajları asla gönderilmez.
+- ai_bundle_action: paket kimliği, eylem (`install_started`, `installed`, `install_failed`, `uninstalled`, `reset_environment` veya `imported`), süre ve başarısız bir kurulumda sabit bir listeden hata kategorisi (`oom`, `network`, `disk`, `checksum`, `cpu_unsupported`, `timeout` veya `other`). Yükleyici çıktısı, yollar ve hata mesajları asla gönderilmez.
 - Frontend kullanımı: hangi araç sayfalarının açıldığı, eklenen dosyalar (yalnızca sayılar), başlatılan araç, indirmeler, kaydetmeler, arama (yalnızca sonuç sayısı), işlenen toplu işlem.
 - Çökme raporları: hata türü, temizlenmiş bir hata mesajı (dosya adları, yollar, e-postalar ve tırnak içindeki değerler çıkarılmış), dosya temel adlarını içeren bir kaynak yığını ve AI araçları için yalnızca dosya temel adlarını içeren bir Python traceback'i.
 

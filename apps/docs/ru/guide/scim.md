@@ -1,7 +1,7 @@
 ---
 description: "Настройка провижининга SCIM 2.0 для синхронизации пользователей и групп из вашего поставщика идентификации в SnapOtter. Охватывает Okta, Azure AD / Entra ID и пользовательские интеграции."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
 i18n_output_hash: 8cf99a7b9e10
 i18n_hash_version: 2
 ---

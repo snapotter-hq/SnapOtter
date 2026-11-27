@@ -1,8 +1,8 @@
 ---
 description: "Kullanıcıları ve grupları kimlik sağlayıcınızdan SnapOtter'a senkronize etmek için SCIM 2.0 sağlamayı kurun. Okta, Azure AD / Entra ID ve özel entegrasyonları kapsar."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: 36ca6db5288b
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: be0459c7dbe2
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ SCIM sağlaması, `scim` özelliğine sahip bir **enterprise** lisansı gerektir
 
 - Genel bir URL üzerinden erişilebilen, çalışan bir SnapOtter örneği
 - `scim` özelliğine sahip bir enterprise lisans anahtarı
-- Tam etkili izin setine sahip yerleşik bir SnapOtter `admin` hesabı. Yetki verilen özel bir rol veya herhangi bir yönetici izninin eksik olduğu bir yönetici API anahtarı, genel SCIM belirtecini oluşturamaz veya iptal edemez.
+- Tam etkili izin setine sahip yerleşik bir SnapOtter `admin` hesabı. Yetki verilen özel bir rol veya herhangi bir yönetici izninin eksik olduğu bir yönetici API anahtarı, genel SCIM token'ını oluşturamaz veya iptal edemez.
 - Kimlik sağlayıcınızın sağlama ayarlarına admin erişimi
 
 ## Hızlı başlangıç {#quick-start}
@@ -50,19 +50,19 @@ SCIM uç noktaları, kullanıcı oturumlarından ve API anahtarlarından ayrı, 
 
 ### Token oluşturma {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` yeni bir SCIM belirteci oluşturur. Belirteç, örnekteki kullanıcıların temel hazırlığını yapıp değiştirebildiğinden, bu uç nokta, tam etkin yönetici izin kümesiyle birlikte yerleşik `admin` rolünü gerektirir. `users:manage`'yi özel bir rolde tutmak yeterli değildir.
+`POST /api/v1/enterprise/scim/token` yeni bir SCIM token'ı oluşturur. Token, örnekteki kullanıcıları sağlayıp değiştirebildiğinden, bu uç nokta, tam etkili yönetici izin kümesine sahip yerleşik `admin` rolünü gerektirir. `users:manage` iznini özel bir rolde tutmak yeterli değildir.
 
 Token düz metin olarak yalnızca bir kez döndürülür. SnapOtter yalnızca bir scrypt karması saklar. Token'ı kaybederseniz iptal edin ve yeni bir tane oluşturun.
 
 Aynı anda yalnızca bir SCIM token etkindir. Yeni bir token oluşturmak öncekinin yerini alır.
 
-::: warning Yükseltme sonrasında jetonun yeniden düzenlenmesi
-Eski sürümlenmemiş SCIM belirteçleri reddedilir. `so_scim_v2_...` belirteçleri veren bir sürüme yükselttikten sonra, yeni bir belirteç oluşturun ve tedariği sürdürmeye devam etmeden önce kimlik sağlayıcınızı güncelleyin.
+::: warning Yükseltme sonrasında token'ın yeniden oluşturulması
+Eski sürümlenmemiş SCIM token'ları reddedilir. `so_scim_v2_...` token'ları veren bir sürüme yükselttikten sonra, yeni bir token oluşturun ve sağlamayı sürdürmeden önce kimlik sağlayıcınızı güncelleyin.
 :::
 
 ### Token iptali {#revoking-a-token}
 
-`DELETE /api/v1/enterprise/scim/token`, mevcut SCIM belirtecini iptal eder. Belirteç oluşturmayla aynı tam yerleşik yönetici gereksinimine sahiptir.
+`DELETE /api/v1/enterprise/scim/token` mevcut SCIM token'ını iptal eder. Token oluşturmayla aynı tam yerleşik yönetici gereksinimine sahiptir.
 
 ### Hız sınırlama {#rate-limiting}
 
@@ -145,7 +145,7 @@ Kullanıcı artık oturum açamaz veya herhangi bir API anahtarı kullanamaz. Ve
 
 ### Kullanıcıyı yeniden etkinleştirme {#reactivate-user}
 
-Daha önce devre dışı bırakılmış bir kullanıcıyı yeniden etkinleştirmek için `active: true` içeren bir `PUT` veya `PATCH` isteği gönderin. SnapOtter, devre dışı bırakmadan önceki orijinal rolü geri yükler (örn. `disabled:editor` yeniden `editor` olur). Orijinal rol belirlenemezse `user` değerine geri döner.
+Daha önce devre dışı bırakılmış bir kullanıcıyı yeniden etkinleştirmek için `PUT` veya `PATCH` isteğini `active: true` ile gönderin. SnapOtter, devre dışı bırakmadan önceki orijinal rolü geri yükler (örn. `disabled:editor` yeniden `editor` olur). Orijinal rol belirlenemezse `user` değerine geri döner.
 
 ::: details Örnek: PATCH ile devre dışı bırakma ve yeniden etkinleştirme
 ```json
@@ -284,7 +284,7 @@ SCIM isteği bir `Authorization: Bearer <token>` başlığı içermiyordu. IdP'n
 
 ### 401 "Invalid token" {#_401-invalid-token}
 
-Belirteç hatalı biçimlendirilmiş, kullanımdan kaldırılmış sürümsüz biçimi kullanıyor veya depolanan karma ile eşleşmiyor. Geçerli bir `so_scim_v2_...` belirteci oluşturun ve belirteci IdP'nizin sağlama ayarlarınızda güncelleyin.
+Token hatalı biçimlendirilmiş, kullanımdan kaldırılmış sürümsüz biçimi kullanıyor veya depolanan karma ile eşleşmiyor. Geçerli bir `so_scim_v2_...` token'ı oluşturun ve token'ı IdP'nizin sağlama ayarlarında güncelleyin.
 
 ### 401 "SCIM not configured" {#_401-scim-not-configured}
 
@@ -304,9 +304,9 @@ SCIM DELETE bir yumuşak devre dışı bırakmadır. Devre dışı bırakılan k
 
 ### `externalId` filtresi OIDC veya SAML ile oturum açan bir kullanıcıyı atlıyor {#recover-scim-ids-in-oidc-or-saml-users}
 
-SCIM `externalId` kendi sütununu (`users.scim_external_id`) almadan önce, bir OIDC veya SAML oturum açmasının zaten bağladığı bir kullanıcı üzerinde yapılan SCIM `PUT` veya `PATCH` işlemi SCIM kimliğini o kullanıcının oturum açma kimliğine yazıyordu. Yükseltme geçişi bu değeri gerçek bir OIDC subject'inden veya SAML NameID'sinden ayırt edemediği için o kullanıcılara dokunmaz. Onlar için, IdP `externalId` taşıyan başka bir güncelleme gönderene kadar `filter=externalId eq "..."` hiçbir şey döndürmez.
+SCIM `externalId` kendi sütununu (`users.scim_external_id`) almadan önce, bir OIDC veya SAML oturum açmasının zaten bağladığı bir kullanıcı üzerinde yapılan SCIM `PUT` veya `PATCH` işlemi SCIM kimliğini o kullanıcının oturum açma kimliğine yazıyordu. Yükseltme geçişi bu değeri gerçek bir OIDC subject'inden veya SAML NameID'sinden ayırt edemediği için o kullanıcılara dokunmaz. Onlar için `filter=externalId eq "..."`, IdP `externalId` taşıyan başka bir güncelleme gönderene kadar hiçbir şey döndürmez.
 
-IdP'yi beklemek istemiyorsanız, denetim günlüğü kimliği doğrulayabilir. SCIM, her kullanıcıyı hangi `externalId` ile oluşturduğunu içeren bir `SCIM_USER_PROVISIONED` satırı yazar. `scim_external_id` sütununu içeren bir sürüme geçtiğinizde, SnapOtter veritabanına `psql` ile bağlanın ([hesap kurtarma kılavuzu](./account-recovery.md#older-images-and-fallbacks) her iki kurulum için nasıl yapılacağını gösterir) ve oturum açma kimliği hâlâ o kimliğe eşit olan kullanıcıları önizleyin:
+IdP'yi beklemek istemiyorsanız, denetim günlüğü kimliği doğrulayabilir. SCIM bir `SCIM_USER_PROVISIONED` satırı yazar; satır, her kullanıcının oluşturulduğu `externalId` değerini içerir. `scim_external_id` sütununu içeren bir sürüme geçtiğinizde, SnapOtter veritabanına `psql` ile bağlanın ([hesap kurtarma kılavuzu](./account-recovery.md#older-images-and-fallbacks) her iki kurulum için nasıl yapılacağını gösterir) ve oturum açma kimliği hâlâ o kimliğe eşit olan kullanıcıları önizleyin:
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id

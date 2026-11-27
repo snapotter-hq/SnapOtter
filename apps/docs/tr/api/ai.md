@@ -1,13 +1,14 @@
 ---
 description: "Tüm yerel ML araçlarını içeren AI motoru referansı. Arka plan kaldırma, büyütme, OCR, yüz algılama, fotoğraf onarımı ve daha fazlası."
-i18n_output_hash: 36dcadbcc0c0
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: bca97efb521e
+i18n_hash_version: 2
 ---
 
 # AI Motoru Referansı {#ai-engine-reference}
 
-`@snapotter/ai` paketi, yerel ML işlemleri için yerel araçları ve Python çalışma zamanlarını koordine eder. Çoğu ML aleti, hızlı ısınma başlatmaları için kalıcı bir Python sidecar kullanır. OCR kasıtlı olarak ayrıdır: `fast`, yerel Tesseract ikili dosyasını çağırırken, `balanced` ve `best`, `/data/ai/v3` altında aktif değişmez RapidOCR nesline sabitlenmiş özel bir kalıcı JSONL dispatcher kullanır. Her istek bir generation lease içerir. Yükseltme sırasında SnapOtter, etkinleştirmeden önce aday üzerinde bir smoke test çalıştırır, atomik olarak yeni dispatcher'ye geçer ve ardından garbage collection'den önce eski nesli boşaltır.
+`@snapotter/ai` paketi, yerel ML işlemleri için yerel araçları ve Python çalışma zamanlarını koordine eder. Çoğu ML aracı, hızlı sıcak başlangıçlar için kalıcı bir Python sidecar kullanır. OCR kasıtlı olarak ayrıdır: `fast` yerel Tesseract ikili dosyasını çağırırken `balanced` ve `best`, `/data/ai/v3` altındaki aktif değişmez RapidOCR nesline sabitlenmiş özel bir kalıcı JSONL dispatcher kullanır. Her istek bir generation lease içerir. Yükseltme sırasında SnapOtter, etkinleştirmeden önce aday üzerinde bir smoke test çalıştırır, atomik olarak yeni dispatcher'a geçer ve ardından garbage collection'dan önce eski nesli boşaltır.
 
 NVIDIA CUDA, onu destekleyen çalışma zamanları tarafından otomatik olarak algılanır ve kullanılır. OCR, NVIDIA GPU'lu sistemler dahil her ana bilgisayarda CPU kullanır; böylece bu araç için CUDA ve sürücü bağımlılığından kaçınılır.
 
@@ -15,12 +16,6 @@ VA-API, Quick Sync veya OpenCL üzerinden Intel/AMD iGPU hızlandırma bugün AI
 
 Dört modalite (image, audio, video, document) genelinde 19 Python sidecar AI aracı, artı isteğe bağlı AI yetenekleri olan 2 araç. Tüm modeller yerel olarak çalışır; ilk model indirmesinden sonra internet gerekmez.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Korece OCR uyumluluğu
-Hızlı OCR `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) ve Arapçayı (`ar`) desteklemez. Korece ve Arapça için doğru OCR paketi ve `balanced` ya da `best` gerekir. Paket resmi Linux amd64 ve arm64 kapsayıcılarında, OCR’nin CPU’da kaldığı NVIDIA ana bilgisayarları dahil çalışır. Desteklenmeyen sistemler Korece ve Arapça için açık bir uyumluluk hatası alır ve sessizce `fast` seçeneğine dönülmez. Korece veya Arapça ile `fast` veya eski `tesseract` diğer adı kuyruk öncesinde `FEATURE_INCOMPATIBLE` ve `fast-korean-unsupported` ile reddedilir.
-:::
-<!-- korean-ocr-contract:end -->
 ## Mimari {#architecture}
 
 ```
@@ -58,11 +53,11 @@ Ayrı bir "docs" dispatcher profili, AI izin listesini belge işleme betikleriyl
 
 ## Özellik Paketleri {#feature-bundles}
 
-AI modelleri, araç başına bir arşiv olarak değil, paylaşılan bağımlılık yığınına göre paketlenir. Bir özellik paketi, araçlar aynı model ailesini, Python wheel'lerini veya yerel kütüphaneleri kullandığında birden fazla aracı etkinleştirebilir. Bu, yayın Docker imgesini daha küçük tutar ve aynı arka plan matlama, yüz algılama, OCR, onarım ve konuşma modellerinin yinelenen kopyalarının saklanmasını önler.
+AI modelleri, araç başına bir arşiv olarak değil, paylaşılan bağımlılık yığınına göre paketlenir. Bir özellik paketi, araçlar aynı model ailesini, Python wheel'lerini veya yerel kütüphaneleri kullandığında birden fazla aracı etkinleştirebilir. Bu, yayın Docker imajını daha küçük tutar ve aynı arka plan matlama, yüz algılama, OCR, onarım ve konuşma modellerinin yinelenen kopyalarının saklanmasını önler.
 
-Docker imgesi, uygulamayı artı ortak çalışma zamanını içerir. Büyük model arşivleri, talep üzerine kalıcı `/data/ai` birimine indirilir, ardından ihtiyaç duyan her araç tarafından yeniden kullanılır. Bir paket, başka bir araç ihtiyaç duyduğu için zaten yüklüyse, ona bağımlı yeni bir aracı etkinleştirmek o paketi tekrar indirmez.
+Docker imajı, uygulamayı artı ortak çalışma zamanını içerir. Büyük model arşivleri, talep üzerine kalıcı `/data/ai` birimine indirilir, ardından ihtiyaç duyan her araç tarafından yeniden kullanılır. Bir paket, başka bir araç ihtiyaç duyduğu için zaten yüklüyse, ona bağımlı yeni bir aracı etkinleştirmek o paketi tekrar indirmez.
 
-Çoğu AI aracının çalıştırılmadan önce bir veya daha fazla özellik paketine ihtiyacı vardır. Yönetici kullanıcı arayüzü bunları `POST /api/v1/admin/tools/:toolId/features/install` aracılığıyla araçla yükler; bu, tam paket listesini çözer, önceden yüklenmiş olan paketleri atlar ve yalnızca eksik indirmeleri sıraya koyar. Örneğin, yeni bir örnekte Pasaport Fotoğrafını etkinleştirmek `background-removal` ve `face-detection` sıralarını oluşturur; Arka Plan Kaldırma zaten yüklendikten sonra etkinleştirildiğinde yalnızca `face-detection` sıraya alınır. OCR bir istisnadır çünkü `fast`'nin pakete ihtiyacı yoktur; isteğe bağlı doğru çalışma süresini kullanıcı arayüzü veya `POST /api/v1/admin/features/ocr/install` aracılığıyla yükleyin.
+Çoğu AI aracı, çalıştırılmadan önce bir veya daha fazla özellik paketi gerektirir. Yönetici arayüzü bunları araç bazında `POST /api/v1/admin/tools/:toolId/features/install` üzerinden yükler; bu, tam paket listesini çözer, zaten yüklü paketleri atlar ve yalnızca eksik indirmeleri sıraya koyar. Örneğin, yeni bir örnekte Passport Photo'yu etkinleştirmek `background-removal` ve `face-detection` paketlerini sıraya koyar; Background Removal zaten yüklüyken etkinleştirmek yalnızca `face-detection` paketini sıraya koyar. OCR bir istisnadır çünkü `fast` için paket gerekmez; isteğe bağlı doğru çalışma zamanını arayüzden veya `POST /api/v1/admin/features/ocr/install` ile yükleyin.
 
 | Paket | Boyut | CPU bellek tabanı | Paylaşılan bağımlılık grubu | Onu kullanan araçlar |
 |--------|------|------------------|-------------------------|-------------------|
@@ -72,7 +67,7 @@ Docker imgesi, uygulamayı artı ortak çalışma zamanını içerir. Büyük mo
 | `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB boş) | Stable Diffusion 1.5 yüksek kaliteli inpainting | erase-object (`qualityMode: "hq"`) |
 | `upscale-enhance` | 5-6 GB | 4 GB RAM (~2,5 GB boş) | RealESRGAN, GFPGAN / CodeFormer, gürültü giderme | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB boş) | çizik onarımı ve restorasyon hattı | restore-photo |
-| `ocr` | ~208-234 MiB indir / ~409-488 MiB kuruldu | Yapılandırılmış 4 GiB etkin bellek (`fast` 2 GB ile çalışır) | İsteğe bağlı RapidOCR 3.9.1, ONNX Runtime 1.20.1 ve sabitlenmiş PP-OCR modelleri | ocr, ocr-pdf (yalnızca `balanced` ve `best`) |
+| `ocr` | ~208-234 MiB indirme / ~409-488 MiB kurulu | Yapılandırılmış 4 GiB etkin bellek (`fast` 2 GB ile çalışır) | İsteğe bağlı RapidOCR 3.9.1, ONNX Runtime 1.20.1 ve sabitlenmiş PP-OCR modelleri | ocr, ocr-pdf (yalnızca `balanced` ve `best`) |
 | `transcription` | ~600 MB | 4 GB RAM (~2 GB boş) | faster-whisper konuşmadan metne modelleri | transcribe-audio, auto-subtitles |
 
 Çapraz paket bağımlılıkları olan araçlar:
@@ -82,13 +77,17 @@ Docker imgesi, uygulamayı artı ortak çalışma zamanını içerir. Büyük mo
 | `passport-photo` | `background-removal`, `face-detection` | Arka planı kaldırır, ardından kırpmayı pasaport ve kimlik fotoğrafı kurallarına göre çerçevelemek için yüz işaret noktalarını kullanır. |
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Seçilen yüz bölgelerinde GFPGAN veya CodeFormer iyileştirmesini çalıştırmadan önce yüzleri algılar. |
 
-Bir araç yalnızca OCR hariç gerekli tüm paketler yüklendiğinde kullanılabilir: yerleşik `fast` katmanı, isteğe bağlı OCR paketi olmadan kullanılabilir durumda kalır. Kısmi kurulumlar geçerlidir ve artımlı olarak işlenir: kurulu paketler yeniden kullanılır, eksik paketler indirmeler olarak gösterilir ve sıraya alınmış kurulumlar birer birer çalıştırılır, böylece paylaşılan Python ortamı aynı anda değiştirilmez.
+Bir araç yalnızca gerekli tüm paketler yüklendiğinde kullanılabilir, OCR hariç: yerleşik `fast` katmanı, isteğe bağlı OCR paketi olmadan kullanılabilir durumda kalır. Kısmi kurulumlar geçerlidir ve artımlı olarak işlenir: kurulu paketler yeniden kullanılır, eksik paketler indirmeler olarak gösterilir ve sıraya alınmış kurulumlar birer birer çalıştırılır, böylece paylaşılan Python ortamı aynı anda değiştirilmez.
+
+### Ayna üzerinden indirme {#downloading-through-a-mirror}
+
+Paket arşivleri ve doğru OCR çalışma zamanı huggingface.co üzerinden indirilir. Bu ana bilgisayarın engellendiği veya yavaş olduğu yerlerde, uygulama konteynerinde `HF_ENDPOINT` değerini bir Hugging Face aynasına ayarlayın, örneğin `HF_ENDPOINT=https://hf-mirror.com`. Her paket indirmesi ve OCR çalışma zamanı bunu kullanır; yedek indirici ve bir kurulum hatasındaki elle indirme bağlantısı da buna dahildir. Kimlik bilgisi içermeyen bir `https` URL'si kullanın; OCR çalışma zamanı kurulumu bunun dışındaki her şeyi reddeder. Bütünlük aynaya bağlı değildir: her paket arşivi SHA-256 değerine karşı denetlenir ve OCR çalışma zamanı dizini imzalıdır, bu yüzden değiştirilmiş dosyalar sunan bir ayna kurulumun başarısız olmasına yol açar. İstisna `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: eksik bir model ağırlığını dolduran çalışma zamanı indirmeleri de `HF_ENDPOINT` kullanır ve bu ağırlıklar sağlama toplamıyla doğrulanmaz, bu yüzden ikisini yalnızca güvendiğiniz bir aynayla birlikte kullanın. Sunucu internete bunun yerine bir proxy üzerinden ulaşıyorsa [Giden proxy ve özel CA](/tr/guide/deployment#outbound-proxy-and-private-ca) bölümüne bakın.
 
 ### Tüm paketleri tek seferde yükleme {#installing-every-bundle-at-once}
 
-Settings > AI Features bölümünde, ana bilgisayarın çalıştırabildiği her paketi sıraya koyan bir **Install All** düğmesi vardır. Zaten yüklü olan her şeyi atlar, ana bilgisayarla uyumsuz olarak bildirilen paketleri atlar ve başarısız olan bir paketi devam etmeden önce bir kez yeniden dener. Normal bir kurulum için o düğme tek başına yeterlidir; aşağıdakilerin hiçbirine gerek yoktur.
+Settings, AI Features bölümünde, ana bilgisayarın çalıştırabildiği her paketi sıraya koyan bir **Install All** düğmesi vardır. Zaten yüklü olan her şeyi atlar, ana bilgisayarla uyumsuz olarak bildirilen paketleri atlar ve başarısız olan bir paketi devam etmeden önce bir kez yeniden dener. Normal bir örnek için o düğme tek başına yeterlidir; aşağıdakilerin hiçbirine gerek yoktur.
 
-Önce disk bütçesini ayırın. Paketler kurulduğunda birlikte yaklaşık 20-25 GB yer kaplar ve imgenin içine değil, veri birimindeki `/data/ai` dizinine inerler; böylece `docker compose down` ve konteynerin yeniden oluşturulmasından sonra da kalırlar. Bunları yükseltme başına değil, ana bilgisayar başına bir kez yüklersiniz.
+Önce disk bütçesini ayırın. Paketler kurulduğunda birlikte yaklaşık 20-25 GB yer kaplar ve imajın içine değil, veri biriminde `/data/ai` dizinine inerler; böylece `docker compose down` ve konteynerin yeniden oluşturulmasından sonra da kalırlar. Bunları yükseltme başına değil, ana bilgisayar başına bir kez yüklersiniz.
 
 Kimsenin hiçbir şeye tıklamayacağı gözetimsiz sağlama için, her paketi bir yönetici API anahtarıyla yükleme uç noktasına POST edin. Sunucu bunları sıraya koyar, bu yüzden sekizini de beklemeden gönderin:
 
@@ -101,25 +100,25 @@ for b in background-removal face-detection object-eraser-colorize inpaint-hq \
 done
 ```
 
-Her çağrı, bir `jobId` ve bir `queued` bayrağıyla birlikte `202` döndürür: hemen başlayan için `false`, geri kalanlar için `true`. Zaten yüklü olan bir paket `409` döndürür ve yok sayılması güvenlidir; bu da döngünün yeniden çalıştırılabilir olmasını sağlar. İlerleme için `GET /api/v1/features` sorgulayın; çalışma bittiğinde her paket `installed` olarak okunur.
+Her çağrı, bir `202` ve bir `jobId` bayrağıyla birlikte `queued` döndürür: hemen başlayan için `false`, geri kalanlar için `true`. Zaten yüklü olan bir paket `409` döndürür ve yok sayılması güvenlidir; bu da döngünün yeniden çalıştırılabilir olmasını sağlar. İlerleme için `GET /api/v1/features` sorgulayın; çalışma bittiğinde her paket `installed` olarak okunur.
 
 Beklemeniz gereken iki şey var. `ocr` paketi bir ana bilgisayar uyumluluğu ön kontrolü çalıştırır ve imzalı minimumunun altındaki ana bilgisayarları reddeder, bu yüzden diğer yedisi başarılı olurken o başarısız olabilir (bkz. [Doğru OCR çalışma zamanı kurulumu](#accurate-ocr-runtime-installation)). Ayrıca herhangi bir yükleme sürerken `POST /api/v1/admin/features/reset` `409` döndürür, bu yüzden yarıda kalmış bir çalışmanın bitmesi ya da ortam silinmeden önce konteynerin yeniden başlatılması gerekir.
 
 ### Doğru OCR çalışma zamanı kurulumu {#accurate-ocr-runtime-installation}
 
-Doğru OCR paketi, resmi Linux amd64 veya Linux arm64 konteyneri için platforma özel bir çalışma zamanıdır. amd64 yapısı Python 3.12'yi kullanır; arm64 yapısı Python 3.11'i kullanır. Her iki yapı da ONNX Runtime'nin `CPUExecutionProvider`'si aracılığıyla RapidOCR'yi çalıştırır, dolayısıyla aynı paket yalnızca CPU ve NVIDIA Docker ana bilgisayarlarında çalışır. Doğru çalışma zamanı en az 4 GiB etkili bellek gerektirir: yapılandırılmış kapsayıcı cgroup sınırı, aksi takdirde ana bilgisayar belleği. İmzalı uyumluluk minimumunun altındaki bir sistem indirmeden önce reddedilir. Bu gereksinim yerleşik Fast OCR için geçerli değildir. Bare-metal yapıları, libc ve Python ABI güvenli bir şekilde çıkarılamadığından reddedilir; Ana bilgisayar Tesseract ve Ghostscript sağladığında hızlı OCR kullanılabilir durumda kalır.
+Doğru OCR paketi, resmi Linux amd64 veya Linux arm64 konteyneri için platforma özel bir çalışma zamanıdır. amd64 yapısı Python 3.12'yi kullanır; arm64 yapısı Python 3.11'i kullanır. Her iki yapı da ONNX Runtime'ın `CPUExecutionProvider` bileşeni aracılığıyla RapidOCR'yi çalıştırır, dolayısıyla aynı paket yalnızca CPU ve NVIDIA Docker ana bilgisayarlarında çalışır. Doğru çalışma zamanı en az 4 GiB etkili bellek gerektirir: yapılandırılmış konteyner cgroup sınırı, aksi takdirde ana bilgisayar belleği. İmzalı uyumluluk minimumunun altındaki bir sistem indirmeden önce reddedilir. Bu gereksinim yerleşik Fast OCR için geçerli değildir. Bare-metal yapıları, libc ve Python ABI güvenli bir şekilde çıkarılamadığından reddedilir; ana bilgisayar Tesseract ve Ghostscript sağladığında Fast OCR kullanılabilir durumda kalır. Fast; `auto`, `en`, `de`, `es`, `fr`, `zh` ve `ja` dillerini destekler, ancak Koreceyi (`ko`) desteklemez. Bu yüzden Korece, desteklenen bir doğru çalışma zamanı ve `balanced` ya da `best` katmanı gerektirir; desteklenmeyen ana bilgisayarlar sessiz bir Fast yedeği yerine açık bir uyumsuzluk yanıtı alır.
 
-İsteğe bağlı yapı, mimariye bağlı olarak yaklaşık 208-234 MiB sıkıştırılmış ve 409-488 MiB çıkartılmıştır. İmzalı dizin, yükleyici tarafından zorunlu kılınan sıkıştırılmış ve çıkartılmış bayt sayımlarını tam olarak bağlar. Yerleşik Tesseract, resmi görüntüye yaklaşık 25 MiB ekler ve `/data/ai`'de hiçbir dosyaya ihtiyaç duymaz.
+İsteğe bağlı yapıt, mimariye bağlı olarak yaklaşık 208-234 MiB sıkıştırılmış ve 409-488 MiB çıkartılmıştır. İmzalı dizin, yükleyici tarafından zorunlu kılınan sıkıştırılmış ve çıkartılmış bayt sayılarını tam olarak bağlar. Yerleşik Tesseract, resmi imaja yaklaşık 25 MiB ekler ve `/data/ai` içinde hiçbir dosyaya ihtiyaç duymaz.
 
-Çevrimiçi kurulum, imzalı bir sürüm dizinini ve geçerli platform için tam içerik adresli yapıyı getirir. SnapOtter, yeni nesli atomik olarak etkinleştirmeden önce Ed25519 dizin imzasını, yapı boyutunu, SHA-256 özetini, model özetlerini, yolları, dosya modlarını ve aşamalı smoke test'yi doğrular. Başarısız bir yükleme önceki sağlıklı nesli etkin bırakır.
+Çevrimiçi kurulum, imzalı bir sürüm dizinini ve geçerli platform için tam içerik adresli yapıtı getirir. SnapOtter, yeni nesli atomik olarak etkinleştirmeden önce Ed25519 dizin imzasını, yapıt boyutunu, SHA-256 özetini, model özetlerini, yolları, dosya modlarını ve aşamalı smoke test'i doğrular. Başarısız bir yükleme önceki sağlıklı nesli etkin bırakır.
 
-Hava boşluklu kurulum için, `index` ve `archive` adlı çok parçalı alanları kullanarak hem sürümün `ocr-runtime-index.json`'sini hem de eşleşen OCR çalışma zamanı arşivini `POST /api/v1/admin/features/import`'ye yükleyin. Çevrimdışı içe aktarma, çevrimiçi kurulumla aynı imza, karma, çıkarma, uyumluluk ve duman testi kontrollerini uygular; güvenilir imzalı dizini olmayan bir arşiv reddedilir.
+Hava boşluklu kurulum için, `ocr-runtime-index.json` ve `POST /api/v1/admin/features/import` adlı çok parçalı alanları kullanarak hem sürümün `index` dosyasını hem de eşleşen OCR çalışma zamanı arşivini `archive` adresine yükleyin. Çevrimdışı içe aktarma, çevrimiçi kurulumla aynı imza, karma, çıkarma, uyumluluk ve smoke test kontrollerini uygular; güvenilir imzalı dizini olmayan bir arşiv reddedilir.
 
 ---
 
 ## Arka Plan Kaldırma {#background-removal}
 
-**Araç rotası:** `remove-background`  
+**Araç rotası:** `remove-background`
 **Model:** BiRefNet (varsayılan) veya U2-Net varyantları ile rembg
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -140,7 +139,7 @@ Hava boşluklu kurulum için, `index` ve `archive` adlı çok parçalı alanlar�
 
 ## Arka Plan Değiştirme {#background-replace}
 
-**Araç rotası:** `background-replace`  
+**Araç rotası:** `background-replace`
 **Model:** rembg / BiRefNet (remove-background ile paylaşılır)
 
 Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
@@ -157,7 +156,7 @@ Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
 
 ## Arka Planı Bulanıklaştırma {#blur-background}
 
-**Araç rotası:** `blur-background`  
+**Araç rotası:** `blur-background`
 **Model:** rembg / BiRefNet (remove-background ile paylaşılır)
 
 Özneyi keskin tutarken arka planı bulanıklaştırır.
@@ -170,7 +169,7 @@ Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
 
 ## Görüntü Büyütme {#image-upscaling}
 
-**Araç rotası:** `upscale`  
+**Araç rotası:** `upscale`
 **Model:** RealESRGAN (kullanılamadığında Lanczos yedeği ile)
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -184,38 +183,38 @@ Arka planı kaldırır ve düz bir renk veya gradyanla değiştirir.
 
 ## OCR / Metin Çıkarma {#ocr-text-extraction}
 
-**Araç rotası:** `ocr`  
-**Modeller:** Tesseract (`fast`); PP-OCRv6 küçük modellerle (`balanced`) RapidOCR; Kalibre edilmiş varyant puanlamasına sahip PP-OCRv6 orta modeller (`best`)
+**Araç rotası:** `ocr`
+**Modeller:** Tesseract (`fast`); PP-OCRv6 küçük modellerle RapidOCR (`balanced`); kalibre edilmiş varyant puanlamasına sahip PP-OCRv6 orta modeller (`best`)
 
 | Parametre | Tür | Varsayılan | Açıklama |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
-| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. `fast` katmanı `ko` ve `ar` desteklemez. |
-| `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Hızlı doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. En İyi için Varsayılanlar Açıktır |
-| `engine` | string | - | Kullanımdan kaldırılan uyumluluk takma adı. `tesseract`'yi `fast`'ye ve eski `paddleocr` değerini `balanced`'ye eşler; PaddlePaddle yüklenmiyor |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen quality, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür |
+| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast, `ko` ve `ar` desteklemez |
+| `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Fast doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. Best için varsayılan olarak açıktır |
+| `engine` | string | - | Kullanımdan kaldırılmış uyumluluk takma adı. `tesseract` değerini `fast` değerine ve eski `paddleocr` değerini `balanced` değerine eşler; PaddlePaddle yüklemez |
 
-Çıkarılan metni artı kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `fast`'yi sessizce çalıştırmak yerine `FEATURE_NOT_INSTALLED` veya `FEATURE_INCOMPATIBLE`'yi döndürür. Korece veya Arapça ile açıkça `fast` veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` ve doğru pakete yönlendirme döndürülür.
+Çıkarılan metni ve kaynak meta verilerini döndürür: motor, istenen ve gerçek kalite, cihaz, sağlayıcı, bozulma durumu, uyarılar ve uygun olduğunda doğru çalışma zamanı/model sürümleri. Açık kalite istekleri hiçbir zaman başka bir katmana geri dönmez. `balanced` veya `best` kullanılamıyorsa API, `FEATURE_NOT_INSTALLED` değerini sessizce çalıştırmak yerine `FEATURE_INCOMPATIBLE` ya da `fast` döndürür. Korece ile açıkça Fast veya eski `tesseract` istendiğinde, iş kuyruğa alınmadan önce `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` ve doğru pakete yönlendirme döndürülür.
 
 ## PDF OCR {#pdf-ocr}
 
-**Araç rotası:** `ocr-pdf`  
+**Araç rotası:** `ocr-pdf`
 **Modeller:** Görüntü OCR ile aynı katman sistemi
 
 Yapay zeka destekli OCR kullanarak taranmış PDF belgelerinden sayfa sayfa metin çıkarır.
 
 | Parametre | Tür | Varsayılan | Açıklama |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen `quality`, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür. |
-| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. `fast` katmanı `ko` ve `ar` desteklemez. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamik | İşleme katmanı. Belirtilmeyen quality, kullanılabilir en yüksek katmanı şu sırayla seçer: `best`, `balanced`, `fast`. Korece ve Arapça için `fast` hiçbir zaman seçilmez; doğru bir katman yoksa doğru çalışma zamanı kurulumu veya uyumluluk hatası döndürülür |
+| `language` | string | `"auto"` | Dil: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast, `ko` ve `ar` desteklemez |
 | `pages` | string | `"all"` | Sayfa seçimi: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Hızlı doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. En İyi için Varsayılanlar Açıktır |
-| `engine` | string | - | Kullanımdan kaldırılan uyumluluk takma adı. `tesseract`'yi `fast`'ye ve eski `paddleocr` değerini `balanced`'ye eşler; PaddlePaddle yüklenmiyor |
+| `enhance` | boolean | Seviyeye bağlı | Yerel kontrastı iyileştirin. Fast doğrudan uygular; doğru katmanlar, yalnızca kalibre edilmiş puanlama OCR'yi iyileştirdiğinde varyantı korur. Best için varsayılan olarak açıktır |
+| `engine` | string | - | Kullanımdan kaldırılmış uyumluluk takma adı. `tesseract` değerini `fast` değerine ve eski `paddleocr` değerini `balanced` değerine eşler; PaddlePaddle yüklemez |
 
-Aynı sürüm düşürmeme ve Korece ve Arapça uyumluluk kuralları PDF OCR için de geçerlidir. PDF sayfaları tanınmadan önce rasterleştirilir ve bir istek en fazla 50 sayfa seçebilir.
+Aynı sürüm düşürmeme ve Korece ile Arapça uyumluluk kuralları PDF OCR için de geçerlidir. PDF sayfaları tanımadan önce rasterleştirilir ve bir istek en fazla 50 sayfa seçebilir.
 
 ## Yüz / PII Bulanıklaştırma {#face-pii-blur}
 
-**Araç rotası:** `blur-faces`  
+**Araç rotası:** `blur-faces`
 **Model:** MediaPipe yüz algılama
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -225,7 +224,7 @@ Aynı sürüm düşürmeme ve Korece ve Arapça uyumluluk kuralları PDF OCR iç
 
 ## Yüz İyileştirme {#face-enhancement}
 
-**Araç rotası:** `enhance-faces`  
+**Araç rotası:** `enhance-faces`
 **Modeller:** GFPGAN, CodeFormer
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -237,7 +236,7 @@ Aynı sürüm düşürmeme ve Korece ve Arapça uyumluluk kuralları PDF OCR iç
 
 ## AI Renklendirme {#ai-colorization}
 
-**Araç rotası:** `colorize`  
+**Araç rotası:** `colorize`
 **Model:** DDColor (OpenCV DNN yedeği ile)
 
 Siyah-beyaz veya gri tonlamalı fotoğrafları tam renge dönüştürür.
@@ -249,7 +248,7 @@ Siyah-beyaz veya gri tonlamalı fotoğrafları tam renge dönüştürür.
 
 ## Gürültü Giderme {#noise-removal}
 
-**Araç rotası:** `noise-removal`  
+**Araç rotası:** `noise-removal`
 **Model:** SCUNet (katmanlı gürültü giderme hattı)
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -292,7 +291,7 @@ Eski veya hasarlı fotoğraflar için çok adımlı hat: çizik/yırtık algıla
 
 ## Pasaport Fotoğrafı {#passport-photo}
 
-**Araç rotası:** `passport-photo`  
+**Araç rotası:** `passport-photo`
 **Modeller:** MediaPipe yüz işaret noktaları + BiRefNet arka plan kaldırma
 
 İki aşamalı iş akışı: analiz et (yüzü algıla + arka planı kaldır) ardından oluştur (kırp, yeniden boyutlandır, döşe). 6 bölgede 37+ ülkeyi destekler.
@@ -327,10 +326,13 @@ Aşama 1 sonuçlarını artı oluşturma ayarlarını içeren bir JSON gövdesi 
 | `landmarks` | object | (gerekli) | Aşama 1'den işaret noktaları |
 | `imageWidth` | number | (gerekli) | Aşama 1'den görüntü genişliği |
 | `imageHeight` | number | (gerekli) | Aşama 1'den görüntü yüksekliği |
+| `clientJobId` | string | (oluşturulur) | İlerleme akışı için kendi iş kimliğiniz |
+
+Oluşturma, kuyruğa alınmış bir iş olarak çalışır: eşzamanlı bekleme penceresi içinde sonuçla birlikte `200`, bundan sonra bir iş kimliğiyle `202`. Ayrıntılar için [Passport Photo](/tr/tools/image/passport-photo#phase-2-generate) bölümüne bakın.
 
 ## Nesne Silme (Inpainting) {#object-erasing-inpainting}
 
-**Araç rotası:** `erase-object`  
+**Araç rotası:** `erase-object`
 **Model:** ONNX Runtime üzerinden LaMa
 
 Maske, base64 olarak değil, **ikinci bir dosya parçası** (alan adı `mask`) olarak gönderilir. Maskedeki beyaz pikseller silinecek alanları belirtir. `format` ve `quality` ayarları üst düzey form alanları olarak gönderilir.
@@ -346,7 +348,7 @@ Bir NVIDIA GPU mevcut olduğunda CUDA hızlandırmalıdır.
 
 ## AI Tuval Genişletme {#ai-canvas-expand}
 
-**Araç rotası:** `ai-canvas-expand`  
+**Araç rotası:** `ai-canvas-expand`
 **Model:** LaMa tabanlı outpainting
 
 Bir görüntünün tuvalini herhangi bir yönde genişletir ve yeni alanları mevcut görüntüyle eşleşen AI tarafından üretilen içerikle doldurur.
@@ -365,7 +367,7 @@ En az bir genişletme yönü 0'dan büyük olmalıdır.
 
 ## Akıllı Kırpma {#smart-crop}
 
-**Araç rotası:** `smart-crop`  
+**Araç rotası:** `smart-crop`
 **Model:** MediaPipe yüz algılama (yalnızca yüz modu)
 
 | Parametre | Tür | Varsayılan | Açıklama |
@@ -396,7 +398,7 @@ Eski `mode` değerleri `attention` ve `content` kabul edilir ve sırasıyla `sub
 
 ## Sesi Yazıya Dök {#transcribe-audio}
 
-**Araç rotası:** `transcribe-audio`  
+**Araç rotası:** `transcribe-audio`
 **Model:** faster-whisper
 
 Konuşmayı metne dönüştürür. Düz metin, SRT ve VTT çıktı biçimlerini destekler.
@@ -408,7 +410,7 @@ Konuşmayı metne dönüştürür. Düz metin, SRT ve VTT çıktı biçimlerini 
 
 ## Otomatik Altyazılar {#auto-subtitles}
 
-**Araç rotası:** `auto-subtitles`  
+**Araç rotası:** `auto-subtitles`
 **Model:** faster-whisper (videodan sesi çıkarır, ardından yazıya döker)
 
 Bir videonun ses parçasından altyazı dosyaları oluşturur.
@@ -420,7 +422,7 @@ Bir videonun ses parçasından altyazı dosyaları oluşturur.
 
 ## PNG Saydamlık Düzeltici {#png-transparency-fixer}
 
-**Araç rotası:** `transparency-fixer`  
+**Araç rotası:** `transparency-fixer`
 **Model:** BiRefNet HR-matting (2048x2048 çözünürlük)
 
 Arka planın kaldırıldığı ancak arkada saçaklanma, hale veya yarı saydam kalıntılar bırakıldığı "sahte saydam" PNG'leri düzeltir. Temiz bir alfa kanalı üretmek için BiRefNet'in yüksek çözünürlüklü matlama modelini kullanır, ardından kenarlar boyunca renk kirlenmesini kaldırmak için yapılandırılabilir saçak giderme işlemi uygular.
@@ -448,7 +450,7 @@ Aşağıdaki araçlar Python sidecar araçları değildir ancak belirli seçenek
 
 ### Görüntü İyileştirme {#image-enhancement}
 
-**Araç rotası:** `image-enhancement`  
+**Araç rotası:** `image-enhancement`
 **Motor:** Analiz tabanlı (Sharp histogramı ve istatistikleri)
 
 Görüntüyü analiz eder ve pozlama, kontrast, beyaz dengesi, doygunluk, keskinlik ve gürültü için otomatik düzeltmeler uygular. Sahneye özgü modları destekler.
@@ -463,13 +465,13 @@ Görüntüyü analiz eder ve pozlama, kontrast, beyaz dengesi, doygunluk, keskin
 | `corrections.saturation` | boolean | `true` | Doygunluk düzeltmesi uygula |
 | `corrections.sharpness` | boolean | `true` | Keskinlik düzeltmesi uygula |
 | `corrections.denoise` | boolean | `true` | Gürültü giderme uygula |
-| `deepEnhance` | boolean | `false` | SCUNet üzerinden AI gürültü giderme etkinleştir (`upscale-enhance` paketi gerektirir) |
+| `deepEnhance` | boolean | `false` | SCUNet üzerinden AI gürültü gidermeyi etkinleştir (`upscale-enhance` paketi gerektirir) |
 
-`POST /api/v1/tools/image/image-enhancement/analyze` adresinde, algılanan düzeltmeleri uygulamadan döndüren ek bir analiz uç noktası mevcuttur.
+Algılanan düzeltmeleri uygulamadan döndüren ek bir analiz uç noktası `POST /api/v1/tools/image/image-enhancement/analyze` adresinde mevcuttur.
 
 ### İçerik Duyarlı Yeniden Boyutlandırma (Seam Carving) {#content-aware-resize-seam-carving}
 
-**Araç rotası:** `content-aware-resize`  
+**Araç rotası:** `content-aware-resize`
 **Motor:** Go `caire` ikilisi (Python değil, GPU avantajı yok)
 
 Düşük enerjili dikişleri kaldırarak veya ekleyerek görüntüleri akıllıca yeniden boyutlandırır, önemli içeriği korur. Her kenar, orijinal boyutunun en fazla 2 katına kadar büyüyebilir.

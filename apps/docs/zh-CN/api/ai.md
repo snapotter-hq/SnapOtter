@@ -1,26 +1,20 @@
 ---
 description: "AI 引擎参考，涵盖所有本地 ML 工具。抠图、放大、OCR、人脸检测、照片修复等。"
-i18n_output_hash: ff4f3f1c541b
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 56e946a56785
+i18n_hash_version: 2
 ---
 
 # AI 引擎参考 {#ai-engine-reference}
 
-`@snapotter/ai` 包协调本机工具和 Python 运行时以进行本地 ML 操作。 大多数 ML 工具使用持久的 Python sidecar 来实现快速热启动。 OCR 是故意分开的： `fast` 调用本机 Tesseract 二进制文件， 而 `balanced` 和 `best` 使用专用的持久性 JSONL dispatcher，固定到 `/data/ai/v3` 下的活动不可变 RapidOCR 代。 每个请求都包含一个 generation lease。 在升级期间，SnapOtter 在激活之前在候选者上运行 smoke test，自动切换到新的 dispatcher，然后在 garbage collection 之前耗尽旧代。
+`@snapotter/ai` 包协调本机工具和 Python 运行时以进行本地 ML 操作。大多数 ML 工具使用持久的 Python sidecar 来实现快速热启动。OCR 是故意分开的：`fast` 调用本机 Tesseract 二进制文件，而 `balanced` 和 `best` 使用专用的持久性 JSONL dispatcher，固定到 `/data/ai/v3` 下的活动不可变 RapidOCR 代。每个请求都包含一个 generation lease。在升级期间，SnapOtter 在激活之前在候选者上运行 smoke test，自动切换到新的 dispatcher，然后在 garbage collection 之前耗尽旧代。
 
-NVIDIA CUDA 由支持它的运行时自动检测和使用。 OCR 在每个主机上使用 CPU，包括具有 NVIDIA GPU 的系统，避免 CUDA 和该工具的驱动程序耦合。
+NVIDIA CUDA 由支持它的运行时自动检测和使用。OCR 在每个主机上使用 CPU，包括具有 NVIDIA GPU 的系统，避免 CUDA 和该工具的驱动程序耦合。
 
 目前不支持通过 VA-API、Quick Sync 或 OpenCL 使用 Intel/AMD 集成显卡加速 AI 推理。将 `/dev/dri` 映射到容器中并不会加速这些 Python 边车工具，除非有支持 CUDA 的 NVIDIA GPU 可用。
 
 19 个 Python 边车 AI 工具，覆盖四种模态（图像、音频、视频、文档），另有 2 个具备可选 AI 能力的工具。所有模型均在本地运行，首次下载模型后无需联网。
-
-
-<!-- korean-ocr-contract:start -->
-::: info 韩语 OCR 兼容性
-快速 OCR 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语 (`ko`) 和阿拉伯语 (`ar`)。韩语和阿拉伯语需要精确 OCR 包以及 `balanced` 或 `best`。该包可在官方 Linux amd64 和 arm64 容器上运行；即使是 NVIDIA 主机，OCR 仍使用 CPU。不受支持的系统会返回明确的兼容性错误，绝不会静默回退到 `fast`。韩语或阿拉伯语与 `fast` 或旧版 `tesseract` 别名的组合会在入队前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒绝。
-:::
-<!-- korean-ocr-contract:end -->
 
 ## 架构 {#architecture}
 
@@ -63,7 +57,7 @@ AI 模型按共享依赖栈打包，而不是每个工具一个归档。当多�
 
 Docker 镜像随附应用程序以及通用运行时。大型模型归档会按需下载到常驻的 `/data/ai` 卷中，然后供每个需要它的工具复用。如果某个包因为另一个工具需要而已经安装，那么启用一个新的依赖工具时不会再次下载该包。
 
-大多数人工智能工具都需要一个或多个功能包才能运行。 管理 UI 通过 `POST /api/v1/admin/tools/:toolId/features/install` 工具安装这些包，它解析完整的捆绑包列表，跳过已安装的捆绑包，并仅对缺少的下载进行排队。 例如，在新实例队列 `background-removal` 和 `face-detection` 上启用 Passport Photo； 在已安装后台删除后启用它仅排队 `face-detection`。 OCR 是例外，因为 `fast` 不需要包装； 通过 UI 或 `POST /api/v1/admin/features/ocr/install` 安装其可选的精确运行时。
+大多数 AI 工具都需要一个或多个功能包才能运行。管理 UI 通过 `POST /api/v1/admin/tools/:toolId/features/install` 按工具安装这些包，它会解析完整的功能包列表，跳过已安装的功能包，并仅将缺少的下载加入队列。例如，在全新实例上启用 Passport Photo 会将 `background-removal` 和 `face-detection` 加入队列；在已安装 Background Removal 之后启用它，则只会将 `face-detection` 加入队列。OCR 是例外，因为 `fast` 不需要包；请通过 UI 或 `POST /api/v1/admin/features/ocr/install` 安装其可选的精确运行时。
 
 | 功能包 | 大小 | CPU 内存下限 | 共享依赖组 | 使用它的工具 |
 |--------|------|------------------|-------------------------|-------------------|
@@ -83,7 +77,11 @@ Docker 镜像随附应用程序以及通用运行时。大型模型归档会按�
 | `passport-photo` | `background-removal`、`face-detection` | 先移除背景，然后使用人脸关键点将裁剪对齐到护照和证件照规则。 |
 | `enhance-faces` | `upscale-enhance`、`face-detection` | 在对选定的人脸区域运行 GFPGAN 或 CodeFormer 增强之前先检测人脸。 |
 
-仅当安装了工具所需的所有捆绑包（OCR 除外）后，该工具才可用：其内置 `fast` 层在没有可选 OCR 包的情况下仍然可用。 部分安装是有效的，并且是增量处理的：已安装的捆绑包被重用，丢失的捆绑包显示为下载，排队安装一次运行一个，因此共享的 Python 环境不会同时修改。
+仅当安装了工具所需的所有功能包（OCR 除外）后，该工具才可用：其内置 `fast` 层在没有可选 OCR 包的情况下仍然可用。部分安装是有效的，并且是增量处理的：已安装的功能包会被复用，缺少的功能包显示为下载，排队的安装一次运行一个，因此共享的 Python 环境不会被同时修改。
+
+### 通过镜像下载 {#downloading-through-a-mirror}
+
+功能包归档和精确 OCR 运行时都从 huggingface.co 下载。如果该主机被屏蔽或速度很慢，请在应用容器上将 `HF_ENDPOINT` 设置为 Hugging Face 镜像，例如 `HF_ENDPOINT=https://hf-mirror.com`。每个功能包的下载和 OCR 运行时都会使用它，包括回退下载器和安装错误中的手动下载链接。请使用不带凭据的 `https` URL；OCR 运行时安装会拒绝其他任何值。完整性不依赖镜像：每个功能包归档都会按其 SHA-256 校验，OCR 运行时索引已签名，因此提供被篡改文件的镜像会导致安装失败。例外是 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`：补全缺失模型权重的运行时下载同样使用 `HF_ENDPOINT`，而这些权重不做校验和验证，所以只应将两者与你信任的镜像搭配使用。如果服务器是通过代理访问互联网，请参见[出站代理与私有 CA](/zh-CN/guide/deployment#outbound-proxy-and-private-ca)。
 
 ### 一次性安装所有功能包 {#installing-every-bundle-at-once}
 
@@ -108,13 +106,13 @@ done
 
 ### 准确的 OCR 运行时安装 {#accurate-ocr-runtime-installation}
 
-准确的 OCR 包是官方 Linux amd64 或 Linux arm64 容器的特定于平台的运行时。 amd64 构建使用 Python 3.12； arm64 版本使用 Python 3.11。 两个版本都通过 ONNX Runtime 的 `CPUExecutionProvider` 运行 RapidOCR，因此同一包可在仅 CPU 和 NVIDIA Docker 主机上运行。 准确的运行时需要至少 4 GiB 的有效内存：配置的容器 cgroup 限制，否则为主机内存。 低于该签名兼容性最低值的系统在下载前会被拒绝。 此要求不适用于内置 Fast OCR。 Bare-metal 构建被拒绝，因为它们的 libc 和 Python ABI 无法安全推断； 当主机提供 Tesseract 和 Ghostscript 时，快速 OCR 保持可用。
+准确的 OCR 包是官方 Linux amd64 或 Linux arm64 容器的特定于平台的运行时。amd64 构建使用 Python 3.12；arm64 构建使用 Python 3.11。两个构建都通过 ONNX Runtime 的 `CPUExecutionProvider` 运行 RapidOCR，因此同一包可在仅 CPU 和 NVIDIA Docker 主机上运行。准确的运行时需要至少 4 GiB 的有效内存：配置的容器 cgroup 限制，否则为主机内存。低于该签名兼容性最低值的系统在下载前会被拒绝。此要求不适用于内置 Fast OCR。Bare-metal 构建被拒绝，因为它们的 libc 和 Python ABI 无法安全推断；当主机提供 Tesseract 和 Ghostscript 时，Fast OCR 保持可用。Fast 支持 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支持韩语（`ko`）。因此，韩语需要受支持的精确运行时以及 `balanced` 或 `best` 层级；不受支持的主机会收到明确的不兼容响应，而不是静默回退到 Fast。
 
-可选工件大约压缩 208-234 MiB 并提取 409-488 MiB，具体取决于架构。 签名索引绑定安装程序强制执行的精确压缩和提取字节计数。 内置 Tesseract 在官方镜像上增加了约25个 MiB，并且不需要`/data/ai`中的文件。
+可选工件大约压缩 208-234 MiB 并提取 409-488 MiB，具体取决于架构。签名索引绑定安装程序强制执行的精确压缩和提取字节计数。内置 Tesseract 在官方镜像上增加了约 25 MiB，并且不需要 `/data/ai` 中的文件。
 
-在线安装会获取已签名的版本索引以及当前平台的精确内容寻址工件。 SnapOtter 在原子激活新一代之前验证 Ed25519 索引签名、工件大小、SHA-256 摘要、模型摘要、路径、文件模式和暂存 smoke test。 失败的安装会使之前的健康生成保持活动状态。
+在线安装会获取已签名的版本索引以及当前平台的精确内容寻址工件。SnapOtter 在原子激活新一代之前验证 Ed25519 索引签名、工件大小、SHA-256 摘要、模型摘要、路径、文件模式和暂存 smoke test。失败的安装会使之前的健康生成保持活动状态。
 
-对于气隙安装，请使用名为 `index` 和 `archive` 的多部分字段将版本的 `ocr-runtime-index.json` 和匹配的 OCR 运行时存档上传到 `POST /api/v1/admin/features/import`。 离线导入应用与在线安装相同的签名、哈希、提取、兼容性和冒烟测试检查； 没有可信签名索引的存档将被拒绝。
+对于气隙安装，请将版本的 `ocr-runtime-index.json` 和匹配的 OCR 运行时存档上传到 `POST /api/v1/admin/features/import`，多部分字段分别名为 `index` 和 `archive`。离线导入应用与在线安装相同的签名、哈希、提取、兼容性和冒烟测试检查；没有可信签名索引的存档将被拒绝。
 
 ---
 
@@ -190,7 +188,7 @@ done
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 quality 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
 | `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。快速层不支持 `ko` 和 `ar` |
 | `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
 | `engine` | string | - | 已弃用的兼容性别名。将 `tesseract` 映射到 `fast`，并将旧版 `paddleocr` 值映射到 `balanced`；它不会加载 PaddlePaddle |
@@ -206,7 +204,7 @@ done
 
 | 参数 | 类型 | 默认值 | 说明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 `quality` 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 动态 | 处理层级。省略 quality 时会按 `best`、`balanced`、`fast` 的顺序选择可用的最高层级。韩语和阿拉伯语绝不会选择 `fast`；在没有可用的精确层级时，会返回精确运行时的安装或兼容性错误 |
 | `language` | string | `"auto"` | 语言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。快速层不支持 `ko` 和 `ar` |
 | `pages` | string | `"all"` | 页面选择：`"all"`、`"1-3"`、`"1,3,5"` |
 | `enhance` | boolean | 取决于层级 | 提高局部对比度。快速层直接应用；精确层级只有在校准评分能改善 OCR 时才保留该变体。Best 默认开启 |
@@ -328,6 +326,9 @@ done
 | `landmarks` | object | （必填） | 来自阶段 1 的关键点 |
 | `imageWidth` | number | （必填） | 来自阶段 1 的图像宽度 |
 | `imageHeight` | number | （必填） | 来自阶段 1 的图像高度 |
+| `clientJobId` | string | （自动生成） | 你自己的作业 ID，用于进度流 |
+
+生成作为排队作业运行：在同步等待窗口内完成时返回 `200` 并附带结果，超出窗口后返回 `202` 并附带作业 ID。详情参见[护照照片](/zh-CN/tools/image/passport-photo#phase-2-generate)。
 
 ## 对象擦除（图像修复） {#object-erasing-inpainting}
 

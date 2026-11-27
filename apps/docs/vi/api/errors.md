@@ -1,9 +1,9 @@
 ---
 title: "Mã lỗi"
 description: "Cấu trúc nội dung lỗi, các mã ổn định và cách xử lý từng mã."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 7364efbdee18
+i18n_output_hash: 29c84d50c9f3
 i18n_hash_version: 2
 ---
 
@@ -140,6 +140,7 @@ Các công cụ, lần chạy hàng loạt và pipeline cần một gói AI tùy
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, hoặc 400 từ chế độ khuôn mặt của Smart Crop | Công cụ, hoặc một bước của pipeline hay lần chạy hàng loạt, cần một gói chưa được cài đặt. Nội dung phản hồi gồm `feature` (ID của gói) và `featureName`. | Cài đặt gói trong Cài đặt, rồi thử lại. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | Việc cài đặt hoặc nhập ngoại tuyến bị từ chối vì các thư viện x86-64 của gói cần AVX mà CPU của máy chủ này không có. Chưa có gì được tải xuống hay cài đặt. Nội dung phản hồi gồm `feature` (ID của gói) và `reason` (`cpu-no-avx`). `GET /api/v1/features` báo cáo cùng gói đó với `compatibility: "incompatible"` và `compatibilityReason: "cpu-no-avx"`. | Chạy SnapOtter trên CPU có AVX, hoặc trên arm64. Các gói khác vẫn cài đặt được. |
+| `FEATURE_INSTALL_BUSY` | 409 | Yêu cầu hủy bị từ chối vì trình cài đặt đang ghi vào môi trường AI dùng chung, và việc dừng nó ở đó sẽ làm hỏng mọi công cụ AI đã cài đặt. | Chờ việc cài đặt hoàn tất, rồi gỡ cài đặt gói nếu bạn không muốn dùng nó. |
 | `FEATURE_INCOMPATIBLE` | 501, hoặc 400 khi Fast OCR nhận một ngôn ngữ mà nó không đọc được | Tính năng đã cài đặt không thể thực hiện chất lượng hoặc ngôn ngữ được yêu cầu. | Đổi thiết lập, hoặc cài đặt một gói hỗ trợ nó. |
 | `ENGINE_UNAVAILABLE` | 503 | Một engine cần thiết không thể khởi động, hoặc runtime OCR đã bị gỡ sau khi yêu cầu được xác thực. | Thử lại sau khi quản trị viên sửa chữa hoặc cài đặt lại tính năng. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium chưa được cài đặt, nên HTML sang ảnh không thể chạy. | Nhờ quản trị viên cài đặt trình duyệt. |
@@ -155,13 +156,17 @@ Các công cụ, lần chạy hàng loạt và pipeline cần một gói AI tùy
 | `NOT_ANIMATED` | 400 | Remove GIF Background nhận được một ảnh tĩnh. | Dùng Remove Background cho ảnh tĩnh. |
 | `TOO_MANY_FRAMES` | 400 | Ảnh động có nhiều khung hình hơn mức máy chủ cho phép (`GIF_BG_MAX_FRAMES`). | Gửi ảnh động ngắn hơn, hoặc nhờ quản trị viên nâng giới hạn. |
 | `TOO_MANY_PIXELS` | 400 | Kích thước khung của ảnh động nhân với số khung hình vượt quá giới hạn của máy chủ: 268,402,689 điểm ảnh (16383 x 16383) cho Remove GIF Background, hoặc mức trần khối lượng GIF cho các công cụ ảnh động khác. | Gửi ít khung hình hơn hoặc ảnh động nhỏ hơn. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | Một công cụ ảnh AI nhận được TIFF nhiều trang hoặc GIF hay WebP động, và định dạng đầu ra sẽ giữ mọi khung hình. Các công cụ này chạy mô hình trên từng ảnh một. | Tách tệp thành các ảnh riêng. Nếu công cụ có thiết lập định dạng đầu ra, một định dạng tĩnh như PNG sẽ chỉ xử lý khung hình đầu tiên. |
 | `IMAGE_TOO_LARGE` | 400 | Ảnh có nhiều điểm ảnh hơn mức bộ giải mã chấp nhận. | Gửi ảnh nhỏ hơn. |
+| `SVG_TOO_COMPLEX` | 400 | SVG không hoàn tất việc rasterize trong vòng `JOB_TIMEOUT_FAST_S`. Nguyên nhân thường gặp là các bộ lọc trên những hình mà `<use>` lặp lại, vì mỗi bản sao vẽ lại bộ lọc. | Đơn giản hóa các bộ lọc hoặc hình lặp lại, hoặc nhờ quản trị viên nâng giới hạn. |
 | `RESULT_TOO_LARGE` | 400 | Các thiết lập sẽ tạo ra ảnh lớn hơn mức bộ mã hóa hoặc giới hạn điểm ảnh cho phép. | Dùng ảnh nhỏ hơn hoặc các thiết lập cho kết quả nhỏ hơn. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice hoặc pandoc không mở được tài liệu. Tài liệu có thể bị hỏng, được bảo vệ bằng mật khẩu, hoặc không đúng định dạng như phần mở rộng cho biết. | Kiểm tra tệp mở được trong ứng dụng văn phòng, rồi gửi lại. |
 | `PDF_DAMAGED` | 400 | Engine PDF phát hiện cấu trúc tài liệu bị hỏng. | Chạy tệp qua Repair PDF, rồi thử lại. |
 | `PDF_PASSWORD_PROTECTED` | 400 | PDF bị mã hóa và công cụ này không mở được. | Hãy mở khóa bằng Unlock PDF trước. |
 | `NO_AUDIO_TRACK` | 400 | Tệp không có luồng âm thanh để công cụ âm thanh sử dụng. | Gửi tệp có âm thanh. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg không đọc được âm thanh hoặc video: không tìm thấy gói dữ liệu, không có tham số codec, không có atom `moov`, hoặc dữ liệu không phân tích được. | Kiểm tra tệp phát được trong trình phát media, hoặc xuất lại, rồi thử lại. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode nhận đầu vào không phải Base64. Khoảng trắng bị bỏ qua và chấp nhận cả bảng chữ cái chuẩn lẫn an toàn cho URL. | Kiểm tra văn bản xem có ký tự lạ hoặc phần cuối bị cắt không. |
+| `DECODED_DATA_NOT_TEXT` | 400 | Base64 hợp lệ nhưng giải mã ra dữ liệu nhị phân, không phải văn bản UTF-8. | Giải mã bằng công cụ lưu thành tệp thay vì hiển thị văn bản. |
 | `PAGE_OUT_OF_RANGE` | 400 | Phạm vi trang nêu một trang mà PDF không có. | Kiểm tra số trang và gửi phạm vi nằm trong đó. |
 | `INVALID_PAGE_RANGE` | 400 | Phạm vi trang không đúng cú pháp. | Dùng số trang như `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages được yêu cầu xóa mọi trang. | Giữ lại ít nhất một trang. |
@@ -172,6 +177,7 @@ Các công cụ, lần chạy hàng loạt và pipeline cần một gói AI tùy
 | `NO_FACE_DETECTED` | 400 | Passport Photo không tìm thấy khuôn mặt trong ảnh. | Gửi ảnh chụp rõ, nhìn thẳng, đủ sáng. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Nén ảnh, hoặc giới hạn kích thước của ảnh hộ chiếu, không thể đưa tệp xuống dưới kích thước yêu cầu, ngay cả sau khi thu nhỏ. | Yêu cầu kích thước mục tiêu lớn hơn, hoặc cắt ảnh trước. |
 | `TOO_MANY_PAGES` | 400 | OCR được yêu cầu xử lý nhiều trang hơn mức nó xử lý trong một tác vụ. | Chọn ít trang hơn bằng phạm vi trang. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR trên TIFF nhiều trang đọc hơn 1,000,000 byte văn bản qua các trang của nó, nhiều hơn mức một kết quả có thể lưu. | Tách TIFF thành các tệp nhỏ hơn và chạy OCR trên từng tệp. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata phát hiện dữ liệu EXIF hiện có của ảnh bị hỏng, nên không thể ghi lại an toàn. | Xóa metadata bằng Remove Image Metadata trước, rồi chỉnh sửa. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML hoặc Markdown sang PDF phát hiện tham chiếu đến ảnh, stylesheet hoặc phông chữ trên mạng, mà máy chủ không tải về. | Nhúng tài nguyên vào tệp (ví dụ dưới dạng URI `data:`), rồi thử lại. |
 
@@ -218,10 +224,11 @@ Các mã này tồn tại trong mã nguồn máy chủ cho nhật ký, telemetry
 | `SIEM_DECRYPTION_FAILED` | Được báo cáo đến hệ thống theo dõi lỗi bởi việc chuyển tiếp SIEM. Không thể giải mã header xác thực của SIEM. |
 | `WEBHOOK_DECRYPTION_FAILED` | Được báo cáo đến hệ thống theo dõi lỗi. Yêu cầu gặp cùng lỗi này trả lời bằng `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Được báo cáo đến hệ thống theo dõi lỗi khi không thể xóa một tệp tải lên tạm. |
+| `RETENTION_DEADLINE_BACKFILLED` | Được báo cáo đến hệ thống theo dõi lỗi bởi lượt quét TTL của lưu trữ khi nó điền hạn giữ lại của nhóm còn thiếu cho một tác vụ đã hoàn tất. Khi đó các tệp của tác vụ tuân theo chính sách giữ lại của nhóm. |
 | `USERNAME_RACE_EXHAUSTED` | Phát sinh khi việc tự tạo tài khoản SSO thua cuộc đua tên người dùng ở mọi lần thử lại. Trang đăng nhập hiển thị một lỗi thay thế. |
 | `ERR_OUT_OF_RANGE` | Được ném ra bởi trình đọc object storage khi dải byte không hợp lệ. |
 | `ETIMEDOUT` | Được đặt trên lỗi hết thời gian chờ của một lần xuất GDPR. Lần xuất thất bại, và có thể yêu cầu lại. |
 | `FST_REQ_FILE_TOO_LARGE` | Mã của Fastify cho tệp tải lên vượt giới hạn. Client nhận 413 với `PAYLOAD_TOO_LARGE`, hoặc thông báo 413 riêng của route. |
 | `TARGET_SIZE_EXCEEDED` | Được ném ra khi việc nén theo kích thước mục tiêu không đạt mục tiêu. Lỗi không có trạng thái hay mã, nên client nhận một lỗi thất bại chung. |
 | `OCR_CACHE_PERMISSIONS` | Được báo cáo đến hệ thống theo dõi lỗi như một sự cố vận hành khi ổ dữ liệu AI để bộ nhớ đệm runtime OCR cho phép ghi với mọi người. Tác vụ cài đặt thất bại với thông báo nêu rõ vấn đề lưu trữ. |
-| `OCR_RUNTIME_UNREACHABLE` | Được báo cáo đến hệ thống theo dõi lỗi như một sự cố vận hành khi máy chủ không bao giờ kết nối được huggingface.co để tải runtime OCR. Tác vụ cài đặt thất bại với thông báo về truy cập mạng, `HTTPS_PROXY` và nhập ngoại tuyến. |
+| `OCR_RUNTIME_UNREACHABLE` | Được báo cáo đến hệ thống theo dõi lỗi như một sự cố vận hành khi máy chủ không bao giờ kết nối được huggingface.co để tải runtime OCR. Tác vụ cài đặt thất bại với thông báo về truy cập mạng, `HTTPS_PROXY`, `HF_ENDPOINT` và nhập ngoại tuyến. |

@@ -1,7 +1,7 @@
 ---
 description: "Richten Sie SCIM-2.0-Provisionierung ein, um Benutzer und Gruppen von Ihrem Identitätsanbieter mit SnapOtter zu synchronisieren. Behandelt Okta, Azure AD / Entra ID und benutzerdefinierte Integrationen."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
 i18n_output_hash: bfa02b0cd1f0
 i18n_hash_version: 2
 ---

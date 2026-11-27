@@ -1,8 +1,8 @@
 ---
 description: "Penyiapan pengembangan lokal, perintah, konvensi kode, dan cara menambahkan tool baru ke SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: c882d2cdecd9
+i18n_output_hash: 4c3f42bbc590
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 melalui Drizzle ORM (pg-core). Dev lokal memerlukan Postgres dan R
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Ini memberi Anda Postgres pada port 5432 dan Redis pada port 6379. Kemudian buat dan terapkan migrasi:
+Ini memberi Anda Postgres pada port 5432 dan Redis pada port 6379. API menerapkan sendiri migrasi yang tertunda saat boot, jadi cukup menjalankan server dev. Setelah mengubah skema, buat migrasi dan boot berikutnya akan menerapkannya, tanpa langkah migrate manual:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Skema didefinisikan di `apps/api/src/db/schema.ts`. Tabel: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Skema didefinisikan di `apps/api/src/db/schema.ts`, yang merupakan daftar tabel terkini.
 
 ## Menambahkan tool baru {#adding-a-new-tool}
 

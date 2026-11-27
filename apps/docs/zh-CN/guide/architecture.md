@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的 monorepo 结构、应用与包架构、请求生命周期以及资源占用。"
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 50c33b5d49d3
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 0355ad03dbc7
 i18n_hash_version: 2
 ---
 
@@ -102,7 +102,7 @@ SnapOtter 的设计目标是低空闲内存占用。启动时不会预加载或�
 
 ### 空闲时 {#at-idle}
 
-Node.js/Fastify 进程、PostgreSQL 和 Redis 均在运行。三个容器（Node.js 进程、Postgres 和 Redis）合计的典型空闲 RAM 约为 **200-300 MB**。没有 Python 进程，内存中也没有模型权重。
+Node.js/Fastify 进程、PostgreSQL 和 Redis 均在运行。三个容器（Node.js 进程、Postgres 和 Redis）合计的典型空闲 RAM 约为 **~200-300 MB**。没有 Python 进程，内存中也没有模型权重。
 
 ### 什么会启动，以及何时启动 {#what-starts-and-when}
 

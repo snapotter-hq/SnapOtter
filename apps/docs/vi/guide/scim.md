@@ -1,7 +1,7 @@
 ---
 description: "Thiết lập cung cấp tài khoản SCIM 2.0 để đồng bộ người dùng và nhóm từ nhà cung cấp danh tính của bạn sang SnapOtter. Bao gồm Okta, Azure AD / Entra ID, và các tích hợp tùy chỉnh."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
 i18n_output_hash: 4f3288085da4
 i18n_hash_version: 2
 ---

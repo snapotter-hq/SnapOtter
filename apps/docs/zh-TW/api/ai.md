@@ -1,8 +1,9 @@
 ---
 description: "AI 引擎參考，涵蓋所有本機 ML 工具。去背、放大、OCR、人臉偵測、相片修復等。"
-i18n_output_hash: 7a0476b48ec2
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 5998018bd552
+i18n_hash_version: 2
 ---
 
 # AI 引擎參考 {#ai-engine-reference}
@@ -15,12 +16,6 @@ NVIDIA CUDA 會自動偵測，並由支援它的執行環境使用。OCR 在所�
 
 19 個 Python sidecar AI 工具，涵蓋四種模態（影像、音訊、影片、文件），另有 2 個具備選用 AI 功能的工具。所有模型都在本機執行，初次下載模型後即不需要網際網路。
 
-
-<!-- korean-ocr-contract:start -->
-::: info 韓語 OCR 相容性
-快速 OCR 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 和 `ja`，但不支援韓語 (`ko`) 和阿拉伯語 (`ar`)。韓語和阿拉伯語需要精確 OCR 套件以及 `balanced` 或 `best`。此套件可在官方 Linux amd64 和 arm64 容器上執行；即使是 NVIDIA 主機，OCR 仍使用 CPU。不受支援的系統會傳回明確的相容性錯誤，絕不會靜默回退至 `fast`。韓語或阿拉伯語搭配 `fast` 或舊版 `tesseract` 別名時，會在排入佇列前以 `FEATURE_INCOMPATIBLE` 和 `fast-korean-unsupported` 拒絕。
-:::
-<!-- korean-ocr-contract:end -->
 ## 架構 {#architecture}
 
 ```
@@ -84,6 +79,10 @@ Docker 映像隨附應用程式加上共用執行環境。大型模型封存檔�
 
 只有在工具所需的所有套件包都安裝後，工具才可使用；OCR 除外：其內建 `fast` 層在沒有選用 OCR 套件包的情況下仍可使用。部分安裝是有效的，且會以增量方式處理：已安裝的套件包會重複使用、缺少的套件包會顯示為待下載，而排入佇列的安裝一次只執行一個，以免共用的 Python 環境被同時修改。
 
+### 透過鏡像下載 {#downloading-through-a-mirror}
+
+套件包封存檔與精確 OCR 執行環境都從 huggingface.co 下載。若該主機被封鎖或速度很慢，請在應用程式容器上將 `HF_ENDPOINT` 設為 Hugging Face 鏡像，例如 `HF_ENDPOINT=https://hf-mirror.com`。每個套件包下載與 OCR 執行環境都會使用它，包括備援下載器，以及安裝錯誤中的手動下載連結。請使用不含憑證的 `https` URL；OCR 執行環境安裝會拒絕其他任何形式。完整性不取決於鏡像：每個套件包封存檔都會以其 SHA-256 檢查，OCR 執行環境索引則經過簽署，因此提供被竄改檔案的鏡像會使安裝失敗。例外是 `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`：補上缺少模型權重的執行環境下載同樣會使用 `HF_ENDPOINT`，而這些權重不會做校驗和驗證，因此只有在鏡像可信任時才將兩者搭配使用。若伺服器是透過 proxy 連上網際網路，請參閱[對外 proxy 與私有 CA](/zh-TW/guide/deployment#outbound-proxy-and-private-ca)。
+
 ### 一次安裝所有套件包 {#installing-every-bundle-at-once}
 
 **設定 → AI 功能**頁面有一個 **全部安裝** 按鈕，會把所有主機可執行的套件包排入佇列。它會略過已安裝的項目、略過回報與主機不相容的套件包，並在繼續之前將失敗的套件包重試一次。對一般執行個體來說，這個按鈕就能解決一切，以下內容都不需要。
@@ -107,7 +106,7 @@ done
 
 ### 精確 OCR 執行環境安裝 {#accurate-ocr-runtime-installation}
 
-精確 OCR 套件是專供官方 Linux amd64 或 Linux arm64 容器使用的平台專屬執行環境。amd64 建置使用 Python 3.12，arm64 建置則使用 Python 3.11。兩者都透過 ONNX Runtime 的 `CPUExecutionProvider` 執行 RapidOCR，因此同一套件也可在僅有 CPU 的主機與 NVIDIA Docker 主機上運作。精確執行環境至少需要 4 GiB 的有效記憶體：也就是容器已設定的 cgroup 上限，若未設定則以主機記憶體為準。低於此簽署相容性下限的系統會在下載前遭到拒絕。這項需求不適用於內建 Fast OCR。裸機建置會遭到拒絕，因為其 libc 與 Python ABI 無法安全推斷；若主機提供 Tesseract 與 Ghostscript，Fast OCR 仍可使用。Fast 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓語（`ko`）和阿拉伯語（`ar`）。因此韓語和阿拉伯語需要受支援的精確執行環境，以及 `balanced` 或 `best` 層級；不受支援的主機會收到明確的相容性錯誤回應，而不是默默退回 Fast。
+精確 OCR 套件是專供官方 Linux amd64 或 Linux arm64 容器使用的平台專屬執行環境。amd64 建置使用 Python 3.12，arm64 建置則使用 Python 3.11。兩者都透過 ONNX Runtime 的 `CPUExecutionProvider` 執行 RapidOCR，因此同一套件也可在僅有 CPU 的主機與 NVIDIA Docker 主機上運作。精確執行環境至少需要 4 GiB 的有效記憶體：也就是容器已設定的 cgroup 上限，若未設定則以主機記憶體為準。低於此簽署相容性下限的系統會在下載前遭到拒絕。這項需求不適用於內建 Fast OCR。裸機建置會遭到拒絕，因為其 libc 與 Python ABI 無法安全推斷；若主機提供 Tesseract 與 Ghostscript，Fast OCR 仍可使用。Fast 支援 `auto`、`en`、`de`、`es`、`fr`、`zh` 與 `ja`，但不支援韓語（`ko`）。因此韓語需要受支援的精確執行環境，以及 `balanced` 或 `best` 層級；不受支援的主機會收到明確的相容性錯誤回應，而不是默默退回 Fast。
 
 選用產物的壓縮大小約為 208-234 MiB，解壓後約為 409-488 MiB，視架構而定。簽署索引會綁定安裝程式強制執行的確切壓縮與解壓位元組數。內建 Tesseract 會為官方映像檔增加約 25 MiB，且不需要在 `/data/ai` 中放置任何檔案。
 
@@ -119,7 +118,7 @@ done
 
 ## 去背 {#background-removal}
 
-**工具路由：** `remove-background`  
+**工具路由：** `remove-background`
 **模型：** rembg 搭配 BiRefNet（預設）或 U2-Net 變體
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -140,7 +139,7 @@ done
 
 ## 背景替換 {#background-replace}
 
-**工具路由：** `background-replace`  
+**工具路由：** `background-replace`
 **模型：** rembg / BiRefNet（與 remove-background 共用）
 
 移除背景並以純色或漸層取代。
@@ -157,7 +156,7 @@ done
 
 ## 模糊背景 {#blur-background}
 
-**工具路由：** `blur-background`  
+**工具路由：** `blur-background`
 **模型：** rembg / BiRefNet（與 remove-background 共用）
 
 在保持主體清晰的同時模糊背景。
@@ -170,7 +169,7 @@ done
 
 ## 影像放大 {#image-upscaling}
 
-**工具路由：** `upscale`  
+**工具路由：** `upscale`
 **模型：** RealESRGAN（不可用時以 Lanczos 備援）
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -184,28 +183,28 @@ done
 
 ## OCR / 文字擷取 {#ocr-text-extraction}
 
-**工具路由：** `ocr`  
+**工具路由：** `ocr`
 **模型：** Tesseract（`fast`）；RapidOCR 搭配 PP-OCRv6 小型模型（`balanced`）；PP-OCRv6 中型模型並搭配校準變體評分（`best`）
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 quality 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
 | `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。Fast 不支援 `ko` 和 `ar` |
 | `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
 | `engine` | string | - | 已棄用的相容性別名。將 `tesseract` 對應到 `fast`，並將舊版 `paddleocr` 值對應到 `balanced`；它不會載入 PaddlePaddle |
 
-傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 別名搭配韓語或阿拉伯語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
+傳回擷取的文字，以及來源中繼資料：引擎、要求的品質與實際品質、裝置、提供者、降級狀態、警告，以及適用時的精確執行環境/模型版本。明確指定品質時，絕不會退回其他層級。若 `balanced` 或 `best` 無法使用，API 會傳回 `FEATURE_NOT_INSTALLED` 或 `FEATURE_INCOMPATIBLE`，而不是默默執行 `fast`。明確指定 Fast，或使用舊版 `tesseract` 搭配韓語時，會在作業排入佇列前傳回 `FEATURE_INCOMPATIBLE`、`compatibilityReason: "fast-korean-unsupported"`，以及精確套件的指引。
 
 ## PDF OCR {#pdf-ocr}
 
-**工具路由：** `ocr-pdf`  
+**工具路由：** `ocr-pdf`
 **模型：** 與影像 OCR 相同的層級系統
 
 使用 AI 驅動的 OCR，逐頁從掃描的 PDF 文件擷取文字。
 
 | 參數 | 型別 | 預設值 | 說明 |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 `quality` 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | 動態 | 處理層級。省略 quality 時，會依 `best`、`balanced`、`fast` 的順序選擇可用的最高層級。韓語和阿拉伯語絕不會選擇 `fast`；若沒有可用的精確層級，會傳回精確執行環境的安裝或相容性錯誤 |
 | `language` | string | `"auto"` | 語言：`auto`、`en`、`de`、`fr`、`es`、`zh`、`ja`、`ko`、`ar`。Fast 不支援 `ko` 和 `ar` |
 | `pages` | string | `"all"` | 頁面選取：`"all"`、`"1-3"`、`"1,3,5"` |
 | `enhance` | boolean | 取決於層級 | 提升局部對比。Fast 會直接套用；精確層級只有在校準評分能改善 OCR 時才會保留該變體。Best 預設為開啟 |
@@ -215,7 +214,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 人臉 / PII 模糊 {#face-pii-blur}
 
-**工具路由：** `blur-faces`  
+**工具路由：** `blur-faces`
 **模型：** MediaPipe 人臉偵測
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -225,7 +224,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 人臉增強 {#face-enhancement}
 
-**工具路由：** `enhance-faces`  
+**工具路由：** `enhance-faces`
 **模型：** GFPGAN、CodeFormer
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -237,7 +236,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## AI 上色 {#ai-colorization}
 
-**工具路由：** `colorize`  
+**工具路由：** `colorize`
 **模型：** DDColor（以 OpenCV DNN 備援）
 
 將黑白或灰階相片轉換為全彩。
@@ -249,7 +248,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 去雜訊 {#noise-removal}
 
-**工具路由：** `noise-removal`  
+**工具路由：** `noise-removal`
 **模型：** SCUNet（分層去雜訊流程）
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -292,7 +291,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 證件照 {#passport-photo}
 
-**工具路由：** `passport-photo`  
+**工具路由：** `passport-photo`
 **模型：** MediaPipe 人臉特徵點 + BiRefNet 去背
 
 兩階段工作流程：分析（偵測人臉 + 移除背景），接著產生（裁切、調整大小、平鋪）。支援橫跨 6 個地區的 37+ 個國家。
@@ -327,10 +326,13 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 | `landmarks` | object | （必填） | 來自階段 1 的特徵點 |
 | `imageWidth` | number | （必填） | 來自階段 1 的影像寬度 |
 | `imageHeight` | number | （必填） | 來自階段 1 的影像高度 |
+| `clientJobId` | string | （自動產生） | 你自己的 job id，用於進度串流 |
+
+產生階段會以排入佇列的工作執行：若在同步等待時間內完成，會回傳 `200` 並附上結果；超過該時間則回傳 `202` 並附上 job id。詳情請參閱[證件照](/zh-TW/tools/image/passport-photo#phase-2-generate)。
 
 ## 物件擦除（影像修補） {#object-erasing-inpainting}
 
-**工具路由：** `erase-object`  
+**工具路由：** `erase-object`
 **模型：** 透過 ONNX Runtime 的 LaMa
 
 遮罩會以**第二個檔案部分**（欄位名稱 `mask`）傳送，而非以 base64。遮罩中的白色像素表示要擦除的區域。`format` 與 `quality` 設定會以頂層表單欄位傳送。
@@ -346,7 +348,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## AI 畫布擴展 {#ai-canvas-expand}
 
-**工具路由：** `ai-canvas-expand`  
+**工具路由：** `ai-canvas-expand`
 **模型：** 以 LaMa 為基礎的外延
 
 朝任何方向擴展影像的畫布，並以與現有影像相符的 AI 生成內容填滿新增區域。
@@ -365,7 +367,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 智慧裁切 {#smart-crop}
 
-**工具路由：** `smart-crop`  
+**工具路由：** `smart-crop`
 **模型：** MediaPipe 人臉偵測（僅 face 模式）
 
 | 參數 | 型別 | 預設值 | 說明 |
@@ -396,7 +398,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 音訊轉錄 {#transcribe-audio}
 
-**工具路由：** `transcribe-audio`  
+**工具路由：** `transcribe-audio`
 **模型：** faster-whisper
 
 將語音轉換為文字。支援純文字、SRT 與 VTT 輸出格式。
@@ -408,7 +410,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## 自動字幕 {#auto-subtitles}
 
-**工具路由：** `auto-subtitles`  
+**工具路由：** `auto-subtitles`
 **模型：** faster-whisper（先從影片擷取音訊，再進行轉錄）
 
 從影片的音軌產生字幕檔。
@@ -420,7 +422,7 @@ PDF OCR 也適用相同的不降級與韓語和阿拉伯語相容性規則。PDF
 
 ## PNG 透明度修復 {#png-transparency-fixer}
 
-**工具路由：** `transparency-fixer`  
+**工具路由：** `transparency-fixer`
 **模型：** BiRefNet HR-matting（2048x2048 解析度）
 
 修復「假透明」的 PNG，也就是背景已被移除但留下毛邊、光暈或半透明瑕疵的情況。使用 BiRefNet 的高解析度去背模型產生乾淨的 alpha 通道，接著套用可設定的去毛邊處理，以移除邊緣沿線的顏色汙染。
@@ -448,7 +450,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 
 ### 影像增強 {#image-enhancement}
 
-**工具路由：** `image-enhancement`  
+**工具路由：** `image-enhancement`
 **引擎：** 以分析為基礎（Sharp 直方圖與統計）
 
 分析影像並自動修正曝光、對比、白平衡、飽和度、銳利度與雜訊。支援特定場景模式。
@@ -469,7 +471,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/transparency-fixer \
 
 ### 內容感知調整大小（接縫裁減） {#content-aware-resize-seam-carving}
 
-**工具路由：** `content-aware-resize`  
+**工具路由：** `content-aware-resize`
 **引擎：** Go `caire` 二進位檔（非 Python，GPU 無法加速）
 
 透過移除或插入低能量接縫來智慧調整影像大小，保留重要內容。每一邊最多可放大到原始尺寸的 2 倍。

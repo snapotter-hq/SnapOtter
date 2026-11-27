@@ -1,8 +1,8 @@
 ---
 description: "SCIM 2.0 프로비저닝을 설정하여 사용자와 그룹을 아이덴티티 공급자에서 SnapOtter로 동기화합니다. Okta, Azure AD / Entra ID, 사용자 지정 통합을 다룹니다."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: a350e8957173
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: 3699c311de1e
 i18n_hash_version: 2
 ---
 
@@ -18,7 +18,7 @@ SCIM 프로비저닝에는 `scim` 기능이 포함된 **엔터프라이즈** 라
 
 - 공개 URL에서 접근할 수 있는 실행 중인 SnapOtter 인스턴스
 - `scim` 기능이 포함된 엔터프라이즈 라이선스 키
-- 전체 유효 권한 집합이 포함된 SnapOtter `admin` 계정이 내장되어 있습니다. 위임된 사용자 정의 역할 또는 관리 권한이 누락된 관리 API 키는 전역 SCIM 토큰을 생성하거나 취소할 수 없습니다.
+- 전체 유효 권한 집합을 가진 내장 SnapOtter `admin` 계정. 위임된 사용자 정의 역할 또는 관리 권한이 하나라도 누락된 관리 API 키는 전역 SCIM 토큰을 생성하거나 취소할 수 없습니다.
 - 아이덴티티 공급자의 프로비저닝 설정에 대한 관리자 접근 권한
 
 ## 빠른 시작 {#quick-start}
@@ -85,7 +85,7 @@ SCIM 그룹은 역할이 아니라 SnapOtter **팀**에 매핑됩니다. SCIM은
 
 `POST /api/v1/scim/v2/Users`
 
-`authProvider` 를 `scim` 로 설정하고 `user` 역할을 부여한 새 사용자 계정을 생성합니다. 사용자는 Default 팀에 할당됩니다. `active` 가 `false` 이면 역할이 대신 `disabled` 로 설정됩니다.
+`authProvider`를 `scim`로 설정하고 `user` 역할을 부여한 새 사용자 계정을 생성합니다. 사용자는 Default 팀에 할당됩니다. `active`가 `false`이면 역할이 대신 `disabled`로 설정됩니다.
 
 필수 속성: `userName`. 선택 속성: `externalId`, `emails`, `active`(기본값 `true`).
 
@@ -112,7 +112,7 @@ SnapOtter 사용자 ID로 단일 사용자를 반환합니다.
 
 `PUT /api/v1/scim/v2/Users/:id`
 
-사용자의 속성을 교체합니다. `userName`, `externalId`, `emails`, `active` 를 지원합니다. 사용자 이름 변경 시 충돌 여부를 확인합니다(새 사용자 이름이 다른 사용자가 사용 중이면 409).
+사용자의 속성을 교체합니다. `userName`, `externalId`, `emails`, `active`를 지원합니다. 사용자 이름 변경 시 충돌 여부를 확인합니다(새 사용자 이름이 다른 사용자가 사용 중이면 409).
 
 ### 사용자 패치 {#patch-user}
 
@@ -123,7 +123,7 @@ SCIM PatchOp를 사용한 부분 업데이트. 지원되는 작업:
 | 작업 | 경로 |
 |---|---|
 | `replace` | `active`, `userName`, `externalId`, `emails`, `emails[type eq "work"].value`, `name.formatted`, `displayName` |
-| `add` | `replace` 와 동일 |
+| `add` | `replace`와 동일 |
 | `remove` | `externalId`, `emails` |
 
 `name.formatted` 및 `displayName` 경로는 호환성을 위해 허용되지만 영속적인 효과는 없습니다(SnapOtter는 별도의 표시 이름을 저장하지 않습니다).
@@ -136,7 +136,7 @@ SCIM PatchOp를 사용한 부분 업데이트. 지원되는 작업:
 
 SnapOtter는 SCIM을 통해 사용자를 하드 삭제하지 않습니다. 대신 DELETE는 소프트 비활성화를 수행합니다:
 
-1. 사용자의 역할이 현재 값(예: `editor`)에서 `disabled:editor` 으로 변경되어 원래 역할을 보존합니다.
+1. 사용자의 역할이 현재 값(예: `editor`)에서 `disabled:editor`으로 변경되어 원래 역할을 보존합니다.
 2. 사용자의 비밀번호가 지워집니다.
 3. 모든 활성 세션이 취소됩니다.
 4. 모든 API 키가 취소됩니다.
@@ -145,7 +145,7 @@ SnapOtter는 SCIM을 통해 사용자를 하드 삭제하지 않습니다. 대�
 
 ### 사용자 재활성화 {#reactivate-user}
 
-이전에 비활성화된 사용자를 재활성화하려면 `active: true` 값과 함께 `PUT` 또는 `PATCH` 요청을 보냅니다. SnapOtter는 비활성화 이전의 원래 역할을 복원합니다(예: `disabled:editor` 가 다시 `editor` 이 됩니다). 원래 역할을 확인할 수 없으면 `user` 로 대체됩니다.
+이전에 비활성화된 사용자를 재활성화하려면 `PUT` 또는 `PATCH` 요청을 보내고 `active: true`을 지정합니다. SnapOtter는 비활성화 이전의 원래 역할을 복원합니다(예: `disabled:editor`가 다시 `editor`이 됩니다). 원래 역할을 확인할 수 없으면 `user`로 대체됩니다.
 
 ::: details 예시: PATCH를 통한 비활성화 및 재활성화
 ```json
@@ -175,13 +175,13 @@ SCIM 그룹은 SnapOtter 팀에 매핑됩니다. 그룹을 생성하면 팀이 �
 
 `POST /api/v1/scim/v2/Groups`
 
-필수: `displayName`. 선택: `members`(`{ value: userId }` 의 배열).
+필수: `displayName`. 선택: `members`(`{ value: userId }`의 배열).
 
 ### 그룹 목록 조회 및 필터링 {#list-and-filter-groups}
 
 `GET /api/v1/scim/v2/Groups`
 
-필터링은 `displayName eq "..."` 만 지원합니다. `startIndex` 및 `count` 로 페이지네이션됩니다(페이지당 최대 200개 결과).
+필터링은 `displayName eq "..."`만 지원합니다. `startIndex` 및 `count`로 페이지네이션됩니다(페이지당 최대 200개 결과).
 
 ### 그룹 조회 {#get-group}
 
@@ -236,7 +236,7 @@ SCIM 그룹은 SnapOtter 팀에 매핑됩니다. 그룹을 생성하면 팀이 �
    - **Tenant URL**: `https://photos.example.com/api/v1/scim/v2`
    - **Secret Token**: 위에서 생성한 SCIM 베어러 토큰
 4. **Test Connection**을 클릭한 다음 **Save**를 클릭합니다.
-5. **Mappings**에서 사용자 및 그룹 속성 매핑을 구성합니다. 기본값이 대개 잘 작동하지만, `userName` 가 원하는 대로 `userPrincipalName` 또는 `mail` 로 매핑되는지 확인하세요.
+5. **Mappings**에서 사용자 및 그룹 속성 매핑을 구성합니다. 기본값이 대개 잘 작동하지만, `userName`가 원하는 대로 `userPrincipalName` 또는 `mail`로 매핑되는지 확인하세요.
 6. **Provisioning Status**를 **On**으로 설정하고 저장합니다.
 
 Azure는 고정된 동기화 주기(일반적으로 40분마다)로 사용자와 그룹을 프로비저닝합니다.
@@ -251,7 +251,7 @@ Azure는 고정된 동기화 주기(일반적으로 40분마다)로 사용자와
 | `GET /api/v1/scim/v2/Schemas` | User 및 Group 스키마 정의 |
 | `GET /api/v1/scim/v2/ResourceTypes` | 사용 가능한 리소스 유형(User, Group) |
 
-`ServiceProviderConfig` 는 다음 기능을 알립니다:
+`ServiceProviderConfig`는 다음 기능을 알립니다:
 
 | 특성 | 지원 여부 |
 |---|---|
@@ -276,7 +276,7 @@ Azure는 고정된 동기화 주기(일반적으로 40분마다)로 사용자와
 
 ### 403 "SCIM provisioning requires an enterprise license with the scim feature" {#_403-scim-provisioning-requires-an-enterprise-license-with-the-scim-feature}
 
-라이선스에 `scim` 기능이 포함되어 있지 않거나 라이선스가 구성되지 않았습니다. SCIM에는 엔터프라이즈 플랜 라이선스가 필요합니다. [`SNAPOTTER_LICENSE_KEY`](/ko/guide/configuration#env-snapotter-license-key) 가 설정되어 있고 라이선스에 `scim` 기능이 포함되어 있는지 확인하세요.
+라이선스에 `scim` 기능이 포함되어 있지 않거나 라이선스가 구성되지 않았습니다. SCIM에는 엔터프라이즈 플랜 라이선스가 필요합니다. [`SNAPOTTER_LICENSE_KEY`](/ko/guide/configuration#env-snapotter-license-key)가 설정되어 있고 라이선스에 `scim` 기능이 포함되어 있는지 확인하세요.
 
 ### 401 "Bearer token required" {#_401-bearer-token-required}
 
@@ -300,13 +300,13 @@ IdP가 분당 1000개를 초과하는 요청을 보내고 있습니다. 일반�
 
 ### 사용자가 프로비저닝 해제되었지만 UI에서 제거되지 않음 {#users-deprovisioned-but-not-removed-from-the-ui}
 
-SCIM DELETE는 소프트 비활성화입니다. 비활성화된 사용자는 여전히 비활성 상태로 관리자 사용자 목록에 표시됩니다. 이는 데이터를 보존하기 위한 의도된 설계입니다. 해당 사용자의 역할은 `disabled:<original-role>` 로 표시됩니다.
+SCIM DELETE는 소프트 비활성화입니다. 비활성화된 사용자는 여전히 비활성 상태로 관리자 사용자 목록에 표시됩니다. 이는 데이터를 보존하기 위한 의도된 설계입니다. 해당 사용자의 역할은 `disabled:<original-role>`로 표시됩니다.
 
 ### `externalId` 필터가 OIDC 또는 SAML로 로그인하는 사용자를 찾지 못함 {#recover-scim-ids-in-oidc-or-saml-users}
 
-SCIM의 `externalId`에 자체 컬럼(`users.scim_external_id`)이 생기기 전에는, OIDC 또는 SAML 로그인이 이미 연결한 사용자에게 SCIM `PUT`이나 `PATCH`를 실행하면 SCIM id가 그 사용자의 로그인 신원에 기록되곤 했습니다. 업그레이드 마이그레이션은 그 값을 실제 OIDC subject나 SAML NameID와 구분할 수 없으므로 해당 사용자들은 그대로 둡니다. 이런 사용자는 IdP가 `externalId`를 담은 업데이트를 다시 보내기 전까지 `filter=externalId eq "..."`로 아무 결과도 얻지 못합니다.
+SCIM의 `externalId`에 자체 컬럼(`users.scim_external_id`)이 생기기 전에는, OIDC 또는 SAML 로그인이 이미 연결한 사용자에게 SCIM `PUT`이나 `PATCH`를 실행하면 SCIM id가 그 사용자의 로그인 신원에 기록되곤 했습니다. 업그레이드 마이그레이션은 그 값을 실제 OIDC subject나 SAML NameID와 구분할 수 없으므로 해당 사용자들은 그대로 둡니다. 이런 사용자는 `filter=externalId eq "..."`가 아무 결과도 반환하지 않으며, IdP가 `externalId`를 담은 업데이트를 다시 보낼 때까지 그렇습니다.
 
-IdP를 기다리고 싶지 않다면 감사 로그가 그 id를 증명해 줄 수 있습니다. SCIM은 각 사용자를 생성할 때 사용한 `externalId`와 함께 `SCIM_USER_PROVISIONED` 행을 기록합니다. `scim_external_id` 컬럼이 있는 릴리스로 올라온 뒤 SnapOtter 데이터베이스에 대해 `psql`을 열고(두 구성 모두에 대한 방법은 [계정 복구 가이드](./account-recovery.md#older-images-and-fallbacks)에 나와 있습니다) 로그인 신원이 아직 그 id와 같은 사용자들을 미리 확인하세요:
+IdP를 기다리고 싶지 않다면 감사 로그가 그 id를 증명해 줄 수 있습니다. SCIM은 `SCIM_USER_PROVISIONED` 행을 기록하며, 각 사용자를 생성할 때 사용한 `externalId`를 함께 담습니다. `scim_external_id` 컬럼이 있는 릴리스로 올라온 뒤 SnapOtter 데이터베이스에 대해 `psql`을 열고(두 구성 모두에 대한 방법은 [계정 복구 가이드](./account-recovery.md#older-images-and-fallbacks)에 나와 있습니다) 로그인 신원이 아직 그 id와 같은 사용자들을 미리 확인하세요:
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id

@@ -1,8 +1,8 @@
 ---
 description: "การตั้งค่าสภาพแวดล้อมการพัฒนาในเครื่อง คำสั่ง แนวทางการเขียนโค้ด และวิธีเพิ่มเครื่องมือใหม่ใน SnapOtter"
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 2ff1146f7814
+i18n_output_hash: d67ed30a2344
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 ผ่าน Drizzle ORM (pg-core) การพัฒนาใน�
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-สิ่งนี้ให้ Postgres บนพอร์ต 5432 และ Redis บนพอร์ต 6379 จากนั้นสร้างและนำการย้ายข้อมูลมาใช้:
+สิ่งนี้ให้ Postgres บนพอร์ต 5432 และ Redis บนพอร์ต 6379 API จะนำการย้ายข้อมูลที่ค้างอยู่มาใช้เองตอนบูต ดังนั้นแค่เริ่ม dev server ก็เพียงพอแล้ว หลังจากเปลี่ยนสคีมา ให้สร้างการย้ายข้อมูล แล้วการบูตครั้งถัดไปจะนำมาใช้ให้ โดยไม่ต้องรันขั้นตอน migrate ด้วยตนเอง:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-สคีมาถูกกำหนดไว้ใน `apps/api/src/db/schema.ts` ตาราง: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog
+สคีมาถูกกำหนดไว้ใน `apps/api/src/db/schema.ts` ซึ่งเป็นรายการตารางปัจจุบัน
 
 ## การเพิ่มเครื่องมือใหม่ {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI สร้าง baseline ทั้งของ `linux` (`ubuntu-latest`) แ�
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-แต่ละงานของระบบปฏิบัติการจะอัปโหลดอาร์ติแฟกต์ `visual-baselines-linux-<run-id>-<attempt>` หรือ `visual-baselines-darwin-<run-id>-<attempt>` และเปิด PR แบบร่าง (`chore/visual-baselines-linux-...` และ `chore/visual-baselines-darwin-...`) ไปยัง `main` พร้อมไฟล์ PNG ที่สร้างใหม่ ในคำอธิบายของแต่ละ PR แบบร่างมีคำสั่ง `gh run download` ให้รันทั้งสองคำสั่งจากรูทของ checkout เพื่อนำ PNG เข้ามาใน branch ของคุณ commit แล้วปิด PR แบบร่าง หาก `changed` พลาดภาพที่คุณคาดว่าจะเปลี่ยน ให้ใช้ `update_snapshots=all` แทน การสั่งรันต้องมีสิทธิ์เขียนในรีโพซิทอรี ถ้า branch ของคุณอยู่บน fork ให้แจ้งใน PR ว่าต้องรีเฟรช baseline แล้วผู้ดูแลจะรันให้
+แต่ละงานของระบบปฏิบัติการจะอัปโหลดอาร์ติแฟกต์ `visual-baselines-linux-<run-id>-<attempt>` หรือ `visual-baselines-darwin-<run-id>-<attempt>` และเปิด PR แบบร่าง (`chore/visual-baselines-linux-...` และ `chore/visual-baselines-darwin-...`) ไปยัง `main` พร้อมไฟล์ PNG ที่สร้างใหม่ ในคำอธิบายของแต่ละ PR แบบร่างมีคำสั่ง `gh run download` ให้รันทั้งสองคำสั่งจากรูทของ checkout เพื่อนำ PNG เข้ามาใน branch ของคุณ commit แล้วปิด PR แบบร่าง ให้ใช้ `update_snapshots=all` แทน หาก `changed` พลาดภาพที่คุณคาดว่าจะเปลี่ยน การสั่งรันต้องมีสิทธิ์เขียนในรีโพซิทอรี ถ้า branch ของคุณอยู่บน fork ให้แจ้งใน PR ว่าต้องรีเฟรช baseline แล้วผู้ดูแลจะรันให้
 
 บน Mac คุณสามารถรีเฟรช baseline ของ `darwin` บนเครื่องได้ด้วยเพื่อความรวดเร็วในการพัฒนา:
 

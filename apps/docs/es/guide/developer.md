@@ -1,8 +1,8 @@
 ---
 description: "Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: da0c06167904
+i18n_output_hash: 914d5408d2c5
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 mediante Drizzle ORM (pg-core). El desarrollo local requiere que P
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Esto te proporciona Postgres en el puerto 5432 y Redis en el puerto 6379. Luego genera y aplica las migraciones:
+Esto te proporciona Postgres en el puerto 5432 y Redis en el puerto 6379. La API aplica ella misma las migraciones pendientes al arrancar, así que basta con iniciar los servidores de desarrollo. Tras cambiar el esquema, genera una migración y el siguiente arranque la aplica, sin ningún paso manual de migración:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-El esquema se define en `apps/api/src/db/schema.ts`. Tablas: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+El esquema se define en `apps/api/src/db/schema.ts`, que es la lista actual de tablas.
 
 ## Añadir una nueva herramienta {#adding-a-new-tool}
 
@@ -245,14 +244,14 @@ DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 
 ## Dominios de versión de lanzamiento {#release-version-domains}
 
-SnapOtter tiene intencionalmente tres dominios de versión. No copie un dominio en otro durante un lanzamiento:
+SnapOtter tiene intencionalmente tres dominios de versión. No copies un dominio en otro durante un lanzamiento:
 
 - La versión de lanzamiento de la aplicación cubre el manifiesto raíz, todos los paquetes de espacios de trabajo privados y `APP_VERSION`. Semantic-release proporciona este valor y `pnpm version:sync <version>` actualiza cada espacio de trabajo antes del lanzamiento de una aplicación.
 - OpenAPI `info.version` es el contrato principal público estable API. Todas las especificaciones localizadas permanecen en `<major>.0.0` para versiones de aplicaciones compatibles y cambian solo cuando el contrato API pasa a una nueva versión principal.
 - `docker/feature-manifest.json` mantiene a `imageVersion: 2.0.0` como la época de almacenamiento de paquetes de funciones heredadas e inmutables. Esas rutas de archivo v2 no son versiones de paquetes de aplicaciones. Accurate OCR utiliza el formato de tiempo de ejecución v3 y registra el origen de la versión de la aplicación por separado.
 
 `tests/unit/infra/release-version-policy.test.ts` impone estos límites. Una nueva versión de dominio o migración debe actualizar ese contrato y el diseño de migración de artefacto relevante juntos.
-Los valores independientes API y del paquete heredado se encuentran en `config/release-version-policy.json`; La sincronización de la versión de la aplicación nunca debe reescribir ese archivo de política implícitamente.
+Los valores independientes API y del paquete heredado se encuentran en `config/release-version-policy.json`; la sincronización de la versión de la aplicación nunca debe reescribir ese archivo de política implícitamente.
 
 ## Variables de entorno {#environment-variables}
 

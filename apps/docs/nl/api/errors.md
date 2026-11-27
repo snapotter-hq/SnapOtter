@@ -1,9 +1,9 @@
 ---
 title: "Foutcodes"
 description: "De structuur van de foutbody, de stabiele codes en wat u bij elke code kunt doen."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 97122477d4ca
+i18n_output_hash: 93e28bc30306
 i18n_hash_version: 2
 ---
 
@@ -140,6 +140,7 @@ Tools, batchruns en pipelines die een optionele AI-bundel nodig hebben, gebruike
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, of 400 vanuit de gezichtsmodus van Smart Crop | De tool, of een stap van een pipeline of batch, heeft een bundel nodig die niet is geïnstalleerd. De body bevat `feature` (de bundel-ID) en `featureName`. | Installeer de bundel in Instellingen en probeer het opnieuw. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | Een installatie of offline import is geweigerd omdat de x86-64-bibliotheken van de bundel AVX nodig hebben en de CPU van deze server dat niet heeft. Er is niets gedownload of geïnstalleerd. De body bevat `feature` (de bundel-ID) en `reason` (`cpu-no-avx`). `GET /api/v1/features` meldt dezelfde bundel met `compatibility: "incompatible"` en `compatibilityReason: "cpu-no-avx"`. | Draai SnapOtter op een CPU met AVX, of op arm64. Andere bundels worden nog steeds geïnstalleerd. |
+| `FEATURE_INSTALL_BUSY` | 409 | Een annulering is geweigerd omdat het installatieprogramma de gedeelde AI-omgeving beschrijft en stoppen op dat moment elke geïnstalleerde AI-tool zou breken. | Wacht tot de installatie klaar is en verwijder de bundel daarna als je hem niet wilt. |
 | `FEATURE_INCOMPATIBLE` | 501, of 400 wanneer Fast OCR een taal krijgt die hij niet kan lezen | De geïnstalleerde functie kan de gevraagde kwaliteit of taal niet aan. | Wijzig de instelling, of installeer een bundel die dit ondersteunt. |
 | `ENGINE_UNAVAILABLE` | 503 | Een vereiste engine kon niet starten, of een OCR-runtime is verwijderd nadat het verzoek was gevalideerd. | Probeer het opnieuw nadat een beheerder de functie heeft hersteld of opnieuw geïnstalleerd. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium is niet geïnstalleerd, dus HTML naar afbeelding kan niet draaien. | Vraag een beheerder de browser te installeren. |
@@ -155,13 +156,17 @@ Tools, batchruns en pipelines die een optionele AI-bundel nodig hebben, gebruike
 | `NOT_ANIMATED` | 400 | Remove GIF Background kreeg een stilstaande afbeelding. | Gebruik Remove Background voor stilstaande afbeeldingen. |
 | `TOO_MANY_FRAMES` | 400 | De animatie heeft meer frames dan de server toestaat (`GIF_BG_MAX_FRAMES`). | Stuur een kortere animatie, of vraag een beheerder de limiet te verhogen. |
 | `TOO_MANY_PIXELS` | 400 | Het canvas van de animatie maal het aantal frames overschrijdt de limiet van de server: 268.402.689 pixels (16383 x 16383) voor Remove GIF Background, of de GIF-werklastlimiet voor andere geanimeerde tools. | Stuur minder frames of een kleinere animatie. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | Een AI-afbeeldingstool kreeg een TIFF met meerdere pagina's of een geanimeerde GIF of WebP, en het uitvoerformaat zou elk frame behouden. Deze tools draaien hun model op één afbeelding tegelijk. | Splits het bestand in aparte afbeeldingen. Heeft de tool een instelling voor het uitvoerformaat, dan verwerkt een stilstaand formaat zoals PNG alleen het eerste frame. |
 | `IMAGE_TOO_LARGE` | 400 | De afbeelding heeft meer pixels dan de decoder accepteert. | Stuur een kleinere afbeelding. |
+| `SVG_TOO_COMPLEX` | 400 | De SVG is niet binnen `JOB_TIMEOUT_FAST_S` klaar met rasteriseren. Filters op vormen die `<use>` herhaalt zijn de gebruikelijke oorzaak, omdat elke kopie het filter opnieuw tekent. | Vereenvoudig de filters of herhaalde vormen, of vraag een beheerder de limiet te verhogen. |
 | `RESULT_TOO_LARGE` | 400 | De instellingen zouden een afbeelding opleveren die groter is dan de encoder- of pixellimiet toestaat. | Gebruik een kleinere afbeelding of instellingen die een kleiner resultaat geven. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice of pandoc kon het document niet openen. Het kan beschadigd zijn, met een wachtwoord beveiligd zijn, of niet het formaat hebben dat de extensie aangeeft. | Controleer of het bestand in een office-app opent en stuur het daarna opnieuw. |
 | `PDF_DAMAGED` | 400 | De pdf-engine vond een kapotte documentstructuur. | Haal het bestand door Repair PDF en probeer het opnieuw. |
 | `PDF_PASSWORD_PROTECTED` | 400 | De pdf is versleuteld en deze tool kan hem niet openen. | Ontgrendel hem eerst met Unlock PDF. |
 | `NO_AUDIO_TRACK` | 400 | Het bestand heeft geen audiostream die een audiotool kan gebruiken. | Stuur een bestand met audio. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg kon de audio of video niet lezen: er zijn geen pakketten, geen codecparameters, geen `moov`-atom of gegevens die het niet kan parseren. | Controleer of het bestand in een mediaspeler afspeelt, of exporteer het opnieuw, en probeer het daarna opnieuw. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode kreeg invoer die geen Base64 is. Witruimte wordt genegeerd en zowel het standaardalfabet als het URL-veilige alfabet wordt geaccepteerd. | Controleer de tekst op verdwaalde tekens of een afgekapt einde. |
+| `DECODED_DATA_NOT_TEXT` | 400 | De Base64 is geldig, maar decodeert naar binaire gegevens en niet naar UTF-8-tekst. | Decodeer het met een tool die een bestand opslaat in plaats van tekst te tonen. |
 | `PAGE_OUT_OF_RANGE` | 400 | Het paginabereik noemt een pagina die de pdf niet heeft. | Controleer het aantal pagina's en stuur een bereik binnen dat aantal. |
 | `INVALID_PAGE_RANGE` | 400 | Het paginabereik heeft geen geldige syntaxis. | Gebruik paginanummers zoals `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages kreeg het verzoek om alle pagina's te verwijderen. | Houd minstens één pagina over. |
@@ -172,6 +177,7 @@ Tools, batchruns en pipelines die een optionele AI-bundel nodig hebben, gebruike
 | `NO_FACE_DETECTED` | 400 | Passport Photo vond geen gezicht in de afbeelding. | Stuur een duidelijke, frontale foto met goede belichting. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Compressie, of de groottelimiet van een pasfoto, kan het bestand niet onder de gevraagde grootte krijgen, zelfs niet na verkleining. | Vraag een grotere doelgrootte, of snijd de afbeelding eerst bij. |
 | `TOO_MANY_PAGES` | 400 | OCR kreeg het verzoek om meer pagina's te verwerken dan in één taak mogelijk is. | Selecteer minder pagina's met het paginabereik. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR op een TIFF met meerdere pagina's las meer dan 1.000.000 bytes tekst over de pagina's heen, wat meer is dan één resultaat kan opslaan. | Splits de TIFF in kleinere bestanden en voer OCR op elk uit. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata vond de bestaande EXIF-gegevens van de afbeelding beschadigd, dus ze kunnen niet veilig worden herschreven. | Verwijder de metadata eerst met Remove Image Metadata en bewerk daarna. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML of Markdown naar pdf vond een verwijzing naar een afbeelding, stylesheet of lettertype op het netwerk, die de server niet ophaalt. | Sluit de bron in het bestand in (bijvoorbeeld als `data:`-URI) en probeer het opnieuw. |
 
@@ -218,10 +224,11 @@ Deze codes bestaan in de serverbron voor logs, telemetrie of de eigen fouten van
 | `SIEM_DECRYPTION_FAILED` | Gemeld aan foutopsporing door SIEM-doorsturing. De auth-header van de SIEM kan niet worden ontsleuteld. |
 | `WEBHOOK_DECRYPTION_FAILED` | Gemeld aan foutopsporing. Het verzoek dat dezelfde fout tegenkwam, antwoordt met `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Gemeld aan foutopsporing wanneer een gestagede upload niet kan worden verwijderd. |
+| `RETENTION_DEADLINE_BACKFILLED` | Gemeld aan foutopsporing door de TTL-opruiming van de opslag wanneer die de ontbrekende bewaartermijn van het team voor een voltooide taak aanvult. De bestanden van de taak volgen dan de bewaartermijn van het team. |
 | `USERNAME_RACE_EXHAUSTED` | Opgeworpen wanneer SSO-automatisch-aanmaken bij elke nieuwe poging de race om de gebruikersnaam verliest. De inlogpagina toont in plaats daarvan een fout. |
 | `ERR_OUT_OF_RANGE` | Opgeworpen door de lezer van objectopslag voor een ongeldig bytebereik. |
 | `ETIMEDOUT` | Gezet op de time-outfout van een GDPR-export. De export mislukt en kan opnieuw worden aangevraagd. |
 | `FST_REQ_FILE_TOO_LARGE` | De code van Fastify voor een upload boven de limiet. Clients krijgen een 413 met `PAYLOAD_TOO_LARGE`, of het eigen 413-bericht van de route. |
 | `TARGET_SIZE_EXCEEDED` | Opgeworpen wanneer compressie op doelgrootte het doel mist. De fout heeft geen status of code, dus clients krijgen een algemene mislukking. |
 | `OCR_CACHE_PERMISSIONS` | Gemeld aan foutopsporing als operationele fout wanneer het AI-gegevensvolume de OCR-runtimecache door iedereen beschrijfbaar achterlaat. De installatietaak mislukt met een bericht dat het opslagprobleem benoemt. |
-| `OCR_RUNTIME_UNREACHABLE` | Gemeld aan foutopsporing als operationele fout wanneer de server huggingface.co nooit bereikte om de OCR-runtime te downloaden. De installatietaak mislukt met een bericht over netwerktoegang, `HTTPS_PROXY` en offline import. |
+| `OCR_RUNTIME_UNREACHABLE` | Gemeld aan foutopsporing als operationele fout wanneer de server huggingface.co nooit bereikte om de OCR-runtime te downloaden. De installatietaak mislukt met een bericht over netwerktoegang, `HTTPS_PROXY`, `HF_ENDPOINT` en offline import. |

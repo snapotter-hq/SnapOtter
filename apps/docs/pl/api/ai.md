@@ -1,13 +1,14 @@
 ---
 description: "Dokumentacja silnika AI ze wszystkimi lokalnymi narzędziami ML. Usuwanie tła, powiększanie, OCR, wykrywanie twarzy, renowacja zdjęć i więcej."
-i18n_output_hash: 1fdd20c038d6
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: c606f8eac7f4
+i18n_hash_version: 2
 ---
 
 # Dokumentacja silnika AI {#ai-engine-reference}
 
-Pakiet `@snapotter/ai` koordynuje natywne narzędzia i środowiska wykonawcze Python dla lokalnych operacji ML. Większość narzędzi ML wykorzystuje trwały Python sidecar do szybkiego ciepłego startu. OCR jest celowo oddzielny: `fast` wywołuje natywny plik binarny Tesseract, podczas gdy `balanced` i `best` używają dedykowanego trwałego JSONL dispatcher przypiętego do aktywnej, niezmiennej generacji RapidOCR w ramach `/data/ai/v3`. Każde żądanie zawiera generation lease. Podczas aktualizacji SnapOtter uruchamia smoke test na kandydacie przed aktywacją, atomowo przełącza się na nowy dispatcher, a następnie opróżnia starą generację przed garbage collection.
+Pakiet `@snapotter/ai` koordynuje natywne narzędzia i środowiska wykonawcze Python dla lokalnych operacji ML. Większość narzędzi ML wykorzystuje trwały Python sidecar do szybkiego ciepłego startu. OCR jest celowo oddzielny: `fast` wywołuje natywny plik binarny Tesseract, podczas gdy `balanced` i `best` używają dedykowanego trwałego JSONL dispatcher przypiętego do aktywnej, niezmiennej generacji RapidOCR w ramach `/data/ai/v3`. Każde żądanie utrzymuje generation lease. Podczas aktualizacji SnapOtter uruchamia smoke test na kandydacie przed aktywacją, atomowo przełącza się na nowy dispatcher, a następnie opróżnia starą generację przed garbage collection.
 
 NVIDIA CUDA jest automatycznie wykrywany i używany przez środowiska wykonawcze, które go obsługują. OCR używa CPU na każdym hoście, w tym na systemach z procesorami graficznymi NVIDIA, unikając łączenia CUDA i sterowników dla tego narzędzia.
 
@@ -15,12 +16,6 @@ Przyspieszenie iGPU Intel/AMD za pośrednictwem VA-API, Quick Sync lub OpenCL ni
 
 19 narzędzi AI procesu pomocniczego Pythona w czterech modalnościach (obraz, dźwięk, wideo, dokument), plus 2 narzędzia z opcjonalnymi funkcjami AI. Wszystkie modele działają lokalnie - po początkowym pobraniu modeli internet nie jest wymagany.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Zgodność OCR dla języka koreańskiego i arabskiego
-Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie język koreański (`ko`) ani arabski (`ar`). Koreański i arabski wymagają dokładnego pakietu OCR i `balanced` lub `best`. Pakiet działa w oficjalnych kontenerach Linux amd64 i arm64, także na hostach NVIDIA, gdzie OCR nadal używa CPU. Nieobsługiwany system otrzymuje jawny błąd zgodności i nigdy po cichu nie przechodzi na `fast`. Koreański lub arabski z `fast` lub starszym aliasem `tesseract` jest odrzucany przed zakolejkowaniem z `FEATURE_INCOMPATIBLE` i `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Architektura {#architecture}
 
 ```
@@ -62,7 +57,7 @@ Modele AI są pakowane według współdzielonego stosu zależności, a nie jako 
 
 Obraz Docker dostarcza aplikację oraz wspólne środowisko uruchomieniowe. Duże archiwa modeli są pobierane na żądanie do trwałego woluminu `/data/ai`, a następnie ponownie wykorzystywane przez każde narzędzie, które ich potrzebuje. Jeśli pakiet jest już zainstalowany, ponieważ inne narzędzie go potrzebowało, włączenie nowego zależnego narzędzia nie powoduje ponownego pobrania tego pakietu.
 
-Większość narzędzi AI wymaga jednego lub więcej pakietów funkcji, zanim będą mogły zostać uruchomione. Interfejs administratora instaluje je za pomocą narzędzia `POST /api/v1/admin/tools/:toolId/features/install`, które rozpoznaje pełną listę pakietów, pomija już zainstalowane pakiety i umieszcza w kolejce tylko brakujące pliki do pobrania. Na przykład włączenie narzędzia Zdjęcie paszportowe na świeżej instancji kolejkuje `background-removal` i `face-detection`; włączenie go, gdy Usuwanie tła jest już zainstalowane, kolejkuje tylko `face-detection`. OCR jest wyjątkiem, ponieważ `fast` nie wymaga pakietu; zainstaluj opcjonalne dokładne środowisko wykonawcze za pośrednictwem interfejsu użytkownika lub `POST /api/v1/admin/features/ocr/install`.
+Większość narzędzi AI wymaga jednego lub więcej pakietów funkcji, zanim będą mogły zostać uruchomione. Interfejs administratora instaluje je według narzędzia za pomocą `POST /api/v1/admin/tools/:toolId/features/install`, które rozpoznaje pełną listę pakietów, pomija już zainstalowane pakiety i umieszcza w kolejce tylko brakujące pliki do pobrania. Na przykład włączenie narzędzia Zdjęcie paszportowe na świeżej instancji kolejkuje `background-removal` i `face-detection`; włączenie go, gdy Usuwanie tła jest już zainstalowane, kolejkuje tylko `face-detection`. OCR jest wyjątkiem, ponieważ `fast` nie wymaga pakietu; zainstaluj opcjonalne dokładne środowisko wykonawcze za pośrednictwem interfejsu użytkownika lub `POST /api/v1/admin/features/ocr/install`.
 
 | Pakiet | Rozmiar | Minimalna pamięć RAM | Współdzielona grupa zależności | Narzędzia, które go używają |
 |--------|------|------|-------------------------|-------------------|
@@ -84,9 +79,13 @@ Narzędzia z zależnościami międzypakietowymi:
 
 Narzędzie jest dostępne tylko wtedy, gdy zainstalowane są wszystkie wymagane pakiety, z wyjątkiem OCR: jego wbudowana warstwa `fast` pozostaje dostępna bez opcjonalnego pakietu OCR. Instalacje częściowe są ważne i obsługiwane przyrostowo: zainstalowane pakiety są ponownie wykorzystywane, brakujące pakiety są wyświetlane jako pliki do pobrania, a instalacje w kolejce są uruchamiane pojedynczo, więc współdzielone środowisko Python nie jest modyfikowane jednocześnie.
 
+### Pobieranie przez serwer lustrzany {#downloading-through-a-mirror}
+
+Archiwa pakietów i dokładne środowisko wykonawcze OCR są pobierane z huggingface.co. Tam, gdzie ten host jest zablokowany lub wolny, ustaw `HF_ENDPOINT` w kontenerze aplikacji na serwer lustrzany Hugging Face, na przykład `HF_ENDPOINT=https://hf-mirror.com`. Korzysta z niego każde pobranie pakietu i środowisko wykonawcze OCR, w tym zapasowy downloader i link do ręcznego pobrania w błędzie instalacji. Użyj adresu `https` bez danych uwierzytelniających; instalacja środowiska OCR odrzuca wszystko inne. Integralność nie zależy od serwera lustrzanego: każde archiwum pakietu jest sprawdzane względem SHA-256, a indeks środowiska OCR jest podpisany, więc serwer lustrzany podający zmienione pliki powoduje niepowodzenie instalacji. Wyjątkiem jest `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: pobrania środowiska, które uzupełniają brakującą wagę modelu, również używają `HF_ENDPOINT`, a te wagi nie mają weryfikowanej sumy kontrolnej, więc łącz oba ustawienia tylko z serwerem lustrzanym, któremu ufasz. Jeśli serwer łączy się z internetem przez proxy, zobacz [Proxy wychodzące i prywatny CA](/pl/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Instalowanie wszystkich pakietów naraz {#installing-every-bundle-at-once}
 
-W **Ustawieniach → Funkcje AI** znajduje się przycisk **Zainstaluj wszystkie**, który kolejkuje każdy pakiet, jaki host może uruchomić. Pomija wszystko, co jest już zainstalowane, pomija pakiety zgłoszone jako niezgodne z hostem i ponawia raz nieudaną instalację pakietu, zanim przejdzie dalej. W typowej instancji ten przycisk wystarcza i nic z poniższych kroków nie jest potrzebne.
+W Ustawieniach, w sekcji Funkcje AI, znajduje się przycisk **Zainstaluj wszystkie**, który kolejkuje każdy pakiet, jaki host może uruchomić. Pomija wszystko, co jest już zainstalowane, pomija pakiety zgłoszone jako niezgodne z hostem i ponawia raz nieudaną instalację pakietu, zanim przejdzie dalej. W typowej instancji ten przycisk wystarcza i nic z poniższych kroków nie jest potrzebne.
 
 Najpierw zaplanuj miejsce na dysku. Razem pakiety zajmują po instalacji około 20-25 GB i trafiają do `/data/ai` na woluminie danych, a nie do obrazu, więc przetrwają `docker compose down` i odtworzenie kontenera. Instalujesz je raz na host, a nie raz na aktualizację.
 
@@ -107,13 +106,13 @@ Na dwie rzeczy warto się przygotować. Pakiet `ocr` wykonuje wstępną kontrol�
 
 ### Dokładna instalacja środowiska wykonawczego OCR {#accurate-ocr-runtime-installation}
 
-Dokładny pakiet OCR to specyficzne dla platformy środowisko uruchomieniowe dla oficjalnego kontenera Linux amd64 lub Linux arm64. Kompilacja amd64 używa Pythona 3.12, a kompilacja arm64 Pythona 3.11. Obie kompilacje uruchamiają RapidOCR przez `CPUExecutionProvider` ONNX Runtime, więc ten sam pakiet działa na hostach z samym CPU i na hostach NVIDIA Docker. Dokładne środowisko wymaga co najmniej 4 GiB efektywnej pamięci: skonfigurowanego limitu cgroup kontenera, a w przeciwnym razie pamięci hosta. System poniżej tego podpisanego minimum zgodności jest odrzucany przed pobraniem. Wymóg ten nie dotyczy wbudowanego Szybkiego OCR. Kompilacje bare-metal są odrzucane, ponieważ nie można bezpiecznie wywnioskować ich libc i ABI Pythona; Szybki OCR pozostaje dostępny, gdy host udostępnia Tesseract i Ghostscript. Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie koreański (`ko`) ani arabski (`ar`). Koreański i arabski wymagają więc obsługiwanego dokładnego środowiska i poziomu `balanced` lub `best`; nieobsługiwane hosty otrzymują jawną odpowiedź o niezgodności zamiast cichego przejścia na Szybki OCR.
+Dokładny pakiet OCR to specyficzne dla platformy środowisko uruchomieniowe dla oficjalnego kontenera Linux amd64 lub Linux arm64. Kompilacja amd64 używa Pythona 3.12, a kompilacja arm64 Pythona 3.11. Obie kompilacje uruchamiają RapidOCR przez `CPUExecutionProvider` ONNX Runtime, więc ten sam pakiet działa na hostach z samym CPU i na hostach NVIDIA Docker. Dokładne środowisko wymaga co najmniej 4 GiB efektywnej pamięci: skonfigurowanego limitu cgroup kontenera, a w przeciwnym razie pamięci hosta. System poniżej tego podpisanego minimum zgodności jest odrzucany przed pobraniem. Wymóg ten nie dotyczy wbudowanego Szybkiego OCR. Kompilacje bare-metal są odrzucane, ponieważ nie można bezpiecznie wywnioskować ich libc i ABI Pythona; Szybki OCR pozostaje dostępny, gdy host udostępnia Tesseract i Ghostscript. Szybki OCR obsługuje `auto`, `en`, `de`, `es`, `fr`, `zh` i `ja`, ale nie koreański (`ko`). Koreański wymaga więc obsługiwanego dokładnego środowiska i poziomu `balanced` lub `best`; nieobsługiwane hosty otrzymują jawną odpowiedź o niezgodności zamiast cichego przejścia na Szybki OCR.
 
 Opcjonalny artefakt ma około 208-234 MiB po kompresji i 409-488 MiB po rozpakowaniu, w zależności od architektury. Podpisany indeks wiąże dokładną liczbę skompresowanych i rozpakowanych bajtów wymuszaną przez instalatora. Wbudowany Tesseract dodaje około 25 MiB do oficjalnego obrazu i nie wymaga żadnych plików w `/data/ai`.
 
-Instalacja online pobiera podpisany indeks wersji i dokładny artefakt adresowany do treści dla bieżącej platformy. SnapOtter weryfikuje sygnaturę indeksu Ed25519, rozmiar artefaktu, podsumowanie SHA-256, podsumowania modelu, ścieżki, tryby plików i etapową smoke test przed atomową aktywacją nowej generacji. Nieudana instalacja pozostawia aktywną poprzednią, zdrową generację.
+Instalacja online pobiera podpisany indeks wersji i dokładny artefakt adresowany do treści dla bieżącej platformy. SnapOtter weryfikuje sygnaturę indeksu Ed25519, rozmiar artefaktu, podsumowanie SHA-256, podsumowania modelu, ścieżki, tryby plików i etapowy smoke test przed atomową aktywacją nowej generacji. Nieudana instalacja pozostawia aktywną poprzednią, zdrową generację.
 
-W przypadku instalacji z przerwą powietrzną prześlij zarówno wersję `ocr-runtime-index.json`, jak i pasujące archiwum wykonawcze OCR do `POST /api/v1/admin/features/import`, używając wieloczęściowych pól o nazwach `index` i `archive`. Import offline stosuje te same kontrole podpisu, skrótu, ekstrakcji, zgodności i testu dymu, co podczas instalacji online; archiwum bez zaufanego podpisanego indeksu jest odrzucane.
+W przypadku instalacji z przerwą powietrzną prześlij zarówno `ocr-runtime-index.json` wydania, jak i pasujące archiwum środowiska OCR do `POST /api/v1/admin/features/import`, używając wieloczęściowych pól o nazwach `index` i `archive`. Import offline stosuje te same kontrole podpisu, skrótu, ekstrakcji, zgodności i smoke testu, co instalacja online; archiwum bez zaufanego podpisanego indeksu jest odrzucane.
 
 ---
 
@@ -189,12 +188,12 @@ Rozmywa tło, zachowując ostrość obiektu.
 
 | Parametr | Typ | Domyślnie | Opis |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy `quality` jest pominięte, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego i arabskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy jakość jest pominięta, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego i arabskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
 | `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast nie obsługuje `ko` ani `ar` |
-| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
+| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Best |
 | `engine` | string | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
 
-Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`. Jawne użycie Fast lub starszego `tesseract` z językiem koreańskim lub arabskim zwraca `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` i wskazówkę dotyczącą dokładnego pakietu, zanim zadanie trafi do kolejki.
+Zwraca wyodrębniony tekst oraz metadane pochodzenia: silnik, żądaną i rzeczywistą jakość, urządzenie, dostawcę, stan degradacji, ostrzeżenia i dokładne wersje środowiska wykonawczego/modelu, jeśli ma to zastosowanie. Wyraźne żądania jakości nigdy nie przechodzą na inny poziom. Jeżeli `balanced` lub `best` jest niedostępne, API zwraca `FEATURE_NOT_INSTALLED` lub `FEATURE_INCOMPATIBLE` zamiast cichego działania `fast`. Jawne użycie Fast lub starszego `tesseract` z językiem koreańskim zwraca `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` i wskazówkę dotyczącą dokładnego pakietu, zanim zadanie trafi do kolejki.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -205,10 +204,10 @@ Wyodrębnia tekst ze skanowanych dokumentów PDF przy użyciu OCR wspieranego pr
 
 | Parametr | Typ | Domyślnie | Opis |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy `quality` jest pominięte, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego i arabskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dynamiczny | Poziom przetwarzania. Gdy jakość jest pominięta, wybierany jest najwyższy dostępny poziom w kolejności `best`, `balanced`, `fast`. Dla języka koreańskiego i arabskiego nigdy nie wybiera `fast`; bez dokładnego poziomu zwraca błąd nakazujący instalację dokładnego środowiska albo błąd zgodności |
 | `language` | string | `"auto"` | Język: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast nie obsługuje `ko` ani `ar` |
 | `pages` | string | `"all"` | Wybór stron: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Najlepsze |
+| `enhance` | boolean | Zależne od poziomu | Popraw lokalny kontrast. Fast stosuje go bezpośrednio; dokładne poziomy utrzymują wariant tylko wtedy, gdy skalibrowana punktacja poprawia OCR. Domyślnie włączone dla Best |
 | `engine` | string | - | Przestarzały alias zgodności. Mapuje `tesseract` na `fast` i starszą wartość `paddleocr` na `balanced`; nie ładuje PaddlePaddle |
 
 Te same zasady braku przechodzenia na niższy poziom i zgodności z językiem koreańskim i arabskim mają zastosowanie do OCR PDF. Strony PDF są rasteryzowane przed rozpoznaniem, a jedno żądanie może wybrać maksymalnie 50 stron.
@@ -327,6 +326,9 @@ Przyjmuje treść JSON z wynikami Fazy 1 oraz ustawieniami generowania:
 | `landmarks` | object | (wymagane) | Punkty charakterystyczne z Fazy 1 |
 | `imageWidth` | number | (wymagane) | Szerokość obrazu z Fazy 1 |
 | `imageHeight` | number | (wymagane) | Wysokość obrazu z Fazy 1 |
+| `clientJobId` | string | (generowane) | Własny identyfikator zadania dla strumienia postępu |
+
+Generowanie działa jako zadanie w kolejce: `200` z wynikiem w obrębie synchronicznego okna oczekiwania, `202` z identyfikatorem zadania po jego upływie. Szczegóły w [Zdjęcie paszportowe](/pl/tools/image/passport-photo#phase-2-generate).
 
 ## Usuwanie obiektów (Inpainting) {#object-erasing-inpainting}
 

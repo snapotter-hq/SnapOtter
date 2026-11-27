@@ -1,8 +1,8 @@
 ---
 description: "Stel SCIM 2.0-provisioning in om gebruikers en groepen vanuit je identity provider naar SnapOtter te synchroniseren. Behandelt Okta, Azure AD / Entra ID en aangepaste integraties."
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: e1cd1731ce4b
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: c1edf4de9ec8
 i18n_hash_version: 2
 ---
 
@@ -75,7 +75,7 @@ SCIM-eindpunten zijn per token beperkt tot 1000 verzoeken per minuut. Wie deze l
 | User | Gebruikersaccount | Ja | Ja | Ja | Soft delete |
 | Group | Team | Ja | Ja | Ja | Ja |
 
-::: warning 
+::: warning  
 SCIM-groepen worden gekoppeld aan SnapOtter-**teams**, niet aan rollen. SCIM kan de rol van een gebruiker niet instellen. Alle via SCIM aangemaakte gebruikers krijgen de `user`-rol. Gebruik de SnapOtter-beheerdersinterface om de rol van een gebruiker te wijzigen.
 :::
 
@@ -147,7 +147,7 @@ De gebruiker kan niet meer inloggen of API-sleutels gebruiken. Hun gegevens (bes
 
 Om een eerder gedeactiveerde gebruiker te heractiveren, stuur je een `PUT`- of `PATCH`-verzoek met `active: true`. SnapOtter herstelt de oorspronkelijke rol van vóór de deactivatie (bijv. `disabled:editor` wordt weer `editor`). Als de oorspronkelijke rol niet kan worden bepaald, valt het terug op `user`.
 
-::: details Voorbeeld: deactiveren en heractiveren via PATCH
+::: details 
 ```json
 // Deactivate
 {
@@ -164,7 +164,7 @@ Om een eerder gedeactiveerde gebruiker te heractiveren, stuur je een `PUT`- of `
     { "op": "replace", "path": "active", "value": true }
   ]
 }
-```
+```Voorbeeld: deactiveren en heractiveren via PATCH
 :::
 
 ## Groepsbewerkingen {#group-operations}

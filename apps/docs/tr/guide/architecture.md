@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ın monorepo yapısı, uygulama ve paket mimarisi, istek yaşam döngüsü ve kaynak ayak izi."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 0d020a6fb0d5
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: 73dcedee8968
 i18n_hash_version: 2
 ---
 
@@ -37,7 +37,7 @@ Bu paketin ağ bağımlılığı yoktur ve tamamen işlem içinde çalışır.
 
 ### `@snapotter/ai` {#snapotter-ai}
 
-Yerel ve Python ML çalışma zamanlarını çağıran bir köprü katmanı. Çoğu Python aracı, ağır kitaplıkları (PIL, NumPy, MediaPipe, rembg) önceden içe aktaran kalıcı bir dispatcher kullanır, böylece sonraki çağrılar içe aktarma yükünü atlar. OCR, bu değiştirilebilir paylaşılan ortamdan yalıtılmıştır: `fast`, yerel Tesseract'yi çağırırken, `balanced` ve `best`, aktif değişmez RapidOCR/ONNX nesline sabitlenmiş özel bir kalıcı JSONL dispatcher kullanır. Her istek bir generation lease içerir. Etkinleştirme önce bir aday üzerinde smoke test çalıştırır, ardından atomik olarak dispatcher'ye geçiş yapar. Önceki dispatcher, oluşturulmadan önce çöp toplama işlemine tabi tutuluyor.
+Yerel ve Python ML çalışma zamanlarını çağıran bir köprü katmanı. Çoğu Python aracı, ağır kitaplıkları (PIL, NumPy, MediaPipe, rembg) önceden içe aktaran kalıcı bir dispatcher kullanır, böylece sonraki çağrılar içe aktarma yükünü atlar. OCR, bu değiştirilebilir paylaşılan ortamdan yalıtılmıştır: `fast`, yerel Tesseract'yi çağırırken, `balanced` ve `best`, aktif değişmez RapidOCR/ONNX nesline sabitlenmiş özel bir kalıcı JSONL dispatcher kullanır. Her istek bir generation lease içerir. Etkinleştirme önce bir aday üzerinde smoke test çalıştırır, ardından atomik olarak dispatcher'ye geçiş yapar. Önceki dispatcher, nesli çöp toplamaya alınmadan önce boşaltılır.
 
 **Modeller önceden yüklenmez.** Her araç betiği, model ağırlıklarını istek zamanında diskten yükler ve istek bittiğinde bunları atar. Tam bellek profili için [Kaynak ayak izi](#resource-footprint) bölümüne bakın.
 

@@ -1,8 +1,9 @@
 ---
 description: "Referencia del motor de IA con todas las herramientas de ML locales. Eliminación de fondo, escalado, OCR, detección de rostros, restauración de fotos y más."
-i18n_output_hash: b39b5e48f5c9
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 5509d49535a4
+i18n_hash_version: 2
 ---
 
 # Referencia del motor de IA {#ai-engine-reference}
@@ -15,12 +16,6 @@ La aceleración con iGPU de Intel/AMD a través de VA-API, Quick Sync u OpenCL n
 
 19 herramientas de IA del sidecar de Python en cuatro modalidades (imagen, audio, video, documento), más 2 herramientas con capacidades de IA opcionales. Todos los modelos se ejecutan localmente: no se requiere internet tras la descarga inicial del modelo.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Compatibilidad del OCR coreano
-OCR rápido admite `auto`, `en`, `de`, `es`, `fr`, `zh` y `ja`, pero no coreano (`ko`) ni árabe (`ar`). Ambos requieren el paquete OCR preciso y `balanced` o `best`. El paquete funciona en los contenedores oficiales Linux amd64 y arm64, incluidos hosts NVIDIA, donde el OCR sigue usando la CPU. Los sistemas no compatibles reciben un error explícito y nunca vuelven silenciosamente a `fast`. Coreano o árabe con `fast` o el alias heredado `tesseract` se rechaza antes de encolarse con `FEATURE_INCOMPATIBLE` y `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Arquitectura {#architecture}
 
 ```
@@ -84,6 +79,10 @@ Herramientas con dependencias entre paquetes:
 
 Una herramienta está disponible solo cuando todos los paquetes requeridos están instalados, excepto OCR: su nivel `fast` integrado permanece disponible sin el paquete OCR opcional. Las instalaciones parciales son válidas y se manejan de forma incremental: los paquetes instalados se reutilizan, los paquetes faltantes se muestran como descargas y las instalaciones en cola se ejecutan una a la vez para que el entorno Python compartido no se modifique al mismo tiempo.
 
+### Descarga a través de un mirror {#downloading-through-a-mirror}
+
+Los archivos de los paquetes y el tiempo de ejecución de OCR preciso se descargan desde huggingface.co. Si ese host está bloqueado o es lento, define `HF_ENDPOINT` en el contenedor de la aplicación con un mirror de Hugging Face, por ejemplo `HF_ENDPOINT=https://hf-mirror.com`. Lo usan todas las descargas de paquetes y el tiempo de ejecución de OCR, incluido el descargador de respaldo y el enlace de descarga manual de un error de instalación. Usa una URL `https` sin credenciales; la instalación del tiempo de ejecución de OCR rechaza cualquier otra. La integridad no depende del mirror: cada archivo de paquete se comprueba contra su SHA-256 y el índice del tiempo de ejecución de OCR está firmado, así que un mirror que sirva archivos alterados hace fallar la instalación. La excepción es `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: las descargas del tiempo de ejecución que completan un peso de modelo ausente también usan `HF_ENDPOINT`, y esos pesos no se verifican con checksum, así que combina ambos solo con un mirror de confianza. Si el servidor llega a internet a través de un proxy, consulta [Proxy de salida y CA privada](/es/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Instalar todos los paquetes a la vez {#installing-every-bundle-at-once}
 
 En Ajustes > Funciones de IA hay un botón **Instalar todo** que pone en cola todos los paquetes que el host puede ejecutar. Omite lo que ya está instalado, omite los paquetes que se informan como incompatibles con el host y reintenta una vez un paquete fallido antes de continuar. Para una instancia normal, ese botón es la respuesta completa y no hace falta nada de lo que sigue.
@@ -107,7 +106,7 @@ Hay dos cosas que tener en cuenta. El paquete `ocr` ejecuta una comprobación pr
 
 ### Instalación precisa del tiempo de ejecución de OCR {#accurate-ocr-runtime-installation}
 
-El paquete OCR preciso es un tiempo de ejecución específico de la plataforma para el contenedor oficial Linux amd64 o Linux arm64. La compilación amd64 utiliza Python 3.12; la compilación arm64 utiliza Python 3.11. Ambas compilaciones ejecutan RapidOCR a través de `CPUExecutionProvider` de ONNX Runtime, por lo que el mismo paquete funciona solo en hosts de CPU y NVIDIA Docker. El tiempo de ejecución preciso requiere al menos 4 GiB de memoria efectiva: el límite cgroup del contenedor configurado; de lo contrario, la memoria del host. Un sistema por debajo de ese mínimo de compatibilidad firmado se rechaza antes de la descarga. Este requisito no se aplica al Fast OCR integrado. Las compilaciones de Bare-metal se rechazan porque sus libc y Python ABI no se pueden inferir de forma segura; Fast OCR permanece disponible cuando el host proporciona Tesseract y Ghostscript. Fast admite `auto`, `en`, `de`, `es`, `fr`, `zh` y `ja`, pero no coreano (`ko`) ni árabe (`ar`). Ambos, por tanto, requieren un tiempo de ejecución preciso compatible y un nivel `balanced` o `best`; los hosts no compatibles reciben, para coreano o árabe, una respuesta explícita de incompatibilidad en lugar de volver silenciosamente a Fast.
+El paquete OCR preciso es un tiempo de ejecución específico de la plataforma para el contenedor oficial Linux amd64 o Linux arm64. La compilación amd64 utiliza Python 3.12; la compilación arm64 utiliza Python 3.11. Ambas compilaciones ejecutan RapidOCR a través de `CPUExecutionProvider` de ONNX Runtime, por lo que el mismo paquete funciona solo en hosts de CPU y NVIDIA Docker. El tiempo de ejecución preciso requiere al menos 4 GiB de memoria efectiva: el límite cgroup del contenedor configurado; de lo contrario, la memoria del host. Un sistema por debajo de ese mínimo de compatibilidad firmado se rechaza antes de la descarga. Este requisito no se aplica al Fast OCR integrado. Las compilaciones de Bare-metal se rechazan porque sus libc y Python ABI no se pueden inferir de forma segura; Fast OCR permanece disponible cuando el host proporciona Tesseract y Ghostscript. Fast admite `auto`, `en`, `de`, `es`, `fr`, `zh` y `ja`, pero no coreano (`ko`). Por tanto, el coreano requiere un tiempo de ejecución preciso compatible y un nivel `balanced` o `best`; los hosts no compatibles reciben una respuesta explícita de incompatibilidad en lugar de volver silenciosamente a Fast.
 
 El artefacto opcional tiene aproximadamente 208-234 MiB comprimidos y 409-488 MiB extraídos, según la arquitectura. El índice firmado vincula los recuentos exactos de bytes comprimidos y extraídos aplicados por el instalador. El Tesseract integrado agrega aproximadamente 25 MiB a la imagen oficial y no necesita archivos en `/data/ai`.
 
@@ -119,7 +118,7 @@ Para una instalación aislada, cargue tanto el archivo `ocr-runtime-index.json` 
 
 ## Eliminación de fondo {#background-removal}
 
-**Ruta de la herramienta:** `remove-background`  
+**Ruta de la herramienta:** `remove-background`
 **Modelo:** rembg con BiRefNet (por defecto) o variantes de U2-Net
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -140,7 +139,7 @@ Para una instalación aislada, cargue tanto el archivo `ocr-runtime-index.json` 
 
 ## Reemplazo de fondo {#background-replace}
 
-**Ruta de la herramienta:** `background-replace`  
+**Ruta de la herramienta:** `background-replace`
 **Modelo:** rembg / BiRefNet (compartido con remove-background)
 
 Elimina el fondo y lo reemplaza por un color sólido o un degradado.
@@ -157,7 +156,7 @@ Elimina el fondo y lo reemplaza por un color sólido o un degradado.
 
 ## Desenfocar fondo {#blur-background}
 
-**Ruta de la herramienta:** `blur-background`  
+**Ruta de la herramienta:** `blur-background`
 **Modelo:** rembg / BiRefNet (compartido con remove-background)
 
 Desenfoca el fondo mientras mantiene nítido al sujeto.
@@ -170,7 +169,7 @@ Desenfoca el fondo mientras mantiene nítido al sujeto.
 
 ## Escalado de imagen {#image-upscaling}
 
-**Ruta de la herramienta:** `upscale`  
+**Ruta de la herramienta:** `upscale`
 **Modelo:** RealESRGAN (con respaldo Lanczos cuando no está disponible)
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -184,38 +183,38 @@ Desenfoca el fondo mientras mantiene nítido al sujeto.
 
 ## OCR / Extracción de texto {#ocr-text-extraction}
 
-**Ruta de la herramienta:** `ocr`  
+**Ruta de la herramienta:** `ocr`
 **Modelos:** Tesseract (`fast`); RapidOCR con modelos pequeños PP-OCRv6 (`balanced`); Modelos medianos PP-OCRv6 con puntuación de variante calibrada (`best`)
 
 | Parámetro | Tipo | Por defecto | Descripción |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinámica | Si se omiten `quality` y `engine`, SnapOtter elige el mejor nivel disponible en este orden: `best`, `balanced`, `fast`. Para coreano y árabe nunca elige `fast`: usa `best`, luego `balanced`, o devuelve el error de instalación o compatibilidad del entorno preciso. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinámica | Nivel de procesamiento. Si se omite quality, se elige el nivel disponible más alto en este orden: `best`, `balanced`, `fast`. Para coreano y árabe nunca se elige `fast`; sin un nivel preciso, devuelve el error de instalación o compatibilidad del entorno preciso |
 | `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast no admite `ko` ni `ar` |
-| `enhance` | booleano | Dependiente del nivel | Mejorar el contraste local. Fast lo aplica directamente; Los niveles precisos mantienen la variante solo cuando la puntuación calibrada mejora OCR. Valor predeterminado activado para Mejor |
-| `engine` | cadena | - | Alias ​​de compatibilidad obsoleto. Asigna `tesseract` a `fast` y el valor heredado de `paddleocr` a `balanced`; no carga PaddlePaddle |
+| `enhance` | booleano | Dependiente del nivel | Mejorar el contraste local. Fast lo aplica directamente; los niveles precisos mantienen la variante solo cuando la puntuación calibrada mejora OCR. Valor predeterminado activado para Mejor |
+| `engine` | cadena | - | Alias de compatibilidad obsoleto. Asigna `tesseract` a `fast` y el valor heredado de `paddleocr` a `balanced`; no carga PaddlePaddle |
 
-Devuelve el texto extraído más metadatos de procedencia: motor, calidad solicitada y real, dispositivo, proveedor, estado de degradación, advertencias y versiones de modelo/tiempo de ejecución preciso cuando corresponda. Las solicitudes de calidad explícitas nunca recaen en otro nivel. Si `balanced` o `best` no están disponibles, API devuelve `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` en lugar de ejecutar `fast` de forma silenciosa. Un `fast` explícito o el alias heredado `tesseract` con coreano o árabe devuelve `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` y la guía del paquete preciso antes de encolar la tarea.
+Devuelve el texto extraído más metadatos de procedencia: motor, calidad solicitada y real, dispositivo, proveedor, estado de degradación, advertencias y versiones de modelo/tiempo de ejecución preciso cuando corresponda. Las solicitudes de calidad explícitas nunca recaen en otro nivel. Si `balanced` o `best` no están disponibles, API devuelve `FEATURE_NOT_INSTALLED` o `FEATURE_INCOMPATIBLE` en lugar de ejecutar `fast` de forma silenciosa. Un `tesseract` explícito o el alias heredado con coreano devuelve `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"` y la guía del paquete preciso antes de encolar la tarea.
 
 ## OCR de PDF {#pdf-ocr}
 
-**Ruta de la herramienta:** `ocr-pdf`  
+**Ruta de la herramienta:** `ocr-pdf`
 **Modelos:** El mismo sistema de niveles que el OCR de imágenes
 
 Extrae texto de documentos PDF escaneados usando OCR con IA, página por página.
 
 | Parámetro | Tipo | Por defecto | Descripción |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinámica | Si se omiten `quality` y `engine`, SnapOtter elige el mejor nivel disponible en este orden: `best`, `balanced`, `fast`. Para coreano y árabe nunca elige `fast`: usa `best`, luego `balanced`, o devuelve el error de instalación o compatibilidad del entorno preciso. |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinámica | Nivel de procesamiento. Si se omite quality, se elige el nivel disponible más alto en este orden: `best`, `balanced`, `fast`. Para coreano y árabe nunca se elige `fast`; sin un nivel preciso, devuelve el error de instalación o compatibilidad del entorno preciso |
 | `language` | string | `"auto"` | Idioma: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast no admite `ko` ni `ar` |
 | `pages` | string | `"all"` | Selección de páginas: `"all"`, `"1-3"`, `"1,3,5"` |
-| `enhance` | booleano | Dependiente del nivel | Mejorar el contraste local. Fast lo aplica directamente; Los niveles precisos mantienen la variante solo cuando la puntuación calibrada mejora OCR. Valor predeterminado activado para Mejor |
-| `engine` | cadena | - | Alias ​​de compatibilidad obsoleto. Asigna `tesseract` a `fast` y el valor heredado de `paddleocr` a `balanced`; no carga PaddlePaddle |
+| `enhance` | booleano | Dependiente del nivel | Mejorar el contraste local. Fast lo aplica directamente; los niveles precisos mantienen la variante solo cuando la puntuación calibrada mejora OCR. Valor predeterminado activado para Mejor |
+| `engine` | cadena | - | Alias de compatibilidad obsoleto. Asigna `tesseract` a `fast` y el valor heredado de `paddleocr` a `balanced`; no carga PaddlePaddle |
 
-La misma regla de no degradación se aplica a PDF OCR. También se aplican las reglas de compatibilidad con el coreano y el árabe. Las páginas PDF se rasterizan antes del reconocimiento y una solicitud puede seleccionar como máximo 50 páginas.
+Se aplican a PDF OCR las mismas reglas de no degradación y de compatibilidad con el coreano y el árabe. Las páginas PDF se rasterizan antes del reconocimiento y una solicitud puede seleccionar como máximo 50 páginas.
 
 ## Desenfoque de rostros / PII {#face-pii-blur}
 
-**Ruta de la herramienta:** `blur-faces`  
+**Ruta de la herramienta:** `blur-faces`
 **Modelo:** detección de rostros de MediaPipe
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -225,7 +224,7 @@ La misma regla de no degradación se aplica a PDF OCR. También se aplican las r
 
 ## Mejora de rostros {#face-enhancement}
 
-**Ruta de la herramienta:** `enhance-faces`  
+**Ruta de la herramienta:** `enhance-faces`
 **Modelos:** GFPGAN, CodeFormer
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -237,7 +236,7 @@ La misma regla de no degradación se aplica a PDF OCR. También se aplican las r
 
 ## Coloración con IA {#ai-colorization}
 
-**Ruta de la herramienta:** `colorize`  
+**Ruta de la herramienta:** `colorize`
 **Modelo:** DDColor (con respaldo OpenCV DNN)
 
 Convierte fotos en blanco y negro o en escala de grises a color completo.
@@ -249,7 +248,7 @@ Convierte fotos en blanco y negro o en escala de grises a color completo.
 
 ## Eliminación de ruido {#noise-removal}
 
-**Ruta de la herramienta:** `noise-removal`  
+**Ruta de la herramienta:** `noise-removal`
 **Modelo:** SCUNet (pipeline de reducción de ruido por niveles)
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -292,7 +291,7 @@ Pipeline de varios pasos para fotos antiguas o dañadas: detección y reparació
 
 ## Foto de pasaporte {#passport-photo}
 
-**Ruta de la herramienta:** `passport-photo`  
+**Ruta de la herramienta:** `passport-photo`
 **Modelos:** puntos de referencia del rostro de MediaPipe + eliminación de fondo con BiRefNet
 
 Flujo de trabajo en dos fases: analizar (detectar rostro + eliminar fondo) y luego generar (recortar, redimensionar, mosaico). Admite más de 37 países en 6 regiones.
@@ -327,10 +326,13 @@ Acepta un cuerpo JSON con los resultados de la Fase 1 más los ajustes de genera
 | `landmarks` | object | (requerido) | Puntos de referencia de la Fase 1 |
 | `imageWidth` | number | (requerido) | Ancho de imagen de la Fase 1 |
 | `imageHeight` | number | (requerido) | Alto de imagen de la Fase 1 |
+| `clientJobId` | string | (generado) | Tu propio ID de trabajo para el flujo de progreso |
+
+Generate se ejecuta como un trabajo en cola: `200` con el resultado dentro de la ventana de espera síncrona, `202` con un ID de trabajo después de ella. Consulta [Foto de pasaporte](/es/tools/image/passport-photo#phase-2-generate) para ver los detalles.
 
 ## Borrado de objetos (inpainting) {#object-erasing-inpainting}
 
-**Ruta de la herramienta:** `erase-object`  
+**Ruta de la herramienta:** `erase-object`
 **Modelo:** LaMa vía ONNX Runtime
 
 La máscara se envía como una **segunda parte de archivo** (nombre de campo `mask`), no como base64. Los píxeles blancos en la máscara indican las áreas a borrar. Los ajustes `format` y `quality` se envían como campos de formulario de nivel superior.
@@ -346,7 +348,7 @@ Acelerado por CUDA cuando hay disponible una GPU NVIDIA.
 
 ## Expansión de lienzo con IA {#ai-canvas-expand}
 
-**Ruta de la herramienta:** `ai-canvas-expand`  
+**Ruta de la herramienta:** `ai-canvas-expand`
 **Modelo:** outpainting basado en LaMa
 
 Expande el lienzo de una imagen en cualquier dirección y rellena las áreas nuevas con contenido generado por IA que coincide con la imagen existente.
@@ -365,7 +367,7 @@ Al menos una dirección de extensión debe ser mayor que 0.
 
 ## Recorte inteligente {#smart-crop}
 
-**Ruta de la herramienta:** `smart-crop`  
+**Ruta de la herramienta:** `smart-crop`
 **Modelo:** detección de rostros de MediaPipe (solo en modo rostro)
 
 | Parámetro | Tipo | Por defecto | Descripción |
@@ -379,7 +381,7 @@ Al menos una dirección de extensión debe ser mayor que 0.
 | `sensitivity` | number (0-1) | `0.5` | Umbral de detección de rostros |
 | `threshold` | integer (0-255) | `30` | Umbral de detección de fondo (modo recorte) |
 | `padToSquare` | boolean | `false` | Rellenar el resultado recortado hasta un cuadrado |
-| `padColor` | string | `"#ffffff"` | Color de fondo para el relleno cuadrado |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Color de fondo para el relleno cuadrado |
 | `targetSize` | integer | - | Tamaño objetivo para la salida rellenada (píxeles) |
 | `quality` | integer (1-100) | - | Calidad de salida |
 
@@ -396,7 +398,7 @@ Los valores heredados de `mode`, `attention` y `content`, se aceptan y se asigna
 
 ## Transcribir audio {#transcribe-audio}
 
-**Ruta de la herramienta:** `transcribe-audio`  
+**Ruta de la herramienta:** `transcribe-audio`
 **Modelo:** faster-whisper
 
 Convierte voz en texto. Admite formatos de salida de texto plano, SRT y VTT.
@@ -408,7 +410,7 @@ Convierte voz en texto. Admite formatos de salida de texto plano, SRT y VTT.
 
 ## Subtítulos automáticos {#auto-subtitles}
 
-**Ruta de la herramienta:** `auto-subtitles`  
+**Ruta de la herramienta:** `auto-subtitles`
 **Modelo:** faster-whisper (extrae el audio del video y luego lo transcribe)
 
 Genera archivos de subtítulos a partir de la pista de audio de un video.
@@ -420,7 +422,7 @@ Genera archivos de subtítulos a partir de la pista de audio de un video.
 
 ## Corrector de transparencia PNG {#png-transparency-fixer}
 
-**Ruta de la herramienta:** `transparency-fixer`  
+**Ruta de la herramienta:** `transparency-fixer`
 **Modelo:** matting HR de BiRefNet (resolución 2048x2048)
 
 Corrige los PNG con "falsa transparencia", donde se eliminó el fondo pero quedaron bordes irregulares, halos o artefactos semitransparentes. Usa el modelo de matting de alta resolución de BiRefNet para producir un canal alfa limpio y luego aplica un procesamiento de eliminación de bordes configurable para quitar la contaminación de color a lo largo de los bordes.
@@ -448,7 +450,7 @@ Las siguientes herramientas no son herramientas del sidecar de Python, pero usan
 
 ### Mejora de imagen {#image-enhancement}
 
-**Ruta de la herramienta:** `image-enhancement`  
+**Ruta de la herramienta:** `image-enhancement`
 **Motor:** Basado en análisis (histograma y estadísticas de Sharp)
 
 Analiza la imagen y aplica correcciones automáticas de exposición, contraste, balance de blancos, saturación, nitidez y ruido. Admite modos específicos de escena.
@@ -469,7 +471,7 @@ Hay disponible un endpoint de análisis adicional en `POST /api/v1/tools/image/i
 
 ### Redimensionado con reconocimiento de contenido (seam carving) {#content-aware-resize-seam-carving}
 
-**Ruta de la herramienta:** `content-aware-resize`  
+**Ruta de la herramienta:** `content-aware-resize`
 **Motor:** binario `caire` de Go (no Python: sin beneficio de GPU)
 
 Redimensiona imágenes de forma inteligente eliminando o insertando costuras de baja energía, preservando el contenido importante. Cada lado puede crecer como máximo hasta el doble de su tamaño original.

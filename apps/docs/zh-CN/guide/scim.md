@@ -1,8 +1,8 @@
 ---
 description: "设置 SCIM 2.0 预配以将用户和组从你的身份提供商同步到 SnapOtter。涵盖 Okta、Azure AD / Entra ID 以及自定义集成。"
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: f8bf6ac98aba
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: a4afb0662487
 i18n_hash_version: 2
 ---
 
@@ -50,7 +50,7 @@ SCIM 端点使用专用的 Bearer 令牌，与用户会话和 API 密钥分开�
 
 ### 生成令牌 {#generating-a-token}
 
-`POST /api/v1/enterprise/scim/token` 生成新的 SCIM 代币。由于令牌可以跨实例配置和更改用户，因此此端点需要具有完整有效管理权限集的内置 `admin` 角色。将 `users:manage` 保留在自定义角色中是不够的。
+`POST /api/v1/enterprise/scim/token` 生成新的 SCIM 令牌。由于令牌可以跨实例配置和更改用户，因此此端点需要具有完整有效管理权限集的内置 `admin` 角色。将 `users:manage` 保留在自定义角色中是不够的。
 
 令牌以明文形式仅返回一次。SnapOtter 只存储 scrypt 哈希值。如果你丢失了令牌，请吊销它并生成一个新的。
 
@@ -145,7 +145,7 @@ SnapOtter 不会通过 SCIM 硬删除用户。DELETE 会执行软停用：
 
 ### 重新激活用户 {#reactivate-user}
 
-要重新激活先前已停用的用户，请发送带有 `active: true` 的 `PUT` 或 `PATCH` 请求。SnapOtter 会恢复停用前的原始角色（例如 `disabled:editor` 再次变为 `editor`）。如果无法确定原始角色，则回退为 `user`。
+要重新激活先前已停用的用户，请发送 `PUT` 或 `PATCH` 请求，并带上 `active: true`。SnapOtter 会恢复停用前的原始角色（例如 `disabled:editor` 再次变为 `editor`）。如果无法确定原始角色，则回退为 `user`。
 
 ::: details 示例：通过 PATCH 停用和重新激活
 ```json

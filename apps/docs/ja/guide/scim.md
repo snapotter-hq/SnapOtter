@@ -1,8 +1,8 @@
 ---
 description: "アイデンティティプロバイダーからSnapOtterへユーザーとグループを同期するSCIM 2.0プロビジョニングを設定します。Okta、Azure AD / Entra ID、カスタム連携をカバーします。"
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: a24c0598fd8f
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: d61cf549710f
 i18n_hash_version: 2
 ---
 
@@ -145,7 +145,7 @@ SnapOtterはSCIM経由でユーザーをハード削除しません。代わり�
 
 ### ユーザーの再有効化 {#reactivate-user}
 
-以前に無効化されたユーザーを再有効化するには、`active: true`を指定して`PUT`または`PATCH`リクエストを送信します。SnapOtterは無効化前の元のロールを復元します(例: `disabled:editor`が再び`editor`になります)。元のロールを判別できない場合は、`user`にフォールバックします。
+以前に無効化されたユーザーを再有効化するには、`PUT`または`PATCH`リクエストを、`active: true`を指定して送信します。SnapOtterは無効化前の元のロールを復元します(例: `disabled:editor`が再び`editor`になります)。元のロールを判別できない場合は、`user`にフォールバックします。
 
 ::: details 例: PATCHによる無効化と再有効化
 ```json
@@ -304,9 +304,9 @@ SCIMのDELETEはソフト無効化です。無効化されたユーザーは、�
 
 ### `externalId` フィルターが OIDC または SAML でサインインするユーザーを見つけられない {#recover-scim-ids-in-oidc-or-saml-users}
 
-SCIM の `externalId` に専用のカラム（`users.scim_external_id`）ができる前は、OIDC または SAML のサインインで既にリンク済みのユーザーに対して SCIM の `PUT` や `PATCH` を実行すると、SCIM ID がそのユーザーのサインイン ID に書き込まれていました。アップグレード時のマイグレーションは、その値を本物の OIDC サブジェクトや SAML NameID と区別できないため、該当ユーザーはそのままにされます。そうしたユーザーでは、IdP が `externalId` を含む更新をもう一度送るまで、`filter=externalId eq "..."` は何も返しません。
+SCIM の `externalId` に専用のカラム（`users.scim_external_id`）ができる前は、OIDC または SAML のサインインで既にリンク済みのユーザーに対して SCIM の `PUT` や `PATCH` を実行すると、SCIM ID がそのユーザーのサインイン ID に書き込まれていました。アップグレード時のマイグレーションは、その値を本物の OIDC サブジェクトや SAML NameID と区別できないため、該当ユーザーはそのままにされます。そうしたユーザーでは、`filter=externalId eq "..."` は、IdP が `externalId` を含む更新をもう一度送るまで何も返しません。
 
-IdP を待ちたくない場合、監査ログが ID の裏付けになります。SCIM は各ユーザーを作成したときの `externalId` を伴う `SCIM_USER_PROVISIONED` 行を書き込みます。`scim_external_id` カラムがあるリリースにアップグレードしたら、SnapOtter データベースに対して `psql` を開き（[アカウント復旧ガイド](./account-recovery.md#older-images-and-fallbacks) に両方の構成での手順があります）、サインイン ID がまだその ID と等しいユーザーをプレビューします:
+IdP を待ちたくない場合、監査ログが ID の裏付けになります。SCIM は `SCIM_USER_PROVISIONED` 行を、各ユーザーを作成したときの `externalId` とともに書き込みます。`scim_external_id` カラムがあるリリースにアップグレードしたら、SnapOtter データベースに対して `psql` を開き（[アカウント復旧ガイド](./account-recovery.md#older-images-and-fallbacks) に両方の構成での手順があります）、サインイン ID がまだその ID と等しいユーザーをプレビューします:
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id

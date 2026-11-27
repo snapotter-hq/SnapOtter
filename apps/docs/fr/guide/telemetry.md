@@ -1,8 +1,8 @@
 ---
 description: "Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées, comment fonctionne le choix du premier lancement et comment désactiver les analyses produit de toute l'instance."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 19f044647bea
+i18n_output_hash: 29ce9ef10c09
 i18n_hash_version: 2
 ---
 

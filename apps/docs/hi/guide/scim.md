@@ -1,8 +1,8 @@
 ---
 description: "अपने identity provider से SnapOtter में users और groups को sync करने के लिए SCIM 2.0 provisioning सेट करें। Okta, Azure AD / Entra ID, और custom integrations को कवर करता है।"
-i18n_source_hash: 77ea64b4082e
-i18n_provenance: human
-i18n_output_hash: 2a9ea8703d77
+i18n_source_hash: 759181ef0fba
+i18n_provenance: machine
+i18n_output_hash: a94295cd4725
 i18n_hash_version: 2
 ---
 
@@ -87,7 +87,7 @@ SCIM Groups SnapOtter **teams** से मैप होते हैं, roles �
 
 `authProvider` को `scim` पर सेट करके और `user` role के साथ एक नया user account बनाता है। User को Default team में सौंपा जाता है। यदि `active` `false` है, तो इसके बजाय role को `disabled` पर सेट किया जाता है।
 
-आवश्यक attributes: `userName`. वैकल्पिक: `externalId`, `emails`, `active` (default `true`).
+आवश्यक attributes: `userName`। वैकल्पिक: `externalId`, `emails`, `active` (default `true`)।
 
 ### List and filter users {#list-and-filter-users}
 
@@ -145,7 +145,7 @@ user अब log in नहीं कर सकता या किसी API key 
 
 ### Reactivate user {#reactivate-user}
 
-पहले से निष्क्रिय किए गए user को पुनः सक्रिय करने के लिए, `active: true` के साथ एक `PUT` या `PATCH` request भेजें। SnapOtter deactivation से पहले की मूल role को पुनर्स्थापित करता है (जैसे `disabled:editor` फिर से `editor` बन जाता है)। यदि मूल role निर्धारित नहीं की जा सकती, तो यह `user` पर वापस आ जाती है।
+पहले से निष्क्रिय किए गए user को पुनः सक्रिय करने के लिए, एक `PUT` या `PATCH` request भेजें, जिसमें `active: true` हो। SnapOtter deactivation से पहले की मूल role को पुनर्स्थापित करता है (जैसे `disabled:editor` फिर से `editor` बन जाता है)। यदि मूल role निर्धारित नहीं की जा सकती, तो यह `user` पर वापस आ जाती है।
 
 ::: details उदाहरण: PATCH के माध्यम से deactivate और reactivate
 ```json
@@ -175,7 +175,7 @@ SCIM Groups SnapOtter teams से मैप होते हैं। एक gr
 
 `POST /api/v1/scim/v2/Groups`
 
-आवश्यक: `displayName`. वैकल्पिक: `members` (`{ value: userId }` का array)।
+आवश्यक: `displayName`। वैकल्पिक: `members` (`{ value: userId }` का array)।
 
 ### List and filter groups {#list-and-filter-groups}
 
@@ -306,7 +306,7 @@ SCIM DELETE एक soft deactivation है। निष्क्रिय क�
 
 इससे पहले कि SCIM के `externalId` का अपना कॉलम (`users.scim_external_id`) होता, किसी ऐसे उपयोगकर्ता पर SCIM `PUT` या `PATCH`, जिसे OIDC या SAML साइन-इन पहले ही लिंक कर चुका था, SCIM id को उस उपयोगकर्ता की साइन-इन पहचान में लिख देता था। अपग्रेड माइग्रेशन उस मान को असली OIDC subject या SAML NameID से अलग नहीं पहचान सकता, इसलिए वह उन उपयोगकर्ताओं को छोड़ देता है। उनके लिए `filter=externalId eq "..."` तब तक कुछ नहीं लौटाता जब तक IdP `externalId` लेकर कोई और अपडेट न भेजे।
 
-यदि आप IdP की प्रतीक्षा नहीं करना चाहते, तो ऑडिट लॉग इस id की पुष्टि कर सकता है। SCIM एक `SCIM_USER_PROVISIONED` पंक्ति लिखता है जिसमें वह `externalId` होता है जिसके साथ उसने हर उपयोगकर्ता बनाया। एक बार जब आप ऐसी रिलीज़ पर हों जिसमें `scim_external_id` कॉलम है, तो SnapOtter डेटाबेस के विरुद्ध `psql` खोलें ([खाता पुनर्प्राप्ति गाइड](/hi/guide/account-recovery#older-images-and-fallbacks) दोनों सेटअप के लिए दिखाती है) और उन उपयोगकर्ताओं का पूर्वावलोकन करें जिनकी साइन-इन पहचान अब भी उस id के बराबर है:
+यदि आप IdP की प्रतीक्षा नहीं करना चाहते, तो ऑडिट लॉग इस id की पुष्टि कर सकता है। SCIM एक `SCIM_USER_PROVISIONED` पंक्ति लिखता है जिसमें वह `externalId` होता है जिसके साथ उसने हर उपयोगकर्ता बनाया। एक बार जब आप ऐसी रिलीज़ पर हों जिसमें `scim_external_id` कॉलम है, तो SnapOtter डेटाबेस के विरुद्ध `psql` खोलें ([खाता पुनर्प्राप्ति गाइड](./account-recovery.md#older-images-and-fallbacks) दोनों सेटअप के लिए दिखाती है) और उन उपयोगकर्ताओं का पूर्वावलोकन करें जिनकी साइन-इन पहचान अब भी उस id के बराबर है:
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id

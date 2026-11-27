@@ -1,9 +1,9 @@
 ---
 title: "Felkoder"
 description: "Felsvarets form, de stabila koderna och vad du ska göra åt var och en."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: 402d4a09306e
+i18n_output_hash: 45d5795e2fb7
 i18n_hash_version: 2
 ---
 
@@ -140,6 +140,7 @@ Verktyg, batchkörningar och pipelines som behöver ett valfritt AI-paket använ
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, eller 400 från Smart Crops ansiktsläge | Verktyget, eller ett steg i en pipeline eller batch, behöver ett paket som inte är installerat. Svaret innehåller `feature` (paketets ID) och `featureName`. | Installera paketet i Inställningar och försök sedan igen. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | En installation eller offline-import nekades eftersom paketets x86-64-bibliotek kräver AVX och den här serverns CPU saknar det. Inget laddades ned eller installerades. Svaret innehåller `feature` (paketets ID) och `reason` (`cpu-no-avx`). `GET /api/v1/features` rapporterar samma paket med `compatibility: "incompatible"` och `compatibilityReason: "cpu-no-avx"`. | Kör SnapOtter på en CPU med AVX, eller på arm64. Andra paket kan fortfarande installeras. |
+| `FEATURE_INSTALL_BUSY` | 409 | Ett avbrott nekades eftersom installationsprogrammet skriver till den delade AI-miljön, och att stoppa det där skulle förstöra varje installerat AI-verktyg. | Vänta tills installationen är klar och avinstallera sedan paketet om du inte vill ha det. |
 | `FEATURE_INCOMPATIBLE` | 501, eller 400 när Fast OCR får ett språk den inte kan läsa | Den installerade funktionen kan inte hantera den begärda kvaliteten eller det begärda språket. | Ändra inställningen eller installera ett paket som stöder den. |
 | `ENGINE_UNAVAILABLE` | 503 | En nödvändig motor kunde inte starta, eller en OCR-körmiljö togs bort efter att begäran validerats. | Försök igen efter att en administratör har reparerat eller installerat om funktionen. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium är inte installerat, så HTML till bild kan inte köras. | Be en administratör installera webbläsaren. |
@@ -155,13 +156,17 @@ Verktyg, batchkörningar och pipelines som behöver ett valfritt AI-paket använ
 | `NOT_ANIMATED` | 400 | Remove GIF Background fick en stillbild. | Använd Remove Background för stillbilder. |
 | `TOO_MANY_FRAMES` | 400 | Animeringen har fler bildrutor än servern tillåter (`GIF_BG_MAX_FRAMES`). | Skicka en kortare animering, eller be en administratör höja gränsen. |
 | `TOO_MANY_PIXELS` | 400 | Animeringens canvas gånger antalet bildrutor överskrider serverns gräns: 268 402 689 pixlar (16383 x 16383) för Remove GIF Background, eller GIF-arbetsbelastningsgränsen för andra animerade verktyg. | Skicka färre bildrutor eller en mindre animering. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | Ett AI-bildverktyg fick en TIFF med flera sidor eller en animerad GIF eller WebP, och utdataformatet skulle behålla varje bildruta. Dessa verktyg kör sin modell på en bild i taget. | Dela upp filen i separata bilder. Om verktyget har en inställning för utdataformat bearbetar ett stillbildsformat som PNG bara den första bildrutan. |
 | `IMAGE_TOO_LARGE` | 400 | Bilden har fler pixlar än avkodaren accepterar. | Skicka en mindre bild. |
+| `SVG_TOO_COMPLEX` | 400 | SVG-filen blev inte färdigrastrerad inom `JOB_TIMEOUT_FAST_S`. Filter på former som `<use>` upprepar är den vanliga orsaken, eftersom varje kopia ritar om filtret. | Förenkla filtren eller de upprepade formerna, eller be en administratör höja gränsen. |
 | `RESULT_TOO_LARGE` | 400 | Inställningarna skulle ge en bild som är större än kodaren eller pixelgränsen tillåter. | Använd en mindre bild eller inställningar som ger ett mindre resultat. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice eller pandoc kunde inte öppna dokumentet. Det kan vara skadat, lösenordsskyddat eller inte ha det format som filändelsen anger. | Kontrollera att filen öppnas i ett kontorsprogram och skicka den sedan igen. |
 | `PDF_DAMAGED` | 400 | PDF-motorn hittade trasig dokumentstruktur. | Kör filen genom Repair PDF och försök sedan igen. |
 | `PDF_PASSWORD_PROTECTED` | 400 | PDF-filen är krypterad och det här verktyget kan inte öppna den. | Lås upp den med Unlock PDF först. |
 | `NO_AUDIO_TRACK` | 400 | Filen har ingen ljudström som ett ljudverktyg kan använda. | Skicka en fil som har ljud. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg kunde inte läsa ljudet eller videon: den hittade inga paket, inga kodekparametrar, ingen `moov`-atom eller data som den inte kan tolka. | Kontrollera att filen spelas upp i en mediespelare, eller exportera den på nytt, och försök sedan igen. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode fick indata som inte är Base64. Blanksteg ignoreras och både standardalfabetet och det URL-säkra alfabetet accepteras. | Kontrollera texten efter överflödiga tecken eller ett avklippt slut. |
+| `DECODED_DATA_NOT_TEXT` | 400 | Base64-datan är giltig men avkodas till binärdata, inte UTF-8-text. | Avkoda den med ett verktyg som sparar en fil i stället för att visa text. |
 | `PAGE_OUT_OF_RANGE` | 400 | Sidintervallet anger en sida som PDF-filen inte har. | Kontrollera sidantalet och skicka ett intervall inom det. |
 | `INVALID_PAGE_RANGE` | 400 | Sidintervallet har ogiltig syntax. | Använd sidnummer som `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages ombads ta bort alla sidor. | Behåll minst en sida. |
@@ -172,6 +177,7 @@ Verktyg, batchkörningar och pipelines som behöver ett valfritt AI-paket använ
 | `NO_FACE_DETECTED` | 400 | Passport Photo hittade inget ansikte i bilden. | Skicka ett tydligt foto framifrån med bra belysning. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Komprimering, eller ett passfotos storleksgräns, kan inte få filen under den begärda storleken, inte ens efter att ha skalat ned den. | Be om en större målstorlek eller beskär bilden först. |
 | `TOO_MANY_PAGES` | 400 | OCR ombads behandla fler sidor än den hanterar i ett jobb. | Välj färre sidor med sidintervallet. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR på en TIFF med flera sidor läste mer än 1 000 000 byte text över sidorna, vilket är mer än ett resultat kan lagra. | Dela upp TIFF-filen i mindre filer och kör OCR på var och en. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata fann att bildens befintliga EXIF-data är skadade, så den kan inte skriva om dem på ett säkert sätt. | Ta bort metadata med Remove Image Metadata först och redigera sedan. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML eller Markdown till PDF hittade en referens till en bild, formatmall eller typsnitt på nätverket, vilket servern inte hämtar. | Bädda in resursen i filen (till exempel som en `data:`-URI) och försök sedan igen. |
 
@@ -218,10 +224,11 @@ Dessa koder finns i serverns källkod för loggar, telemetri eller Fastifys egna
 | `SIEM_DECRYPTION_FAILED` | Rapporteras till felspårning av SIEM-vidarebefordran. SIEM-autentiseringshuvudet kan inte dekrypteras. |
 | `WEBHOOK_DECRYPTION_FAILED` | Rapporteras till felspårning. Begäran som drabbades av samma fel svarar med `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Rapporteras till felspårning när en mellanlagrad uppladdning inte kan tas bort. |
+| `RETENTION_DEADLINE_BACKFILLED` | Rapporteras till felspårning av lagringens TTL-svep när det fyller i en färdig jobbs saknade tidsfrist för teamets lagring. Jobbets filer följer då teamets lagring. |
 | `USERNAME_RACE_EXHAUSTED` | Utlöses när SSO-autoskapande förlorar kapplöpningen om användarnamnet vid varje nytt försök. Inloggningssidan visar ett fel i stället. |
 | `ERR_OUT_OF_RANGE` | Kastas av objektlagringsläsaren för ett ogiltigt byteintervall. |
 | `ETIMEDOUT` | Sätts på timeoutfelet för en GDPR-export. Exporten misslyckas och kan begäras igen. |
 | `FST_REQ_FILE_TOO_LARGE` | Fastifys kod för en uppladdning över gränsen. Klienter får en 413 med `PAYLOAD_TOO_LARGE`, eller routens egna 413-meddelande. |
 | `TARGET_SIZE_EXCEEDED` | Kastas när en komprimering till målstorlek missar sitt mål. Felet har ingen status eller kod, så klienter får ett generellt fel. |
 | `OCR_CACHE_PERMISSIONS` | Rapporteras till felspårning som ett driftfel när AI-datavolymen lämnar OCR-körmiljöns cache skrivbar för alla. Installationsjobbet misslyckas med ett meddelande som nämner lagringsproblemet. |
-| `OCR_RUNTIME_UNREACHABLE` | Rapporteras till felspårning som ett driftfel när servern aldrig nådde huggingface.co för att ladda ned OCR-körmiljön. Installationsjobbet misslyckas med ett meddelande om nätverksåtkomst, `HTTPS_PROXY` och offline-import. |
+| `OCR_RUNTIME_UNREACHABLE` | Rapporteras till felspårning som ett driftfel när servern aldrig nådde huggingface.co för att ladda ned OCR-körmiljön. Installationsjobbet misslyckas med ett meddelande om nätverksåtkomst, `HTTPS_PROXY`, `HF_ENDPOINT` och offline-import. |

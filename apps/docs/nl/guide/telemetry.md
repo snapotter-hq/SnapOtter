@@ -1,8 +1,8 @@
 ---
 description: "Welke anonieme gebruiksgegevens SnapOtter verzamelt, wanneer ze worden verstuurd, hoe de keuze bij de eerste start werkt en hoe je de productanalyse voor de hele instantie uitschakelt."
-i18n_source_hash: 784b2a0c06eb
+i18n_source_hash: f3cfb0b3f961
 i18n_provenance: machine
-i18n_output_hash: 884b36a4dea9
+i18n_output_hash: 252cef0693fe
 i18n_hash_version: 2
 ---
 
@@ -11,6 +11,14 @@ i18n_hash_version: 2
 Anonymous Product Analytics wordt door een beheerder voor de hele instantie ingesteld. Een nieuwe instantie vraagt het bij de eerste start en verstuurt niets totdat iemand antwoordt. Je kunt het op elk moment wijzigen onder Settings > System > Privacy.
 
 Als analyse aan staat, stuurt SnapOtter naar PostHog welke tools en pipelines draaien, hoe lang ze duren, of ze slagen, foutcodes en aantallen bestanden, samen met de anonieme id van de instantie, de versie, de CPU-architectuur, het besturingssysteem, het installatietype en of er een GPU is. Crashrapporten gaan naar Sentry, waarbij bestandsnamen, paden, e-mailadressen en waarden tussen aanhalingstekens zijn verwijderd. Er worden nooit je bestanden verstuurd, ook niet hun namen of paden, hun inhoud, OCR-uitvoer of uitgelezen tekst, afbeeldingsmetadata of je accountidentiteit. PostHog en Sentry zijn de enige twee bestemmingen waarnaar iets wordt verstuurd, en met analyse uit gaat er naar geen van beide iets heen.
+
+## Keuze bij de eerste start {#first-run-choice}
+
+De eerste keer dat een beheerder een nieuwe instantie opent, vraagt SnapOtter: "Send anonymous usage stats and crash reports? Your files are never sent." De twee antwoorden wegen even zwaar en geen van beide is vooraf geselecteerd. Sluit je de melding zonder te antwoorden, dan blijft analyse uit en wordt het bij het volgende bezoek opnieuw gevraagd. Alleen een beheerder ziet de vraag. Met `AUTH_ENABLED=false` zijn er geen accounts en treedt de lokale gebruiker op als beheerder, dus wie de app opent, beantwoordt de vraag. De desktop-app vraagt het op dezelfde manier.
+
+Een instantie die al draaide voordat deze vraag bestond, krijgt hem niet te zien. Die behoudt de analyse-instelling die ze had: aan, tenzij een beheerder of `SNAPOTTER_ANALYTICS_DEFAULT=off` het heeft uitgezet.
+
+## Gebeurtenissen die we versturen (indien ingeschakeld) {#events-we-send-when-enabled}
 
 - tool_used: tool-id, status, duur, categorie, of het een AI-tool is, een foutcode bij een mislukking en de stapnaam voor een tool die één fase apart meldt (de analysestap van Passport Photo).
 - pipeline_executed: aantal stappen, tool-id's, batch-flag, aantal bestanden, duur, status.

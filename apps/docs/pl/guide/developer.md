@@ -1,8 +1,8 @@
 ---
 description: "Lokalna konfiguracja środowiska developerskiego, komendy, konwencje kodu oraz jak dodać nowe narzędzie do SnapOtter."
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 615011f88c94
+i18n_output_hash: a8d0cee5c0fc
 i18n_hash_version: 2
 ---
 
@@ -89,15 +89,14 @@ PostgreSQL 17 przez Drizzle ORM (pg-core). Lokalny development wymaga działają
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Daje Ci to Postgresa na porcie 5432 i Redisa na porcie 6379. Następnie wygeneruj i zastosuj migracje:
+Daje Ci to Postgresa na porcie 5432 i Redisa na porcie 6379. API samo stosuje oczekujące migracje przy starcie, więc wystarczy uruchomić serwery developerskie. Po zmianie schematu wygeneruj migrację, a następny start ją zastosuje, bez ręcznego kroku migrate:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-Schemat jest zdefiniowany w `apps/api/src/db/schema.ts`. Tabele: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog.
+Schemat jest zdefiniowany w `apps/api/src/db/schema.ts`, który jest aktualną listą tabel.
 
 ## Dodawanie nowego narzędzia {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI generuje wzorce zarówno dla `linux` (`ubuntu-latest`), jak i `darwin` (`maco
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Każdy przebieg systemu operacyjnego wysyła artefakt `visual-baselines-linux-<run-id>-<attempt>` lub `visual-baselines-darwin-<run-id>-<attempt>` i otwiera szkic PR (`chore/visual-baselines-linux-...` oraz `chore/visual-baselines-darwin-...`) do `main` z wygenerowanymi na nowo plikami PNG. W opisie każdego szkicu PR znajduje się polecenie `gh run download`; uruchom oba w katalogu głównym swojego checkoutu, aby pobrać pliki PNG do swojej gałęzi, zatwierdź je i zamknij szkice PR. Użyj `update_snapshots=all`, jeśli `changed` pominie zrzut, który według ciebie powinien się zmienić. Uruchomienie wymaga uprawnień zapisu do repozytorium, więc jeśli twoja gałąź jest na forku, napisz w PR, że potrzebuje odświeżenia wzorców, a maintainer je uruchomi.
+Każdy przebieg systemu operacyjnego wysyła artefakt `visual-baselines-linux-<run-id>-<attempt>` lub `visual-baselines-darwin-<run-id>-<attempt>` i otwiera szkic PR (`chore/visual-baselines-linux-...` oraz `chore/visual-baselines-darwin-...`) do `main` z wygenerowanymi na nowo plikami PNG. W opisie każdego szkicu PR znajduje się polecenie `gh run download`; uruchom oba w katalogu głównym swojego checkoutu, aby pobrać pliki PNG do swojej gałęzi, zatwierdź je i zamknij szkice PR. Użyj `update_snapshots=all`, jeśli `changed` pominie zrzut, który według Ciebie powinien się zmienić. Uruchomienie wymaga uprawnień zapisu do repozytorium, więc jeśli Twoja gałąź jest na forku, napisz w PR, że potrzebuje odświeżenia wzorców, a maintainer je uruchomi.
 
 Na Macu możesz też odświeżyć wzorce `darwin` lokalnie, aby szybciej iterować:
 
@@ -243,16 +242,16 @@ Użyj montowań cache BuildKit dla szybszych przebudów:
 DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t snapotter:latest .
 ```
 
-## Wydaj domeny wersji {#release-version-domains}
+## Domeny wersji wydania {#release-version-domains}
 
 SnapOtter celowo ma trzy domeny wersji. Nie kopiuj jednej domeny do drugiej podczas wydania:
 
-- Wersja aplikacji obejmuje manifest główny, wszystkie pakiety prywatnego obszaru roboczego i `APP_VERSION`. Semantic-release dostarcza tę wartość, a `pnpm version:sync <version>` aktualizuje każdy obszar roboczy przed wydaniem aplikacji.
-- OpenAPI `info.version` to stabilny publiczny kontrakt główny API. Wszystkie zlokalizowane specyfikacje pozostają w `<major>.0.0` dla zgodnych wydań aplikacji i zmieniają się tylko wtedy, gdy umowa API zostanie przeniesiona do nowej głównej wersji.
+- Wersja wydania aplikacji obejmuje manifest główny, wszystkie pakiety prywatnego obszaru roboczego i `APP_VERSION`. Semantic-release dostarcza tę wartość, a `pnpm version:sync <version>` aktualizuje każdy obszar roboczy przed wydaniem aplikacji.
+- OpenAPI `info.version` to stabilny publiczny kontrakt głównej wersji API. Wszystkie zlokalizowane specyfikacje pozostają w `<major>.0.0` dla zgodnych wydań aplikacji i zmieniają się tylko wtedy, gdy kontrakt API przechodzi do nowej głównej wersji.
 - `docker/feature-manifest.json` utrzymuje `imageVersion: 2.0.0` jako niezmienną epokę przechowywania starszych pakietów funkcji. Te ścieżki archiwów v2 nie są wersjami pakietów aplikacji. Accurate OCR korzysta z formatu wykonawczego v3 i oddzielnie rejestruje pochodzenie wydania aplikacji.
 
-`tests/unit/infra/release-version-policy.test.ts` wymusza te granice. Domena nowej wersji lub migracja muszą jednocześnie aktualizować tę umowę i odpowiedni projekt migracji artefaktów.
-Niezależne wartości API i starsze pakiety znajdują się w `config/release-version-policy.json`; synchronizacja wersji aplikacji nie może nigdy pośrednio przepisać tego pliku zasad.
+`tests/unit/infra/release-version-policy.test.ts` wymusza te granice. Nowa domena wersji lub migracja musi jednocześnie aktualizować ten kontrakt i odpowiedni projekt migracji artefaktów.
+Niezależne wartości API i starszych pakietów znajdują się w `config/release-version-policy.json`; synchronizacja wersji aplikacji nie może nigdy pośrednio przepisać tego pliku zasad.
 
 ## Zmienne środowiskowe {#environment-variables}
 

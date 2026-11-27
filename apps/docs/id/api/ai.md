@@ -1,8 +1,9 @@
 ---
 description: "Referensi mesin AI dengan semua alat ML lokal. Penghapusan latar belakang, upscaling, OCR, deteksi wajah, restorasi foto, dan lainnya."
-i18n_output_hash: b099908e2002
-i18n_source_hash: 89992068cacc
-i18n_provenance: human
+i18n_source_hash: 8eb785f85304
+i18n_provenance: machine
+i18n_output_hash: 0e7e1bf3d01c
+i18n_hash_version: 2
 ---
 
 # Referensi Mesin AI {#ai-engine-reference}
@@ -15,12 +16,6 @@ Akselerasi iGPU Intel/AMD melalui VA-API, Quick Sync, atau OpenCL saat ini tidak
 
 19 alat AI sidecar Python di empat modalitas (gambar, audio, video, dokumen), plus 2 alat dengan kemampuan AI opsional. Semua model berjalan secara lokal - tidak diperlukan internet setelah unduhan model awal.
 
-
-<!-- korean-ocr-contract:start -->
-::: info Kompatibilitas OCR bahasa Korea
-OCR Cepat mendukung `auto`, `en`, `de`, `es`, `fr`, `zh`, dan `ja`, tetapi tidak mendukung bahasa Korea (`ko`) maupun bahasa Arab (`ar`). Keduanya memerlukan paket OCR Akurat dan `balanced` atau `best`. Paket berjalan pada kontainer resmi Linux amd64 dan arm64, termasuk host NVIDIA dengan OCR tetap memakai CPU. Sistem yang tidak didukung menerima kesalahan kompatibilitas yang jelas dan tidak pernah diam-diam kembali ke `fast`. Bahasa Korea atau Arab dengan `fast` atau alias lama `tesseract` ditolak sebelum antre dengan `FEATURE_INCOMPATIBLE` dan `fast-korean-unsupported`.
-:::
-<!-- korean-ocr-contract:end -->
 ## Arsitektur {#architecture}
 
 ```
@@ -84,9 +79,13 @@ Alat dengan dependensi lintas bundel:
 
 Alat hanya tersedia ketika semua bundel yang diperlukan telah diinstal, kecuali OCR: tingkat `fast` bawaannya tetap tersedia tanpa paket OCR opsional. Penginstalan sebagian valid dan ditangani secara bertahap: bundel yang terinstal digunakan kembali, bundel yang hilang ditampilkan sebagai unduhan, dan antrean penginstalan dijalankan satu per satu sehingga lingkungan Python yang dibagikan tidak diubah secara bersamaan.
 
+### Mengunduh melalui mirror {#downloading-through-a-mirror}
+
+Arsip bundel dan runtime OCR yang akurat diunduh dari huggingface.co. Jika host itu diblokir atau lambat, setel `HF_ENDPOINT` pada kontainer aplikasi ke mirror Hugging Face, misalnya `HF_ENDPOINT=https://hf-mirror.com`. Setiap unduhan bundel dan runtime OCR memakainya, termasuk pengunduh cadangan dan tautan unduhan manual pada error instalasi. Gunakan URL `https` tanpa kredensial; instalasi runtime OCR menolak yang lain. Integritas tidak bergantung pada mirror: setiap arsip bundel diperiksa terhadap SHA-256-nya dan indeks runtime OCR ditandatangani, sehingga mirror yang menyajikan file yang diubah akan menggagalkan instalasi. Pengecualiannya adalah `SNAPOTTER_ALLOW_MODEL_DOWNLOAD=1`: unduhan runtime yang mengisi bobot model yang hilang juga memakai `HF_ENDPOINT`, dan bobot tersebut tidak diverifikasi dengan checksum, jadi gabungkan keduanya hanya dengan mirror yang Anda percaya. Jika server terhubung ke internet melalui proxy, lihat [Proxy keluar dan CA privat](/id/guide/deployment#outbound-proxy-and-private-ca).
+
 ### Memasang semua bundel sekaligus {#installing-every-bundle-at-once}
 
-Di Settings > AI Features terdapat tombol **Install All** yang mengantrekan setiap bundel yang dapat dijalankan host. Tombol ini melewati apa pun yang sudah terpasang, melewati bundel yang dilaporkan tidak kompatibel dengan host, dan mencoba ulang sekali bundel yang gagal sebelum melanjutkan. Untuk instance biasa, tombol itu sudah menjadi jawaban lengkap, dan tidak ada yang perlu dilakukan dari bagian berikutnya.
+Di Settings, AI Features terdapat tombol **Install All** yang mengantrekan setiap bundel yang dapat dijalankan host. Tombol ini melewati apa pun yang sudah terpasang, melewati bundel yang dilaporkan tidak kompatibel dengan host, dan mencoba ulang sekali bundel yang gagal sebelum melanjutkan. Untuk instance biasa, tombol itu sudah menjadi jawaban lengkap, dan tidak ada yang perlu dilakukan dari bagian berikutnya.
 
 Perhitungkan disk terlebih dahulu. Secara keseluruhan, bundel-bundel ini berukuran sekitar 20-25 GB setelah terpasang, dan disimpan di `/data/ai` pada volume data, bukan di dalam image, sehingga tetap ada setelah `docker compose down` dan pembuatan ulang kontainer. Anda memasangnya sekali per host, bukan sekali per upgrade.
 
@@ -189,12 +188,12 @@ Memburamkan latar belakang sambil menjaga subjek tetap tajam.
 
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. `quality` yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. quality yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea dan Arab tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
 | `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast tidak mendukung `ko` maupun `ar` |
 | `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
 | `engine` | string | - | Alias kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; tidak memuat PaddlePaddle |
 
-Mengembalikan teks yang diekstraksi ditambah metadata asal: mesin, kualitas yang diminta dan aktual, perangkat, penyedia, status degradasi, peringatan, dan versi runtime/model yang akurat bila berlaku. Permintaan kualitas eksplisit tidak pernah kembali ke tingkat lain. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE` alih-alih menjalankan `fast` secara diam-diam. Fast eksplisit atau `tesseract` lama dengan bahasa Korea atau Arab mengembalikan `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, dan panduan paket akurat sebelum job diantrekan.
+Mengembalikan teks yang diekstraksi ditambah metadata asal: mesin, kualitas yang diminta dan aktual, perangkat, penyedia, status degradasi, peringatan, dan versi runtime/model yang akurat bila berlaku. Permintaan kualitas eksplisit tidak pernah kembali ke tingkat lain. Jika `balanced` atau `best` tidak tersedia, API mengembalikan `FEATURE_NOT_INSTALLED` atau `FEATURE_INCOMPATIBLE` alih-alih menjalankan `fast` secara diam-diam. Fast eksplisit atau `tesseract` lama dengan bahasa Korea mengembalikan `FEATURE_INCOMPATIBLE`, `compatibilityReason: "fast-korean-unsupported"`, dan panduan paket akurat sebelum job diantrekan.
 
 ## OCR PDF {#pdf-ocr}
 
@@ -205,13 +204,13 @@ Mengekstrak teks dari dokumen PDF hasil pindaian menggunakan OCR bertenaga AI, h
 
 | Parameter | Tipe | Default | Deskripsi |
 |-----------|------|---------|-------------|
-| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. `quality` yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
+| `quality` | `"fast"` \| `"balanced"` \| `"best"` | Dinamis | Tingkat pemrosesan. quality yang dihilangkan memilih tingkat tertinggi yang tersedia dalam urutan ini: `best`, `balanced`, `fast`. Bahasa Korea dan Arab tidak pernah memilih `fast`; tanpa tingkat akurat, ia mengembalikan kesalahan instalasi runtime akurat atau kesalahan kompatibilitas |
 | `language` | string | `"auto"` | Bahasa: `auto`, `en`, `de`, `fr`, `es`, `zh`, `ja`, `ko`, `ar`. Fast tidak mendukung `ko` maupun `ar` |
 | `pages` | string | `"all"` | Pemilihan halaman: `"all"`, `"1-3"`, `"1,3,5"` |
 | `enhance` | boolean | Bergantung pada tingkatan | Tingkatkan kontras lokal. Fast menerapkannya secara langsung; tingkatan akurat mempertahankan varian hanya ketika skor yang dikalibrasi meningkatkan OCR. Defaultnya aktif untuk yang Terbaik |
 | `engine` | string | - | Alias kompatibilitas yang tidak digunakan lagi. Memetakan `tesseract` ke `fast` dan nilai `paddleocr` lama ke `balanced`; tidak memuat PaddlePaddle |
 
-Aturan larangan penurunan versi yang sama juga berlaku untuk PDF OCR. Halaman PDF diraster sebelum dikenali, dan satu permintaan dapat memilih maksimal 50 halaman.
+Aturan larangan penurunan versi dan kompatibilitas bahasa Korea dan Arab yang sama juga berlaku untuk PDF OCR. Halaman PDF diraster sebelum dikenali, dan satu permintaan dapat memilih maksimal 50 halaman.
 
 ## Blur Wajah / PII {#face-pii-blur}
 
@@ -327,6 +326,9 @@ Menerima body JSON berisi hasil Fase 1 ditambah pengaturan pembuatan:
 | `landmarks` | object | (wajib) | Landmark dari Fase 1 |
 | `imageWidth` | number | (wajib) | Lebar gambar dari Fase 1 |
 | `imageHeight` | number | (wajib) | Tinggi gambar dari Fase 1 |
+| `clientJobId` | string | (dibuat otomatis) | Job id Anda sendiri untuk aliran progres |
+
+Generate berjalan sebagai job antrean: `200` dengan hasil di dalam jendela tunggu sinkron, `202` dengan job id setelahnya. Lihat [Foto Paspor](/id/tools/image/passport-photo#phase-2-generate) untuk rinciannya.
 
 ## Penghapusan Objek (Inpainting) {#object-erasing-inpainting}
 

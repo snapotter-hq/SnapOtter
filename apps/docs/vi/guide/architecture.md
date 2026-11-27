@@ -1,8 +1,8 @@
 ---
 description: "Cấu trúc monorepo, kiến trúc ứng dụng và gói, vòng đời yêu cầu, và dấu chân tài nguyên của SnapOtter."
-i18n_source_hash: 9a22dc09e976
-i18n_provenance: human
-i18n_output_hash: 5b7fddf37603
+i18n_source_hash: 880f317289dc
+i18n_provenance: machine
+i18n_output_hash: ba45b2128669
 i18n_hash_version: 2
 ---
 

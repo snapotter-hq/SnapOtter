@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter में स्थानीय विकास सेटअप, कमांड, कोड परंपराएँ, और एक नया टूल कैसे जोड़ें।"
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: 11914c4e8f89
+i18n_output_hash: 65b8095de76b
 i18n_hash_version: 2
 ---
 
@@ -83,21 +83,20 @@ pnpm test:coverage      # tests with coverage report
 
 ## डेटाबेस {#database}
 
-Drizzle ORM (pg-core) के माध्यम से PostgreSQL 17. स्थानीय डेव के लिए Postgres और Redis का चलना आवश्यक है - उन्हें इसके साथ शुरू करें:
+Drizzle ORM (pg-core) के माध्यम से PostgreSQL 17। स्थानीय डेव के लिए Postgres और Redis का चलना आवश्यक है, उन्हें इसके साथ शुरू करें:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-यह आपको पोर्ट 5432 पर Postgres और पोर्ट 6379 पर Redis देता है। फिर माइग्रेशन जनरेट और लागू करें:
+यह आपको पोर्ट 5432 पर Postgres और पोर्ट 6379 पर Redis देता है। API बूट पर लंबित माइग्रेशन खुद लागू कर लेता है, इसलिए डेव सर्वर शुरू करना ही काफ़ी है। स्कीमा बदलने के बाद एक माइग्रेशन जनरेट करें और अगला बूट उसे लागू कर देगा, किसी मैनुअल माइग्रेट चरण की ज़रूरत नहीं:
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-स्कीमा `apps/api/src/db/schema.ts` में परिभाषित है। टेबल: users, sessions, settings, jobs, apiKeys, pipelines, teams, userFiles, roles, auditLog।
+स्कीमा `apps/api/src/db/schema.ts` में परिभाषित है, जो तालिकाओं की मौजूदा सूची है।
 
 ## एक नया टूल जोड़ना {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI `linux` (`ubuntu-latest`) और `darwin` (`macos-latest`) दोनों �
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-हर OS लेग `visual-baselines-linux-<run-id>-<attempt>` या `visual-baselines-darwin-<run-id>-<attempt>` आर्टिफ़ैक्ट अपलोड करता है और दोबारा बनाए गए PNG के साथ `main` के विरुद्ध एक ड्राफ़्ट PR (`chore/visual-baselines-linux-...` और `chore/visual-baselines-darwin-...`) खोलता है। हर ड्राफ़्ट PR के विवरण में एक `gh run download` कमांड होता है; PNG को अपनी ब्रांच में लाने के लिए दोनों को अपने चेकआउट के रूट से चलाएँ, उन्हें कमिट करें और ड्राफ़्ट PR बंद कर दें। अगर `changed` कोई ऐसा शॉट छोड़ दे जिसके बदलने की आपको उम्मीद थी, तो उसकी जगह `update_snapshots=all` इस्तेमाल करें। इसे चलाने के लिए रिपॉज़िटरी पर लिखने की अनुमति चाहिए, इसलिए अगर आपकी ब्रांच किसी फ़ोर्क पर है, तो PR में बताएँ कि उसे बेसलाइन रीफ़्रेश चाहिए और कोई मेंटेनर उसे चलाएगा।
+हर OS लेग `visual-baselines-linux-<run-id>-<attempt>` या `visual-baselines-darwin-<run-id>-<attempt>` आर्टिफ़ैक्ट अपलोड करता है और एक ड्राफ़्ट PR (`chore/visual-baselines-linux-...` और `chore/visual-baselines-darwin-...`) खोलता है, जो `main` के विरुद्ध होता है और जिसमें दोबारा बनाए गए PNG होते हैं। हर ड्राफ़्ट PR के विवरण में एक `gh run download` कमांड होता है; PNG को अपनी ब्रांच में लाने के लिए दोनों को अपने चेकआउट के रूट से चलाएँ, उन्हें कमिट करें और ड्राफ़्ट PR बंद कर दें। `update_snapshots=all` का उपयोग तब करें जब `changed` कोई ऐसा शॉट छोड़ दे जिसके बदलने की आपको उम्मीद थी। इसे चलाने के लिए रिपॉज़िटरी पर लिखने की अनुमति चाहिए, इसलिए अगर आपकी ब्रांच किसी फ़ोर्क पर है, तो PR में बताएँ कि उसे बेसलाइन रीफ़्रेश चाहिए और कोई मेंटेनर उसे चलाएगा।
 
 Mac पर तेज़ बदलावों के लिए आप `darwin` बेसलाइन को लोकल रूप से भी रीफ़्रेश कर सकते हैं:
 

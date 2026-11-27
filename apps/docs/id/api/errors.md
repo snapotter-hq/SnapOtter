@@ -1,9 +1,9 @@
 ---
 title: "Kode error"
 description: "Bentuk isi error, kode-kode yang stabil, dan apa yang perlu dilakukan untuk masing-masing kode."
-i18n_source_hash: dd2420de1d32
+i18n_source_hash: 7e48ef36024d
 i18n_provenance: machine
-i18n_output_hash: e4408df0bb9f
+i18n_output_hash: 0d30a61b68ff
 i18n_hash_version: 2
 ---
 
@@ -140,6 +140,7 @@ Alat, proses batch, dan pipeline yang memerlukan bundel AI opsional menggunakan 
 |--------|--------|---------|------------|
 | `FEATURE_NOT_INSTALLED` | 501, atau 400 dari mode wajah Smart Crop | Alat, atau satu langkah dari pipeline atau batch, memerlukan bundel yang belum terpasang. Isi respons menyertakan `feature` (ID bundel) dan `featureName`. | Pasang bundel di Pengaturan, lalu coba lagi. |
 | `FEATURE_CPU_UNSUPPORTED` | 409 | Pemasangan atau impor offline ditolak karena pustaka x86-64 milik bundel memerlukan AVX dan CPU server ini tidak memilikinya. Tidak ada yang diunduh atau dipasang. Isi respons menyertakan `feature` (ID bundel) dan `reason` (`cpu-no-avx`). `GET /api/v1/features` melaporkan bundel yang sama dengan `compatibility: "incompatible"` dan `compatibilityReason: "cpu-no-avx"`. | Jalankan SnapOtter di CPU dengan AVX, atau di arm64. Bundel lain tetap dapat dipasang. |
+| `FEATURE_INSTALL_BUSY` | 409 | Pembatalan ditolak karena penginstal sedang menulis ke lingkungan AI bersama, dan menghentikannya di tengah proses akan merusak semua alat AI yang terpasang. | Tunggu pemasangan selesai, lalu copot bundel jika Anda tidak menginginkannya. |
 | `FEATURE_INCOMPATIBLE` | 501, atau 400 saat Fast OCR mendapat bahasa yang tidak dapat dibacanya | Fitur yang terpasang tidak dapat menangani kualitas atau bahasa yang diminta. | Ubah pengaturan, atau pasang bundel yang mendukungnya. |
 | `ENGINE_UNAVAILABLE` | 503 | Engine yang diperlukan tidak dapat dijalankan, atau runtime OCR dihapus setelah permintaan divalidasi. | Coba lagi setelah administrator memperbaiki atau memasang ulang fitur. |
 | `BROWSER_NOT_AVAILABLE` | 503 | Chromium belum terpasang, sehingga HTML ke gambar tidak dapat berjalan. | Minta administrator memasang browser tersebut. |
@@ -155,13 +156,17 @@ Alat, proses batch, dan pipeline yang memerlukan bundel AI opsional menggunakan 
 | `NOT_ANIMATED` | 400 | Remove GIF Background menerima gambar diam. | Gunakan Remove Background untuk gambar diam. |
 | `TOO_MANY_FRAMES` | 400 | Animasi memiliki lebih banyak frame daripada yang diizinkan server (`GIF_BG_MAX_FRAMES`). | Kirim animasi yang lebih pendek, atau minta administrator menaikkan batasnya. |
 | `TOO_MANY_PIXELS` | 400 | Kanvas animasi dikalikan jumlah frame melebihi batas server: 268.402.689 piksel (16383 x 16383) untuk Remove GIF Background, atau batas beban kerja GIF untuk alat animasi lainnya. | Kirim lebih sedikit frame atau animasi yang lebih kecil. |
+| `MULTI_FRAME_UNSUPPORTED` | 400 | Alat gambar AI menerima TIFF multi-halaman atau GIF atau WebP beranimasi, dan format keluaran akan mempertahankan setiap frame. Alat-alat ini menjalankan modelnya pada satu gambar dalam satu waktu. | Pisahkan file menjadi gambar-gambar terpisah. Jika alat memiliki pengaturan format keluaran, format diam seperti PNG hanya memproses frame pertama. |
 | `IMAGE_TOO_LARGE` | 400 | Gambar memiliki lebih banyak piksel daripada yang diterima decoder. | Kirim gambar yang lebih kecil. |
+| `SVG_TOO_COMPLEX` | 400 | SVG tidak selesai dirasterisasi dalam `JOB_TIMEOUT_FAST_S`. Filter pada bentuk yang diulang oleh `<use>` biasanya penyebabnya, karena setiap salinan menggambar ulang filter tersebut. | Sederhanakan filter atau bentuk yang diulang, atau minta administrator menaikkan batasnya. |
 | `RESULT_TOO_LARGE` | 400 | Pengaturan tersebut akan menghasilkan gambar yang lebih besar daripada yang diizinkan batas encoder atau piksel. | Gunakan gambar yang lebih kecil atau pengaturan yang menghasilkan hasil lebih kecil. |
 | `DOCUMENT_UNREADABLE` | 400 | LibreOffice atau pandoc tidak dapat membuka dokumen. Dokumen mungkin rusak, dilindungi kata sandi, atau bukan format yang disebutkan ekstensinya. | Pastikan file dapat dibuka di aplikasi office, lalu kirim lagi. |
 | `PDF_DAMAGED` | 400 | Engine PDF menemukan struktur dokumen yang rusak. | Jalankan file melalui Repair PDF, lalu coba lagi. |
 | `PDF_PASSWORD_PROTECTED` | 400 | PDF terenkripsi dan alat ini tidak dapat membukanya. | Buka kuncinya dengan Unlock PDF terlebih dahulu. |
 | `NO_AUDIO_TRACK` | 400 | File tidak memiliki aliran audio yang dapat digunakan alat audio. | Kirim file yang memiliki audio. |
 | `MEDIA_UNDECODABLE` | 400 | ffmpeg tidak dapat membaca audio atau video: tidak menemukan paket, parameter codec, atom `moov`, atau data yang dapat diurai. | Pastikan file dapat diputar di pemutar media, atau ekspor ulang, lalu coba lagi. |
+| `ENCODED_TEXT_INVALID` | 400 | Base64 Encode / Decode menerima input yang bukan Base64. Spasi kosong diabaikan dan alfabet standar maupun URL-safe diterima. | Periksa teks dari karakter nyasar atau ujung yang terpotong. |
+| `DECODED_DATA_NOT_TEXT` | 400 | Base64 valid tetapi didekode menjadi data biner, bukan teks UTF-8. | Dekode dengan alat yang menyimpan file alih-alih menampilkan teks. |
 | `PAGE_OUT_OF_RANGE` | 400 | Rentang halaman menyebut halaman yang tidak dimiliki PDF. | Periksa jumlah halaman dan kirim rentang di dalamnya. |
 | `INVALID_PAGE_RANGE` | 400 | Rentang halaman bukan sintaks yang valid. | Gunakan nomor halaman seperti `1-3,5`. |
 | `CANNOT_REMOVE_ALL_PAGES` | 400 | Remove Pages diminta menghapus semua halaman. | Sisakan setidaknya satu halaman. |
@@ -172,6 +177,7 @@ Alat, proses batch, dan pipeline yang memerlukan bundel AI opsional menggunakan 
 | `NO_FACE_DETECTED` | 400 | Passport Photo tidak menemukan wajah pada gambar. | Kirim foto yang jelas, menghadap ke depan, dengan pencahayaan yang baik. |
 | `TARGET_SIZE_UNREACHABLE` | 400 | Kompresi, atau batas ukuran foto paspor, tidak dapat membuat file lebih kecil dari ukuran yang diminta, bahkan setelah diperkecil. | Minta ukuran target yang lebih besar, atau potong gambar terlebih dahulu. |
 | `TOO_MANY_PAGES` | 400 | OCR diminta memproses lebih banyak halaman daripada yang diproses dalam satu job. | Pilih lebih sedikit halaman dengan rentang halaman. |
+| `OCR_OUTPUT_TOO_LARGE` | 500 | OCR pada TIFF multi-halaman membaca lebih dari 1.000.000 byte teks di seluruh halamannya, melebihi yang dapat disimpan satu hasil. | Pisahkan TIFF menjadi file-file yang lebih kecil dan jalankan OCR pada masing-masing. |
 | `METADATA_DAMAGED` | 400 | Edit Metadata menemukan data EXIF gambar yang ada rusak, sehingga tidak dapat menulis ulang dengan aman. | Hapus metadata dengan Remove Image Metadata terlebih dahulu, lalu edit. |
 | `REMOTE_RESOURCES_DISABLED` | 400 | HTML atau Markdown ke PDF menemukan referensi ke gambar, stylesheet, atau font di jaringan, yang tidak diambil oleh server. | Sematkan sumber daya tersebut di dalam file (misalnya sebagai URI `data:`), lalu coba lagi. |
 
@@ -218,10 +224,11 @@ Kode-kode ini ada di kode sumber server untuk log, telemetri, atau error milik F
 | `SIEM_DECRYPTION_FAILED` | Dilaporkan ke pelacakan error oleh penerusan SIEM. Header autentikasi SIEM tidak dapat didekripsi. |
 | `WEBHOOK_DECRYPTION_FAILED` | Dilaporkan ke pelacakan error. Permintaan yang mengalami kegagalan yang sama dijawab dengan `DECRYPTION_FAILED`. |
 | `STAGED_DISCARD_FAILED` | Dilaporkan ke pelacakan error ketika unggahan yang di-stage tidak dapat dihapus. |
+| `RETENTION_DEADLINE_BACKFILLED` | Dilaporkan ke pelacakan error oleh penyapuan TTL penyimpanan ketika mengisi batas waktu retensi tim yang hilang pada job yang selesai. File job tersebut kemudian mengikuti retensi tim. |
 | `USERNAME_RACE_EXHAUSTED` | Dimunculkan ketika pembuatan otomatis SSO kalah dalam perebutan username pada setiap percobaan ulang. Halaman login menampilkan error sebagai gantinya. |
 | `ERR_OUT_OF_RANGE` | Dilempar oleh pembaca object storage untuk rentang byte yang tidak valid. |
 | `ETIMEDOUT` | Ditetapkan pada error timeout untuk ekspor GDPR. Ekspor gagal, dan dapat diminta lagi. |
 | `FST_REQ_FILE_TOO_LARGE` | Kode Fastify untuk unggahan yang melebihi batas. Klien mendapat 413 dengan `PAYLOAD_TOO_LARGE`, atau pesan 413 milik rute itu sendiri. |
 | `TARGET_SIZE_EXCEEDED` | Dilempar ketika kompresi ukuran target tidak mencapai targetnya. Error ini tidak memiliki status atau kode, jadi klien mendapat kegagalan generik. |
 | `OCR_CACHE_PERMISSIONS` | Dilaporkan ke pelacakan error sebagai kesalahan operasional ketika volume data AI membuat cache runtime OCR dapat ditulis oleh semua pengguna. Job instalasi gagal dengan pesan yang menyebutkan masalah penyimpanan. |
-| `OCR_RUNTIME_UNREACHABLE` | Dilaporkan ke pelacakan error sebagai kesalahan operasional ketika server tidak pernah menjangkau huggingface.co untuk mengunduh runtime OCR. Job instalasi gagal dengan pesan tentang akses jaringan, `HTTPS_PROXY`, dan impor offline. |
+| `OCR_RUNTIME_UNREACHABLE` | Dilaporkan ke pelacakan error sebagai kesalahan operasional ketika server tidak pernah menjangkau huggingface.co untuk mengunduh runtime OCR. Job instalasi gagal dengan pesan tentang akses jaringan, `HTTPS_PROXY`, `HF_ENDPOINT`, dan impor offline. |

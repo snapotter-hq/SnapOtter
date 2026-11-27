@@ -1,8 +1,8 @@
 ---
 description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
-i18n_source_hash: e04bd8b67465
+i18n_source_hash: a6c463237c05
 i18n_provenance: machine
-i18n_output_hash: a91e6fdbef95
+i18n_output_hash: dfaf90c8a109
 i18n_hash_version: 2
 ---
 
@@ -17,7 +17,7 @@ i18n_hash_version: 2
 - [Docker](https://www.docker.com/)（ローカルの Postgres + Redis、コンテナビルド、AI 機能に必要）
 - Git
 
-Python 3.10 以上は、AI/ML サイドカー（背景除去、アップスケール、OCR）に取り組む場合にのみ必要です。
+Python 3.11 以上は、AI/ML サイドカー（背景除去、アップスケール、OCR）に取り組む場合にのみ必要です。
 
 ## セットアップ {#setup}
 
@@ -89,15 +89,14 @@ Drizzle ORM（pg-core）経由の PostgreSQL 17。ローカル開発では Postg
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-これにより、Postgres がポート 5432 で、Redis がポート 6379 で利用できます。続いてマイグレーションを生成して適用します。
+これにより、Postgres がポート 5432 で、Redis がポート 6379 で利用できます。API は起動時に未適用のマイグレーションを自分で適用するため、開発サーバーを起動するだけで済みます。スキーマを変更したあとはマイグレーションを生成すれば、次回の起動時に適用されます。手動で migrate を実行する必要はありません。
 
 ```bash
 cd apps/api
 npx drizzle-kit generate   # generate a migration from schema changes
-npx drizzle-kit migrate    # apply pending migrations
 ```
 
-スキーマは `apps/api/src/db/schema.ts` で定義されています。テーブル: users、sessions、settings、jobs、apiKeys、pipelines、teams、userFiles、roles、auditLog。
+スキーマは `apps/api/src/db/schema.ts` で定義されており、これが現在のテーブル一覧です。
 
 ## 新しいツールの追加 {#adding-a-new-tool}
 
@@ -217,7 +216,7 @@ CI は `linux`（`ubuntu-latest`）と `darwin`（`macos-latest`）の両方の�
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-各 OS ジョブは `visual-baselines-linux-<run-id>-<attempt>` または `visual-baselines-darwin-<run-id>-<attempt>` アーティファクトをアップロードし、再生成した PNG を含むドラフト PR（`chore/visual-baselines-linux-...` と `chore/visual-baselines-darwin-...`）を `main` 向けに作成します。各ドラフト PR の本文に `gh run download` コマンドがあるので、チェックアウトのルートで両方とも実行して PNG をブランチに取り込み、コミットしてからドラフト PR をクローズしてください。変わるはずのスクリーンショットを `changed` が拾わない場合は、代わりに `update_snapshots=all` を使います。実行にはリポジトリへの書き込み権限が必要です。ブランチがフォークにある場合は、ベースラインの更新が必要だと PR に書いてください。メンテナーが実行します。
+各 OS ジョブは `visual-baselines-linux-<run-id>-<attempt>` または `visual-baselines-darwin-<run-id>-<attempt>` アーティファクトをアップロードし、再生成した PNG を含むドラフト PR（`chore/visual-baselines-linux-...` と `chore/visual-baselines-darwin-...`）を `main` 向けに作成します。各ドラフト PR の本文に `gh run download` コマンドがあるので、チェックアウトのルートで両方とも実行して PNG をブランチに取り込み、コミットしてからドラフト PR をクローズしてください。代わりに `update_snapshots=all` を使うのは、変わるはずのスクリーンショットを `changed` が拾わない場合です。実行にはリポジトリへの書き込み権限が必要です。ブランチがフォークにある場合は、ベースラインの更新が必要だと PR に書いてください。メンテナーが実行します。
 
 Mac では、手元で素早く確認したい場合に `darwin` のベースラインをローカルで更新することもできます：
 
