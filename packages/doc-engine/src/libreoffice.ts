@@ -14,7 +14,7 @@ import {
 import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
-  timeoutMs?: number; // default 120s, spec 4.7 hard kill
+  timeoutMs?: number; // default 120s, spec 4.7 hard kill; 0 means no deadline
   signal?: AbortSignal;
 }
 
@@ -174,13 +174,16 @@ export async function convertDocument(
         child.kill("SIGKILL");
         reject(new Error("Canceled"));
       };
-      const timer = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        opts.signal?.removeEventListener("abort", onAbort);
-        child.kill("SIGKILL");
-        reject(new Error(`LibreOffice timed out after ${Math.round(timeoutMs / 1000)}s`));
-      }, timeoutMs);
+      const timer =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              opts.signal?.removeEventListener("abort", onAbort);
+              child.kill("SIGKILL");
+              reject(new Error(`LibreOffice timed out after ${Math.round(timeoutMs / 1000)}s`));
+            }, timeoutMs)
+          : undefined;
       child.stderr.on("data", (c: Buffer) => {
         err = (err + c.toString("utf8")).slice(-4096);
       });

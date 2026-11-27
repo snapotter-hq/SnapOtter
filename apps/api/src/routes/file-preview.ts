@@ -71,7 +71,7 @@ function previewDirPath(): string {
  */
 function staleAfterMs(): number {
   const encodeS = env.PREVIEW_TIMEOUT_S || 86_400;
-  const convertS = env.LIBREOFFICE_TIMEOUT_S || 120;
+  const convertS = env.LIBREOFFICE_TIMEOUT_S || 86_400;
   return Math.max(encodeS, convertS) * 1000;
 }
 
@@ -476,7 +476,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           }
 
           await convertDocument(tempInput, stagedDir, "pdf", {
-            timeoutMs: (env.LIBREOFFICE_TIMEOUT_S || 120) * 1000,
+            timeoutMs: env.LIBREOFFICE_TIMEOUT_S * 1000,
           });
 
           // convertDocument outputs next to the temp file: input.pdf
