@@ -4,6 +4,7 @@
  * of keeping libvips busy in the API process (#5274).
  */
 
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
@@ -108,6 +109,24 @@ describe("custom routes bound their SVG render", () => {
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).results[0].mimeType).toBe("image/svg+xml");
+  });
+
+  it("image-to-base64 reports the dimensions of the rendered PNG, not the SVG header", async () => {
+    const inches = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="2in" height="1in" viewBox="0 0 10 5"><rect width="10" height="5" fill="#c60"/></svg>',
+    );
+    const res = await post("image-to-base64", [
+      { name: "file", filename: "inches.svg", contentType: "image/svg+xml", content: inches },
+      settingsPart({ outputFormat: "png" }),
+    ]);
+
+    expect(res.statusCode, res.body).toBe(200);
+    const result = JSON.parse(res.body).results[0];
+    const encoded = await sharp(Buffer.from(result.base64, "base64")).metadata();
+    expect({ width: result.width, height: result.height }).toEqual({
+      width: encoded.width,
+      height: encoded.height,
+    });
   });
 
   it("find-duplicates skips the file with the deadline's reason", async () => {
