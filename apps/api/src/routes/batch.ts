@@ -709,10 +709,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     throw err;
                   }
                   try {
-                    processBuffer = await rasterizeSvgInput(processBuffer, {
-                      density: toolConfig.svgDensity,
-                    });
-                    processFilename = replaceExtWithPng(processFilename);
+                    if (!toolConfig.keepSvgVector) {
+                      processBuffer = await rasterizeSvgInput(processBuffer, {
+                        density: toolConfig.svgDensity,
+                      });
+                      processFilename = replaceExtWithPng(processFilename);
+                    }
                   } catch (err) {
                     if (!(err instanceof InputValidationError)) throw err;
                     reportEngineUnavailable(err, toolId, request.log);

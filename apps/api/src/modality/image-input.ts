@@ -45,6 +45,7 @@ export class ImageInputHandler implements InputHandler {
       maxDimension?: number;
       maxPixels?: number;
       svgDensity?: number;
+      keepSvgVector?: boolean;
       signal?: AbortSignal;
       log?: FastifyBaseLogger;
       outputFormat?: (input: Buffer) => Promise<string | undefined>;
@@ -195,13 +196,16 @@ export class ImageInputHandler implements InputHandler {
         throw err;
       }
       // Tools only ever see the PNG: rendering the SVG anywhere in-process
-      // can't be stopped once it starts (#5153).
-      fileBuffer = await rasterizeSvgInput(fileBuffer, {
-        density: opts.svgDensity,
-        maxPixels: opts.maxPixels,
-        signal: opts.signal,
-      });
-      name = replaceExtWithPng(name);
+      // can't be stopped once it starts (#5153). Tools that edit the vector
+      // source and never render it opt out.
+      if (!opts.keepSvgVector) {
+        fileBuffer = await rasterizeSvgInput(fileBuffer, {
+          density: opts.svgDensity,
+          maxPixels: opts.maxPixels,
+          signal: opts.signal,
+        });
+        name = replaceExtWithPng(name);
+      }
     }
 
     // AVIF can pass metadata validation but fail pixel decode when

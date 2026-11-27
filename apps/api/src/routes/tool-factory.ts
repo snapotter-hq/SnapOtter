@@ -190,6 +190,11 @@ export interface ToolRouteConfig<T> {
    */
   svgDensity?: number;
   /**
+   * Skip the intake rasterization and pass the sanitized SVG through. Only for
+   * tools that edit SVG source without rendering it (optimize-svg).
+   */
+  keepSvgVector?: boolean;
+  /**
    * When set, produces a redacted copy of settings for the durable DB
    * row. Passwords and other secrets are replaced so they do not persist
    * in the jobs table (retention keeps rows for days). The BullMQ job
@@ -220,6 +225,7 @@ export interface AnyToolRouteConfig {
   missingBundle?: (settings: unknown) => string | null;
   skipStructuralValidation?: boolean;
   svgDensity?: number;
+  keepSvgVector?: boolean;
   redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
 }
 
@@ -564,6 +570,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                 ),
                 lenient: config.skipStructuralValidation,
                 svgDensity: config.svgDensity,
+                keepSvgVector: config.keepSvgVector,
                 // Reject encrypted PDFs up front only for PDF-only tools (qpdf
                 // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the
                 // flag never forces a %PDF- header on non-PDF document tools

@@ -54,6 +54,8 @@ export interface InputHandler {
       maxDimension?: number;
       /** Pixels per inch an SVG input is rasterized at; defaults to sharp's 72. */
       svgDensity?: number;
+      /** Hand an SVG input to the tool as sanitized SVG instead of rasterizing it. */
+      keepSvgVector?: boolean;
       /** Abort validation, external decoders, and normalization with the job. */
       signal?: AbortSignal;
       /**

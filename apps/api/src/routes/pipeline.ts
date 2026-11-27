@@ -640,10 +640,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   throw err;
                 }
                 try {
-                  processBuffer = await rasterizeSvgInput(processBuffer, {
-                    density: getToolConfig(firstToolId ?? "")?.svgDensity,
-                  });
-                  filename = replaceExtWithPng(filename);
+                  const firstConfig = getToolConfig(firstToolId ?? "");
+                  if (!firstConfig?.keepSvgVector) {
+                    processBuffer = await rasterizeSvgInput(processBuffer, {
+                      density: firstConfig?.svgDensity,
+                    });
+                    filename = replaceExtWithPng(filename);
+                  }
                 } catch (err) {
                   if (!(err instanceof InputValidationError)) throw err;
                   reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
@@ -1946,10 +1949,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                   const firstStepToolId = parsedSteps[0]?.resolvedToolId;
                   try {
-                    processBuffer = await rasterizeSvgInput(processBuffer, {
-                      density: getToolConfig(firstStepToolId ?? "")?.svgDensity,
-                    });
-                    processFilename = replaceExtWithPng(processFilename);
+                    const firstConfig = getToolConfig(firstStepToolId ?? "");
+                    if (!firstConfig?.keepSvgVector) {
+                      processBuffer = await rasterizeSvgInput(processBuffer, {
+                        density: firstConfig?.svgDensity,
+                      });
+                      processFilename = replaceExtWithPng(processFilename);
+                    }
                   } catch (err) {
                     if (!(err instanceof InputValidationError)) throw err;
                     reportEngineUnavailable(err, firstStepToolId ?? "pipeline", request.log);

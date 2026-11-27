@@ -800,7 +800,9 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
 });
 
 describe("ImageInputHandler SVG rasterization (#5153)", () => {
-  function prepareSvg(opts: { svgDensity?: number; maxPixels?: number } = {}) {
+  function prepareSvg(
+    opts: { svgDensity?: number; maxPixels?: number; keepSvgVector?: boolean } = {},
+  ) {
     mocks.validateImageBuffer.mockResolvedValue({
       valid: true,
       format: "svg",
@@ -819,6 +821,15 @@ describe("ImageInputHandler SVG rasterization (#5153)", () => {
       signal: undefined,
     });
     expect(result).toEqual({ buffer: RENDERED, filename: "icon.png" });
+  });
+
+  it("keeps the sanitized SVG and its name for a tool that opts out of rasterizing", async () => {
+    mocks.renderSvgToPng.mockClear();
+
+    const result = await prepareSvg({ keepSvgVector: true });
+
+    expect(mocks.renderSvgToPng).not.toHaveBeenCalled();
+    expect(result).toEqual({ buffer: RAW, filename: "icon.svg" });
   });
 
   it("answers 400 SVG_TOO_COMPLEX when the render outlives its deadline", async () => {

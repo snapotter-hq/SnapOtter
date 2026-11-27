@@ -169,6 +169,7 @@ export function registerOptimizeSvg(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "optimize-svg",
     settingsSchema,
+    keepSvgVector: true,
     // The image handler accepts any image and any SVG up to MAX_SVG_SIZE_MB,
     // so refuse a raster or an oversized SVG here instead of in the worker.
     preValidate: ({ inputs }) => {
