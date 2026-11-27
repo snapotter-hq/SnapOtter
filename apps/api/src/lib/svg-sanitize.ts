@@ -219,11 +219,15 @@ function neutralizeHrefSchemes(input: string): string {
   return out + blockHrefSchemes(input.slice(pos), null);
 }
 
-/** The legacy handler pass: every `on*=` anywhere, whatever surrounds it. */
+/**
+ * The legacy handler pass: every `on*=` anywhere, whatever surrounds it. It
+ * has no tag boundaries to count markers against, and a marker per handler
+ * repeats the attribute name (#5332). A space stands in for each handler
+ * instead: dropping it outright could join a `<` before it to the text after
+ * it and make a new tag name.
+ */
 function stripHandlersEverywhere(input: string): string {
-  return input
-    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, 'data-removed=""')
-    .replace(/\bon\w+\s*=\s*\S+/gi, 'data-removed=""');
+  return input.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, " ").replace(/\bon\w+\s*=\s*\S+/gi, " ");
 }
 
 // The patterns below follow the HTML tokenizer's tag states rather than XML's,
