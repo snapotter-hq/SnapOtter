@@ -128,4 +128,38 @@ describe("custom routes bound their SVG render", () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/took longer than 1s to render/);
   });
+
+  it("the file preview answers 400 SVG_TOO_COMPLEX", async () => {
+    const { body, contentType } = createMultipartPayload([svgPart()]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/preview",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("SVG_TOO_COMPLEX");
+  });
+
+  it("a library thumbnail answers 422 instead of rendering in the API process", async () => {
+    const { body, contentType } = createMultipartPayload([svgPart()]);
+    const upload = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(upload.statusCode, upload.body).toBe(201);
+    const fileId = upload.json().files[0].id as string;
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).error).toBe("Could not generate thumbnail");
+  });
 });
