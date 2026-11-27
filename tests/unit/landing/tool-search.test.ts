@@ -808,6 +808,8 @@ describe("landing searchTools with real catalog metadata", () => {
     it.each([
       ["combine pdf", "merge-pdf"],
       ["join pdf", "merge-pdf"],
+      ["join pdf files", "merge-pdf"],
+      ["pdf join", "merge-pdf"],
       ["merge pdf", "merge-pdf"],
       ["shrink pdf", "compress-pdf"],
       ["black out pdf", "redact-pdf"],
