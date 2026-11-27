@@ -239,6 +239,41 @@ export function asDecoderOutOfMemory(err: unknown): unknown {
   );
 }
 
+/**
+ * asDecoderOutOfMemory plus the allocation failures of cjxl and heif-enc under
+ * SUBPROCESS_MEMORY_LIMIT_MB (#5263). The decoder rule leaves an uncaught
+ * std::bad_alloc alone because a crafted upload can raise one. An encoder's
+ * input is a PNG the server produced (Sharp or an AI sidecar), never the
+ * uploaded bytes, so an allocation failure there is about the server's memory.
+ *
+ * - heif-enc: an abort on std::bad_alloc, or x265's "memory allocation
+ *   failure, aborting encode" (exit 1).
+ * - cjxl: SIGILL on `JXL_CHECK: bytes_.get()`, libjxl 0.7's null check right
+ *   after AllocateArray in lib/jxl/image.cc.
+ *
+ * Shapes are stderr from the shipped image encoding 24 MP under `ulimit -v`.
+ */
+const ENCODER_BAD_ALLOC = /instance of 'std::bad_alloc'/;
+const X265_ALLOCATION_FAILED = /memory allocation failure, aborting encode/;
+const LIBJXL_ALLOCATION_FAILED = /JXL_CHECK: bytes_\.get\(\)/;
+
+export function asEncoderOutOfMemory(err: unknown): unknown {
+  const decoderVerdict = asDecoderOutOfMemory(err);
+  if (decoderVerdict !== err) return decoderVerdict;
+  const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
+  const encoderOutput =
+    typeof stderr === "string" ? stderr : Buffer.isBuffer(stderr) ? stderr.toString("utf8") : "";
+  const outOfMemory =
+    (signal === "SIGABRT" && ENCODER_BAD_ALLOC.test(encoderOutput)) ||
+    X265_ALLOCATION_FAILED.test(encoderOutput) ||
+    (signal === "SIGILL" && LIBJXL_ALLOCATION_FAILED.test(encoderOutput));
+  if (!outOfMemory) return err;
+  return new DecoderOutOfMemoryError(
+    "The image encoder ran out of memory encoding this image. If SUBPROCESS_MEMORY_LIMIT_MB is set, it may be too low for an image this size.",
+    err,
+  );
+}
+
 /** Killed or timed out, or exited 0 without writing its output: no verdict either way. */
 function inconclusive(err: unknown): boolean {
   const e = err as { killed?: unknown; signal?: unknown; code?: unknown; syscall?: unknown } | null;
