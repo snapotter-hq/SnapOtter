@@ -207,7 +207,7 @@ describe("qr-generate capacity per error-correction level (#4402)", () => {
       expect(res.statusCode).toBe(400);
       expect(res.json()).toEqual({
         error: "Invalid settings",
-        details: `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${limit} bytes of general text (more if it is only digits or uppercase letters). Shorten the text or choose a lower error correction level.`,
+        details: `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${limit} bytes of general text (more if it is only digits or uppercase letters). ${level === "L" ? "Shorten the text." : "Shorten the text or choose a lower error correction level."}`,
       });
       expect(putObject).not.toHaveBeenCalled();
     },

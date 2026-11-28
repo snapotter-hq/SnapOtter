@@ -30,9 +30,9 @@ function isQrCapacityError(err: unknown): boolean {
 
 function qrCapacityMessage(text: string, level: ErrorCorrectionLevel, logoForcedH: boolean) {
   const bytes = Buffer.byteLength(text, "utf8");
-  const remedy = logoForcedH
-    ? "A logo always uses level H. Shorten the text or remove the logo."
-    : "Shorten the text or choose a lower error correction level.";
+  let remedy = "Shorten the text or choose a lower error correction level.";
+  if (logoForcedH) remedy = "A logo always uses level H. Shorten the text or remove the logo.";
+  else if (level === "L") remedy = "Shorten the text.";
   return `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${QR_BYTE_CAPACITY[level]} bytes of general text (more if it is only digits or uppercase letters). ${remedy}`;
 }
 
