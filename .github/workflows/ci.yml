@@ -169,12 +169,12 @@ jobs:
       - name: Production Node dependency license and notices check
         run: pnpm check:production-node-licenses
 
-  # Advisory, not required (#5177): the API reference must be translated in the
-  # same PR as the English change. Do not add it to the `main` ruleset without
-  # the owner's say-so. Other surfaces (landing, docs) still report problems on
-  # main, so only `api` is checked here.
+  # Required in the `main` ruleset (#5385): the API reference must be translated
+  # in the same PR as the English change. The ruleset matches this job's `name:`
+  # exactly, so renaming it strands every PR. Other surfaces (landing, docs)
+  # still report problems on main, so only `api` is checked here.
   i18n-api:
-    name: API translations (advisory)
+    name: API translations
     runs-on: ${{ needs.changes.outputs.fleet == 'true' && fromJSON('["self-hosted","snapotter-fleet"]') || 'ubuntu-latest' }}
     needs: changes
     if: github.event_name == 'pull_request' && needs.changes.outputs.apii18n == 'true'
