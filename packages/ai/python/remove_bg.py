@@ -390,6 +390,13 @@ def main():
             else:
                 raise
 
+        # Runs after a cache hit too: onnxruntime may have dropped CUDA when the
+        # session was built, and the cached object is that same session.
+        if device == "cuda":
+            from gpu import session_device
+
+            device = session_device(session, providers)
+
         emit_progress(25, "Model loaded")
 
         with open(input_path, "rb") as f:

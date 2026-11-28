@@ -476,6 +476,28 @@ def onnx_providers():
     return (["CPUExecutionProvider"], "cpu")
 
 
+def session_device(session, providers):
+    """Device a session built with `providers` really runs on: "cuda" or "cpu".
+
+    onnxruntime drops its CUDA provider without raising when it cannot load it
+    (a missing cuDNN is the usual cause) and runs the model on the CPU, so the
+    providers we asked for say nothing about where it runs (#5372). Accepts a
+    rembg session (reads `inner_session`) or a bare InferenceSession. A session
+    that cannot report its providers keeps the requested device.
+    """
+    if "CUDAExecutionProvider" not in providers:
+        return "cpu"
+    inner = getattr(session, "inner_session", session)
+    get_providers = getattr(inner, "get_providers", None)
+    if not callable(get_providers) or "CUDAExecutionProvider" in get_providers():
+        return "cuda"
+    emit_info(
+        "onnxruntime could not load its CUDAExecutionProvider and is running on the CPU "
+        "(usually a missing cuDNN or CUDA library); processing on CPU"
+    )
+    return "cpu"
+
+
 def safe_onnx_session(model_path, providers=None):
     """Create an ONNX Runtime InferenceSession with graceful CUDA EP fallback.
 

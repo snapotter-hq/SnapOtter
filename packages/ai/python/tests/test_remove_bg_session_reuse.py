@@ -50,6 +50,7 @@ def harness(tmp_path, monkeypatch):
     gpu = types.ModuleType("gpu")
     gpu.onnx_providers = lambda: (state.providers, state.device)
     gpu.emit_info = lambda _m: None
+    gpu.session_device = lambda _session, providers: "cuda" if "CUDAExecutionProvider" in providers else "cpu"
     model_paths = types.ModuleType("model_paths")
     model_paths.ensure_rembg_model_home = lambda: None
     for name, mod in (

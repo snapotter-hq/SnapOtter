@@ -39,6 +39,7 @@ sessions = types.ModuleType("rembg.sessions")
 sessions.sessions_class = []
 gpu = types.ModuleType("gpu")
 gpu.emit_info = info.append
+gpu.session_device = lambda _session, providers: "cuda" if "CUDAExecutionProvider" in providers else "cpu"
 model_paths = types.ModuleType("model_paths")
 model_paths.ensure_rembg_model_home = lambda: None
 for name, mod in (("rembg", rembg), ("rembg.sessions", sessions), ("gpu", gpu), ("model_paths", model_paths)):
