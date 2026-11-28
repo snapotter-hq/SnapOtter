@@ -1,8 +1,8 @@
 ---
 description: "Tất cả biến môi trường của SnapOtter cùng giá trị mặc định. Cấu hình xác thực, lưu trữ, mô hình AI, analytics và nhiều hơn nữa."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: dd249e5b00ee
+i18n_output_hash: 4cf92727756a
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Mọi cấu hình đều được thực hiện thông qua biến môi trường
 | `CORS_ORIGIN` | (trống) | Danh sách các origin được phép cho CORS, phân tách bằng dấu phẩy, hoặc để trống để chỉ cho phép cùng origin. |
 | `LOG_LEVEL` | `info` | Mức độ chi tiết của log. Một trong: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Những peer nào được phép đặt IP máy khách thông qua `X-Forwarded-For`. Mặc định chỉ tin một peer thuộc mạng riêng, nên reverse proxy trên mạng Docker hoặc LAN được tin cậy còn header giả mạo từ máy khách công khai thì không. Chỉ đặt `true` khi có một proxy do bạn kiểm soát đứng phía trước ở một địa chỉ công khai. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (chưa đặt) | Trả lời trước câu hỏi về analytics ở lần chạy đầu tiên, nên không ai bị hỏi. Nếu chưa đặt, instance mới sẽ hỏi quản trị viên của nó và không gửi gì cho đến khi có câu trả lời. `off` khởi động nó với "Anonymous Product Analytics" đã tắt; `on` khởi động với tùy chọn này đã bật. Biến này chỉ điền giá trị cho cài đặt khi chưa có ai chọn. Khi cài đặt đã được lưu, dù bởi quản trị viên hay bởi biến này, việc thay đổi biến không còn tác dụng gì; quản trị viên vẫn có thể thay đổi nó trong Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Đặt `off` để khởi động instance mới với "Anonymous Product Analytics" đã tắt, nên nó không gửi gì ngay từ lần khởi động đầu tiên. Biến này chỉ điền giá trị cho cài đặt khi chưa có ai chọn. Khi cài đặt đã được lưu, dù bởi quản trị viên hay bởi biến này, việc thay đổi biến không còn tác dụng gì; quản trị viên vẫn có thể bật analytics trong Settings > System > Privacy. |
 
 ### Xác thực {#authentication}
 
@@ -91,7 +91,7 @@ Chạy image mà không có `DATABASE_URL` và `REDIS_URL` thì nó tự khởi 
 
 Nâng cấp từ 1.x: đặt `snapotter.db` cũ của bạn tại `/data/snapotter.db` trong volume và chế độ nhúng sẽ nhập nó vào PostgreSQL nhúng ở lần khởi động đầu tiên. Việc nhập chỉ chạy một lần; các lần khởi động sau bỏ qua.
 
-Lưu ý về telemetry: chế độ nhúng thừa hưởng mặc định analytics của image như mọi cấu hình khác. Image được phát hành có thể gửi analytics, nhưng instance mới sẽ hỏi quản trị viên trước và không gửi gì cho đến khi có câu trả lời. Để tắt nó, hãy trả lời không, build với `--build-arg SNAPOTTER_ANALYTICS=off`, đặt `SNAPOTTER_ANALYTICS_DEFAULT=off` trước lần khởi động đầu tiên, hoặc dùng tùy chọn từ chối của quản trị viên trong ứng dụng.
+Lưu ý về telemetry: chế độ nhúng thừa hưởng mặc định analytics của image như mọi cấu hình khác. Image được phát hành đi kèm analytics đã bật; để tắt nó, hãy build với `--build-arg SNAPOTTER_ANALYTICS=off`, đặt `SNAPOTTER_ANALYTICS_DEFAULT=off` trước lần khởi động đầu tiên, hoặc dùng tùy chọn từ chối của quản trị viên trong ứng dụng.
 
 ### Giới hạn xử lý {#processing-limits}
 

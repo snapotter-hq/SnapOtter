@@ -29,7 +29,7 @@ On a Raspberry Pi, an old laptop, or a small VPS, run one job at a time and cap 
 :::
 
 ::: tip Anonymous Product Analytics
-SnapOtter includes anonymous product analytics. A new instance asks its administrator on first run and sends nothing until answered. To turn it off later, open **Settings → System → Privacy** and switch off **Anonymous Product Analytics**. It stops immediately for the whole instance.
+SnapOtter includes anonymous product analytics by default. To turn it off, open **Settings → System → Privacy** and switch off **Anonymous Product Analytics**. It stops immediately for the whole instance.
 
 You can also set the environment variable `SNAPOTTER_TELEMETRY=0` (`false` and `off` work too) to disable all telemetry for the instance without a rebuild.
 

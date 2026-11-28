@@ -1,8 +1,8 @@
 ---
 description: "기본값과 함께 정리한 SnapOtter 환경 변수 전체 목록입니다. 인증, 스토리지, AI 모델, 분석 등을 설정합니다."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 7a8af6236f21
+i18n_output_hash: ffeddd552d90
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ i18n_hash_version: 2
 | `CORS_ORIGIN` | (비어 있음) | CORS에 허용할 출처를 쉼표로 구분한 목록입니다. 비워 두면 동일 출처만 허용합니다. |
 | `LOG_LEVEL` | `info` | 로그 상세 수준입니다. 다음 중 하나입니다: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For`를 통해 클라이언트 IP를 지정할 수 있는 피어를 정합니다. 기본값은 사설 네트워크 피어만 신뢰하므로, Docker 네트워크나 LAN에 있는 리버스 프록시는 신뢰하고 공개 클라이언트가 위조한 헤더는 신뢰하지 않습니다. `true`는 직접 관리하는 프록시가 공개 주소 앞단에 있을 때만 설정하세요. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (설정 안 됨) | 첫 실행 시 묻는 분석 질문에 미리 답하므로 아무에게도 묻지 않습니다. 설정하지 않으면 새 인스턴스가 관리자에게 먼저 묻고, 답을 받을 때까지 아무것도 전송하지 않습니다. `off`는 "Anonymous Product Analytics"가 꺼진 상태로, `on`는 켜진 상태로 시작합니다. 이 변수는 아직 아무도 값을 선택하지 않았을 때만 해당 설정을 채웁니다. 관리자나 이 변수에 의해 설정이 한 번 저장되면 변수를 바꿔도 아무 효과가 없습니다. 관리자는 여전히 Settings > System > Privacy에서 이를 바꿀 수 있습니다. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | `off`로 설정하면 새 인스턴스가 "Anonymous Product Analytics"가 꺼진 상태로 시작하여 첫 부팅부터 아무것도 전송하지 않습니다. 이 변수는 아직 아무도 값을 선택하지 않았을 때만 해당 설정을 채웁니다. 관리자나 이 변수에 의해 설정이 한 번 저장되면 변수를 바꿔도 아무 효과가 없습니다. 관리자는 여전히 Settings > System > Privacy에서 분석을 켤 수 있습니다. |
 
 ### 인증 {#authentication}
 
@@ -91,7 +91,7 @@ i18n_hash_version: 2
 
 1.x에서 업그레이드하는 경우: 이전 `snapotter.db`를 볼륨의 `/data/snapotter.db`에 두면 임베디드 모드가 첫 부팅 때 이를 임베디드 PostgreSQL로 가져옵니다. 가져오기는 한 번만 실행되며 이후 부팅에서는 건너뜁니다.
 
-원격 분석 참고: 임베디드 모드도 다른 구성과 마찬가지로 이미지의 분석 기본값을 그대로 따릅니다. 배포 이미지는 분석을 전송할 수 있지만, 새 인스턴스는 먼저 관리자에게 묻고 답을 받을 때까지 아무것도 전송하지 않습니다. 끄려면 아니요로 답하거나, `--build-arg SNAPOTTER_ANALYTICS=off`로 빌드하거나, 첫 부팅 전에 `SNAPOTTER_ANALYTICS_DEFAULT=off`를 설정하거나, 앱 내 관리자 옵트아웃을 사용하세요.
+원격 분석 참고: 임베디드 모드도 다른 구성과 마찬가지로 이미지의 분석 기본값을 그대로 따릅니다. 배포 이미지는 분석이 켜진 상태로 제공됩니다. 끄려면 `--build-arg SNAPOTTER_ANALYTICS=off`로 빌드하거나, 첫 부팅 전에 `SNAPOTTER_ANALYTICS_DEFAULT=off`를 설정하거나, 앱 내 관리자 옵트아웃을 사용하세요.
 
 ### 처리 제한 {#processing-limits}
 

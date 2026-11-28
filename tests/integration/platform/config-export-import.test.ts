@@ -1400,12 +1400,7 @@ describe("config import with enterprise license", () => {
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
 
     try {
-      // Start from an admin's yes: with no stored answer a fresh database
-      // reads as undecided, which is off (#4910).
-      await db
-        .insert(schema.settings)
-        .values({ key: "analyticsEnabled", value: "true" })
-        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+      await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
       __resetGateForTests();
       await refreshAnalyticsGate();
       expect(analyticsEnabled()).toBe(true);

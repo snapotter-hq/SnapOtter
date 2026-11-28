@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 所有環境變數及其預設值。可設定驗證、儲存空間、AI 模型、分析等項目。"
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 0bb14d260ee4
+i18n_output_hash: a2de4efbfd67
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ i18n_hash_version: 2
 | `CORS_ORIGIN` | （空） | 以逗號分隔的 CORS 允許來源，留空則僅允許同源。 |
 | `LOG_LEVEL` | `info` | 日誌詳細程度。可選值：`fatal`、`error`、`warn`、`info`、`debug`、`trace`。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | 哪些對等端可透過 `X-Forwarded-For` 設定用戶端 IP。預設值只信任私有網路中的對等端，因此位於 Docker 網路或區域網路的反向代理會被信任，而公開用戶端偽造的標頭則不會。只有在您掌控的代理伺服器位於公開位址前端時，才設定 `true`。 |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | （未設定） | 預先回答首次執行時的分析問題，因此不會詢問任何人。未設定時，新的執行個體會詢問其管理員，在得到答覆前不傳送任何資料。`off` 讓它在關閉「匿名產品分析」的狀態下啟動；`on` 則在開啟狀態下啟動。它只會在尚未有人做出選擇時填入此設定。一旦設定已儲存（無論是由管理員或由此變數儲存），變更此變數都不再有任何作用；管理員仍可在「設定 > 系統 > 隱私」中變更。 |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | 設為 `off` 可讓新的執行個體在關閉「匿名產品分析」的狀態下啟動，因此從首次啟動起就不傳送任何資料。它只會在尚未有人做出選擇時填入此設定。一旦設定已儲存（無論是由管理員或由此變數儲存），變更此變數都不再有任何作用；管理員仍可在「設定 > 系統 > 隱私權」中重新開啟分析。 |
 
 ### 驗證 {#authentication}
 
@@ -91,7 +91,7 @@ i18n_hash_version: 2
 
 從 1.x 升級：將舊的 `snapotter.db` 放在磁碟區中的 `/data/snapotter.db`，內嵌模式會在首次啟動時將其匯入內嵌 PostgreSQL。匯入只會執行一次；之後的啟動會略過。
 
-遙測說明：內嵌模式與其他設定一樣，沿用映像檔的分析預設值。已發佈的映像檔可以傳送分析資料，但新的執行個體會先詢問其管理員，在得到答覆前不傳送任何資料。若要停用，請回答「否」、使用 `--build-arg SNAPOTTER_ANALYTICS=off` 建置、在首次啟動前設定 `SNAPOTTER_ANALYTICS_DEFAULT=off`，或使用應用程式內管理員的選擇退出功能。
+遙測說明：內嵌模式與其他設定一樣，沿用映像檔的分析預設值。已發佈的映像檔預設開啟分析；若要停用，請使用 `--build-arg SNAPOTTER_ANALYTICS=off` 建置、在首次啟動前設定 `SNAPOTTER_ANALYTICS_DEFAULT=off`，或使用應用程式內管理員的選擇退出功能。
 
 ### 處理限制 {#processing-limits}
 

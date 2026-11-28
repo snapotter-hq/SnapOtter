@@ -26,9 +26,4 @@ export interface AnalyticsConfig {
    * Compose stack from the all-in-one container. Absent when analytics is off.
    */
   deployMode?: DeployMode;
-  /**
-   * True while a fresh install waits for its admin to answer the first-run
-   * analytics prompt. `enabled` is false and nothing is sent until then.
-   */
-  consentPending?: boolean;
 }

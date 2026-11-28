@@ -1,7 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { ANALYTICS_CONSENT_ORIGIN_KEY } from "./analytics-consent.js";
 import { logger } from "./logger.js";
 import { getSettingPolicy, prepareSetting } from "./settings-policy.js";
 
@@ -105,9 +104,8 @@ export async function getSettingStrict(key: string): Promise<string | undefined>
 /**
  * Seed defaultTheme, defaultLocale, and defaultToolView from env when absent,
  * and repair any existing row whose stored value fails its setting policy
- * schema (#3964). An explicit SNAPOTTER_ANALYTICS_DEFAULT also seeds
- * analyticsEnabled ("off" as false, "on" as true) when no row exists, which
- * answers the first-run consent prompt in advance (#4910).
+ * schema (#3964). With SNAPOTTER_ANALYTICS_DEFAULT=off, also seed
+ * analyticsEnabled=false when no row exists.
  */
 export async function ensureDefaultSettings(): Promise<void> {
   const defaults: Record<string, string> = {
@@ -132,38 +130,7 @@ export async function ensureDefaultSettings(): Promise<void> {
   // index.ts runs this before analytics starts (ensure-default-settings.test.ts
   // pins the order), so an instance seeded off never sends a first event. Only
   // a missing row is filled, so an admin's later choice always stands.
-  if (env.SNAPOTTER_ANALYTICS_DEFAULT !== undefined) {
-    await setSettingIfAbsent(
-      "analyticsEnabled",
-      env.SNAPOTTER_ANALYTICS_DEFAULT === "off" ? "false" : "true",
-    );
+  if (env.SNAPOTTER_ANALYTICS_DEFAULT === "off") {
+    await setSettingIfAbsent("analyticsEnabled", "false");
   }
-}
-
-/**
- * Record, once, whether this database already held an instance when the
- * first-run analytics consent prompt shipped (#4910). An upgraded instance
- * keeps its old default (a missing analyticsEnabled row still means on) and is
- * never prompted; a fresh one waits for the admin's answer and sends nothing.
- *
- * Every earlier release seeds a user (admin or anonymous) and settings rows on
- * its first boot, and a 1.x SQLite import lands users before this runs, so any
- * user or settings row here means the database predates this code. index.ts
- * runs this right after the import and before any other boot write, which
- * makes the marker the first row a fresh database gets. ON CONFLICT DO NOTHING
- * keeps the first replica's answer when several boot at once (#4500): a later
- * replica that sees rows only sees them because the first one already wrote
- * the marker.
- */
-export async function classifyAnalyticsConsentOrigin(): Promise<"fresh" | "upgrade" | "known"> {
-  if ((await getSettingStrict(ANALYTICS_CONSENT_ORIGIN_KEY)) !== undefined) return "known";
-  const { rows } = await db.execute(sql`
-    SELECT (
-      EXISTS (SELECT 1 FROM users)
-      OR EXISTS (SELECT 1 FROM settings WHERE key <> ${ANALYTICS_CONSENT_ORIGIN_KEY})
-    ) AS existed
-  `);
-  const origin = rows[0]?.existed === true ? "upgrade" : "fresh";
-  await setSettingIfAbsent(ANALYTICS_CONSENT_ORIGIN_KEY, origin);
-  return origin;
 }

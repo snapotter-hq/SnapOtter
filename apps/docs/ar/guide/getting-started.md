@@ -1,8 +1,8 @@
 ---
 description: "ثبّت SnapOtter باستخدام Docker بأمر واحد، وسجّل الدخول، وافتح أول أداة. يشمل تسريع GPU والأجهزة الصغيرة وDocker Compose والبناء من المصدر."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 3b764edeef66
+i18n_output_hash: 63324ad6d027
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip التحليلات المجهولة للمنتج
-يتضمن SnapOtter تحليلات مجهولة للمنتج. تسأل النسخة الجديدة مسؤولها عند أول تشغيل ولا ترسل أي شيء إلى أن يجيب. لإيقافها لاحقاً، افتح **Settings → System → Privacy** وأوقف **Anonymous Product Analytics**. تتوقف فوراً على مستوى النسخة بالكامل.
+يتضمن SnapOtter تحليلات مجهولة للمنتج افتراضيًا. لإيقافها، افتح **Settings → System → Privacy** وأوقف **Anonymous Product Analytics**. تتوقف فوراً على مستوى النسخة بالكامل.
 
 يمكنك أيضاً ضبط متغير البيئة `SNAPOTTER_TELEMETRY=0` (ويعمل `false` و`off` أيضاً) لتعطيل كل القياس عن بُعد للنسخة دون إعادة بناء.
 

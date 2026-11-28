@@ -1,8 +1,8 @@
 ---
 description: "Distribuisca SnapOtter in produzione con Docker. Requisiti hardware, configurazione GPU e configurazioni di reverse proxy per Nginx, Traefik e Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 0a2c98583438
+i18n_output_hash: 15c2fe3a5a37
 i18n_hash_version: 2
 ---
 
@@ -732,7 +732,7 @@ Semantic-release determina la versione dalla cronologia dei commit. Il tag Docke
 
 ## Analitiche {#analytics}
 
-SnapOtter include analitiche di prodotto anonime (modelli di utilizzo degli strumenti, segnalazioni di errori) per aiutare a individuare bug e migliorare le funzionalità. Una nuova istanza lo chiede all'amministratore al primo avvio e non invia nulla finché non riceve una risposta. I Suoi file, i nomi dei file e i dati personali non ne fanno mai parte. SnapOtter funziona normalmente con le analitiche disabilitate.
+SnapOtter include analitiche di prodotto anonime (modelli di utilizzo degli strumenti, segnalazioni di errori) per aiutare a individuare bug e migliorare le funzionalità. È attivo per impostazione predefinita e un amministratore può disattivarlo nelle Impostazioni. I Suoi file, i nomi dei file e i dati personali non ne fanno mai parte. SnapOtter funziona normalmente con le analitiche disabilitate.
 
 ### Disabilitare le analitiche {#disabling-analytics}
 

@@ -1,7 +1,7 @@
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import Fastify from "fastify";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   __resetGateForTests,
   __setReaderForTests,
@@ -77,13 +77,6 @@ describe("PostHog first-party proxy (/ingest)", () => {
     testApp = await buildTestApp();
   });
 
-  // A fresh test database has no analyticsEnabled answer, which reads as
-  // undecided and forwards nothing (#4910), so these tests answer yes.
-  beforeEach(async () => {
-    __setReaderForTests(() => Promise.resolve(true));
-    await refreshAnalyticsGate();
-  });
-
   afterEach(() => {
     api.received.length = 0;
     assets.received.length = 0;
@@ -157,18 +150,6 @@ describe("PostHog first-party proxy (/ingest)", () => {
     }
   });
 
-  it("returns 204 and forwards nothing while first-run consent is pending (#4910)", async () => {
-    __setReaderForTests(() => Promise.resolve(undefined));
-    await refreshAnalyticsGate();
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/ingest/capture/",
-      payload: "{}",
-    });
-    expect(res.statusCode).toBe(204);
-    expect(api.received).toHaveLength(0);
-  });
-
   it("returns 204 and forwards nothing when analytics is disabled", async () => {
     __setReaderForTests(() => Promise.resolve(false));
     await refreshAnalyticsGate();
@@ -203,9 +184,6 @@ describe("PostHog proxy upstream failure observability (#788)", () => {
     process.env.SNAPOTTER_POSTHOG_UPSTREAM = DEAD_UPSTREAM;
     process.env.SNAPOTTER_POSTHOG_ASSETS_UPSTREAM = DEAD_UPSTREAM;
     deadApp = await buildTestApp();
-    // Answer yes: a fresh test database reads as undecided and forwards nothing (#4910).
-    __setReaderForTests(() => Promise.resolve(true));
-    await refreshAnalyticsGate();
   });
 
   afterAll(async () => {
@@ -294,8 +272,6 @@ describe("PostHog proxy registration", () => {
 
     process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     process.env.SNAPOTTER_POSTHOG_UPSTREAM = DEAD_UPSTREAM;
-    __setReaderForTests(() => Promise.resolve(true));
-    await refreshAnalyticsGate();
     const app = Fastify();
     let errorHandlerHits = 0;
     app.setErrorHandler((_error, _request, reply) => {

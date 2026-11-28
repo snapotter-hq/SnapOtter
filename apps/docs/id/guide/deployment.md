@@ -1,8 +1,8 @@
 ---
 description: "Deploy SnapOtter ke produksi dengan Docker. Kebutuhan perangkat keras, pengaturan GPU, dan konfigurasi reverse proxy untuk Nginx, Traefik, dan Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: a46ff6afbdc3
+i18n_output_hash: 140a7eed8a62
 i18n_hash_version: 2
 ---
 
@@ -731,7 +731,7 @@ Semantic-release menentukan versi dari riwayat commit. Tag Docker `latest` selal
 
 ## Analitik {#analytics}
 
-SnapOtter menyertakan analitik produk anonim (pola penggunaan alat, laporan error) untuk membantu menemukan bug dan meningkatkan fitur. Instance baru menanyakan administratornya saat pertama kali dijalankan dan tidak mengirim apa pun sampai pertanyaan itu dijawab. File, nama file, dan data pribadi Anda tidak pernah menjadi bagian darinya. SnapOtter bekerja normal dengan analitik dinonaktifkan.
+SnapOtter menyertakan analitik produk anonim (pola penggunaan alat, laporan error) untuk membantu menemukan bug dan meningkatkan fitur. Fitur ini aktif secara default, dan admin dapat mematikannya di Settings. File, nama file, dan data pribadi Anda tidak pernah menjadi bagian darinya. SnapOtter bekerja normal dengan analitik dinonaktifkan.
 
 ### Menonaktifkan analitik {#disabling-analytics}
 

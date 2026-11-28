@@ -1,14 +1,14 @@
 ---
 description: "Hướng dẫn tăng cường bảo mật cho SnapOtter. Bảo mật container, cô lập mạng, Docker secrets, triển khai Kubernetes và các tài liệu tuân thủ."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 8349a54cf5f5
+i18n_output_hash: d6c0bb3c2791
 i18n_hash_version: 2
 ---
 
 # Bảo mật và tăng cường {#security-hardening}
 
-SnapOtter xử lý tệp hoàn toàn trên hạ tầng của bạn. Nó có thể gửi phân tích sử dụng sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, để giúp cải thiện dự án, nhưng một instance mới sẽ hỏi quản trị viên trước và không gửi gì cho đến khi được trả lời. Nó không bao giờ gửi tệp, tên tệp, nội dung tệp, kết quả OCR, metadata ảnh hay văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi đi, chỉ khi phân tích được bật, và các trường liên hệ chỉ được đưa vào khi có sự đồng ý liên hệ rõ ràng. Quản trị viên có thể tắt phân tích và thu thập phản hồi chỉ bằng một cú nhấp trong Settings > System > Privacy, không cần build lại. Việc xử lý tệp luôn nằm bên trong container của bạn.
+SnapOtter xử lý tệp hoàn toàn trên hạ tầng của bạn. Theo mặc định, nó gửi phân tích sử dụng sản phẩm và báo cáo sự cố ẩn danh, không chứa nội dung, để giúp cải thiện dự án. Nó không bao giờ gửi tệp, tên tệp, nội dung tệp, kết quả OCR, metadata ảnh hay văn bản tài liệu của bạn. Phản hồi tùy chọn chỉ được gửi sau khi người dùng gửi đi, chỉ khi phân tích được bật, và các trường liên hệ chỉ được đưa vào khi có sự đồng ý liên hệ rõ ràng. Quản trị viên có thể tắt phân tích và thu thập phản hồi chỉ bằng một cú nhấp trong Settings > System > Privacy, không cần build lại. Việc xử lý tệp luôn nằm bên trong container của bạn.
 
 Container chạy dưới một người dùng không phải root chuyên dụng (`snapotter`) với mọi capability Linux bị loại bỏ, trừ tập tối thiểu cần thiết. Để xem chính sách công bố lỗ hổng đầy đủ và kiến trúc bảo mật, hãy xem [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) trên GitHub.
 

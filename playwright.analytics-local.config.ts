@@ -141,11 +141,6 @@ export default defineConfig({
         // exercised end to end. bakedEnabled() honors this when
         // NODE_ENV !== "production".
         ANALYTICS_BAKED_OVERRIDE: "on",
-        // Each run boots a fresh database, which would otherwise wait for the
-        // first-run consent answer with analytics off (#4910). Answer it in
-        // advance so the opt-out specs start from "on";
-        // analytics-consent.spec.ts covers the prompt itself.
-        SNAPOTTER_ANALYTICS_DEFAULT: "on",
         DATABASE_URL: backingState.databaseUrl,
         E2E_PG_BASE_URL: backingState.postgresBaseUrl,
         REDIS_URL: backingState.redisUrl,

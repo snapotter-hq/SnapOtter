@@ -1,18 +1,12 @@
 ---
-description: What anonymous usage data SnapOtter collects, when it is sent, how the first-run choice works, and how to turn instance-wide product analytics off.
+description: What anonymous usage data SnapOtter collects, when it is sent, that it is on by default, and how an admin turns instance-wide product analytics off.
 ---
 
 # What SnapOtter collects {#what-snapotter-collects}
 
-Anonymous Product Analytics is set for the whole instance by an administrator. A new instance asks on first run and sends nothing until someone answers. Change it any time under Settings > System > Privacy.
+Anonymous Product Analytics is on by default on every instance, with no first-run prompt. An administrator can turn it off for the whole instance under Settings > System > Privacy, and that stops all analytics traffic to PostHog and Sentry.
 
 When analytics is on, SnapOtter sends PostHog which tools and pipelines run, how long they take, whether they succeed, error codes, and file counts, along with the instance's anonymous id, its version, CPU architecture, operating system, install type, and whether it has a GPU. Crash reports go to Sentry with file names, paths, emails, and quoted values stripped out. It never sends your files, their names or paths, their contents, OCR output or extracted text, image metadata, or your account identity. PostHog and Sentry are the only two places it sends anything, and with analytics off it sends nothing to either.
-
-## First-run choice {#first-run-choice}
-
-The first time an administrator opens a new instance, SnapOtter asks: "Send anonymous usage stats and crash reports? Your files are never sent." The two answers carry equal weight and neither is pre-selected. Closing the prompt without answering keeps analytics off and asks again on the next visit. Only an administrator sees it. With `AUTH_ENABLED=false` there are no accounts and the local user acts as the administrator, so whoever opens the app answers it. The desktop app asks the same way.
-
-An instance that was already running before this prompt existed isn't asked. It keeps the analytics setting it had: on unless an administrator or `SNAPOTTER_ANALYTICS_DEFAULT=off` turned it off.
 
 ## Events we send (when enabled) {#events-we-send-when-enabled}
 
@@ -39,6 +33,6 @@ While analytics is on, the server asks PostHog every few hours which SnapOtter r
 
 ## Turning it off {#turning-it-off}
 
-Admins: Settings > System > Privacy, flip "Anonymous Product Analytics" off. It stops immediately, instance-wide. To build an image that can never emit, set the `SNAPOTTER_ANALYTICS=off` build arg. `SNAPOTTER_TELEMETRY=off` in the server's environment does the same at runtime and wins over any answer stored in the app.
+Admins: Settings > System > Privacy, flip "Anonymous Product Analytics" off. It stops immediately, instance-wide, and nothing more is sent to PostHog or Sentry. To build an image that can never emit, set the `SNAPOTTER_ANALYTICS=off` build arg. `SNAPOTTER_TELEMETRY=off` in the server's environment does the same at runtime without a rebuild.
 
-To answer the first-run question in advance, add `SNAPOTTER_ANALYTICS_DEFAULT=off` (or `on`) to the server's environment before its first boot, and nobody is asked. With Docker Compose, put it under the app service's `environment:`, because setting it in `.env` alone doesn't reach the container.
+To start a new instance with analytics already off, add `SNAPOTTER_ANALYTICS_DEFAULT=off` to the server's environment before its first boot. With Docker Compose, put it under the app service's `environment:`, because setting it in `.env` alone doesn't reach the container.

@@ -176,12 +176,6 @@ export const ar: TranslationKeys = {
     discoverySourceLabel: "كيف سمعت عنا؟",
     optionalHint: "(اختياري)",
     continueLabel: "متابعة",
-    analyticsConsentTitle: "هل تريد إرسال إحصاءات استخدام مجهولة وتقارير الأعطال؟",
-    analyticsConsentBody: "لا تُرسَل ملفاتك أبدًا. يمكنك تغيير ذلك لاحقًا من الإعدادات.",
-    analyticsConsentLearnMore: "اطّلع على ما يُرسَل",
-    analyticsConsentYes: "إرسال",
-    analyticsConsentNo: "عدم الإرسال",
-    analyticsConsentSaveFailed: "تعذّر حفظ اختيارك. يرجى المحاولة مرة أخرى.",
   },
   categories: {
     essentials: "الأساسيات",
@@ -5289,7 +5283,7 @@ export const ar: TranslationKeys = {
     privacy: {
       title: "الخصوصية",
       description:
-        "تساعد تحليلات المنتج المجهولة في تحسين SnapOtter. ويضبطها المسؤول لكامل النسخة.",
+        "تساعد تحليلات المنتج المجهولة في تحسين SnapOtter. وهي مفعّلة افتراضيًا ويضبطها المسؤول لكامل النسخة.",
       analyticsLabel: "تحليلات المنتج المجهولة",
       analyticsDescription:
         "شارك بيانات استخدام مجهولة (الأدوات التي تعمل، ومدد التشغيل، ورموز الأخطاء) وتقارير الأعطال. بلا عنوان IP وبلا هوية حساب. لا نجمع أبدًا أسماء ملفاتك أو محتوى الملفات أو مخرجات OCR أو البيانات الوصفية للصور أو نص المستندات. أوقف هذا الخيار لإيقاف كل ذلك.",

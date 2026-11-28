@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 一条命令安装 SnapOtter，登录并打开你的第一个工具。涵盖 GPU 加速、小型机器、Docker Compose 以及从源码构建。"
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 1284194820da
+i18n_output_hash: c63c1d13d30f
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip 匿名产品分析
-SnapOtter 包含匿名产品分析。新实例在首次运行时会询问其管理员，在得到回答之前不会发送任何数据。之后若要关闭，请打开 **设置 → 系统 → 隐私**，并关闭 **匿名产品分析**。它会立即对整个实例停止。
+SnapOtter 默认包含匿名产品分析。若要关闭，请打开 **设置 → 系统 → 隐私**，并关闭 **匿名产品分析**。它会立即对整个实例停止。
 
 你也可以设置环境变量 `SNAPOTTER_TELEMETRY=0`（`false` 和 `off` 同样有效），无需重新构建即可为该实例禁用所有遥测。
 

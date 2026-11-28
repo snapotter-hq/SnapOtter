@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter के लिए सुरक्षा hardening गाइड। Container सुरक्षा, network isolation, Docker secrets, Kubernetes deployment, और compliance artifacts।"
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 6b5c7a140615
+i18n_output_hash: 327a1907efc4
 i18n_hash_version: 2
 ---
 
 # सुरक्षा और Hardening {#security-hardening}
 
-SnapOtter फ़ाइलों को पूरी तरह आपके अपने infrastructure पर प्रोसेस करता है। प्रोजेक्ट को बेहतर बनाने में मदद के लिए यह गुमनाम, सामग्री-रहित product analytics और crash reports भेज सकता है, लेकिन नया instance पहले अपने administrator से पूछता है और जवाब मिलने तक कुछ नहीं भेजता। यह आपकी फ़ाइलें, फ़ाइल नाम, फ़ाइल सामग्री, OCR output, image metadata, या दस्तावेज़ का टेक्स्ट कभी नहीं भेजता। वैकल्पिक फ़ीडबैक केवल तब भेजा जाता है जब उपयोगकर्ता उसे सबमिट करे, केवल तब जब analytics सक्षम हो, और संपर्क फ़ील्ड केवल स्पष्ट संपर्क सहमति के साथ शामिल होते हैं। कोई administrator Settings > System > Privacy में एक क्लिक से analytics और फ़ीडबैक कैप्चर बंद कर सकता है, rebuild की ज़रूरत नहीं। फ़ाइल प्रोसेसिंग हमेशा आपके container के भीतर ही रहती है।
+SnapOtter फ़ाइलों को पूरी तरह आपके अपने infrastructure पर प्रोसेस करता है। प्रोजेक्ट को बेहतर बनाने में मदद के लिए यह प्रोजेक्ट को बेहतर बनाने में मदद के लिए डिफ़ॉल्ट रूप से गुमनाम, सामग्री-रहित product analytics और crash reports भेजता है। यह आपकी फ़ाइलें, फ़ाइल नाम, फ़ाइल सामग्री, OCR output, image metadata, या दस्तावेज़ का टेक्स्ट कभी नहीं भेजता। वैकल्पिक फ़ीडबैक केवल तब भेजा जाता है जब उपयोगकर्ता उसे सबमिट करे, केवल तब जब analytics सक्षम हो, और संपर्क फ़ील्ड केवल स्पष्ट संपर्क सहमति के साथ शामिल होते हैं। कोई administrator Settings > System > Privacy में एक क्लिक से analytics और फ़ीडबैक कैप्चर बंद कर सकता है, rebuild की ज़रूरत नहीं। फ़ाइल प्रोसेसिंग हमेशा आपके container के भीतर ही रहती है।
 
 Container एक समर्पित non-root उपयोगकर्ता (`snapotter`) के रूप में चलता है, जिसमें न्यूनतम आवश्यक सेट को छोड़कर सभी Linux capabilities हटा दी जाती हैं। पूरी vulnerability disclosure policy और सुरक्षा architecture के लिए GitHub पर [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) देखें।
 

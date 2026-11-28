@@ -1,8 +1,8 @@
 ---
 description: "Встановіть SnapOtter через Docker однією командою, увійдіть і відкрийте перший інструмент. Охоплює прискорення на GPU, слабкі машини, Docker Compose і збірку з вихідного коду."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 8719d32bead0
+i18n_output_hash: c0081e066479
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip Анонімна продуктова аналітика
-SnapOtter містить анонімну продуктову аналітику. Новий екземпляр під час першого запуску запитує адміністратора і нічого не надсилає, доки не отримає відповідь. Щоб вимкнути її пізніше, відкрийте **Settings → System → Privacy** і вимкніть **Anonymous Product Analytics**. Аналітика одразу припиняється для всього екземпляра.
+SnapOtter за замовчуванням містить анонімну продуктову аналітику. Щоб вимкнути її, відкрийте **Settings → System → Privacy** і вимкніть **Anonymous Product Analytics**. Аналітика одразу припиняється для всього екземпляра.
 
 Також можна задати змінну середовища `SNAPOTTER_TELEMETRY=0` (працюють також `false` і `off`), щоб вимкнути всю телеметрію для екземпляра без перебудови.
 

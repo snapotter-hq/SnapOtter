@@ -1,8 +1,8 @@
 ---
 description: "Installeer SnapOtter met Docker in één opdracht, log in en open uw eerste tool. Behandelt GPU-versnelling, kleine machines, Docker Compose en bouwen vanaf de broncode."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: f3e7e3e17e53
+i18n_output_hash: 58c040bd6c35
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Voer op een Raspberry Pi, een oude laptop of een kleine VPS één taak tegelijk 
 :::
 
 ::: tip Anonieme productanalyse
-SnapOtter bevat anonieme productanalyse. Een nieuwe instantie vraagt de beheerder bij de eerste keer opstarten om toestemming en verstuurt niets totdat die vraag is beantwoord. Om het later uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
+SnapOtter bevat standaard anonieme productanalyse. Om het uit te schakelen opent u **Settings → System → Privacy** en zet u **Anonymous Product Analytics** uit. Het stopt direct voor de hele instantie.
 
 U kunt ook de omgevingsvariabele `SNAPOTTER_TELEMETRY=0` (`false` en `off` werken ook) instellen om alle telemetrie voor de instantie uit te schakelen zonder opnieuw te bouwen.
 

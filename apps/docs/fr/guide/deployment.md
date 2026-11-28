@@ -1,8 +1,8 @@
 ---
 description: "Déployez SnapOtter en production avec Docker. Configuration matérielle requise, configuration GPU et configurations de reverse proxy pour Nginx, Traefik et Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 62d346b48612
+i18n_output_hash: b0c3700e3768
 i18n_hash_version: 2
 ---
 
@@ -732,7 +732,7 @@ Semantic-release détermine la version à partir de l'historique des commits. Le
 
 ## Analytique {#analytics}
 
-SnapOtter inclut une analytique produit anonyme (habitudes d'utilisation des outils, rapports d'erreurs) pour aider à repérer les bugs et à améliorer les fonctionnalités. Une nouvelle instance interroge d'abord son administrateur au premier démarrage et n'envoie rien tant qu'il n'a pas répondu. Vos fichiers, noms de fichiers et données personnelles n'en font jamais partie. SnapOtter fonctionne normalement avec l'analytique désactivée.
+SnapOtter inclut une analytique produit anonyme (habitudes d'utilisation des outils, rapports d'erreurs) pour aider à repérer les bugs et à améliorer les fonctionnalités. Elle est activée par défaut, et un administrateur peut la désactiver dans les Paramètres. Vos fichiers, noms de fichiers et données personnelles n'en font jamais partie. SnapOtter fonctionne normalement avec l'analytique désactivée.
 
 ### Désactiver l'analytique {#disabling-analytics}
 

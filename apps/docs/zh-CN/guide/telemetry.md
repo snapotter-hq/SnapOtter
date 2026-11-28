@@ -1,22 +1,16 @@
 ---
-description: "SnapOtter 收集哪些匿名使用数据、何时发送、首次运行时的选择如何运作,以及如何关闭整个实例的产品分析。"
-i18n_source_hash: f3cfb0b3f961
+description: "SnapOtter 收集哪些匿名使用数据、何时发送、默认已开启，以及管理员如何关闭整个实例的产品分析。"
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 4083e52fb452
+i18n_output_hash: aff74ad3d05f
 i18n_hash_version: 2
 ---
 
 # SnapOtter 收集的内容 {#what-snapotter-collects}
 
-Anonymous Product Analytics 由管理员为整个实例设置。新实例会在首次运行时询问,在有人回答之前不会发送任何内容。您可以随时在 Settings > System > Privacy 中更改。
+Anonymous Product Analytics 在每个实例上默认开启，首次运行时不会弹出提示。管理员可以在 Settings > System > Privacy 中为整个实例关闭它，关闭后会停止发往 PostHog 和 Sentry 的所有分析流量。
 
 开启分析后,SnapOtter 会向 PostHog 发送运行了哪些工具和流水线、耗时多久、是否成功、错误代码和文件数量,以及实例的匿名 ID、版本、CPU 架构、操作系统、安装类型和是否有 GPU。崩溃报告会发送到 Sentry,其中的文件名、路径、电子邮件和引号内的值都已被去除。它绝不会发送您的文件、文件名或路径、文件内容、OCR 输出或提取的文本、图像元数据,也不会发送您的账户身份。它只会向 PostHog 和 Sentry 这两个地方发送数据,关闭分析后则不会向任何一方发送任何内容。
-
-## 首次运行时的选择 {#first-run-choice}
-
-管理员第一次打开新实例时,SnapOtter 会询问:"Send anonymous usage stats and crash reports? Your files are never sent."两个选项地位相同,都不会被预先选中。不回答就关闭提示,分析会保持关闭,并在下次访问时再次询问。只有管理员会看到这个提示。使用 `AUTH_ENABLED=false` 时没有账户,本地用户即管理员,因此谁打开应用谁来回答。桌面应用的询问方式相同。
-
-在此提示出现之前就已运行的实例不会被询问,它会保留原有的分析设置:除非管理员或 `SNAPOTTER_ANALYTICS_DEFAULT=off` 将其关闭,否则保持开启。
 
 ## 我们发送的事件(启用时) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Anonymous Product Analytics 由管理员为整个实例设置。新实例会在�
 
 ## 关闭方法 {#turning-it-off}
 
-管理员:在 Settings > System > Privacy 中将 "Anonymous Product Analytics" 关闭。它会立即停止,对整个实例生效。若要构建一个永远不会发送数据的镜像,请设置 `SNAPOTTER_ANALYTICS=off` 构建参数。在服务器环境中设置 `SNAPOTTER_TELEMETRY=off` 可在运行时达到同样效果,并且优先于应用中保存的任何回答。
+管理员:在 Settings > System > Privacy 中将 "Anonymous Product Analytics" 关闭。它会立即停止，对整个实例生效，之后不会再向 PostHog 或 Sentry 发送任何内容。若要构建一个永远不会发送数据的镜像，请设置 `SNAPOTTER_ANALYTICS=off` 构建参数。在服务器环境中设置 `SNAPOTTER_TELEMETRY=off` 可在运行时达到同样效果，无需重新构建。
 
-若要提前回答首次运行的问题,请在服务器首次启动之前,将 `SNAPOTTER_ANALYTICS_DEFAULT=off`(或 `on`)添加到服务器环境中,这样就不会询问任何人。使用 Docker Compose 时,请把它放在应用服务的 `environment:` 下,因为只在 `.env` 中设置不会传到容器里。
+若要让新实例一开始就关闭分析，请在服务器首次启动之前，将 `SNAPOTTER_ANALYTICS_DEFAULT=off` 添加到服务器环境中。使用 Docker Compose 时，请把它放在应用服务的 `environment:` 下，因为只在 `.env` 中设置不会传到容器里。

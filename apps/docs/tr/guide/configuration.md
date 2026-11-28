@@ -1,8 +1,8 @@
 ---
 description: "Varsayılan değerleriyle tüm SnapOtter ortam değişkenleri. Kimlik doğrulamayı, depolamayı, AI modellerini, analitiği ve daha fazlasını yapılandırın."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 52e3eb4f1b46
+i18n_output_hash: 6369f0c89e8e
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Tüm yapılandırma ortam değişkenleri üzerinden yapılır. Her değişkenin 
 | `CORS_ORIGIN` | (boş) | CORS için izin verilen kaynakların virgülle ayrılmış listesi. Boşsa yalnızca aynı kaynağa izin verilir. |
 | `LOG_LEVEL` | `info` | Günlük ayrıntı düzeyi. Şunlardan biri: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Hangi eşlerin istemci IP'sini `X-Forwarded-For` üzerinden ayarlayabileceği. Varsayılan değer yalnızca özel ağdaki bir eşe güvenir; böylece Docker ağındaki veya LAN'daki bir ters vekil sunucu (reverse proxy) güvenilir sayılır, genel ağdaki bir istemcinin taklit ettiği başlık ise sayılmaz. `true` değerini yalnızca önünüzde, genel bir adreste kontrol ettiğiniz bir vekil sunucu varsa ayarlayın. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (ayarlanmamış) | İlk çalıştırmadaki analitik sorusunu önceden yanıtlar, böylece kimseye sorulmaz. Ayarlanmamışsa yeni bir örnek yöneticisine sorar ve yanıt alana kadar hiçbir şey göndermez. `off` örneği "Anonim Ürün Analitiği" kapalı olarak, `on` ise açık olarak başlatır. Bu değişken ayarı yalnızca henüz kimse bir seçim yapmamışken doldurur. Ayar bir kez kaydedildikten sonra, ister bir yönetici ister bu değişken tarafından, değişkeni değiştirmenin hiçbir etkisi olmaz; bir yönetici ayarı yine de Ayarlar > Sistem > Gizlilik altından değiştirebilir. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Yeni bir örneği "Anonim Ürün Analitiği" kapalı olarak başlatmak için `off` ayarlayın; böylece ilk açılıştan itibaren hiçbir şey göndermez. Bu değişken ayarı yalnızca henüz kimse bir seçim yapmamışken doldurur. Ayar bir kez kaydedildikten sonra, ister bir yönetici ister bu değişken tarafından, değişkeni değiştirmenin hiçbir etkisi olmaz; bir yönetici analitiği yine de Ayarlar > Sistem > Gizlilik altından açabilir. |
 
 ### Kimlik doğrulama {#authentication}
 
@@ -91,7 +91,7 @@ Yalnızca `STORAGE_MODE=s3` olduğunda okunur. Zorunlu üç değişkenden biri e
 
 1.x'ten yükseltme: eski `snapotter.db` dosyanızı birimde `/data/snapotter.db` konumuna koyun; gömülü mod, ilk açılışta onu gömülü PostgreSQL'e aktarır. İçe aktarma bir kez çalışır; sonraki açılışlar onu atlar.
 
-Telemetri notu: gömülü mod, diğer tüm yapılandırmalar gibi imajın analitik varsayılanını devralır. Yayımlanan imaj analitik gönderebilir, ancak yeni bir örnek önce yöneticisine sorar ve yanıt alana kadar hiçbir şey göndermez. Kapatmak için hayır yanıtını verin, `--build-arg SNAPOTTER_ANALYTICS=off` ile derleyin, ilk açılıştan önce `SNAPOTTER_ANALYTICS_DEFAULT=off` ayarlayın veya uygulama içi yönetici devre dışı bırakma seçeneğini kullanın.
+Telemetri notu: gömülü mod, diğer tüm yapılandırmalar gibi imajın analitik varsayılanını devralır. Yayımlanan imaj analitik açık olarak gelir; kapatmak için `--build-arg SNAPOTTER_ANALYTICS=off` ile derleyin, ilk açılıştan önce `SNAPOTTER_ANALYTICS_DEFAULT=off` ayarlayın veya uygulama içi yönetici devre dışı bırakma seçeneğini kullanın.
 
 ### İşleme sınırları {#processing-limits}
 

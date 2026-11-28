@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 将 SnapOtter 部署到生产环境。包含硬件要求、GPU 设置，以及 Nginx、Traefik 和 Cloudflare 的反向代理配置。"
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 2ff11778a274
+i18n_output_hash: a61d2d5d6bc1
 i18n_hash_version: 2
 ---
 
@@ -731,7 +731,7 @@ Semantic-release 根据提交历史确定版本号。`latest` Docker 标签始�
 
 ## 分析 {#analytics}
 
-SnapOtter 包含匿名的产品分析（工具使用模式、错误报告），以帮助发现缺陷并改进功能。新实例在首次运行时会先询问管理员，在得到回答之前不会发送任何数据。你的文件、文件名和个人数据绝不会包含在内。禁用分析后，SnapOtter 仍可正常工作。
+SnapOtter 包含匿名的产品分析（工具使用模式、错误报告），以帮助发现缺陷并改进功能。它默认开启，管理员可以在设置中将其关闭。你的文件、文件名和个人数据绝不会包含在内。禁用分析后，SnapOtter 仍可正常工作。
 
 ### 禁用分析 {#disabling-analytics}
 

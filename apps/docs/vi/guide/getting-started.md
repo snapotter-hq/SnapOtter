@@ -1,8 +1,8 @@
 ---
 description: "Cài đặt SnapOtter bằng Docker chỉ với một lệnh, đăng nhập và mở công cụ đầu tiên. Bao gồm tăng tốc GPU, máy cấu hình thấp, Docker Compose và build từ mã nguồn."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 3b309a6a7a30
+i18n_output_hash: 7ad5000cfb1c
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Trên Raspberry Pi, laptop cũ hoặc VPS nhỏ, hãy chạy từng job một v�
 :::
 
 ::: tip Phân tích sử dụng sản phẩm ẩn danh
-SnapOtter có phân tích sử dụng sản phẩm ẩn danh. Một instance mới sẽ hỏi quản trị viên ở lần chạy đầu tiên và không gửi gì cho đến khi nhận được câu trả lời. Để tắt sau này, hãy mở **Settings → System → Privacy** và tắt **Anonymous Product Analytics**. Tính năng này dừng ngay lập tức cho toàn bộ instance.
+Theo mặc định, SnapOtter có phân tích sử dụng sản phẩm ẩn danh. Để tắt, hãy mở **Settings → System → Privacy** và tắt **Anonymous Product Analytics**. Tính năng này dừng ngay lập tức cho toàn bộ instance.
 
 Bạn cũng có thể đặt biến môi trường `SNAPOTTER_TELEMETRY=0` (`false` và `off` cũng dùng được) để tắt toàn bộ telemetry của instance mà không cần build lại.
 

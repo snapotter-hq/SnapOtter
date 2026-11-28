@@ -728,7 +728,7 @@ Semantic-release determines the version from commit history. The `latest` Docker
 
 ## Analytics {#analytics}
 
-SnapOtter includes anonymous product analytics (tool usage patterns, error reports) to help catch bugs and improve features. A new instance asks its administrator on first run and sends nothing until answered. Your files, file names, and personal data are never part of this. SnapOtter works normally with analytics disabled.
+SnapOtter includes anonymous product analytics (tool usage patterns, error reports) to help catch bugs and improve features. It is on by default, and an admin can turn it off in Settings. Your files, file names, and personal data are never part of this. SnapOtter works normally with analytics disabled.
 
 ### Disabling analytics {#disabling-analytics}
 

@@ -1,8 +1,8 @@
 ---
 description: "Despliegue de SnapOtter en producción con Docker. Requisitos de hardware, configuración de GPU y configuraciones de proxy inverso para Nginx, Traefik y Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: eb1fac00168a
+i18n_output_hash: a0cb2d4a74eb
 i18n_hash_version: 2
 ---
 
@@ -731,7 +731,7 @@ Semantic-release determina la versión a partir del historial de commits. La eti
 
 ## Analítica {#analytics}
 
-SnapOtter incluye analítica de producto anónima (patrones de uso de herramientas, informes de errores) para ayudar a detectar errores y mejorar las funciones. Una instancia nueva pregunta a su administrador en el primer inicio y no envía nada hasta que responda. Sus archivos, nombres de archivo y datos personales nunca forman parte de ella. SnapOtter funciona con normalidad con la analítica deshabilitada.
+SnapOtter incluye analítica de producto anónima (patrones de uso de herramientas, informes de errores) para ayudar a detectar errores y mejorar las funciones. Está activada por defecto y un administrador puede desactivarla en Configuración. Sus archivos, nombres de archivo y datos personales nunca forman parte de ella. SnapOtter funciona con normalidad con la analítica deshabilitada.
 
 ### Deshabilitar la analítica {#disabling-analytics}
 

@@ -180,14 +180,6 @@ export const fr: TranslationKeys = {
     discoverySourceLabel: "Comment avez-vous entendu parler de nous ?",
     optionalHint: "(facultatif)",
     continueLabel: "Continuer",
-    analyticsConsentTitle:
-      "Envoyer des statistiques d'utilisation anonymes et des rapports de plantage ?",
-    analyticsConsentBody:
-      "Vos fichiers ne sont jamais envoyés. Vous pourrez modifier ce choix plus tard dans les Paramètres.",
-    analyticsConsentLearnMore: "Voir ce qui est envoyé",
-    analyticsConsentYes: "Envoyer",
-    analyticsConsentNo: "Ne pas envoyer",
-    analyticsConsentSaveFailed: "Votre choix n'a pas pu être enregistré. Veuillez réessayer.",
   },
   categories: {
     essentials: "Essentiels",
@@ -5352,7 +5344,7 @@ export const fr: TranslationKeys = {
     privacy: {
       title: "Confidentialité",
       description:
-        "Les statistiques produit anonymes aident à améliorer SnapOtter. Un administrateur les configure pour toute l'instance.",
+        "Les statistiques produit anonymes aident à améliorer SnapOtter. Elles sont activées par défaut et configurées pour toute l'instance par un administrateur.",
       analyticsLabel: "Statistiques produit anonymes",
       analyticsDescription:
         "Partagez des données d'usage anonymes (quels outils sont exécutés, durées, codes d'erreur) et des rapports de plantage. Aucune adresse IP, aucune identité de compte. Nous ne collectons jamais vos noms de fichiers, le contenu des fichiers, les résultats d'OCR, les métadonnées d'images ni le texte des documents. Désactivez cette option pour tout arrêter.",

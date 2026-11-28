@@ -30,18 +30,6 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
 
 let testApp: TestApp;
 
-// A fresh test database has no analyticsEnabled answer, which the gate reads
-// as undecided and sends nothing (#4910). Tests that need analytics on store
-// the admin's yes; afterEach deletes it again.
-async function enableAnalytics(): Promise<void> {
-  process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-  await db
-    .insert(schema.settings)
-    .values({ key: "analyticsEnabled", value: "true" })
-    .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
-  await refreshAnalyticsGate();
-}
-
 beforeAll(async () => {
   testApp = await buildTestApp();
 });
@@ -124,7 +112,8 @@ describe("GET /api/v1/config/analytics", () => {
   });
 
   it("reports the server's feedback sink, not a copy of the baked key (#2252)", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
 
     feedbackSink.present = true;
     const withSink = JSON.parse(
@@ -144,13 +133,14 @@ describe("GET /api/v1/config/analytics", () => {
   });
 
   it("bake on + admin opt-out: enabled flips true -> false end to end", async () => {
+    // Force the bake on for this test only (non-production override).
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
     try {
-      // Force the bake on and store the admin's yes. This also primes the gate
-      // so the GET below doesn't kick off a background refresh that could race
-      // the opt-out write. fetchedAt is now fresh.
-      await enableAnalytics();
+      // Prime the gate so the GET below doesn't kick off a background refresh
+      // that could race the opt-out write. fetchedAt is now fresh.
+      await refreshAnalyticsGate();
 
-      // Analytics is on before the opt-out.
+      // No opt-out setting yet -> effective state is enabled.
       const before = JSON.parse(
         (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
       );
@@ -184,7 +174,7 @@ describe("GET /api/v1/config/analytics", () => {
   });
 });
 
-describe("first-run consent (#4910)", () => {
+describe("analytics is on by default (#5382)", () => {
   afterEach(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsConsentOrigin"));
   });
@@ -195,145 +185,71 @@ describe("first-run consent (#4910)", () => {
     );
   }
 
-  it("a fresh install sends nothing and asks until the admin answers yes", async () => {
-    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    await db
-      .insert(schema.settings)
-      .values({ key: "analyticsConsentOrigin", value: "fresh" })
-      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "fresh" } });
-    await refreshAnalyticsGate();
-    feedbackSink.present = true;
-
-    const pending = await readConfig();
-    expect(pending.enabled).toBe(false);
-    expect(pending.consentPending).toBe(true);
-    expect(pending.posthogApiKey).toBe("");
-    expect(pending.sentryDsnWeb).toBe("");
-    expect(pending.instanceId).toBe("");
-
-    const token = await loginAsAdmin(testApp.app);
-    const put = await testApp.app.inject({
-      method: "PUT",
-      url: "/api/v1/settings",
-      headers: { authorization: `Bearer ${token}` },
-      payload: { analyticsEnabled: "true" },
-    });
-    expect(put.statusCode).toBe(200);
-
-    const answered = await readConfig();
-    expect(answered.enabled).toBe(true);
-    expect(answered.consentPending).toBe(false);
-  });
-
-  it("answering no clears the prompt and keeps analytics off", async () => {
-    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    await db
-      .insert(schema.settings)
-      .values({ key: "analyticsConsentOrigin", value: "fresh" })
-      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "fresh" } });
-    await refreshAnalyticsGate();
-
-    const token = await loginAsAdmin(testApp.app);
-    await testApp.app.inject({
-      method: "PUT",
-      url: "/api/v1/settings",
-      headers: { authorization: `Bearer ${token}` },
-      payload: { analyticsEnabled: "false" },
-    });
-    const answered = await readConfig();
-    expect(answered.enabled).toBe(false);
-    expect(answered.consentPending).toBe(false);
-  });
-
-  it("an upgraded instance with no stored answer stays on and is never asked", async () => {
-    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-    await db
-      .insert(schema.settings)
-      .values({ key: "analyticsConsentOrigin", value: "upgrade" })
-      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "upgrade" } });
-    await refreshAnalyticsGate();
-
-    const config = await readConfig();
-    expect(config.enabled).toBe(true);
-    expect(config.consentPending).toBe(false);
-  });
-
-  it("does not ask when the bake is off, since nothing could be sent", async () => {
-    await refreshAnalyticsGate();
-    const config = await readConfig();
-    expect(config.enabled).toBe(false);
-    expect(config.consentPending).toBe(false);
-  });
-
-  it("classifies a database that already has users and settings as an upgrade, once", async () => {
-    // buildTestApp seeded an admin and settings, like any earlier release's first boot.
-    const { classifyAnalyticsConsentOrigin } = await import(
-      "../../../apps/api/src/lib/settings-helpers.js"
-    );
-    await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsConsentOrigin"));
-    await expect(classifyAnalyticsConsentOrigin()).resolves.toBe("upgrade");
-    const [row] = await db
-      .select()
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "analyticsConsentOrigin"));
-    expect(row?.value).toBe("upgrade");
-    await expect(classifyAnalyticsConsentOrigin()).resolves.toBe("known");
-  });
-
-  describe("instance_started on the first answer (#5014)", () => {
-    async function putAnalytics(value: "true" | "false") {
-      const token = await loginAsAdmin(testApp.app);
-      const res = await testApp.app.inject({
-        method: "PUT",
-        url: "/api/v1/settings",
-        headers: { authorization: `Bearer ${token}` },
-        payload: { analyticsEnabled: value },
-      });
-      expect(res.statusCode).toBe(200);
-    }
-
-    async function setOrigin(origin: "fresh" | "upgrade") {
-      process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-      await db
-        .insert(schema.settings)
-        .values({ key: "analyticsConsentOrigin", value: origin })
-        .onConflictDoUpdate({ target: schema.settings.key, set: { value: origin } });
-      await refreshAnalyticsGate();
-    }
-
-    const censusCount = () =>
-      sentEvents.filter((e) => e === ANALYTICS_EVENTS.INSTANCE_STARTED).length;
-
-    it("sends it once when a fresh install says yes, and not on a later yes", async () => {
-      await setOrigin("fresh");
-      await putAnalytics("true");
-      expect(censusCount()).toBe(1);
-      await putAnalytics("true");
-      expect(censusCount()).toBe(1);
-    });
-
-    it("sends nothing when a fresh install says no", async () => {
-      await setOrigin("fresh");
-      await putAnalytics("false");
-      expect(censusCount()).toBe(0);
-    });
-
-    it("sends nothing for an upgraded instance, which was already counted at boot", async () => {
-      await setOrigin("upgrade");
-      await putAnalytics("true");
-      expect(censusCount()).toBe(0);
-    });
-  });
-
-  it("the origin marker can't be written through the settings API", async () => {
+  async function putAnalytics(value: "true" | "false") {
     const token = await loginAsAdmin(testApp.app);
     const res = await testApp.app.inject({
       method: "PUT",
       url: "/api/v1/settings",
       headers: { authorization: `Bearer ${token}` },
-      payload: { analyticsConsentOrigin: "upgrade" },
+      payload: { analyticsEnabled: value },
     });
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBe(200);
+  }
+
+  const censusCount = () =>
+    sentEvents.filter((e) => e === ANALYTICS_EVENTS.INSTANCE_STARTED).length;
+
+  it("a database with no analyticsEnabled row reports analytics on", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
+    const config = await readConfig();
+    expect(config.enabled).toBe(true);
+    expect(config).not.toHaveProperty("consentPending");
+  });
+
+  it("a leftover analyticsConsentOrigin row from a pre-release build changes nothing", async () => {
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await db
+      .insert(schema.settings)
+      .values({ key: "analyticsConsentOrigin", value: "fresh" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "fresh" } });
+    await refreshAnalyticsGate();
+    expect((await readConfig()).enabled).toBe(true);
+
+    const token = await loginAsAdmin(testApp.app);
+    const list = await testApp.app.inject({
+      method: "GET",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(JSON.parse(list.body).settings).not.toHaveProperty("analyticsConsentOrigin");
+  });
+
+  describe("instance_started when an admin turns analytics back on", () => {
+    it("sends it once on off -> on, and not on a later save that leaves it on", async () => {
+      process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+      await refreshAnalyticsGate();
+      await putAnalytics("false");
+      expect(censusCount()).toBe(0);
+      await putAnalytics("true");
+      expect(censusCount()).toBe(1);
+      await putAnalytics("true");
+      expect(censusCount()).toBe(1);
+    });
+
+    it("sends nothing when an admin turns it off", async () => {
+      process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+      await refreshAnalyticsGate();
+      await putAnalytics("false");
+      expect(censusCount()).toBe(0);
+    });
+
+    it("sends nothing when the bake is off, whatever the admin saves", async () => {
+      await refreshAnalyticsGate();
+      await putAnalytics("false");
+      await putAnalytics("true");
+      expect(censusCount()).toBe(0);
+    });
   });
 });
 

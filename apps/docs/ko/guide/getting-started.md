@@ -1,8 +1,8 @@
 ---
 description: "Docker로 명령 한 줄에 SnapOtter를 설치하고, 로그인한 뒤 첫 번째 도구를 열어 봅니다. GPU 가속, 저사양 장비, Docker Compose, 소스 빌드도 다룹니다."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: f796bceb2c41
+i18n_output_hash: 5bfdc97e8775
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Raspberry Pi, 오래된 노트북, 작은 VPS에서는 작업을 한 번에 하�
 :::
 
 ::: tip 익명 제품 분석
-SnapOtter에는 익명 제품 분석이 포함되어 있습니다. 새 인스턴스는 처음 실행할 때 관리자에게 먼저 묻고, 답하기 전까지는 아무것도 전송하지 않습니다. 나중에 끄려면 **설정 → 시스템 → 개인정보 보호**를 열고 **익명 제품 분석**을 끄세요. 인스턴스 전체에서 즉시 중단됩니다.
+SnapOtter에는 기본적으로 익명 제품 분석이 포함되어 있습니다. 끄려면 **설정 → 시스템 → 개인정보 보호**를 열고 **익명 제품 분석**을 끄세요. 인스턴스 전체에서 즉시 중단됩니다.
 
 환경 변수 `SNAPOTTER_TELEMETRY=0`(`false`와 `off`도 사용 가능)를 설정하면 다시 빌드하지 않고도 인스턴스의 모든 텔레메트리를 비활성화할 수 있습니다.
 

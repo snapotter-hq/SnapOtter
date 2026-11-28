@@ -1,8 +1,8 @@
 ---
 description: "Toutes les variables d'environnement de SnapOtter avec leurs valeurs par défaut. Configurez l'authentification, le stockage, les modèles d'IA, l'analytique et plus encore."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: e8189a77a370
+i18n_output_hash: 024e16828afc
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Toute la configuration se fait via des variables d'environnement. Chaque variabl
 | `CORS_ORIGIN` | (vide) | Origines autorisées pour le CORS, séparées par des virgules, ou vide pour la même origine uniquement. |
 | `LOG_LEVEL` | `info` | Verbosité des journaux. L'une des valeurs : `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quels pairs peuvent définir l'IP du client via `X-Forwarded-For`. La valeur par défaut ne croit qu'un pair d'un réseau privé : un reverse proxy sur un réseau Docker ou sur un LAN est donc digne de confiance, alors que l'en-tête falsifié d'un client public ne l'est pas. Ne mettez `true` que lorsqu'un proxy que vous contrôlez se trouve devant, sur une adresse publique. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (non définie) | Répond à l'avance à la question sur l'analytique posée au premier démarrage, si bien que personne n'est interrogé. Si elle n'est pas définie, une nouvelle instance interroge son administrateur et n'envoie rien tant qu'il n'a pas répondu. `off` la démarre avec le paramètre « Analyses de produit anonymes » désactivé ; `on` la démarre avec ce paramètre activé. La variable ne renseigne le paramètre que tant que personne n'en a choisi un. Une fois le paramètre enregistré, par un administrateur ou par cette variable, modifier la variable n'a plus aucun effet ; un administrateur peut toujours le modifier dans Paramètres > Système > Confidentialité. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Définissez `off` pour démarrer une nouvelle instance avec le paramètre « Analyses de produit anonymes » désactivé, de sorte qu'elle n'envoie rien dès son premier démarrage. La variable ne renseigne le paramètre que tant que personne n'en a choisi un. Une fois le paramètre enregistré, par un administrateur ou par cette variable, modifier la variable n'a plus aucun effet ; un administrateur peut toujours activer l'analytique dans Paramètres > Système > Confidentialité. |
 
 ### Authentification {#authentication}
 
@@ -91,7 +91,7 @@ Exécutez l'image sans `DATABASE_URL` et sans `REDIS_URL` et elle démarre ses p
 
 Mise à niveau depuis la version 1.x : placez votre ancien `snapotter.db` à `/data/snapotter.db` dans le volume et le mode intégré l'importe dans le PostgreSQL intégré au premier démarrage. L'import s'exécute une fois ; les démarrages suivants l'ignorent.
 
-Note sur la télémétrie : le mode intégré hérite de la valeur d'analytique par défaut de l'image comme toute autre configuration. L'image publiée peut envoyer des données d'analytique, mais une nouvelle instance interroge d'abord son administrateur et n'envoie rien tant qu'il n'a pas répondu. Pour la désactiver, répondez non, compilez avec `--build-arg SNAPOTTER_ANALYTICS=off`, définissez `SNAPOTTER_ANALYTICS_DEFAULT=off` avant le premier démarrage, ou utilisez la désactivation admin intégrée à l'application.
+Note sur la télémétrie : le mode intégré hérite de la valeur d'analytique par défaut de l'image comme toute autre configuration. L'image publiée est livrée avec l'analytique activée ; pour la désactiver, compilez avec `--build-arg SNAPOTTER_ANALYTICS=off`, définissez `SNAPOTTER_ANALYTICS_DEFAULT=off` avant le premier démarrage, ou utilisez la désactivation admin intégrée à l'application.
 
 ### Limites de traitement {#processing-limits}
 

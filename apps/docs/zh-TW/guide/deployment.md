@@ -1,8 +1,8 @@
 ---
 description: "使用 Docker 將 SnapOtter 部署到正式環境。包含硬體需求、GPU 設定，以及 Nginx、Traefik 與 Cloudflare 的反向代理設定。"
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: acc024e715a6
+i18n_output_hash: eb3157f7c5af
 i18n_hash_version: 2
 ---
 
@@ -714,7 +714,7 @@ Semantic-release 會依據提交歷史決定版本。Docker 標籤 `latest` 永�
 
 ## 分析 {#analytics}
 
-SnapOtter 包含匿名的產品分析（工具使用模式、錯誤報告），協助找出錯誤並改進功能。全新的執行個體會在首次執行時詢問管理員，在得到回答之前不會傳送任何資料。您的檔案、檔名與個人資料絕不會成為其中的一部分。停用分析後，SnapOtter 仍可正常運作。
+SnapOtter 包含匿名的產品分析（工具使用模式、錯誤報告），協助找出錯誤並改進功能。它預設為開啟，管理員可以在設定中將其關閉。您的檔案、檔名與個人資料絕不會成為其中的一部分。停用分析後，SnapOtter 仍可正常運作。
 
 ### 停用分析 {#disabling-analytics}
 

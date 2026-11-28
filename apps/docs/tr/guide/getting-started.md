@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile tek komutta kurun, giriş yapın ve ilk aracınızı açın. GPU hızlandırmayı, küçük makineleri, Docker Compose kurulumunu ve kaynak koddan derlemeyi kapsar."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 9d7575825034
+i18n_output_hash: 30668574b045
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Raspberry Pi, eski bir dizüstü bilgisayar ya da küçük bir VPS üzerinde ayn
 :::
 
 ::: tip Anonim Ürün Analitiği
-SnapOtter anonim ürün analitiği içerir. Yeni bir örnek ilk çalıştırmada yöneticisine sorar ve yanıt verilene kadar hiçbir şey göndermez. Daha sonra kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
+SnapOtter varsayılan olarak anonim ürün analitiği içerir. Kapatmak için **Ayarlar → Sistem → Gizlilik** bölümünü açın ve **Anonim Ürün Analitiği** seçeneğini kapatın. Tüm örnek için anında durur.
 
 Yeniden derleme yapmadan örnekteki tüm telemetriyi devre dışı bırakmak için `SNAPOTTER_TELEMETRY=0` ortam değişkenini de ayarlayabilirsiniz (`false` ve `off` da çalışır).
 

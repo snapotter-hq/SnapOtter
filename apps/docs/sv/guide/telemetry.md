@@ -1,22 +1,16 @@
 ---
-description: "Vilka anonyma användningsdata SnapOtter samlar in, när de skickas, hur valet vid första start fungerar och hur du stänger av produktanalysen för hela instansen."
-i18n_source_hash: f3cfb0b3f961
+description: "Vilka anonyma användningsdata SnapOtter samlar in, när de skickas, att analysen är på som standard och hur en administratör stänger av produktanalysen för hela instansen."
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 34467ec206ac
+i18n_output_hash: e8bd941b7a0e
 i18n_hash_version: 2
 ---
 
 # Vad SnapOtter samlar in {#what-snapotter-collects}
 
-Anonymous Product Analytics ställs in för hela instansen av en administratör. En ny instans frågar vid första start och skickar ingenting förrän någon svarar. Du kan ändra det när som helst under Settings > System > Privacy.
+Anonymous Product Analytics är på som standard i varje instans, utan någon fråga vid första start. En administratör kan stänga av det för hela instansen under Settings > System > Privacy, och då upphör all analystrafik till PostHog och Sentry.
 
 När analys är på skickar SnapOtter till PostHog vilka verktyg och pipelines som körs, hur lång tid de tar, om de lyckas, felkoder och antal filer, tillsammans med instansens anonyma id, dess version, CPU-arkitektur, operativsystem, installationstyp och om den har en GPU. Kraschrapporter skickas till Sentry med filnamn, sökvägar, e-postadresser och värden inom citattecken borttagna. Den skickar aldrig dina filer, deras namn eller sökvägar, deras innehåll, OCR-utdata eller extraherad text, bildmetadata eller din kontoidentitet. PostHog och Sentry är de enda två platser dit något skickas, och när analys är av skickas ingenting till någon av dem.
-
-## Val vid första start {#first-run-choice}
-
-Första gången en administratör öppnar en ny instans frågar SnapOtter: "Send anonymous usage stats and crash reports? Your files are never sent." De två svaren väger lika tungt och inget är förvalt. Om du stänger dialogrutan utan att svara förblir analys av, och frågan ställs igen vid nästa besök. Bara en administratör ser den. Med `AUTH_ENABLED=false` finns det inga konton och den lokala användaren fungerar som administratör, så den som öppnar appen svarar. Skrivbordsappen frågar på samma sätt.
-
-En instans som redan körde innan den här frågan fanns tillfrågas inte. Den behåller den analysinställning den hade: på, om inte en administratör eller `SNAPOTTER_ANALYTICS_DEFAULT=off` stängde av den.
 
 ## Händelser vi skickar (när det är aktiverat) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Medan analys är på frågar servern PostHog med några timmars mellanrum vilken
 
 ## Stänga av det {#turning-it-off}
 
-Administratörer: Settings > System > Privacy, stäng av "Anonymous Product Analytics". Det upphör omedelbart, för hela instansen. Om du vill bygga en image som aldrig kan skicka något, ange build-argumentet `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` i serverns miljö gör detsamma vid körning och går före varje svar som sparats i appen.
+Administratörer: Settings > System > Privacy, stäng av "Anonymous Product Analytics". Det upphör omedelbart, för hela instansen, och inget mer skickas till PostHog eller Sentry. Om du vill bygga en image som aldrig kan skicka något, ange build-argumentet `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` i serverns miljö gör detsamma vid körning, utan ombyggnad.
 
-Om du vill besvara frågan vid första start i förväg lägger du till `SNAPOTTER_ANALYTICS_DEFAULT=off` (eller `on`) i serverns miljö före dess första start, så frågas ingen. Med Docker Compose lägger du det under `environment:` för appens tjänst, eftersom att ange det bara i `.env` inte når containern.
+Om du vill starta en ny instans med analysen redan av lägger du till `SNAPOTTER_ANALYTICS_DEFAULT=off` i serverns miljö före dess första start. Med Docker Compose lägger du det under `environment:` för appens tjänst, eftersom att ange det bara i `.env` inte når containern.

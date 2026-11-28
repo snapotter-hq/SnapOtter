@@ -1,8 +1,8 @@
 ---
 description: "すべての SnapOtter 環境変数とデフォルト値。認証、ストレージ、AI モデル、分析などを設定します。"
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 00dc11406de2
+i18n_output_hash: 3606fd9d0eb8
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ i18n_hash_version: 2
 | `CORS_ORIGIN` | (空) | CORS で許可するオリジンのカンマ区切りリスト。空の場合は同一オリジンのみ。 |
 | `LOG_LEVEL` | `info` | ログの詳細度。`fatal`、`error`、`warn`、`info`、`debug`、`trace` のいずれか。 |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | `X-Forwarded-For` でクライアント IP を設定できるピアを指定します。デフォルトはプライベートネットワークのピアだけを信じるため、Docker ネットワークや LAN 上のリバースプロキシは信頼され、公開クライアントが偽装したヘッダーは信頼されません。公開アドレスで自分が管理するプロキシを前段に置いている場合にのみ `true` に設定してください。 |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | （未設定） | 初回起動時の分析に関する質問に前もって答えるため、誰にも質問されません。未設定の場合、新しいインスタンスは管理者に質問し、回答があるまで何も送信しません。`off` では「Anonymous Product Analytics」をオフにした状態で、`on` ではオンにした状態で起動します。この変数は、まだ誰もこの設定を選んでいない間だけ設定値を埋めます。管理者またはこの変数によって設定が一度保存されると、変数を変更しても何も起きません。管理者は引き続き Settings > System > Privacy で変更できます。 |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | `off` を設定すると、新しいインスタンスを「Anonymous Product Analytics」をオフにした状態で開始し、最初の起動から何も送信しません。この変数は、まだ誰もこの設定を選んでいない間だけ設定値を埋めます。管理者またはこの変数によって設定が一度保存されると、変数を変更しても何も起きません。管理者は引き続き Settings > System > Privacy で分析をオンにできます。 |
 
 ### 認証 {#authentication}
 
@@ -91,7 +91,7 @@ i18n_hash_version: 2
 
 1.x からのアップグレード: 古い `snapotter.db` をボリューム内の `/data/snapotter.db` に配置すると、組み込みモードが初回起動時にそれを組み込み PostgreSQL へインポートします。インポートは一度だけ実行され、以降の起動ではスキップされます。
 
-テレメトリに関する注記: 組み込みモードは、他の設定と同様にイメージの分析デフォルトを継承します。公開イメージは分析を送信できますが、新しいインスタンスはまず管理者に質問し、回答があるまで何も送信しません。無効にするには、「いいえ」と答えるか、`--build-arg SNAPOTTER_ANALYTICS=off` でビルドするか、最初の起動前に `SNAPOTTER_ANALYTICS_DEFAULT=off` を設定するか、アプリ内の admin オプトアウトを使用してください。
+テレメトリに関する注記: 組み込みモードは、他の設定と同様にイメージの分析デフォルトを継承します。公開イメージは分析がオンの状態で提供されます。無効にするには、`--build-arg SNAPOTTER_ANALYTICS=off` でビルドするか、最初の起動前に `SNAPOTTER_ANALYTICS_DEFAULT=off` を設定するか、アプリ内の admin オプトアウトを使用してください。
 
 ### 処理制限 {#processing-limits}
 

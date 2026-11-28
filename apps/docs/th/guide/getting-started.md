@@ -1,8 +1,8 @@
 ---
 description: "ติดตั้ง SnapOtter ด้วย Docker ในคำสั่งเดียว เข้าสู่ระบบ แล้วเปิดเครื่องมือแรกของคุณ ครอบคลุมการเร่งความเร็วด้วย GPU เครื่องขนาดเล็ก Docker Compose และการสร้างจากซอร์สโค้ด"
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 793498dcafa4
+i18n_output_hash: 0e5111eb5db2
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ docker run -d --name SnapOtter -p 1349:1349 -v SnapOtter-data:/data snapotter/sn
 :::
 
 ::: tip การวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน
-SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตน อินสแตนซ์ใหม่จะถามผู้ดูแลระบบในการรันครั้งแรก และจะไม่ส่งข้อมูลใด ๆ จนกว่าจะได้รับคำตอบ หากต้องการปิดภายหลัง ให้เปิด **Settings → System → Privacy** แล้วปิด **Anonymous Product Analytics** การทำงานจะหยุดทันทีสำหรับทั้งอินสแตนซ์
+SnapOtter มีการวิเคราะห์ผลิตภัณฑ์แบบไม่ระบุตัวตนเปิดไว้โดยค่าเริ่มต้น หากต้องการปิด ให้เปิด **Settings → System → Privacy** แล้วปิด **Anonymous Product Analytics** การทำงานจะหยุดทันทีสำหรับทั้งอินสแตนซ์
 
 คุณยังตั้งค่าตัวแปรสภาพแวดล้อม `SNAPOTTER_TELEMETRY=0` (ใช้ `false` และ `off` ได้เช่นกัน) เพื่อปิดการส่งข้อมูลเทเลเมทรีทั้งหมดของอินสแตนซ์โดยไม่ต้องสร้างใหม่
 
