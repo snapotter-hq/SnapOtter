@@ -345,12 +345,17 @@ def _cached_session(model, providers):
     )
 
 
-def _with_real_device(session, providers, device):
+def _with_real_device(model, session, providers, device):
     """Pair a session with the device it runs on: onnxruntime may have dropped CUDA (#5372)."""
     if device == "cuda":
         from gpu import session_device
 
         device = session_device(session, providers)
+        if device == "cpu":
+            # Kept under the CUDA key it would spend VRAM budget and serve later requests on the CPU (#5376).
+            from session_cache import forget
+
+            forget(model, providers, "onnxruntime dropped CUDA")
     return session, device
 
 
@@ -362,7 +367,7 @@ def _create_session(model, providers, device):
     _register_matting_session(sessions_class)
     _register_hr_matting_session(sessions_class)
     try:
-        return _with_real_device(_cached_session(model, providers), providers, device)
+        return _with_real_device(model, _cached_session(model, providers), providers, device)
     except Exception as e:
         if (
             "CUDAExecutionProvider" in providers
@@ -375,7 +380,7 @@ def _create_session(model, providers, device):
                 # The cache was holding VRAM that is free now; stay on the GPU.
                 try:
                     return _with_real_device(
-                        _cached_session(model, providers), providers, device
+                        model, _cached_session(model, providers), providers, device
                     )
                 except Exception as retry_err:
                     e = retry_err

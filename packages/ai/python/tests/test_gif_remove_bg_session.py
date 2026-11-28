@@ -196,3 +196,33 @@ def test_gif_sessions_share_the_cache_with_remove_bg(tmp_path, monkeypatch):
     assert first is second is from_still
     assert device == "cuda"
     assert calls == [("u2net", tuple(cuda))]
+
+
+def test_session_that_lost_cuda_is_forgotten_but_still_returned(monkeypatch):
+    import gpu
+    import session_cache
+
+    forgotten = []
+    monkeypatch.setattr(gpu, "session_device", lambda _s, _p: "cpu")
+    monkeypatch.setattr(session_cache, "forget", lambda *args: forgotten.append(args))
+    mod = load_gif_module(lambda model, providers=None: "dropped-session")
+    cuda = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+    session, device = mod._create_session("u2net", cuda, "cuda")
+
+    assert (session, device) == ("dropped-session", "cpu")
+    assert len(forgotten) == 1 and forgotten[0][:2] == ("u2net", cuda)
+
+
+def test_cuda_session_that_kept_cuda_is_not_forgotten(monkeypatch):
+    import gpu
+    import session_cache
+
+    forgotten = []
+    monkeypatch.setattr(gpu, "session_device", lambda _s, _p: "cuda")
+    monkeypatch.setattr(session_cache, "forget", lambda *args: forgotten.append(args))
+    mod = load_gif_module(lambda model, providers=None: "gpu-session")
+
+    mod._create_session("u2net", ["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
+
+    assert forgotten == []

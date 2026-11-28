@@ -95,6 +95,19 @@ def test_cpu_request_does_not_get_a_cuda_session(harness):
     assert harness.sessions == [("u2net", tuple(CUDA)), ("u2net", tuple(CPU))]
 
 
+def test_session_that_lost_cuda_is_not_kept_under_the_cuda_key(harness, monkeypatch):
+    import gpu
+
+    monkeypatch.setattr(gpu, "session_device", lambda _s, _p: "cpu")
+    assert harness.run()["device"] == "cpu"
+    assert not session_cache._entries
+
+    monkeypatch.setattr(gpu, "session_device", lambda _s, _p: "cuda")
+    assert harness.run()["device"] == "cuda"
+    assert harness.sessions == [("u2net", tuple(CUDA)), ("u2net", tuple(CUDA))]
+    assert list(session_cache._entries) == [("u2net", tuple(CUDA))]
+
+
 def test_out_of_memory_drops_the_cached_session(harness):
     harness.run()
     harness.remove_error = RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")

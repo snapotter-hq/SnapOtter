@@ -253,6 +253,22 @@ def evict_all(reason):
     return True
 
 
+def forget(model, providers, reason):
+    """Drop one session by its key, e.g. a CUDA-keyed session that runs on the CPU.
+
+    The caller keeps its own reference, so the request in flight still finishes
+    on it. Returns whether an entry was held.
+    """
+    key = (model, tuple(providers))
+    with _lock:
+        if key not in _entries:
+            return False
+        _drop(key)
+        _log(f"evicted {model} ({reason})")
+    gc.collect()
+    return True
+
+
 def request_started():
     global _busy
     with _lock:
