@@ -40,6 +40,13 @@ MODEL_SIZE = 512
 # prompt with a "keep it background" negative prompt biases toward clean removal
 # (continue the surroundings) rather than hallucinating a new object.
 STEPS = int(os.environ.get("SD15_INPAINT_STEPS", "28"))
+# Below 1 the denoise starts from the crop as given (noised to this fraction)
+# instead of from pure noise, and run_model hands the model a crop whose masked
+# area is already filled from its surroundings (#5000). From noise alone, SD1.5
+# inpainting drew boats and jet skis into plain water; started from a context
+# fill it continues the background instead. 1.0 restores the old behaviour.
+STRENGTH = float(os.environ.get("SD15_INPAINT_STRENGTH", "0.95"))
+PREFILL_RADIUS = 5
 GUIDANCE = float(os.environ.get("SD15_INPAINT_GUIDANCE", "7.0"))
 PROMPT = os.environ.get("SD15_INPAINT_PROMPT", "")
 NEGATIVE_PROMPT = os.environ.get(
@@ -52,12 +59,15 @@ SEED = int(os.environ.get("SD15_INPAINT_SEED", "0"))
 
 
 def make_run_model(pipe, device, steps=STEPS, guidance=GUIDANCE, prompt=PROMPT,
-                   negative_prompt=NEGATIVE_PROMPT, seed=SEED, progress=None):
+                   negative_prompt=NEGATIVE_PROMPT, seed=SEED, strength=STRENGTH,
+                   progress=None):
     """Build a run_model(crop_img, crop_mask) backed by a diffusion pipeline.
 
     Matches inpaint.py's run_model contract: crop in (HxWx3 uint8 RGB), inpainted
-    crop out (same HxWx3). Resizes the crop to the model's 512, runs the pipe with
-    the (dilated) mask, and resizes the result back to the native crop size. A crop
+    crop out (same HxWx3). Fills the masked area from its surroundings (Telea,
+    skipped at strength 1 where the model ignores its init image), resizes the
+    crop to the model's 512, runs the pipe with the (dilated) mask, and resizes
+    the result back to the native crop size. A crop
     that is already 512x512 passes through unchanged, since cv2.resize to the same
     size is an exact copy.
 
@@ -82,6 +92,10 @@ def make_run_model(pipe, device, steps=STEPS, guidance=GUIDANCE, prompt=PROMPT,
 
     def run_model(crop_img, crop_mask):
         h, w = crop_img.shape[:2]
+        if strength < 1.0:
+            crop_img = cv2.inpaint(
+                crop_img, (crop_mask > 127).astype(np.uint8) * 255, PREFILL_RADIUS, cv2.INPAINT_TELEA
+            )
         interp = cv2.INTER_AREA if (w > MODEL_SIZE or h > MODEL_SIZE) else cv2.INTER_LINEAR
         img_resized = cv2.resize(crop_img, (MODEL_SIZE, MODEL_SIZE), interpolation=interp)
         mask_resized = cv2.resize(
@@ -97,6 +111,7 @@ def make_run_model(pipe, device, steps=STEPS, guidance=GUIDANCE, prompt=PROMPT,
             mask_image=pil_mask,
             num_inference_steps=steps,
             guidance_scale=guidance,
+            strength=strength,
             height=MODEL_SIZE,
             width=MODEL_SIZE,
         )
