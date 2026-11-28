@@ -52,6 +52,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { recordRecentTool } from "@/hooks/use-recent-tools";
 import { track } from "@/lib/analytics";
+import { useJustInstalled } from "@/lib/bundle-install-handoff";
 import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
@@ -839,6 +840,14 @@ function ToolPageContent({
     ],
   );
 
+  const showInstallPrompt = isAiTool && featuresLoaded && !toolInstalled && !!featureBundle;
+  const justInstalled = useJustInstalled(
+    toolId,
+    showInstallPrompt,
+    isAiTool && toolInstalled,
+    files.length > 0,
+  );
+
   // Document-level paste handler (only when an active, installed tool workspace with a dropzone is rendered)
   const disabledByAdmin = Boolean(tool && isToolDisabled(tool.id, disabledTools));
   const canAcceptPaste = Boolean(
@@ -941,7 +950,7 @@ function ToolPageContent({
     );
   }
 
-  if (isAiTool && !toolInstalled && featureBundle) {
+  if (showInstallPrompt && featureBundle) {
     return (
       <AppLayout breadcrumb={breadcrumb}>
         {/* min-h-full (not flex-1): AppLayout's <main> is a block scroll
@@ -1741,6 +1750,7 @@ function ToolPageContent({
                 onUrlImport={handleUrlImport}
                 bulkModalOpen={bulkModalOpen}
                 onBulkModalOpenChange={handleBulkModalOpenChange}
+                justInstalled={justInstalled}
               />
             </div>
           </div>
@@ -1880,6 +1890,7 @@ function ToolPageContent({
               onUrlImport={handleUrlImport}
               bulkModalOpen={bulkModalOpen}
               onBulkModalOpenChange={handleBulkModalOpenChange}
+              justInstalled={justInstalled}
             />
           </div>
         </div>

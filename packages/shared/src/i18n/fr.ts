@@ -4555,6 +4555,7 @@ export const fr: TranslationKeys = {
     applyAndDownload: "Appliquer et télécharger",
     andMore: "et {count} de plus",
     importFromFiles: "Importer depuis Fichiers",
+    installedReady: "{tool} est prêt. Déposez un fichier pour commencer.",
     saveToFiles: "Enregistrer dans Fichiers",
     savedToFiles: "Enregistré dans Fichiers",
     resultExpired: "Ce résultat a expiré. Relancez l'outil.",
@@ -5697,6 +5698,7 @@ export const fr: TranslationKeys = {
       description: "Gérez les paquets de modèles AI pour le traitement avancé de fichiers.",
       installAll: "Tout installer",
       diskUsage: "Utilisation du disque : {size}",
+      readyTools: "Prêt à essayer :",
       statusStale:
         "Impossible d’actualiser l’état des bundles. La liste ci-dessous est peut-être obsolète.",
       sizeOnDisk: "{size} sur le disque",

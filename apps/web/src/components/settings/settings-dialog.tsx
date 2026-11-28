@@ -278,7 +278,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {activeSection === "audit-log" && <AuditLogSection />}
           {activeSection === "usage" && <UsageSection />}
           {activeSection === "api-keys" && <ApiKeysSection />}
-          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection onNavigate={onClose} />}
           {activeSection === "tools" && <ToolsSection />}
 
           {activeSection === "about" && <AboutSection />}
@@ -349,7 +349,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {activeSection === "audit-log" && <AuditLogSection />}
           {activeSection === "usage" && <UsageSection />}
           {activeSection === "api-keys" && <ApiKeysSection />}
-          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection onNavigate={onClose} />}
           {activeSection === "tools" && <ToolsSection />}
 
           {activeSection === "about" && <AboutSection />}

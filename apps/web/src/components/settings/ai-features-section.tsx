@@ -1,4 +1,4 @@
-import type { FeatureBundleState, TranslationKeys } from "@snapotter/shared";
+import type { FeatureBundleState, Tool, TranslationKeys } from "@snapotter/shared";
 import {
   AlertTriangle,
   Clock,
@@ -11,11 +11,14 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet, failedAnswerMessage, formatHeaders, userErrorMessage } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
+import { readyToolsForBundle } from "@/lib/bundle-install-handoff";
 import { format, formatFileSize } from "@/lib/format";
+import { getToolName } from "@/lib/tool-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
 
 export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
@@ -38,7 +41,7 @@ export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: stri
   return format(t.features.minutesLeft, { mins });
 }
 
-export function AiFeaturesSection() {
+export function AiFeaturesSection({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { t } = useTranslation();
   const {
     bundles,
@@ -126,6 +129,8 @@ export function AiFeaturesSection() {
             isQueued={queued.includes(bundle.id)}
             isCanceling={canceling.includes(bundle.id)}
             startTime={startTimes[bundle.id] ?? null}
+            readyTools={readyToolsForBundle(bundle.id, bundles)}
+            onNavigate={onNavigate}
           />
         ))}
       </div>
@@ -449,6 +454,8 @@ function BundleCard({
   isQueued,
   isCanceling,
   startTime,
+  readyTools,
+  onNavigate,
 }: {
   bundle: FeatureBundleState;
   progress: BundleProgress | null;
@@ -461,6 +468,8 @@ function BundleCard({
   isQueued: boolean;
   isCanceling: boolean;
   startTime: number | null;
+  readyTools: Tool[];
+  onNavigate?: () => void;
 }) {
   const { t, locale } = useTranslation();
   const [confirming, setConfirming] = useState(false);
@@ -663,6 +672,9 @@ function BundleCard({
             )}
         </div>
       </div>
+      {status === "installed" && readyTools.length > 0 && (
+        <ReadyToolLinks tools={readyTools} onNavigate={onNavigate} />
+      )}
       {status === "installing" && progress && (
         <div className="mt-3 space-y-1.5">
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -680,5 +692,28 @@ function BundleCard({
         </div>
       )}
     </div>
+  );
+}
+
+const READY_TOOLS_SHOWN = 3;
+
+function ReadyToolLinks({ tools, onNavigate }: { tools: Tool[]; onNavigate?: () => void }) {
+  const { t } = useTranslation();
+  const hidden = tools.length - READY_TOOLS_SHOWN;
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <span>{t.settings.aiFeatures.readyTools}</span>
+      {tools.slice(0, READY_TOOLS_SHOWN).map((tool) => (
+        <Link
+          key={tool.id}
+          to={tool.route}
+          onClick={onNavigate}
+          className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+        >
+          {getToolName(t, tool.id, tool.name)}
+        </Link>
+      ))}
+      {hidden > 0 && <span>{format(t.toolPage.andMore, { count: hidden })}</span>}
+    </p>
   );
 }

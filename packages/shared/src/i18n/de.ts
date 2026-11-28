@@ -4562,6 +4562,7 @@ export const de: TranslationKeys = {
     applyAndDownload: "Anwenden & Herunterladen",
     andMore: "und {count} weitere",
     importFromFiles: "Aus Dateien importieren",
+    installedReady: "{tool} ist bereit. Legen Sie eine Datei ab, um zu starten.",
     saveToFiles: "In Dateien speichern",
     savedToFiles: "In Dateien gespeichert",
     resultExpired: "Dieses Ergebnis ist abgelaufen. Führen Sie das Werkzeug erneut aus.",
@@ -5708,6 +5709,7 @@ export const de: TranslationKeys = {
       description: "AI-Modellpakete für erweiterte Dateiverarbeitung verwalten.",
       installAll: "Alle installieren",
       diskUsage: "Speicherplatznutzung: {size}",
+      readyTools: "Jetzt ausprobieren:",
       statusStale:
         "Der Status der Bundles konnte nicht aktualisiert werden. Die Liste unten ist möglicherweise veraltet.",
       sizeOnDisk: "{size} auf der Festplatte",
