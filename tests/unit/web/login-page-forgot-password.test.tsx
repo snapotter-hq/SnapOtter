@@ -3,6 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,5 +64,30 @@ describe("Forgot password on the login page", () => {
       "href",
       "https://docs.snapotter.com/guide/account-recovery#reset-a-forgotten-password",
     );
+  });
+
+  // Keyboard users and password managers expect username, then password. The
+  // button stays a tab stop, but only after the password field.
+  it("tabs from username to password, then Forgot password, then login", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    const username = screen.getByLabelText(en.auth.username);
+    const password = screen.getByLabelText(en.auth.password);
+
+    await user.type(username, "grace");
+    await user.type(password, "hunter2");
+    username.focus();
+    await user.tab();
+    expect(password).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: en.auth.forgotPassword })).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: en.auth.loginButton })).toHaveFocus();
   });
 });
