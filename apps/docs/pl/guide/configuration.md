@@ -1,8 +1,8 @@
 ---
 description: "Wszystkie zmienne środowiskowe SnapOtter wraz z wartościami domyślnymi. Konfiguracja uwierzytelniania, przechowywania danych, modeli AI, analityki i nie tylko."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 579fca5549b0
+i18n_output_hash: b1344eeb55ea
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie anal
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Największe pole `settings`, jakie może zawierać żądanie narzędzia, w kilobajtach, liczone w bajtach UTF-8. Żądania przekraczające limit otrzymują `400`. Ustawienie 0 oznacza brak limitu. Rzeczywiste ustawienia narzędzi są znacznie mniejsze niż 64 KB, więc tę wartość należy zwiększać tylko wtedy, gdy klient wysyła nietypowo duże ustawienia. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Największy plik napisów (`.srt`, `.vtt`, `.ass`), jaki przyjmują narzędzia Wypal napisy i Osadź napisy, w megabajtach. Większe pliki otrzymują `400` z podanym rozmiarem pliku i limitem. Ustawienie 0 oznacza brak limitu. Plik napisów do pełnometrażowego filmu zwykle ma znacznie mniej niż 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Najdłuższa wartość, jaką Edytuj metadane zapisuje w pojedynczym tagu (wykonawca, opis, słowa kluczowe itd.), w znakach. Dłuższe wartości otrzymują `400` z nazwą tagu i limitem. Ustawienie 0 oznacza brak limitu. Zwiększ ją, jeśli przechowujesz długie podpisy lub opisy. Wartość tagu musi się też zmieścić w `MAX_SETTINGS_PAYLOAD_KB` i w limicie systemu operacyjnego na pojedynczy argument (128 KB w Linuksie). |
+
+### Narzędzia AI {#ai-tools}
+
+Te zmienne odczytuje sidecar Pythona. Ustaw je w środowisku kontenera (albo w `.env` dla opublikowanych plików Compose) i uruchom ponownie.
+
+| Zmienna | Domyślnie | Opis |
+|---|---|---|
+| `SNAPOTTER_GPU` | (puste) | Ustaw na `0`, `false` lub `no`, aby wszystkie narzędzia AI działały na CPU, nawet gdy dostępny jest GPU. Każda inna wartość lub puste pole pozwala SnapOtter używać wykrytego GPU. Użyj tego, gdy mały GPU wyczerpuje pamięć w trakcie zadania albo gdy problem ze sterownikiem powoduje błędy uruchomień na GPU. Najczęściej ma to znaczenie przy instalacjach natywnych i LXC, które teraz używają GPU, gdy obecny jest pakiet pip cuDNN. Uruchomienia na CPU są wolniejsze, a `MAX_CPU_UPSCALE_MP` dotyczy skalowania w górę. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Folder z modelem inpaintingu Stable Diffusion 1.5 (układ diffusers), którego Usuwanie obiektów używa w trybie wysokiej jakości. Pakiet funkcji `inpaint-hq` umieszcza go tutaj, więc zmieniaj to tylko wtedy, gdy model leży gdzie indziej. `MODELS_PATH` SnapOtter ustawia na `ai/models` w katalogu danych. |
+| `SD15_INPAINT_STEPS` | `28` | Liczba kroków odszumiania na jedno usunięcie. Więcej kroków może dodać szczegółów i trwa proporcjonalnie dłużej. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Jak daleko model może domalować zamaskowany obszar, od 0 do 1. Niższe wartości zachowują więcej oryginalnych pikseli (obszar jest najpierw wypełniany z otoczenia, a potem lekko dopracowywany). Wyższe wartości pozwalają modelowi malować swobodniej, a `1` ignoruje otoczenie i maluje z szumu, co częściej wymyśla nowy obiekt. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Jak ściśle model trzyma się promptów. Wyższe wartości trzymają się ich dosłowniej; bardzo wysokie mogą wyglądać ostro. |
+| `SD15_INPAINT_PROMPT` | (puste) | Tekst opisujący, co domalować w usuniętym obszarze. Puste działa najlepiej przy usuwaniu, bo model wtedy kontynuuje otoczenie. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Tekst opisujący, czego unikać w usuniętym obszarze. Wartość domyślna odwodzi model od malowania nowego obiektu w luce. |
+| `SD15_INPAINT_SEED` | `0` | Ziarno losowe. Stałe ziarno sprawia, że ten sam obraz i ta sama maska są usuwane za każdym razem tak samo. Zmień je, aby uzyskać inny wynik. |
 
 ### Silniki {#engines}
 

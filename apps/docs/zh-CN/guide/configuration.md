@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的所有环境变量及其默认值。可配置认证、存储、AI 模型、分析等。"
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 5e91de02f5d6
+i18n_output_hash: 1e309906f08a
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ i18n_hash_version: 2
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | 工具请求可携带的 `settings` 字段的最大大小，单位为 KB，按 UTF-8 字节计算。超过限制的请求会收到 `400`。设为 0 表示不设限制。实际的工具设置远小于 64 KB，因此仅当客户端发送异常大的设置时才需要调高此值。 |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | 烧录字幕和嵌入字幕接受的最大字幕文件（`.srt`、`.vtt`、`.ass`），单位为 MB。更大的文件会收到 `400`，其中包含文件大小和上限。设为 0 表示不设上限。一部长片的字幕文件通常远小于 1 MB。 |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | 编辑元数据写入单个标签（艺术家、描述、关键词等）的最长值，单位为字符。更长的值会收到 `400`，其中包含标签和上限。设为 0 表示不设上限。如果你存储较长的说明或描述，请调高它。标签值还必须能放入 `MAX_SETTINGS_PAYLOAD_KB` 和操作系统的单个参数上限（Linux 上为 128 KB）。 |
+
+### AI 工具 {#ai-tools}
+
+这些变量由 Python sidecar 读取。请在容器环境中设置（已发布的 Compose 文件则写入 `.env`），然后重启。
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `SNAPOTTER_GPU` | （空） | 设为 `0`、`false` 或 `no` 时，即使存在 GPU，所有 AI 工具也都在 CPU 上运行。设为其他任何值或留空，则 SnapOtter 会使用它检测到的 GPU。当小显存 GPU 在作业中途耗尽显存，或驱动问题导致 GPU 运行失败时，可使用此变量。它对原生安装和 LXC 安装更可能有影响，这两种安装现在会在 pip 的 cuDNN wheel 存在时使用 GPU。CPU 运行较慢，`MAX_CPU_UPSCALE_MP` 适用于放大。 |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | 存放 Stable Diffusion 1.5 修复模型（diffusers 布局）的文件夹，擦除对象在高质量模式下会用到它。`inpaint-hq` 功能包会把模型放在这里，所以只有当你把模型存放在别处时才需要修改。`MODELS_PATH` 由 SnapOtter 设为数据目录下的 `ai/models`。 |
+| `SD15_INPAINT_STEPS` | `28` | 每次擦除的去噪步数。步数越多，可能增加越多细节，耗时也按比例增加。 |
+| `SD15_INPAINT_STRENGTH` | `0.95` | 模型可以在多大程度上重绘被遮罩的区域，范围 0 到 1。较低的值会保留更多原始像素（该区域先根据周围内容填充，再轻度细化）。较高的值让模型更自由地重绘，而 `1` 会忽略周围内容并从噪声开始绘制，更可能凭空生成新物体。 |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | 模型遵循提示词的强度。值越高，越按字面遵循提示词；过高的值可能显得生硬。 |
+| `SD15_INPAINT_PROMPT` | （空） | 描述要在被擦除区域绘制什么内容的文本。擦除时留空效果最好，因为模型会延续周围的内容。 |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | 描述要避免出现在被擦除区域的内容的文本。默认值会避免在空缺处绘制新物体。 |
+| `SD15_INPAINT_SEED` | `0` | 随机种子。固定种子可使同一图像和遮罩每次都以相同方式擦除。更改它可获得不同的结果。 |
 
 ### 引擎 {#engines}
 

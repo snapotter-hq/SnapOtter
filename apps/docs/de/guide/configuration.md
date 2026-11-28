@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-Umgebungsvariablen mit Standardwerten. Konfigurieren Sie Authentifizierung, Speicher, KI-Modelle, Analytics und mehr."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 9dc3727dea13
+i18n_output_hash: cdfe1f159e73
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Hinweis zur Telemetrie: Der eingebettete Modus übernimmt den Analytics-Standard
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Größtes `settings`-Feld, das eine Tool-Anfrage enthalten darf, in Kilobyte, gezählt in UTF-8-Bytes. Anfragen über dem Limit erhalten ein `400`. Auf 0 setzen für kein Limit. Echte Tool-Einstellungen sind weit kleiner als 64 KB, erhöhen Sie diesen Wert also nur, wenn ein Client ungewöhnlich große Einstellungen sendet. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Größte Untertiteldatei (`.srt`, `.vtt`, `.ass`), die Untertitel einbrennen und Untertitel einbetten akzeptieren, in Megabyte. Größere Dateien erhalten ein `400`, das Dateigröße und Limit nennt. Auf 0 setzen für kein Limit. Eine Untertiteldatei in Spielfilmlänge liegt meist deutlich unter 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Längster Wert, den Metadaten bearbeiten in ein einzelnes Tag schreibt (Künstler, Beschreibung, Schlüsselwörter usw.), in Zeichen. Längere Werte erhalten ein `400`, das Tag und Limit nennt. Auf 0 setzen für kein Limit. Erhöhen Sie ihn, wenn Sie lange Bildunterschriften oder Beschreibungen speichern. Ein Tag-Wert muss außerdem in `MAX_SETTINGS_PAYLOAD_KB` und in das Argumentlimit des Betriebssystems pro Argument passen (128 KB unter Linux). |
+
+### KI-Tools {#ai-tools}
+
+Diese Variablen liest der Python-Sidecar. Setzen Sie sie in der Container-Umgebung (oder in `.env` bei den veröffentlichten Compose-Dateien) und starten Sie neu.
+
+| Variable | Standard | Beschreibung |
+|---|---|---|
+| `SNAPOTTER_GPU` | (leer) | Auf `0`, `false` oder `no` setzen, damit jedes KI-Tool auf der CPU läuft, auch wenn eine GPU vorhanden ist. Jeder andere Wert und ein leeres Feld lassen SnapOtter die erkannte GPU nutzen. Verwenden Sie die Variable, wenn einer kleinen GPU mitten in einem Auftrag der Speicher ausgeht oder wenn ein Treiberproblem GPU-Läufe scheitern lässt. Am ehesten spielt sie bei nativen und LXC-Installationen eine Rolle, die jetzt die GPU nutzen, sobald das pip-cuDNN-Wheel vorhanden ist. CPU-Läufe sind langsamer, und `MAX_CPU_UPSCALE_MP` gilt für das Hochskalieren. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Ordner mit dem Stable-Diffusion-1.5-Inpainting-Modell (diffusers-Layout), das Objektentferner im Modus für hohe Qualität verwendet. Das Feature-Bundle `inpaint-hq` legt es hier ab, ändern Sie die Variable also nur, wenn Sie das Modell anderswo aufbewahren. `MODELS_PATH` setzt SnapOtter auf `ai/models` im Datenverzeichnis. |
+| `SD15_INPAINT_STEPS` | `28` | Entrauschungsschritte pro Entfernung. Mehr Schritte können mehr Details bringen und dauern proportional länger. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Wie weit das Modell den maskierten Bereich neu malen darf, von 0 bis 1. Niedrigere Werte behalten mehr der ursprünglichen Pixel (der Bereich wird zuerst aus seiner Umgebung aufgefüllt und dann leicht verfeinert). Höhere Werte lassen das Modell freier neu malen, und `1` ignoriert die Umgebung und malt aus dem Rauschen, was eher ein neues Objekt erfindet. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Wie stark das Modell den Prompts folgt. Höhere Werte folgen ihnen wörtlicher; sehr hohe Werte können hart wirken. |
+| `SD15_INPAINT_PROMPT` | (leer) | Text, der beschreibt, was in den entfernten Bereich gemalt werden soll. Leer funktioniert beim Entfernen am besten, weil das Modell dann die Umgebung fortsetzt. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Text, der beschreibt, was im entfernten Bereich nicht vorkommen soll. Der Standardwert hält das Modell davon ab, ein neues Objekt in die Lücke zu malen. |
+| `SD15_INPAINT_SEED` | `0` | Zufalls-Seed. Mit einem festen Seed werden dasselbe Bild und dieselbe Maske jedes Mal gleich entfernt. Ändern Sie ihn, um ein anderes Ergebnis zu erhalten. |
 
 ### Engines {#engines}
 

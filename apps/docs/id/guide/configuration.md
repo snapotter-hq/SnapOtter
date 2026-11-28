@@ -1,8 +1,8 @@
 ---
 description: "Semua environment variable SnapOtter beserta nilai defaultnya. Atur auth, storage, model AI, analytics, dan lainnya."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 9b8414a607af
+i18n_output_hash: 380d7bf5c599
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Catatan telemetri: embedded mode mewarisi default analytics dari image seperti k
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Field `settings` terbesar yang boleh dibawa permintaan tool, dalam kilobyte, dihitung dalam byte UTF-8. Permintaan yang melebihi batas mendapat `400`. Atur ke 0 untuk tanpa batas. Setting tool yang sebenarnya jauh lebih kecil dari 64 KB, jadi naikkan ini hanya jika klien mengirim setting yang luar biasa besar. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | File subtitle terbesar (`.srt`, `.vtt`, `.ass`) yang diterima Burn Subtitles dan Embed Subtitles, dalam megabyte. File yang lebih besar mendapat `400` yang menyebutkan ukuran file dan batasnya. Atur ke 0 untuk tanpa batas. File subtitle film berdurasi penuh biasanya jauh di bawah 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Nilai terpanjang yang ditulis Edit Metadata ke satu tag (artist, description, keywords, dan seterusnya), dalam karakter. Nilai yang lebih panjang mendapat `400` yang menyebutkan tag dan batasnya. Atur ke 0 untuk tanpa batas. Naikkan jika Anda menyimpan caption atau deskripsi panjang. Nilai tag juga harus muat dalam `MAX_SETTINGS_PAYLOAD_KB` dan batas per argumen sistem operasi (128 KB di Linux). |
+
+### Alat AI {#ai-tools}
+
+Variabel ini dibaca oleh Python sidecar. Atur di environment container (atau di `.env` untuk file Compose yang dipublikasikan) lalu restart.
+
+| Variable | Default | Deskripsi |
+|---|---|---|
+| `SNAPOTTER_GPU` | (kosong) | Atur ke `0`, `false`, atau `no` agar semua alat AI tetap berjalan di CPU meskipun ada GPU. Nilai lain, atau dibiarkan kosong, membuat SnapOtter memakai GPU yang terdeteksi. Pakai ini saat GPU kecil kehabisan memori di tengah pekerjaan, atau saat masalah driver membuat proses GPU gagal. Pengaruhnya lebih mungkin terasa di instalasi native dan LXC, yang kini memakai GPU bila pip cuDNN wheel tersedia. Proses di CPU lebih lambat, dan `MAX_CPU_UPSCALE_MP` berlaku untuk upscaling. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Folder berisi model inpainting Stable Diffusion 1.5 (layout diffusers) yang dipakai Hapus Objek dalam mode kualitas tinggi. Feature bundle `inpaint-hq` menaruhnya di sini, jadi ubah hanya jika Anda menyimpan model di tempat lain. `MODELS_PATH` diatur oleh SnapOtter ke `ai/models` di dalam direktori data. |
+| `SD15_INPAINT_STEPS` | `28` | Langkah denoising per penghapusan. Lebih banyak langkah bisa menambah detail dan memakan waktu secara proporsional. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Seberapa jauh model boleh melukis ulang area yang di-mask, dari 0 sampai 1. Nilai rendah mempertahankan lebih banyak piksel asli (area itu diisi dulu dari sekitarnya, lalu diperhalus sedikit). Nilai tinggi membiarkan model melukis ulang lebih bebas, dan `1` mengabaikan sekitarnya dan melukis dari noise, sehingga lebih mungkin menciptakan objek baru. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Seberapa kuat model mengikuti prompt. Nilai tinggi mengikutinya lebih harfiah; nilai yang sangat tinggi bisa terlihat kasar. |
+| `SD15_INPAINT_PROMPT` | (kosong) | Teks yang menjelaskan apa yang dilukis ke area yang dihapus. Dibiarkan kosong paling baik untuk penghapusan, karena model lalu melanjutkan area sekitarnya. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Teks yang menjelaskan apa yang harus dijauhkan dari area yang dihapus. Default mengarahkan model agar tidak melukis objek baru di celah itu. |
+| `SD15_INPAINT_SEED` | `0` | Seed acak. Seed tetap membuat gambar dan mask yang sama terhapus dengan cara yang sama setiap kali. Ubah untuk mendapatkan hasil berbeda. |
 
 ### Engines {#engines}
 
