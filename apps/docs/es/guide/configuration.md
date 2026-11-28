@@ -1,8 +1,8 @@
 ---
 description: "Todas las variables de entorno de SnapOtter con sus valores predeterminados. Configura autenticación, almacenamiento, modelos de IA, analítica y más."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 64547e181139
+i18n_output_hash: 357b0506993d
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Nota sobre telemetría: el modo embebido hereda el valor predeterminado de anal�
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Tamaño máximo del campo `settings` que puede incluir una solicitud de herramienta, en kilobytes, contado en bytes UTF-8. Las solicitudes que superan el límite reciben un `400`. Ponlo a 0 para que no haya límite. Los ajustes reales de las herramientas son mucho menores de 64 KB, así que auméntalo solo si un cliente envía ajustes inusualmente grandes. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Archivo de subtítulos más grande (`.srt`, `.vtt`, `.ass`) que aceptan Grabar subtítulos e Incrustar subtítulos, en megabytes. Los archivos mayores reciben un `400` que indica el tamaño del archivo y el límite. Ponlo a 0 para que no haya límite. Un archivo de subtítulos de una película suele quedar muy por debajo de 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Valor más largo que Editar metadatos escribe en una sola etiqueta (artista, descripción, palabras clave, etc.), en caracteres. Los valores más largos reciben un `400` que indica la etiqueta y el límite. Ponlo a 0 para que no haya límite. Súbelo si guardas pies de foto o descripciones largos. El valor de una etiqueta también tiene que caber en `MAX_SETTINGS_PAYLOAD_KB` y en el límite por argumento del sistema operativo (128 KB en Linux). |
+
+### Herramientas de IA {#ai-tools}
+
+Las lee el sidecar de Python. Defínelas en el entorno del contenedor (o en `.env` para los archivos Compose publicados) y reinicia.
+
+| Variable | Predeterminado | Descripción |
+|---|---|---|
+| `SNAPOTTER_GPU` | (vacío) | Establécela en `0`, `false` o `no` para mantener todas las herramientas de IA en la CPU aunque haya una GPU. Cualquier otro valor, o dejarla vacía, permite que SnapOtter use la GPU que detecte. Úsala cuando una GPU pequeña se quede sin memoria a mitad de un trabajo, o cuando un problema del controlador haga fallar las ejecuciones en GPU. Es más probable que importe en instalaciones nativas y LXC, que ahora usan la GPU cuando está presente la rueda pip de cuDNN. Las ejecuciones en CPU son más lentas, y `MAX_CPU_UPSCALE_MP` se aplica al escalado. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Carpeta que contiene el modelo de inpainting Stable Diffusion 1.5 (formato diffusers) que Borrador de objetos usa en su modo de alta calidad. El paquete de funciones `inpaint-hq` lo coloca aquí, así que cámbiala solo si guardas el modelo en otro lugar. `MODELS_PATH` lo establece SnapOtter en `ai/models` dentro del directorio de datos. |
+| `SD15_INPAINT_STEPS` | `28` | Pasos de eliminación de ruido por borrado. Más pasos pueden añadir detalle y tardan proporcionalmente más. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Cuánto puede repintar el modelo el área enmascarada, de 0 a 1. Los valores bajos conservan más píxeles originales (el área se rellena primero a partir de su entorno y luego se refina ligeramente). Los valores altos dejan que el modelo repinte con más libertad, y `1` ignora el entorno y pinta a partir de ruido, lo que hace más probable que invente un objeto nuevo. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Con qué fuerza sigue el modelo los prompts. Los valores altos los siguen de forma más literal; los muy altos pueden verse duros. |
+| `SD15_INPAINT_PROMPT` | (vacío) | Texto que describe qué pintar en el área borrada. Vacío funciona mejor para eliminar, porque entonces el modelo continúa el entorno. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Texto que describe qué mantener fuera del área borrada. El valor predeterminado evita que se pinte un objeto nuevo en el hueco. |
+| `SD15_INPAINT_SEED` | `0` | Semilla aleatoria. Una semilla fija hace que la misma imagen y la misma máscara se borren siempre de la misma manera. Cámbiala para obtener un resultado distinto. |
 
 ### Motores {#engines}
 

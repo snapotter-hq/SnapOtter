@@ -49,6 +49,30 @@ describe("AI sidecar model download policy", () => {
   });
 });
 
+describe("HQ erase tuning variables", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // #5384: inpaint_hq.py reads these, but the sidecar env is an allowlist, so an
+  // operator's setting never arrived and the docs would have promised a no-op.
+  it("reaches the sidecar", () => {
+    const names = [
+      "SD15_INPAINT_DIR",
+      "SD15_INPAINT_STEPS",
+      "SD15_INPAINT_STRENGTH",
+      "SD15_INPAINT_GUIDANCE",
+      "SD15_INPAINT_PROMPT",
+      "SD15_INPAINT_NEGATIVE",
+      "SD15_INPAINT_SEED",
+    ];
+    for (const name of names) vi.stubEnv(name, `value-of-${name}`);
+
+    const env = buildMinimalEnv();
+    for (const name of names) expect(env[name]).toBe(`value-of-${name}`);
+  });
+});
+
 describe("bundle installer environment", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

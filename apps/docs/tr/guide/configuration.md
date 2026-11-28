@@ -1,8 +1,8 @@
 ---
 description: "Varsayılan değerleriyle tüm SnapOtter ortam değişkenleri. Kimlik doğrulamayı, depolamayı, AI modellerini, analitiği ve daha fazlasını yapılandırın."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 6369f0c89e8e
+i18n_output_hash: 206c33352177
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Telemetri notu: gömülü mod, diğer tüm yapılandırmalar gibi imajın analit
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Bir araç isteğinin taşıyabileceği en büyük `settings` alanı, kilobayt cinsinden ve UTF-8 bayt olarak sayılır. Sınırı aşan istekler `400` alır. Sınır olmaması için 0 yapın. Gerçek araç ayarları 64 KB'tan çok daha küçüktür; bu yüzden bunu yalnızca bir istemci alışılmadık derecede büyük ayarlar gönderiyorsa artırın. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Altyazı Yak ve Altyazı Göm araçlarının kabul ettiği en büyük altyazı dosyası (`.srt`, `.vtt`, `.ass`), megabayt cinsinden. Daha büyük dosyalar, dosya boyutunu ve sınırı belirten bir `400` alır. Sınır olmaması için 0 yapın. Uzun metrajlı bir film altyazı dosyası genellikle 1 MB'ın çok altındadır. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Meta Verileri Düzenle aracının tek bir etikete (sanatçı, açıklama, anahtar sözcükler vb.) yazdığı en uzun değer, karakter cinsinden. Daha uzun değerler, etiketi ve sınırı belirten bir `400` alır. Sınır olmaması için 0 yapın. Uzun başlıklar veya açıklamalar saklıyorsanız artırın. Bir etiket değerinin ayrıca `MAX_SETTINGS_PAYLOAD_KB` ve işletim sisteminin argüman başına sınırı (Linux'ta 128 KB) içine sığması gerekir. |
+
+### Yapay zekâ araçları {#ai-tools}
+
+Bunları Python sidecar okur. Kapsayıcı ortamında (veya yayımlanan Compose dosyaları için `.env` içinde) ayarlayın ve yeniden başlatın.
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `SNAPOTTER_GPU` | (boş) | GPU olsa bile tüm yapay zekâ araçlarını CPU'da tutmak için `0`, `false` veya `no` yapın. Başka herhangi bir değer ya da boş bırakmak, SnapOtter'ın algıladığı GPU'yu kullanmasına izin verir. Küçük bir GPU'nun belleği bir işin ortasında tükendiğinde veya bir sürücü sorunu GPU çalıştırmalarını başarısız kıldığında kullanın. Pip cuDNN paketi varken artık GPU kullanan yerel ve LXC kurulumlarında daha sık gerekir. CPU çalıştırmaları daha yavaştır ve büyütme için `MAX_CPU_UPSCALE_MP` geçerlidir. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Nesne Silici'nin yüksek kalite modunda kullandığı Stable Diffusion 1.5 inpainting modelinin (diffusers düzeni) bulunduğu klasör. `inpaint-hq` özellik paketi modeli buraya koyar, bu yüzden modeli başka bir yerde tutmuyorsanız değiştirmeyin. `MODELS_PATH` değerini SnapOtter veri dizininin altındaki `ai/models` olarak ayarlar. |
+| `SD15_INPAINT_STEPS` | `28` | Her silme için gürültü giderme adımı sayısı. Daha fazla adım ayrıntı ekleyebilir ve süreyi orantılı olarak uzatır. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Modelin maskelenmiş alanı ne kadar yeniden çizebileceği, 0 ile 1 arasında. Düşük değerler özgün piksellerin daha fazlasını korur (alan önce çevresinden doldurulur, sonra hafifçe iyileştirilir). Yüksek değerler modelin daha serbestçe yeniden çizmesine izin verir; `1` ise çevreyi yok sayar ve gürültüden çizer, bu da yeni bir nesne uydurma olasılığını artırır. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Modelin istemleri ne kadar sıkı izlediği. Yüksek değerler onları daha harfi harfine izler; çok yüksek değerler sert görünebilir. |
+| `SD15_INPAINT_PROMPT` | (boş) | Silinen alana ne çizileceğini anlatan metin. Silme için boş bırakmak en iyisidir, çünkü model o zaman çevreyi sürdürür. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Silinen alanın dışında tutulacakları anlatan metin. Varsayılan değer, boşluğa yeni bir nesne çizilmesini engeller. |
+| `SD15_INPAINT_SEED` | `0` | Rastgele tohum değeri. Sabit bir tohum, aynı görsel ve maskenin her seferinde aynı şekilde silinmesini sağlar. Farklı bir sonuç için değiştirin. |
 
 ### Motorlar {#engines}
 

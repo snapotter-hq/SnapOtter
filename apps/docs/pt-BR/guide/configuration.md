@@ -1,8 +1,8 @@
 ---
 description: "Todas as variáveis de ambiente do SnapOtter com seus valores padrão. Configure autenticação, armazenamento, modelos de IA, análises e mais."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 143fadca1735
+i18n_output_hash: f9764a787b73
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Nota sobre telemetria: o modo embutido herda o padrão de análises da imagem co
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Maior campo `settings` que uma requisição de ferramenta pode conter, em kilobytes, contados em bytes UTF-8. Requisições acima do limite recebem `400`. Defina como 0 para não ter limite. As configurações reais das ferramentas são bem menores que 64 KB, então aumente este valor apenas se um cliente enviar configurações excepcionalmente grandes. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Maior arquivo de legendas (`.srt`, `.vtt`, `.ass`) que Gravar Legendas e Incorporar Legendas aceitam, em megabytes. Arquivos maiores recebem `400` com o tamanho do arquivo e o limite. Defina como 0 para não ter limite. Um arquivo de legendas de um longa-metragem costuma ter bem menos de 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Maior valor que Editar Metadados grava em uma única tag (artista, descrição, palavras-chave etc.), em caracteres. Valores mais longos recebem `400` com o nome da tag e o limite. Defina como 0 para não ter limite. Aumente se você guarda legendas ou descrições longas. O valor de uma tag também precisa caber em `MAX_SETTINGS_PAYLOAD_KB` e no limite por argumento do sistema operacional (128 KB no Linux). |
+
+### Ferramentas de IA {#ai-tools}
+
+Elas são lidas pelo sidecar Python. Defina-as no ambiente do contêiner (ou em `.env` para os arquivos Compose publicados) e reinicie.
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `SNAPOTTER_GPU` | (vazio) | Defina como `0`, `false` ou `no` para manter todas as ferramentas de IA na CPU mesmo quando há uma GPU. Qualquer outro valor, ou deixá-la vazia, permite que o SnapOtter use a GPU detectada. Use quando uma GPU pequena fica sem memória no meio de um trabalho, ou quando um problema de driver faz as execuções em GPU falharem. É mais provável que importe em instalações nativas e LXC, que agora usam a GPU quando a roda pip do cuDNN está presente. As execuções em CPU são mais lentas, e `MAX_CPU_UPSCALE_MP` se aplica à ampliação. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Pasta que contém o modelo de inpainting Stable Diffusion 1.5 (formato diffusers) que o Apagador de objetos usa no modo de alta qualidade. O pacote de recursos `inpaint-hq` o coloca aqui, então altere somente se você guarda o modelo em outro lugar. `MODELS_PATH` é definida pelo SnapOtter como `ai/models` dentro do diretório de dados. |
+| `SD15_INPAINT_STEPS` | `28` | Passos de remoção de ruído por apagamento. Mais passos podem acrescentar detalhe e levam proporcionalmente mais tempo. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Quanto o modelo pode repintar a área mascarada, de 0 a 1. Valores baixos mantêm mais pixels originais (a área é preenchida primeiro a partir do entorno e depois levemente refinada). Valores altos deixam o modelo repintar com mais liberdade, e `1` ignora o entorno e pinta a partir de ruído, o que torna mais provável inventar um objeto novo. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Com que força o modelo segue os prompts. Valores altos os seguem de forma mais literal; valores muito altos podem parecer duros. |
+| `SD15_INPAINT_PROMPT` | (vazio) | Texto que descreve o que pintar na área apagada. Vazio funciona melhor para remoção, porque o modelo então continua o entorno. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Texto que descreve o que manter fora da área apagada. O padrão evita que um objeto novo seja pintado no espaço. |
+| `SD15_INPAINT_SEED` | `0` | Semente aleatória. Uma semente fixa faz a mesma imagem e a mesma máscara serem apagadas do mesmo jeito sempre. Altere para obter um resultado diferente. |
 
 ### Engines {#engines}
 

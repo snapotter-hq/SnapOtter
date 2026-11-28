@@ -1,8 +1,8 @@
 ---
 description: "Alle SnapOtter-omgevingsvariabelen met standaardwaarden. Configureer authenticatie, opslag, AI-modellen, analytics en meer."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 4578c77ab171
+i18n_output_hash: d5e9238d61a4
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Opmerking over telemetrie: de embedded-modus erft de analytics-standaard van de 
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Grootste `settings`-veld dat een toolverzoek mag bevatten, in kilobytes, geteld in UTF-8-bytes. Verzoeken boven de limiet krijgen een `400`. Stel in op 0 voor geen limiet. Echte toolinstellingen zijn veel kleiner dan 64 KB, dus verhoog dit alleen als een client ongebruikelijk grote instellingen verstuurt. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Grootste ondertitelbestand (`.srt`, `.vtt`, `.ass`) dat Burn Subtitles en Embed Subtitles accepteren, in megabytes. Grotere bestanden krijgen een `400` met de bestandsgrootte en de limiet. Stel in op 0 voor geen limiet. Een ondertitelbestand voor een speelfilm is meestal ruim onder 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Langste waarde die Edit Metadata in één tag schrijft (artiest, beschrijving, trefwoorden enzovoort), in tekens. Langere waarden krijgen een `400` met de tag en de limiet. Stel in op 0 voor geen limiet. Verhoog dit als u lange bijschriften of beschrijvingen opslaat. Een tagwaarde moet ook passen binnen `MAX_SETTINGS_PAYLOAD_KB` en de limiet per argument van het besturingssysteem (128 KB op Linux). |
+
+### AI-tools {#ai-tools}
+
+Deze worden gelezen door de Python-sidecar. Stel ze in via de containeromgeving (of `.env` bij de gepubliceerde Compose-bestanden) en start opnieuw op.
+
+| Variabele | Standaard | Beschrijving |
+|---|---|---|
+| `SNAPOTTER_GPU` | (leeg) | Zet op `0`, `false` of `no` om elke AI-tool op de CPU te houden, ook als er een GPU aanwezig is. Elke andere waarde, of een leeg veld, laat SnapOtter de gedetecteerde GPU gebruiken. Gebruik dit wanneer een kleine GPU halverwege een taak zonder geheugen komt te zitten, of wanneer een stuurprogrammaprobleem GPU-runs laat mislukken. Het is vooral relevant bij native en LXC-installaties, die nu de GPU gebruiken wanneer het pip-cuDNN-wheel aanwezig is. CPU-runs zijn trager, en `MAX_CPU_UPSCALE_MP` geldt voor upscaling. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Map met het Stable Diffusion 1.5 inpainting-model (diffusers-indeling) dat Object verwijderen gebruikt in de modus voor hoge kwaliteit. De featurebundel `inpaint-hq` plaatst het hier, dus wijzig dit alleen als u het model elders bewaart. `MODELS_PATH` wordt door SnapOtter ingesteld op `ai/models` onder de datamap. |
+| `SD15_INPAINT_STEPS` | `28` | Denoising-stappen per verwijdering. Meer stappen kunnen meer detail toevoegen en duren evenredig langer. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Hoe ver het model het gemaskeerde gebied mag overschilderen, van 0 tot 1. Lagere waarden behouden meer van de oorspronkelijke pixels (het gebied wordt eerst opgevuld vanuit de omgeving en daarna licht verfijnd). Hogere waarden laten het model vrijer overschilderen, en `1` negeert de omgeving en schildert vanuit ruis, wat eerder een nieuw object verzint. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Hoe sterk het model de prompts volgt. Hogere waarden volgen ze letterlijker; zeer hoge waarden kunnen er hard uitzien. |
+| `SD15_INPAINT_PROMPT` | (leeg) | Tekst die beschrijft wat in het verwijderde gebied moet worden geschilderd. Leeg werkt het best voor verwijderen, omdat het model dan de omgeving voortzet. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Tekst die beschrijft wat uit het verwijderde gebied moet blijven. De standaardwaarde zorgt ervoor dat er geen nieuw object in de opening wordt geschilderd. |
+| `SD15_INPAINT_SEED` | `0` | Willekeurige seed. Met een vaste seed worden dezelfde afbeelding en hetzelfde masker elke keer op dezelfde manier verwijderd. Wijzig hem voor een ander resultaat. |
 
 ### Engines {#engines}
 

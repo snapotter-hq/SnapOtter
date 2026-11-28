@@ -1,8 +1,8 @@
 ---
 description: "Alla miljövariabler i SnapOtter med standardvärden. Konfigurera autentisering, lagring, AI-modeller, analys med mera."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 86ae159d1b51
+i18n_output_hash: 00ff78fb3606
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Notering om telemetri: inbäddat läge ärver avbildens standardinställning fö
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Det största fältet `settings` som en verktygsförfrågan får innehålla, i kilobyte, räknat i UTF-8-byte. Förfrågningar över gränsen får `400`. Ange 0 för ingen gräns. Verkliga verktygsinställningar är mycket mindre än 64 KB, så höj detta bara om en klient skickar ovanligt stora inställningar. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Största undertextfil (`.srt`, `.vtt`, `.ass`) som Bränn in undertexter och Bädda in undertexter tar emot, i megabyte. Större filer får ett `400` som anger filstorleken och gränsen. Ange 0 för ingen gräns. En undertextfil till en långfilm är oftast långt under 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Längsta värde som Redigera metadata skriver i en enskild tagg (artist, beskrivning, nyckelord och så vidare), i tecken. Längre värden får ett `400` som anger taggen och gränsen. Ange 0 för ingen gräns. Höj det om du lagrar långa bildtexter eller beskrivningar. Ett taggvärde måste också rymmas inom `MAX_SETTINGS_PAYLOAD_KB` och operativsystemets gräns per argument (128 KB på Linux). |
+
+### AI-verktyg {#ai-tools}
+
+Dessa läses av Python-sidecaren. Ställ in dem i containermiljön (eller i `.env` för de publicerade Compose-filerna) och starta om.
+
+| Variabel | Standard | Beskrivning |
+|---|---|---|
+| `SNAPOTTER_GPU` | (tom) | Sätt till `0`, `false` eller `no` för att hålla alla AI-verktyg på CPU:n även när en GPU finns. Alla andra värden, eller ett tomt fält, låter SnapOtter använda den GPU som upptäcks. Använd det när en liten GPU får slut på minne mitt i ett jobb, eller när ett drivrutinsproblem gör att GPU-körningar misslyckas. Det spelar troligast roll för inbyggda installationer och LXC-installationer, som nu använder GPU:n när pip-hjulet för cuDNN finns. CPU-körningar går långsammare, och `MAX_CPU_UPSCALE_MP` gäller för uppskalning. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Mapp med Stable Diffusion 1.5-modellen för inpainting (diffusers-layout) som Objektraderare använder i läget för hög kvalitet. Funktionspaketet `inpaint-hq` lägger den här, så ändra den bara om du förvarar modellen någon annanstans. `MODELS_PATH` sätts av SnapOtter till `ai/models` under datakatalogen. |
+| `SD15_INPAINT_STEPS` | `28` | Brusreduceringssteg per radering. Fler steg kan ge mer detaljer och tar proportionellt längre tid. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Hur långt modellen får måla om det maskerade området, från 0 till 1. Lägre värden behåller fler av de ursprungliga pixlarna (området fylls först i från sin omgivning och finjusteras sedan lätt). Högre värden låter modellen måla om friare, och `1` ignorerar omgivningen och målar från brus, vilket oftare hittar på ett nytt objekt. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Hur starkt modellen följer prompterna. Högre värden följer dem mer bokstavligt; mycket höga värden kan se hårda ut. |
+| `SD15_INPAINT_PROMPT` | (tom) | Text som beskriver vad som ska målas in i det raderade området. Tomt fungerar bäst för borttagning, eftersom modellen då fortsätter omgivningen. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Text som beskriver vad som ska hållas utanför det raderade området. Standardvärdet styr bort från att måla ett nytt objekt i luckan. |
+| `SD15_INPAINT_SEED` | `0` | Slumpfrö. Ett fast frö raderar samma bild och mask på samma sätt varje gång. Ändra det för att få ett annat resultat. |
 
 ### Motorer {#engines}
 

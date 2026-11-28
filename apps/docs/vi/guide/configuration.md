@@ -1,8 +1,8 @@
 ---
 description: "Tất cả biến môi trường của SnapOtter cùng giá trị mặc định. Cấu hình xác thực, lưu trữ, mô hình AI, analytics và nhiều hơn nữa."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 4cf92727756a
+i18n_output_hash: ebedc7e9deca
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Lưu ý về telemetry: chế độ nhúng thừa hưởng mặc định analyti
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Kích thước lớn nhất của trường `settings` mà một yêu cầu công cụ có thể mang, tính bằng kilobyte, đếm theo byte UTF-8. Yêu cầu vượt giới hạn sẽ nhận `400`. Đặt là 0 để không giới hạn. Cài đặt công cụ thực tế nhỏ hơn 64 KB rất nhiều, nên chỉ tăng giá trị này nếu một client gửi cài đặt lớn bất thường. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Tệp phụ đề lớn nhất (`.srt`, `.vtt`, `.ass`) mà Burn Subtitles và Embed Subtitles chấp nhận, tính bằng megabyte. Tệp lớn hơn nhận `400` nêu kích thước tệp và giới hạn. Đặt là 0 để không giới hạn. Một tệp phụ đề phim dài thường nhỏ hơn 1 MB rất nhiều. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Giá trị dài nhất mà Edit Metadata ghi vào một thẻ đơn (nghệ sĩ, mô tả, từ khóa, v.v.), tính bằng ký tự. Giá trị dài hơn nhận `400` nêu thẻ và giới hạn. Đặt là 0 để không giới hạn. Hãy tăng giá trị này nếu bạn lưu chú thích hoặc mô tả dài. Giá trị thẻ cũng phải nằm trong `MAX_SETTINGS_PAYLOAD_KB` và giới hạn trên mỗi đối số của hệ điều hành (128 KB trên Linux). |
+
+### Công cụ AI {#ai-tools}
+
+Các biến này do Python sidecar đọc. Đặt chúng trong môi trường container (hoặc trong `.env` đối với các tệp Compose đã phát hành) rồi khởi động lại.
+
+| Variable | Mặc định | Mô tả |
+|---|---|---|
+| `SNAPOTTER_GPU` | (trống) | Đặt là `0`, `false` hoặc `no` để giữ mọi công cụ AI chạy trên CPU ngay cả khi có GPU. Giá trị khác, hoặc để trống, sẽ cho phép SnapOtter dùng GPU mà nó phát hiện được. Dùng khi GPU nhỏ hết bộ nhớ giữa chừng một tác vụ, hoặc khi sự cố driver làm các lần chạy GPU thất bại. Biến này có thể quan trọng hơn với bản cài native và LXC, vốn nay dùng GPU khi có pip cuDNN wheel. Chạy trên CPU chậm hơn, và `MAX_CPU_UPSCALE_MP` áp dụng cho việc phóng to ảnh. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Thư mục chứa mô hình inpainting Stable Diffusion 1.5 (bố cục diffusers) mà Xóa đối tượng dùng ở chế độ chất lượng cao. Gói tính năng `inpaint-hq` đặt nó ở đây, nên chỉ đổi khi bạn để mô hình ở nơi khác. `MODELS_PATH` do SnapOtter đặt thành `ai/models` bên trong thư mục dữ liệu. |
+| `SD15_INPAINT_STEPS` | `28` | Số bước khử nhiễu cho mỗi lần xóa. Nhiều bước hơn có thể thêm chi tiết và tốn thời gian tương ứng. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Mức độ mô hình được phép vẽ lại vùng đã che, từ 0 đến 1. Giá trị thấp giữ lại nhiều điểm ảnh gốc hơn (vùng này trước hết được lấp từ xung quanh, rồi tinh chỉnh nhẹ). Giá trị cao cho phép mô hình vẽ lại tự do hơn, và `1` bỏ qua vùng xung quanh và vẽ từ nhiễu, dễ tạo ra một vật thể mới hơn. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Mức độ mô hình bám theo các prompt. Giá trị cao bám sát nghĩa đen hơn; giá trị rất cao có thể trông gắt. |
+| `SD15_INPAINT_PROMPT` | (trống) | Văn bản mô tả thứ cần vẽ vào vùng đã xóa. Để trống cho kết quả tốt nhất khi xóa vật thể, vì khi đó mô hình tiếp nối phần xung quanh. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Văn bản mô tả thứ cần tránh đưa vào vùng đã xóa. Mặc định giúp tránh vẽ một vật thể mới vào khoảng trống. |
+| `SD15_INPAINT_SEED` | `0` | Hạt giống ngẫu nhiên. Seed cố định giúp cùng một ảnh và mặt nạ luôn được xóa theo cùng một cách. Đổi seed để có kết quả khác. |
 
 ### Engine {#engines}
 

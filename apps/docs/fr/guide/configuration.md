@@ -1,8 +1,8 @@
 ---
 description: "Toutes les variables d'environnement de SnapOtter avec leurs valeurs par défaut. Configurez l'authentification, le stockage, les modèles d'IA, l'analytique et plus encore."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 024e16828afc
+i18n_output_hash: c0dcb30dc218
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Note sur la télémétrie : le mode intégré hérite de la valeur d'analytique 
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Taille maximale du champ `settings` qu'une requête d'outil peut transporter, en kilo-octets, comptée en octets UTF-8. Les requêtes au-delà de la limite reçoivent une `400`. Définissez 0 pour aucune limite. Les paramètres réels des outils sont bien inférieurs à 64 KB, n'augmentez donc cette valeur que si un client envoie des paramètres inhabituellement volumineux. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Plus gros fichier de sous-titres (`.srt`, `.vtt`, `.ass`) accepté par Incruster des sous-titres et Intégrer des sous-titres, en mégaoctets. Les fichiers plus gros reçoivent un `400` qui indique la taille du fichier et la limite. Mettez 0 pour aucune limite. Un fichier de sous-titres de long métrage reste en général bien en dessous de 1 Mo. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Valeur la plus longue que Modifier les métadonnées écrit dans une seule balise (artiste, description, mots-clés, etc.), en caractères. Les valeurs plus longues reçoivent un `400` qui indique la balise et la limite. Mettez 0 pour aucune limite. Augmentez-la si vous stockez de longues légendes ou descriptions. La valeur d'une balise doit aussi tenir dans `MAX_SETTINGS_PAYLOAD_KB` et dans la limite par argument du système d'exploitation (128 Ko sous Linux). |
+
+### Outils d'IA {#ai-tools}
+
+Ces variables sont lues par le sidecar Python. Définissez-les dans l'environnement du conteneur (ou dans `.env` pour les fichiers Compose publiés), puis redémarrez.
+
+| Variable | Par défaut | Description |
+|---|---|---|
+| `SNAPOTTER_GPU` | (vide) | Définissez-la sur `0`, `false` ou `no` pour garder tous les outils d'IA sur le CPU même quand un GPU est présent. Toute autre valeur, ou une valeur vide, laisse SnapOtter utiliser le GPU qu'il détecte. Utilisez-la quand un petit GPU manque de mémoire en cours de traitement, ou quand un problème de pilote fait échouer les exécutions sur GPU. Elle compte surtout pour les installations natives et LXC, qui utilisent désormais le GPU quand la roue pip cuDNN est présente. Les exécutions sur CPU sont plus lentes, et `MAX_CPU_UPSCALE_MP` s'applique à l'agrandissement. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Dossier contenant le modèle d'inpainting Stable Diffusion 1.5 (format diffusers) que l'Effaceur d'objets utilise dans son mode haute qualité. Le bundle de fonctionnalités `inpaint-hq` l'y place, donc ne la changez que si vous gardez le modèle ailleurs. `MODELS_PATH` est défini par SnapOtter sur `ai/models` dans le répertoire de données. |
+| `SD15_INPAINT_STEPS` | `28` | Étapes de débruitage par effacement. Plus d'étapes peuvent ajouter du détail et prennent proportionnellement plus de temps. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Dans quelle mesure le modèle peut repeindre la zone masquée, de 0 à 1. Les valeurs basses conservent davantage de pixels d'origine (la zone est d'abord remplie à partir de son environnement, puis légèrement affinée). Les valeurs hautes laissent le modèle repeindre plus librement, et `1` ignore l'environnement et peint à partir du bruit, ce qui risque davantage d'inventer un nouvel objet. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Degré auquel le modèle suit les prompts. Les valeurs élevées les suivent plus littéralement ; les valeurs très élevées peuvent paraître dures. |
+| `SD15_INPAINT_PROMPT` | (vide) | Texte décrivant ce qu'il faut peindre dans la zone effacée. Vide donne les meilleurs résultats pour une suppression, car le modèle prolonge alors l'environnement. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Texte décrivant ce qu'il faut tenir hors de la zone effacée. La valeur par défaut évite qu'un nouvel objet soit peint dans le trou. |
+| `SD15_INPAINT_SEED` | `0` | Graine aléatoire. Une graine fixe fait effacer de la même façon la même image avec le même masque à chaque fois. Changez-la pour obtenir un autre résultat. |
 
 ### Moteurs {#engines}
 

@@ -1,8 +1,8 @@
 ---
 description: "Tutte le variabili d'ambiente di SnapOtter con i valori predefiniti. Configuri autenticazione, storage, modelli AI, analytics e altro."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: 711b4e8a4116
+i18n_output_hash: 6ef9f75f1148
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ Nota sulla telemetria: la modalità embedded eredita l'impostazione predefinita 
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | Dimensione massima del campo `settings` che una richiesta a uno strumento può contenere, in kilobyte, calcolata in byte UTF-8. Le richieste oltre il limite ricevono un `400`. Imposti 0 per nessun limite. Le impostazioni reali degli strumenti sono molto più piccole di 64 KB, quindi aumenti questo valore solo se un client invia impostazioni insolitamente grandi. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | File di sottotitoli più grande (`.srt`, `.vtt`, `.ass`) che Burn Subtitles ed Embed Subtitles accettano, in megabyte. I file più grandi ricevono un `400` che indica la dimensione del file e il limite. Imposti 0 per nessun limite. Un file di sottotitoli per un lungometraggio è di solito ben sotto 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Valore più lungo che Edit Metadata scrive in un singolo tag (artista, descrizione, parole chiave e così via), in caratteri. I valori più lunghi ricevono un `400` che indica il tag e il limite. Imposti 0 per nessun limite. Lo aumenti se conserva didascalie o descrizioni lunghe. Il valore di un tag deve inoltre rientrare in `MAX_SETTINGS_PAYLOAD_KB` e nel limite per argomento del sistema operativo (128 KB su Linux). |
+
+### Strumenti IA {#ai-tools}
+
+Vengono lette dal sidecar Python. Impostale nell'ambiente del container (o in `.env` per i file Compose pubblicati) e riavvia.
+
+| Variabile | Predefinito | Descrizione |
+|---|---|---|
+| `SNAPOTTER_GPU` | (vuoto) | Impostala su `0`, `false` o `no` per tenere tutti gli strumenti IA sulla CPU anche quando è presente una GPU. Qualsiasi altro valore, o lasciarla vuota, permette a SnapOtter di usare la GPU rilevata. Usala quando una GPU piccola esaurisce la memoria a metà di un lavoro, o quando un problema del driver fa fallire le esecuzioni su GPU. Conta soprattutto nelle installazioni native e LXC, che ora usano la GPU quando è presente la wheel pip di cuDNN. Le esecuzioni su CPU sono più lente, e `MAX_CPU_UPSCALE_MP` si applica all'upscaling. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Cartella che contiene il modello di inpainting Stable Diffusion 1.5 (formato diffusers) usato da Cancella oggetti nella modalità ad alta qualità. Il bundle di funzionalità `inpaint-hq` lo colloca qui, quindi cambiala solo se tieni il modello altrove. `MODELS_PATH` è impostata da SnapOtter su `ai/models` nella directory dei dati. |
+| `SD15_INPAINT_STEPS` | `28` | Passi di riduzione del rumore per cancellazione. Più passi possono aggiungere dettaglio e richiedono proporzionalmente più tempo. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | Quanto il modello può ridipingere l'area mascherata, da 0 a 1. Valori bassi mantengono più pixel originali (l'area viene prima riempita a partire dall'intorno, poi rifinita leggermente). Valori alti lasciano il modello ridipingere più liberamente, e `1` ignora l'intorno e dipinge dal rumore, con più probabilità di inventare un nuovo oggetto. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | Con quanta forza il modello segue i prompt. Valori più alti li seguono più alla lettera; valori molto alti possono apparire duri. |
+| `SD15_INPAINT_PROMPT` | (vuoto) | Testo che descrive cosa dipingere nell'area cancellata. Vuoto funziona meglio per la rimozione, perché il modello continua l'intorno. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Testo che descrive cosa tenere fuori dall'area cancellata. Il valore predefinito evita di dipingere un nuovo oggetto nel vuoto. |
+| `SD15_INPAINT_SEED` | `0` | Seed casuale. Un seed fisso fa cancellare nello stesso modo la stessa immagine con la stessa maschera ogni volta. Cambialo per ottenere un risultato diverso. |
 
 ### Motori {#engines}
 

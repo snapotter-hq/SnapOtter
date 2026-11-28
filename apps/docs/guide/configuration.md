@@ -124,6 +124,21 @@ Telemetry note: embedded mode inherits the image's analytics default like any ot
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Largest subtitle file (`.srt`, `.vtt`, `.ass`) Burn Subtitles and Embed Subtitles accept, in megabytes. Larger files get a `400` that names the file size and the limit. Set to 0 for no limit. A feature-length subtitle file is usually well under 1 MB. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Longest value Edit Metadata writes into a single tag (artist, description, keywords and so on), in characters. Longer values get a `400` that names the tag and the limit. Set to 0 for no limit. Raise it if you store long captions or descriptions. A tag value also has to fit inside `MAX_SETTINGS_PAYLOAD_KB` and the operating system's per-argument limit (128 KB on Linux). |
 
+### AI tools {#ai-tools}
+
+These are read by the Python sidecar. Set them in the container environment (or `.env` for the published Compose files) and restart.
+
+| Variable | Default | Description |
+|---|---|---|
+| `SNAPOTTER_GPU` | (empty) | Set to `0`, `false` or `no` to keep every AI tool on the CPU even when a GPU is present. Any other value, or leaving it empty, lets SnapOtter use the GPU it detects. Use it when a small GPU runs out of memory partway through a job, or when a driver problem makes GPU runs fail. It's more likely to matter on native and LXC installs, which now use the GPU when the pip cuDNN wheel is present. CPU runs are slower, and `MAX_CPU_UPSCALE_MP` applies to upscaling. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | Folder holding the Stable Diffusion 1.5 inpainting model (diffusers layout) that Erase Object uses in its high-quality mode. The `inpaint-hq` feature bundle puts it here, so change it only if you keep the model somewhere else. `MODELS_PATH` is set by SnapOtter to `ai/models` under the data directory. |
+| `SD15_INPAINT_STEPS` | `28` | Denoising steps per erase. More steps can add detail and take proportionally longer. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | How far the model may repaint the masked area, from 0 to 1. Lower values keep more of the original pixels (the area is first filled in from its surroundings, then lightly refined). Higher values let the model repaint more freely, and `1` ignores the surroundings and paints from noise, which is more likely to invent a new object. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | How strongly the model follows the prompts. Higher values follow them more literally; very high values can look harsh. |
+| `SD15_INPAINT_PROMPT` | (empty) | Text describing what to paint into the erased area. Empty works best for removal, because the model then continues the surroundings. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | Text describing what to keep out of the erased area. The default steers away from painting a new object in the gap. |
+| `SD15_INPAINT_SEED` | `0` | Random seed. A fixed seed makes the same image and mask erase the same way every time. Change it to get a different result. |
+
 ### Engines {#engines}
 
 SnapOtter looks up each processing binary on `$PATH` inside the container, so these stay empty unless you mount a build of your own.

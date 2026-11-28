@@ -1,8 +1,8 @@
 ---
 description: "기본값과 함께 정리한 SnapOtter 환경 변수 전체 목록입니다. 인증, 스토리지, AI 모델, 분석 등을 설정합니다."
-i18n_source_hash: 3523a064e1a6
+i18n_source_hash: 0a7a78fd254c
 i18n_provenance: machine
-i18n_output_hash: ffeddd552d90
+i18n_output_hash: fa3437777f6c
 i18n_hash_version: 2
 ---
 
@@ -127,6 +127,21 @@ i18n_hash_version: 2
 | `MAX_SETTINGS_PAYLOAD_KB` | `64` | 도구 요청에 담을 수 있는 `settings` 필드의 최대 크기(킬로바이트)이며, UTF-8 바이트 기준으로 계산합니다. 한도를 넘는 요청은 `400`를 받습니다. 0으로 설정하면 제한이 없습니다. 실제 도구 설정은 64 KB보다 훨씬 작으므로, 클라이언트가 비정상적으로 큰 설정을 보내는 경우에만 이 값을 늘리세요. |
 | `MAX_SUBTITLE_SIZE_MB` | `1` | Burn Subtitles와 Embed Subtitles가 받아들이는 가장 큰 자막 파일(`.srt`, `.vtt`, `.ass`)의 크기(MB)입니다. 더 큰 파일은 파일 크기와 한도를 알려 주는 `400`를 받습니다. 0으로 설정하면 제한이 없습니다. 장편 영화 자막 파일은 보통 1 MB보다 훨씬 작습니다. |
 | `MAX_METADATA_TAG_LENGTH` | `10000` | Edit Metadata가 태그 하나(아티스트, 설명, 키워드 등)에 쓸 수 있는 가장 긴 값(글자 수)입니다. 더 긴 값은 태그 이름과 한도를 알려 주는 `400`를 받습니다. 0으로 설정하면 제한이 없습니다. 긴 캡션이나 설명을 저장한다면 이 값을 늘리세요. 태그 값은 `MAX_SETTINGS_PAYLOAD_KB`와 운영 체제의 인수당 한도(Linux에서는 128 KB) 안에도 들어와야 합니다. |
+
+### AI 도구 {#ai-tools}
+
+이 변수는 Python 사이드카가 읽습니다. 컨테이너 환경(게시된 Compose 파일에서는 `.env`)에 설정한 뒤 다시 시작하세요.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `SNAPOTTER_GPU` | (비어 있음) | `0`, `false`, `no` 중 하나로 설정하면 GPU가 있어도 모든 AI 도구가 CPU에서 실행됩니다. 그 밖의 값이거나 비워 두면 SnapOtter가 감지한 GPU를 사용합니다. 작은 GPU가 작업 도중 메모리가 부족해지거나 드라이버 문제로 GPU 실행이 실패할 때 사용하세요. 네이티브 설치와 LXC 설치에서 영향이 나타날 가능성이 더 높으며, 이들은 이제 pip cuDNN wheel이 있으면 GPU를 사용합니다. CPU 실행은 더 느리며, `MAX_CPU_UPSCALE_MP`는 업스케일링에 적용됩니다. |
+| `SD15_INPAINT_DIR` | `$MODELS_PATH/sd15-inpainting` | 개체 지우기가 고품질 모드에서 사용하는 Stable Diffusion 1.5 인페인팅 모델(diffusers 레이아웃)이 들어 있는 폴더입니다. `inpaint-hq` 기능 번들이 모델을 여기에 두므로, 모델을 다른 곳에 보관할 때만 변경하세요. `MODELS_PATH`는 SnapOtter가 데이터 디렉터리 아래의 `ai/models`로 설정합니다. |
+| `SD15_INPAINT_STEPS` | `28` | 지우기 1회당 디노이징 단계 수입니다. 단계가 많을수록 디테일이 늘어날 수 있지만 시간도 그에 비례해 더 걸립니다. |
+| `SD15_INPAINT_STRENGTH` | `0.95` | 모델이 마스크된 영역을 얼마나 다시 그릴 수 있는지를 0에서 1 사이로 지정합니다. 값이 낮을수록 원본 픽셀을 더 많이 유지합니다(영역을 먼저 주변으로 채운 뒤 가볍게 다듬습니다). 값이 높을수록 모델이 더 자유롭게 다시 그리며, `1`은 주변을 무시하고 노이즈에서 그리기 때문에 새로운 개체를 만들어 낼 가능성이 더 큽니다. |
+| `SD15_INPAINT_GUIDANCE` | `7.0` | 모델이 프롬프트를 얼마나 강하게 따르는지를 나타냅니다. 값이 높을수록 프롬프트를 더 문자 그대로 따르며, 매우 높은 값은 거칠게 보일 수 있습니다. |
+| `SD15_INPAINT_PROMPT` | (비어 있음) | 지워진 영역에 무엇을 그릴지 설명하는 텍스트입니다. 모델이 주변을 이어 그리므로, 제거에는 비워 두는 것이 가장 좋습니다. |
+| `SD15_INPAINT_NEGATIVE` | `object, person, text, watermark, artifact, blurry, distorted, extra limbs` | 지워진 영역에 넣지 않을 것을 설명하는 텍스트입니다. 기본값은 빈 곳에 새로운 개체를 그리지 않도록 유도합니다. |
+| `SD15_INPAINT_SEED` | `0` | 난수 시드입니다. 시드를 고정하면 같은 이미지와 마스크가 매번 같은 방식으로 지워집니다. 다른 결과를 얻으려면 값을 바꾸세요. |
 
 ### 엔진 {#engines}
 
