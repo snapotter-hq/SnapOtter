@@ -396,6 +396,12 @@ def main():
             from gpu import session_device
 
             device = session_device(session, providers)
+            if device == "cpu":
+                # Cached under the CUDA key it would spend VRAM budget and serve
+                # every later request on the CPU (#5376).
+                from session_cache import forget
+
+                forget(model, providers, "onnxruntime dropped CUDA")
 
         emit_progress(25, "Model loaded")
 

@@ -169,6 +169,25 @@ def test_eviction_actually_releases_the_session():
     assert ref() is None
 
 
+def test_forget_drops_only_the_named_key():
+    create, made = counting_factory()
+    session_cache.get_session("m", CUDA, create, 10 * MB)
+    session_cache.get_session("other", CUDA, create, 10 * MB)
+    assert session_cache.forget("m", CUDA, "test") is True
+    assert session_cache.forget("m", CUDA, "test") is False
+    assert [k[0] for k in session_cache._entries] == ["other"]
+    session_cache.get_session("m", CUDA, create, 10 * MB)
+    assert len(made) == 3
+
+
+def test_forget_leaves_the_session_usable_by_its_caller():
+    create, _ = counting_factory()
+    held = session_cache.get_session("m", CUDA, create, 10 * MB)
+    session_cache.forget("m", CUDA, "test")
+    assert isinstance(held, Session)
+    assert not session_cache._used_this_request
+
+
 def test_evict_all_clears_everything():
     create, _ = counting_factory()
     session_cache.get_session("a", CUDA, create, 10 * MB)

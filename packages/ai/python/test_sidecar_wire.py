@@ -1360,6 +1360,37 @@ def _verify_session_device_reports_dropped_cuda():
 _verify_session_device_reports_dropped_cuda()
 
 
+def _verify_cache_forgets_a_session_that_lost_cuda():
+    # A CPU session cached under the CUDA key would spend VRAM budget and serve
+    # every later request on the CPU; forget() drops it so CUDA is retried (#5376).
+    cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    prev_budget = os.environ.get("AI_SESSION_CACHE_BYTES")
+    os.environ["AI_SESSION_CACHE_BYTES"] = str(100 * 1024 * 1024)
+    session_cache.evict_all("test isolation")
+    try:
+        built = []
+
+        def create():
+            built.append(object())
+            return built[-1]
+
+        held = session_cache.get_session("m", cuda_providers, create, 1024)
+        assert session_cache.get_session("m", cuda_providers, create, 1024) is held
+        assert session_cache.forget("m", cuda_providers, "test") is True
+        assert session_cache.forget("m", cuda_providers, "test") is False
+        assert session_cache.get_session("m", cuda_providers, create, 1024) is not held
+        assert len(built) == 2, built
+    finally:
+        session_cache.evict_all("test isolation")
+        if prev_budget is None:
+            os.environ.pop("AI_SESSION_CACHE_BYTES", None)
+        else:
+            os.environ["AI_SESSION_CACHE_BYTES"] = prev_budget
+
+
+_verify_cache_forgets_a_session_that_lost_cuda()
+
+
 def _verify_remove_bg_oom_handling():
     rembg_calls = []
     session_calls = []
