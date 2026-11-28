@@ -1,19 +1,28 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * Unit tests for the venv upgrade-stamp mechanism in docker/entrypoint.sh.
+ * Unit tests for the venv upgrade-stamp mechanism: bootstrap_ai_venv in
+ * docker/embedded-lib.sh, the function docker/entrypoint.sh calls.
  *
- * The entrypoint compares /opt/venv/.venv-version (baked into the image at
- * build time) against /data/ai/venv/.venv-version (persisted on the volume).
- * When missing or mismatched, the venv is nuked and re-copied so upgraded
- * base packages take effect immediately.
+ * It compares /opt/venv/.venv-version (baked into the image at build time)
+ * against /data/ai/venv/.venv-version (persisted on the volume). When missing
+ * or mismatched, the venv is nuked and re-copied so upgraded base packages
+ * take effect immediately.
  *
- * These tests exercise the bootstrap logic in isolation using temp dirs.
+ * These tests source the real function and point it at temp dirs.
  */
 
 let root: string;
@@ -25,76 +34,48 @@ let installedJson: string;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ENTRYPOINT_LIB = resolve(here, "../../../docker/entrypoint-lib.sh");
+const EMBEDDED_LIB = resolve(here, "../../../docker/embedded-lib.sh");
 
-// Self-contained shell script mirroring the entrypoint bootstrap block.
-// Uses env vars for paths so we can point at temp directories.
-const BOOTSTRAP_SCRIPT = `
-#!/bin/sh
+// Stands in for docker/reseed-ai-venv.sh, which copies between the image's
+// fixed paths. bootstrap_ai_venv only decides when to call it.
+const RESEED_SCRIPT = `#!/bin/sh
 set -e
-
 . "$TEST_ENTRYPOINT_LIB"
-
-AI_VENV="$TEST_AI_VENV"
-AI_VENV_TMP="$TEST_AI_VENV_TMP"
-OPT_VENV="$TEST_OPT_VENV"
-
-if [ -d "$AI_VENV_TMP" ]; then
-  echo "CLEANUP_INTERRUPTED"
-  rm -rf "$AI_VENV_TMP"
-fi
-
-if [ -d "$OPT_VENV" ]; then
-  NEED_BOOTSTRAP=false
-
-  if [ ! -d "$AI_VENV" ]; then
-    NEED_BOOTSTRAP=true
-    echo "FIRST_RUN"
-  elif [ -f "$OPT_VENV/.venv-version" ]; then
-    IMAGE_STAMP=$(cat "$OPT_VENV/.venv-version")
-    CURRENT_STAMP=""
-    if [ -f "$AI_VENV/.venv-version" ]; then
-      CURRENT_STAMP=$(cat "$AI_VENV/.venv-version")
-    fi
-    if [ "$CURRENT_STAMP" != "$IMAGE_STAMP" ]; then
-      NEED_BOOTSTRAP=true
-      echo "STAMP_MISMATCH"
-    fi
-  fi
-
-  if [ "$NEED_BOOTSTRAP" = true ]; then
-    rm -rf "$AI_VENV"
-    cp -r "$OPT_VENV" "$AI_VENV_TMP"
-    mv "$AI_VENV_TMP" "$AI_VENV"
-    rewrite_venv_paths "$AI_VENV" "$OPT_VENV" "$AI_VENV"
-    if [ -f "$TEST_INSTALLED_JSON" ]; then
-      echo '{"bundles":{}}' > "$TEST_INSTALLED_JSON"
-      echo "BUNDLES_RESET"
-    fi
-    echo "VENV_READY"
-  else
-    rewrite_venv_paths "$AI_VENV" "$OPT_VENV" "$AI_VENV"
-    echo "SKIP"
-  fi
-else
-  echo "NO_OPT_VENV"
-fi
+rm -rf "$TEST_DATA_AI/venv"
+cp -r "$TEST_OPT_VENV" "$TEST_DATA_AI/venv.bootstrapping"
+mv "$TEST_DATA_AI/venv.bootstrapping" "$TEST_DATA_AI/venv"
+rewrite_venv_paths "$TEST_DATA_AI/venv" "$TEST_OPT_VENV" "$TEST_DATA_AI/venv"
+[ -z "$TEST_RESEED_FAIL" ] || exit 1
 `;
 
-function runBootstrap(): string {
-  return execFileSync("/bin/sh", ["-c", BOOTSTRAP_SCRIPT], {
-    env: {
-      TEST_AI_VENV: aiVenv,
-      TEST_AI_VENV_TMP: aiVenvTmp,
-      TEST_OPT_VENV: optVenv,
-      TEST_INSTALLED_JSON: installedJson,
-      TEST_ENTRYPOINT_LIB: ENTRYPOINT_LIB,
-      PATH: process.env.PATH,
-      // A python3 wrapper on PATH may resolve its venv under $HOME (the fleet
-      // hosts do), so the shell needs HOME like any login shell has (#4118).
-      HOME: process.env.HOME,
+let reseedScript: string;
+
+function runBootstrap(extraEnv: Record<string, string> = {}): { status: number; out: string } {
+  const res = spawnSync(
+    "/bin/sh",
+    [
+      "-c",
+      '. "$TEST_ENTRYPOINT_LIB"; . "$TEST_EMBEDDED_LIB"; bootstrap_ai_venv "$TEST_OPT_VENV" "$TEST_DATA_AI" "$TEST_RESEED"',
+    ],
+    {
+      env: {
+        TEST_OPT_VENV: optVenv,
+        TEST_DATA_AI: dataAi,
+        TEST_RESEED: reseedScript,
+        TEST_ENTRYPOINT_LIB: ENTRYPOINT_LIB,
+        TEST_EMBEDDED_LIB: EMBEDDED_LIB,
+        TEST_RESEED_FAIL: "",
+        PATH: process.env.PATH,
+        // A python3 wrapper on PATH may resolve its venv under $HOME (the fleet
+        // hosts do), so the shell needs HOME like any login shell has (#4118).
+        HOME: process.env.HOME,
+        ...extraEnv,
+      },
+      encoding: "utf-8",
+      timeout: 15_000,
     },
-    encoding: "utf-8",
-  }).trim();
+  );
+  return { status: res.status ?? 1, out: `${res.stdout ?? ""}${res.stderr ?? ""}`.trim() };
 }
 
 beforeEach(() => {
@@ -115,6 +96,9 @@ beforeEach(() => {
   writeFileSync(join(optVenv, "pyvenv.cfg"), `command = python3 -m venv ${optVenv}\n`);
 
   mkdirSync(dataAi, { recursive: true });
+  reseedScript = join(root, "reseed.sh");
+  writeFileSync(reseedScript, RESEED_SCRIPT);
+  chmodSync(reseedScript, 0o755);
 });
 
 afterEach(() => {
@@ -123,9 +107,10 @@ afterEach(() => {
 
 describe("venv upgrade stamp", () => {
   it("bootstraps on first run when no venv exists", () => {
-    const output = runBootstrap();
-    expect(output).toContain("FIRST_RUN");
-    expect(output).toContain("VENV_READY");
+    const { status, out } = runBootstrap();
+    expect(status).toBe(0);
+    expect(out).toContain("First run: bootstrapping AI venv from base image...");
+    expect(out).toContain(`AI venv ready at ${aiVenv}`);
     expect(existsSync(join(aiVenv, ".venv-version"))).toBe(true);
     expect(readFileSync(join(aiVenv, "marker.txt"), "utf-8")).toBe("base-package-content");
     expect(readFileSync(join(aiVenv, "bin", "pip"), "utf-8")).toContain(aiVenv);
@@ -139,8 +124,7 @@ describe("venv upgrade stamp", () => {
     mkdirSync(aiVenv, { recursive: true });
     writeFileSync(join(aiVenv, ".venv-version"), "abc123\n");
 
-    const output = runBootstrap();
-    expect(output).toBe("SKIP");
+    expect(runBootstrap()).toEqual({ status: 0, out: "" });
   });
 
   it("repairs copied venv paths even when stamps already match", () => {
@@ -150,8 +134,7 @@ describe("venv upgrade stamp", () => {
     writeFileSync(join(aiVenv, "bin", "activate"), `VIRTUAL_ENV=${optVenv}\n`);
     writeFileSync(join(aiVenv, "pyvenv.cfg"), `command = python3 -m venv ${optVenv}\n`);
 
-    const output = runBootstrap();
-    expect(output).toBe("SKIP");
+    expect(runBootstrap()).toEqual({ status: 0, out: "" });
     for (const file of [
       join(aiVenv, "bin", "pip"),
       join(aiVenv, "bin", "activate"),
@@ -169,9 +152,10 @@ describe("venv upgrade stamp", () => {
     writeFileSync(join(aiVenv, ".venv-version"), "old-hash\n");
     writeFileSync(join(aiVenv, "stale-file.txt"), "should-be-removed");
 
-    const output = runBootstrap();
-    expect(output).toContain("STAMP_MISMATCH");
-    expect(output).toContain("VENV_READY");
+    const { status, out } = runBootstrap();
+    expect(status).toBe(0);
+    expect(out).toContain("Base venv updated (stamp mismatch): refreshing AI venv...");
+    expect(out).toContain(`AI venv ready at ${aiVenv}`);
     // Old content replaced with fresh copy
     expect(existsSync(join(aiVenv, "stale-file.txt"))).toBe(false);
     expect(readFileSync(join(aiVenv, "marker.txt"), "utf-8")).toBe("base-package-content");
@@ -183,9 +167,10 @@ describe("venv upgrade stamp", () => {
     mkdirSync(aiVenv, { recursive: true });
     writeFileSync(join(aiVenv, "old-pkg.txt"), "legacy");
 
-    const output = runBootstrap();
-    expect(output).toContain("STAMP_MISMATCH");
-    expect(output).toContain("VENV_READY");
+    const { status, out } = runBootstrap();
+    expect(status).toBe(0);
+    expect(out).toContain("Base venv updated (stamp mismatch): refreshing AI venv...");
+    expect(out).toContain(`AI venv ready at ${aiVenv}`);
     expect(existsSync(join(aiVenv, "old-pkg.txt"))).toBe(false);
   });
 
@@ -205,8 +190,10 @@ describe("venv upgrade stamp", () => {
       }),
     );
 
-    const output = runBootstrap();
-    expect(output).toContain("BUNDLES_RESET");
+    const { out } = runBootstrap();
+    expect(out).toContain(
+      "WARNING: Installed AI feature bundles were reset after base venv upgrade.",
+    );
     const data = JSON.parse(readFileSync(installedJson, "utf-8"));
     expect(data).toEqual({ bundles: {} });
   });
@@ -216,9 +203,9 @@ describe("venv upgrade stamp", () => {
     mkdirSync(aiVenv, { recursive: true });
     writeFileSync(join(aiVenv, ".venv-version"), "old-hash\n");
 
-    const output = runBootstrap();
-    expect(output).toContain("VENV_READY");
-    expect(output).not.toContain("BUNDLES_RESET");
+    const { out } = runBootstrap();
+    expect(out).toContain(`AI venv ready at ${aiVenv}`);
+    expect(out).not.toContain("WARNING: Installed AI feature bundles");
   });
 
   it("does nothing when /opt/venv has no stamp (old image)", () => {
@@ -227,8 +214,7 @@ describe("venv upgrade stamp", () => {
     mkdirSync(aiVenv, { recursive: true });
     writeFileSync(join(aiVenv, "existing.txt"), "keep");
 
-    const output = runBootstrap();
-    expect(output).toBe("SKIP");
+    expect(runBootstrap()).toEqual({ status: 0, out: "" });
     // Existing venv untouched
     expect(existsSync(join(aiVenv, "existing.txt"))).toBe(true);
   });
@@ -237,14 +223,37 @@ describe("venv upgrade stamp", () => {
     mkdirSync(aiVenvTmp, { recursive: true });
     writeFileSync(join(aiVenvTmp, "partial.txt"), "incomplete");
 
-    const output = runBootstrap();
-    expect(output).toContain("CLEANUP_INTERRUPTED");
+    const { out } = runBootstrap();
+    expect(out).toContain("Cleaning up interrupted venv bootstrap...");
     expect(existsSync(aiVenvTmp)).toBe(false);
   });
 
   it("does nothing when /opt/venv does not exist", () => {
     rmSync(optVenv, { recursive: true });
-    const output = runBootstrap();
-    expect(output).toBe("NO_OPT_VENV");
+    expect(runBootstrap()).toEqual({ status: 0, out: "" });
+  });
+
+  // Root writes through a read-only mode, so the write can't be made to fail there.
+  it.skipIf(process.getuid?.() === 0)(
+    "returns 1 when installed.json can't be reset after a reseed",
+    () => {
+      // A stale installed.json would claim bundles whose packages left with the
+      // old venv, so a failed reset has to stop the boot.
+      mkdirSync(aiVenv, { recursive: true });
+      writeFileSync(join(aiVenv, ".venv-version"), "old-hash\n");
+      writeFileSync(installedJson, '{"bundles":{"background-removal":{}}}');
+      chmodSync(installedJson, 0o444);
+
+      const { status, out } = runBootstrap();
+      expect(status).toBe(1);
+      expect(out).not.toContain("AI venv ready");
+      expect(readFileSync(installedJson, "utf-8")).toContain("background-removal");
+    },
+  );
+
+  it("returns 1 and claims nothing when the reseed fails", () => {
+    const { status, out } = runBootstrap({ TEST_RESEED_FAIL: "1" });
+    expect(status).toBe(1);
+    expect(out).not.toContain("AI venv ready");
   });
 });
