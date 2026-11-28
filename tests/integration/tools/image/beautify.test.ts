@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
 import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { settleAcceptedResponse as settle } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -1170,11 +1171,15 @@ describe("Beautify", () => {
       },
     ]);
 
-    const res = await post("/api/v1/tools/image/beautify", payload);
-    expect(res.statusCode).toBe(200);
+    // The shadow blur on the stress fixture can outlast the 30 s sync window
+    // on a slow runner (#5328), which answers 202. settle() resolves that 202
+    // to the job's result, and the vitest timeout covers the sync window, this
+    // wait, and the cancel settle() runs on a stuck job.
+    const res = await settle(await post("/api/v1/tools/image/beautify", payload), 90_000);
+    expect(res.statusCode, res.body).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.processedSize).toBeGreaterThan(0);
-  });
+  }, 180_000);
 
   // ── Tiny file handling ─────────────────────────────────────────────
   it("beautifies 1x1 pixel image", async () => {
