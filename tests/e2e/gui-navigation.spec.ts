@@ -86,27 +86,27 @@ test.describe("Login Page", () => {
     await expect(page).toHaveURL("/");
   });
 
-  test("tab order is username -> forgot password -> password -> login button", async ({ page }) => {
+  test("tab order is username -> password -> forgot password -> login button", async ({ page }) => {
     await page.goto("/login");
 
     // Focus the username field first
     await page.getByLabel("Username").focus();
     await expect(page.getByLabel("Username")).toBeFocused();
 
-    // The Forgot password button sits in the Password label row, so it is a real tab stop
-    // between the two inputs and must stay reachable from the keyboard.
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: /forgot password/i })).toBeFocused();
-
+    // Username goes straight to Password. The Forgot password button is still a tab stop, but it
+    // follows the Password input in the DOM so password managers and keyboard users aren't detoured.
     await page.keyboard.press("Tab");
     await expect(page.getByLabel("Password")).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: /forgot password/i })).toBeFocused();
 
     // Fill both fields so login button becomes enabled
     await page.getByLabel("Username").fill("admin");
     await page.getByLabel("Password").fill("admin");
 
-    // Focus password again, then Tab to login button
-    await page.getByLabel("Password").focus();
+    // From Forgot password, Tab reaches the login button
+    await page.getByRole("button", { name: /forgot password/i }).focus();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: /login/i })).toBeFocused();
   });

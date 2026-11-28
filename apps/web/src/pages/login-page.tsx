@@ -895,21 +895,15 @@ export function LoginPage() {
                     required
                   />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="password" className="text-sm font-medium text-foreground">
-                      {t.auth.password}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowForgot((open) => !open)}
-                      aria-expanded={showForgot}
-                      aria-controls="forgot-password-help"
-                      className="text-xs text-primary-ink hover:underline focus:outline-none focus-visible:underline"
-                    >
-                      {t.auth.forgotPassword}
-                    </button>
-                  </div>
+                <div className="grid grid-cols-[1fr_auto] items-center gap-y-1">
+                  {/* The button comes after the input in the DOM so Tab goes username, password,
+                      then this button. The grid keeps it on the label's row. */}
+                  <label
+                    htmlFor="password"
+                    className="col-start-1 row-start-1 text-sm font-medium text-foreground"
+                  >
+                    {t.auth.password}
+                  </label>
                   <input
                     id="password"
                     type="password"
@@ -918,13 +912,22 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t.auth.enterPassword}
-                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="col-span-2 row-start-2 w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot((open) => !open)}
+                    aria-expanded={showForgot}
+                    aria-controls="forgot-password-help"
+                    className="col-start-2 row-start-1 text-xs text-primary-ink hover:underline focus:outline-none focus-visible:underline"
+                  >
+                    {t.auth.forgotPassword}
+                  </button>
                   {showForgot && (
                     <div
                       id="forgot-password-help"
-                      className="mt-2 space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+                      className="col-span-2 mt-1 space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
                     >
                       <p>{t.auth.forgotPasswordHelp}</p>
                       <code
