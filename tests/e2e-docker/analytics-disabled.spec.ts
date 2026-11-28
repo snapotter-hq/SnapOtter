@@ -19,9 +19,7 @@ test.describe("Analytics disabled by build-time config", () => {
   test.beforeEach(async ({ request: _request }, testInfo) => {
     const res = await fetch(`${BASE_URL}/api/v1/config/analytics`);
     const config = await res.json();
-    // consentPending means analytics is baked on and waiting for the first-run
-    // answer (#4910): off for now, but not disabled at build time.
-    if (config.enabled || config.consentPending) {
+    if (config.enabled) {
       testInfo.skip();
     }
   });
@@ -41,7 +39,6 @@ test.describe("Analytics disabled by build-time config", () => {
       sentryDsnWeb: "",
       posthogSampleRate: 0,
       instanceId: "",
-      consentPending: false,
     });
   });
 

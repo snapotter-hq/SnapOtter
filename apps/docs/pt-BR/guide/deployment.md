@@ -1,8 +1,8 @@
 ---
 description: "Implante o SnapOtter em produção com Docker. Requisitos de hardware, configuração de GPU e configurações de proxy reverso para Nginx, Traefik e Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 235c6ca5a20d
+i18n_output_hash: d6f6d877b46a
 i18n_hash_version: 2
 ---
 
@@ -732,7 +732,7 @@ O semantic-release determina a versão a partir do histórico de commits. A tag 
 
 ## Análises {#analytics}
 
-O SnapOtter inclui análises anônimas de produto (padrões de uso das ferramentas, relatórios de erro) para ajudar a encontrar bugs e melhorar os recursos. Uma nova instância pergunta ao administrador na primeira execução e não envia nada até receber uma resposta. Seus arquivos, nomes de arquivo e dados pessoais nunca fazem parte delas. O SnapOtter funciona normalmente com as análises desativadas.
+O SnapOtter inclui análises anônimas de produto (padrões de uso das ferramentas, relatórios de erro) para ajudar a encontrar bugs e melhorar os recursos. Vem ativada por padrão, e um administrador pode desativá-la em Configurações. Seus arquivos, nomes de arquivo e dados pessoais nunca fazem parte delas. O SnapOtter funciona normalmente com as análises desativadas.
 
 ### Desativando as análises {#disabling-analytics}
 

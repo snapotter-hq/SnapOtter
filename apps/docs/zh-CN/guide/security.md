@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter 安全加固指南。容器安全、网络隔离、Docker 密钥、Kubernetes 部署以及合规产物。"
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: e29232b968ce
+i18n_output_hash: 7cf42ecf4ce4
 i18n_hash_version: 2
 ---
 
 # 安全与加固 {#security-hardening}
 
-SnapOtter 完全在你的基础设施上处理文件。它可以发送匿名且不含内容的产品分析和崩溃报告，以帮助改进项目，但新实例会先询问管理员，在得到答复之前不会发送任何内容。它绝不会发送你的文件、文件名、文件内容、OCR 输出、图像元数据或文档文本。可选的反馈仅在用户提交后才会发送，仅在启用分析时发送，并且只有在明确同意联系时才会包含联系字段。管理员可以在 设置 > 系统 > 隐私 下一键关闭分析和反馈收集，无需重新构建。文件处理始终保留在你的容器内。
+SnapOtter 完全在你的基础设施上处理文件。它可以发送匿名且不含内容的产品分析和崩溃报告，以帮助改进项目，默认即会发送。它绝不会发送你的文件、文件名、文件内容、OCR 输出、图像元数据或文档文本。可选的反馈仅在用户提交后才会发送，仅在启用分析时发送，并且只有在明确同意联系时才会包含联系字段。管理员可以在 设置 > 系统 > 隐私 下一键关闭分析和反馈收集，无需重新构建。文件处理始终保留在你的容器内。
 
 容器以专用的非 root 用户（`snapotter`）运行，除所需的最小集合之外，所有 Linux 能力均已移除。完整的漏洞披露政策和安全架构请参阅 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
 

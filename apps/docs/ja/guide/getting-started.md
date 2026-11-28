@@ -1,8 +1,8 @@
 ---
 description: "Docker で 1 つのコマンドから SnapOtter をインストールし、サインインして最初のツールを開きます。GPU アクセラレーション、小規模なマシン、Docker Compose、ソースからのビルドも扱います。"
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: 5a0d80c93a45
+i18n_output_hash: bfc39903daa7
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Raspberry Pi、古いノート PC、小規模な VPS では、ジョブを 1 つ
 :::
 
 ::: tip 匿名のプロダクト分析
-SnapOtter には匿名のプロダクト分析が含まれています。新しいインスタンスは初回起動時に管理者に確認し、回答があるまで何も送信しません。後から無効にするには、**Settings → System → Privacy** を開き、**Anonymous Product Analytics** をオフにします。インスタンス全体で即座に停止します。
+SnapOtter には匿名のプロダクト分析がデフォルトで含まれています。無効にするには、**Settings → System → Privacy** を開き、**Anonymous Product Analytics** をオフにします。インスタンス全体で即座に停止します。
 
 環境変数 `SNAPOTTER_TELEMETRY=0`（`false` と `off` も使えます）を設定すると、再ビルドなしでインスタンスのすべてのテレメトリを無効にできます。
 

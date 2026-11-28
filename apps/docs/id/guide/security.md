@@ -1,14 +1,14 @@
 ---
 description: "Panduan hardening keamanan untuk SnapOtter. Keamanan container, isolasi jaringan, Docker secrets, deployment Kubernetes, dan artefak kepatuhan."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: a470b4175593
+i18n_output_hash: 857b443963f5
 i18n_hash_version: 2
 ---
 
 # Keamanan & Hardening {#security-hardening}
 
-SnapOtter memproses file sepenuhnya di infrastruktur Anda. SnapOtter dapat mengirim analitik produk dan laporan crash yang anonim dan tanpa konten untuk membantu meningkatkan proyek, tetapi instance baru bertanya dulu kepada administratornya dan tidak mengirim apa pun sampai pertanyaan itu dijawab. SnapOtter tidak pernah mengirim file, nama file, isi file, output OCR, metadata gambar, atau teks dokumen Anda. Umpan balik opsional hanya dikirim setelah pengguna mengirimkannya, hanya ketika analitik diaktifkan, dan kolom kontak hanya disertakan dengan persetujuan kontak yang eksplisit. Administrator dapat mematikan analitik dan pengumpulan umpan balik dengan satu klik di Settings > System > Privacy, tanpa perlu build ulang. Pemrosesan file selalu berada di dalam container Anda.
+SnapOtter memproses file sepenuhnya di infrastruktur Anda. SnapOtter mengirim analitik produk dan laporan crash yang anonim dan tanpa konten secara default untuk membantu meningkatkan proyek. SnapOtter tidak pernah mengirim file, nama file, isi file, output OCR, metadata gambar, atau teks dokumen Anda. Umpan balik opsional hanya dikirim setelah pengguna mengirimkannya, hanya ketika analitik diaktifkan, dan kolom kontak hanya disertakan dengan persetujuan kontak yang eksplisit. Administrator dapat mematikan analitik dan pengumpulan umpan balik dengan satu klik di Settings > System > Privacy, tanpa perlu build ulang. Pemrosesan file selalu berada di dalam container Anda.
 
 Container berjalan sebagai pengguna non-root khusus (`snapotter`) dengan semua kapabilitas Linux dihapus kecuali set minimum yang diperlukan. Untuk kebijakan pengungkapan kerentanan lengkap dan arsitektur keamanan, lihat [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) di GitHub.
 

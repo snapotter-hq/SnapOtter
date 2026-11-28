@@ -1,14 +1,14 @@
 ---
 description: "Guía de endurecimiento de seguridad de SnapOtter. Seguridad de contenedores, aislamiento de red, secretos de Docker, despliegue en Kubernetes y artefactos de cumplimiento."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 6a1ab90dd1cc
+i18n_output_hash: bc7e893602fd
 i18n_hash_version: 2
 ---
 
 # Seguridad y endurecimiento {#security-hardening}
 
-SnapOtter procesa los archivos íntegramente en su infraestructura. Puede enviar analítica de producto anónima y sin contenido, además de informes de fallos, para ayudar a mejorar el proyecto, pero una instancia nueva pregunta primero a su administrador y no envía nada hasta que este responda. Nunca envía sus archivos, nombres de archivo, contenido de archivos, resultados de OCR, metadatos de imagen ni texto de documentos. Los comentarios opcionales solo se envían después de que un usuario los remita, solo cuando la analítica está habilitada, y los campos de contacto se incluyen únicamente con consentimiento explícito de contacto. Un administrador puede desactivar la analítica y la captura de comentarios con un clic en Settings > System > Privacy, sin necesidad de recompilar. El procesamiento de archivos siempre permanece dentro de su contenedor.
+SnapOtter procesa los archivos íntegramente en su infraestructura. Envía por defecto analítica de producto anónima y sin contenido, además de informes de fallos, para ayudar a mejorar el proyecto. Nunca envía sus archivos, nombres de archivo, contenido de archivos, resultados de OCR, metadatos de imagen ni texto de documentos. Los comentarios opcionales solo se envían después de que un usuario los remita, solo cuando la analítica está habilitada, y los campos de contacto se incluyen únicamente con consentimiento explícito de contacto. Un administrador puede desactivar la analítica y la captura de comentarios con un clic en Settings > System > Privacy, sin necesidad de recompilar. El procesamiento de archivos siempre permanece dentro de su contenedor.
 
 El contenedor se ejecuta como un usuario dedicado sin privilegios de root (`snapotter`) con todas las capacidades de Linux eliminadas, salvo el conjunto mínimo necesario. Para la política completa de divulgación de vulnerabilidades y la arquitectura de seguridad, consulte [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) en GitHub.
 

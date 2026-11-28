@@ -1,8 +1,8 @@
 ---
 description: "Implementeer SnapOtter in productie met Docker. Hardwarevereisten, GPU-installatie en reverse proxy-configuraties voor Nginx, Traefik en Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: fa3ab8c7c72b
+i18n_output_hash: a4bb6ee9ea43
 i18n_hash_version: 2
 ---
 
@@ -729,7 +729,7 @@ Semantic-release bepaalt de versie uit de commitgeschiedenis. De Docker-tag `lat
 
 ## Analytics {#analytics}
 
-SnapOtter bevat anonieme productanalyse (gebruikspatronen van tools, foutrapporten) om bugs op te sporen en functies te verbeteren. Een nieuwe instantie vraagt de beheerder bij de eerste start om toestemming en verstuurt niets totdat er antwoord is gegeven. Uw bestanden, bestandsnamen en persoonlijke gegevens maken daar nooit deel van uit. SnapOtter werkt normaal met analytics uitgeschakeld.
+SnapOtter bevat anonieme productanalyse (gebruikspatronen van tools, foutrapporten) om bugs op te sporen en functies te verbeteren. Het staat standaard aan en een beheerder kan het uitschakelen in Instellingen. Uw bestanden, bestandsnamen en persoonlijke gegevens maken daar nooit deel van uit. SnapOtter werkt normaal met analytics uitgeschakeld.
 
 ### Analytics uitschakelen {#disabling-analytics}
 

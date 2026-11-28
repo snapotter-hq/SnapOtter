@@ -1,8 +1,8 @@
 ---
 description: "Docker を使って SnapOtter を本番環境にデプロイします。ハードウェア要件、GPU のセットアップ、Nginx、Traefik、Cloudflare のリバースプロキシ設定を扱います。"
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: f3b2c0108495
+i18n_output_hash: 6ef34a14c69b
 i18n_hash_version: 2
 ---
 
@@ -714,7 +714,7 @@ semantic-release は、コミット履歴からバージョンを決定します
 
 ## アナリティクス {#analytics}
 
-SnapOtter には、バグの発見と機能の改善に役立てるための匿名のプロダクトアナリティクス (ツールの利用パターン、エラーレポート) が含まれています。新しいインスタンスでは、初回起動時に管理者に確認し、回答があるまでは何も送信しません。ファイル、ファイル名、個人データが含まれることはありません。アナリティクスを無効にしても、SnapOtter は通常どおり動作します。
+SnapOtter には、バグの発見と機能の改善に役立てるための匿名のプロダクトアナリティクス (ツールの利用パターン、エラーレポート) が含まれています。デフォルトでオンになっており、管理者は Settings でオフにできます。ファイル、ファイル名、個人データが含まれることはありません。アナリティクスを無効にしても、SnapOtter は通常どおり動作します。
 
 ### アナリティクスの無効化 {#disabling-analytics}
 

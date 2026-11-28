@@ -173,12 +173,6 @@ export const zhCN: TranslationKeys = {
     discoverySourceLabel: "您是如何了解到我们的?",
     optionalHint: "(可选)",
     continueLabel: "继续",
-    analyticsConsentTitle: "发送匿名使用统计和崩溃报告吗?",
-    analyticsConsentBody: "您的文件永远不会被发送。您之后可以在设置中更改此选项。",
-    analyticsConsentLearnMore: "查看发送哪些内容",
-    analyticsConsentYes: "发送",
-    analyticsConsentNo: "不发送",
-    analyticsConsentSaveFailed: "无法保存您的选择。请重试。",
   },
   categories: {
     essentials: "基础工具",
@@ -4981,7 +4975,8 @@ export const zhCN: TranslationKeys = {
     },
     privacy: {
       title: "隐私",
-      description: "匿名产品分析有助于改进 SnapOtter。该功能由管理员为整个实例统一设置。",
+      description:
+        "匿名产品分析有助于改进 SnapOtter。该功能默认开启，并由管理员为整个实例统一设置。",
       analyticsLabel: "匿名产品分析",
       analyticsDescription:
         "共享匿名使用数据（运行了哪些工具、时长、错误代码）和崩溃报告。不含 IP 地址，不含账户身份。我们绝不收集您的文件名、文件内容、OCR 输出、图像元数据或文档文本。关闭此项即可停止所有这些收集。",

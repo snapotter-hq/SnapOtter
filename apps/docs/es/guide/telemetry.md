@@ -1,22 +1,16 @@
 ---
-description: "Qué datos de uso anónimos recopila SnapOtter, cuándo se envían, cómo funciona la elección de la primera ejecución y cómo desactivar las analíticas de producto de toda la instancia."
-i18n_source_hash: f3cfb0b3f961
+description: "Qué datos de uso anónimos recopila SnapOtter, cuándo se envían, que están activadas por defecto y cómo desactiva un administrador las analíticas de producto de toda la instancia."
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: f3b45eea1409
+i18n_output_hash: 969042e335bb
 i18n_hash_version: 2
 ---
 
 # Qué recopila SnapOtter {#what-snapotter-collects}
 
-Anonymous Product Analytics la configura un administrador para toda la instancia. Una instancia nueva pregunta en la primera ejecución y no envía nada hasta que alguien responde. Puedes cambiarlo en cualquier momento en Settings > System > Privacy.
+Anonymous Product Analytics está activado por defecto en todas las instancias, sin aviso en la primera ejecución. Un administrador puede desactivarlo para toda la instancia en Settings > System > Privacy, y con eso se detiene todo el tráfico de analíticas hacia PostHog y Sentry.
 
 Cuando las analíticas están activadas, SnapOtter envía a PostHog qué herramientas y pipelines se ejecutan, cuánto tardan, si terminan con éxito, los códigos de error y el número de archivos, junto con el ID anónimo de la instancia, su versión, la arquitectura de CPU, el sistema operativo, el tipo de instalación y si tiene GPU. Los informes de errores van a Sentry sin nombres de archivo, rutas, correos electrónicos ni valores entre comillas. Nunca envía tus archivos, sus nombres o rutas, su contenido, el resultado del OCR ni el texto extraído, los metadatos de imagen ni la identidad de tu cuenta. PostHog y Sentry son los únicos dos destinos a los que envía algo, y con las analíticas desactivadas no envía nada a ninguno de los dos.
-
-## Elección de la primera ejecución {#first-run-choice}
-
-La primera vez que un administrador abre una instancia nueva, SnapOtter pregunta: "Send anonymous usage stats and crash reports? Your files are never sent." Las dos respuestas tienen el mismo peso y ninguna viene preseleccionada. Si cierras el aviso sin responder, las analíticas siguen desactivadas y se vuelve a preguntar en la siguiente visita. Solo lo ve un administrador. Con `AUTH_ENABLED=false` no hay cuentas y el usuario local actúa como administrador, así que responde quien abra la aplicación. La aplicación de escritorio pregunta del mismo modo.
-
-A una instancia que ya estaba en funcionamiento antes de que existiera este aviso no se le pregunta. Conserva el ajuste de analíticas que tenía: activado, salvo que un administrador o `SNAPOTTER_ANALYTICS_DEFAULT=off` lo haya desactivado.
 
 ## Eventos que enviamos (cuando están activados) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Mientras las analíticas están activadas, el servidor pregunta a PostHog cada p
 
 ## Cómo desactivarlo {#turning-it-off}
 
-Administradores: Settings > System > Privacy, desactiva "Anonymous Product Analytics". Se detiene de inmediato, en toda la instancia. Para crear una imagen que nunca pueda emitir datos, define el argumento de compilación `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` en el entorno del servidor hace lo mismo en tiempo de ejecución y prevalece sobre cualquier respuesta guardada en la aplicación.
+Administradores: Settings > System > Privacy, desactiva "Anonymous Product Analytics". Se detiene de inmediato, en toda la instancia, y no se envía nada más a PostHog ni a Sentry. Para crear una imagen que nunca pueda emitir datos, define el argumento de compilación `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` en el entorno del servidor hace lo mismo en tiempo de ejecución, sin recompilar.
 
-Para responder de antemano a la pregunta de la primera ejecución, añade `SNAPOTTER_ANALYTICS_DEFAULT=off` (o `on`) al entorno del servidor antes de su primer arranque y no se preguntará a nadie. Con Docker Compose, ponlo en `environment:` del servicio de la aplicación, porque definirlo solo en `.env` no llega al contenedor.
+Para iniciar una instancia nueva con las analíticas ya desactivadas, añade `SNAPOTTER_ANALYTICS_DEFAULT=off` al entorno del servidor antes de su primer arranque. Con Docker Compose, ponlo en `environment:` del servicio de la aplicación, porque definirlo solo en `.env` no llega al contenedor.

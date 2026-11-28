@@ -1,8 +1,8 @@
 ---
 description: "Docker로 SnapOtter를 프로덕션에 배포합니다. 하드웨어 요구 사항, GPU 설정, Nginx, Traefik, Cloudflare용 리버스 프록시 설정을 다룹니다."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 6bf669b02e03
+i18n_output_hash: 6dd5b9373730
 i18n_hash_version: 2
 ---
 
@@ -714,7 +714,7 @@ Semantic-release는 커밋 기록으로 버전을 결정합니다. `latest` Dock
 
 ## 분석 {#analytics}
 
-SnapOtter에는 버그를 찾고 기능을 개선하는 데 도움이 되는 익명 제품 분석(도구 사용 패턴, 오류 보고서)이 포함되어 있습니다. 새 인스턴스는 처음 실행할 때 관리자에게 먼저 물어보며, 답하기 전에는 아무것도 전송하지 않습니다. 파일, 파일 이름, 개인 데이터는 절대 포함되지 않습니다. 분석을 끄더라도 SnapOtter는 정상적으로 작동합니다.
+SnapOtter에는 버그를 찾고 기능을 개선하는 데 도움이 되는 익명 제품 분석(도구 사용 패턴, 오류 보고서)이 포함되어 있습니다. 기본적으로 켜져 있으며, 관리자는 설정에서 끌 수 있습니다. 파일, 파일 이름, 개인 데이터는 절대 포함되지 않습니다. 분석을 끄더라도 SnapOtter는 정상적으로 작동합니다.
 
 ### 분석 끄기 {#disabling-analytics}
 

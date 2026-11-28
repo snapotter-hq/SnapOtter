@@ -213,9 +213,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const writesAnalytics = entries.some((e) => e.key === "analyticsEnabled");
-    // Read before the write: once it lands the prompt no longer reads as pending.
-    const consentWasPending =
-      writesAnalytics && (await import("../lib/analytics-gate.js")).analyticsConsentPending();
+    // Read before the write, so a switch from off to on can be told apart from
+    // a save that leaves it on.
+    const analyticsWasOff =
+      writesAnalytics && !(await import("../lib/analytics-gate.js")).analyticsEnabled();
 
     // Pass 2: write all entries now that all have passed validation
     if (entries.length > 0) {
@@ -297,9 +298,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         request.log.warn({ err }, "analytics gate invalidation failed (save still applied)");
       }
-      // The boot census was dropped while this fresh install was undecided, so
-      // the first answer is when it gets counted. A "no" sends nothing (#5014).
-      if (consentWasPending) {
+      // The boot census is dropped while analytics is off, so turning it back
+      // on is when this instance gets counted again. The gate decides, so a
+      // save that leaves it off sends nothing.
+      if (analyticsWasOff && (await import("../lib/analytics-gate.js")).analyticsEnabled()) {
         const { trackInstanceStarted } = await import("../lib/instance-started.js");
         await trackInstanceStarted();
       }

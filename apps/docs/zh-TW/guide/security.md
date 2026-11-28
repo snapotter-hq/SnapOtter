@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter 安全性強化指南。涵蓋容器安全、網路隔離、Docker secrets、Kubernetes 部署，以及合規文件。"
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 9e988a98b2de
+i18n_output_hash: 441d3449ec1f
 i18n_hash_version: 2
 ---
 
 # 安全性與強化 {#security-hardening}
 
-SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進專案，它可以傳送匿名且不含內容的產品分析與當機報告，但新的執行個體會先詢問其管理員，在獲得回覆之前不會傳送任何資料。它絕不會傳送您的檔案、檔名、檔案內容、OCR 輸出、圖片中繼資料或文件文字。選用的意見回饋只會在使用者提交後傳送，且僅在啟用分析時才會傳送，聯絡欄位也只有在使用者明確同意提供聯絡方式時才會包含。管理員可以在「設定 > 系統 > 隱私權」下一鍵關閉分析與意見回饋的收集，無須重新建置。檔案處理一律在您的容器內進行。
+SnapOtter 完全在您自己的基礎設施上處理檔案。為了協助改進專案，它可以傳送匿名且不含內容的產品分析與當機報告，預設即會傳送。它絕不會傳送您的檔案、檔名、檔案內容、OCR 輸出、圖片中繼資料或文件文字。選用的意見回饋只會在使用者提交後傳送，且僅在啟用分析時才會傳送，聯絡欄位也只有在使用者明確同意提供聯絡方式時才會包含。管理員可以在「設定 > 系統 > 隱私權」下一鍵關閉分析與意見回饋的收集，無須重新建置。檔案處理一律在您的容器內進行。
 
 容器以專用的非 root 使用者（`snapotter`）執行，並捨棄除最低必要集合之外的所有 Linux capabilities。完整的弱點揭露政策與安全架構，請參閱 GitHub 上的 [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md)。
 

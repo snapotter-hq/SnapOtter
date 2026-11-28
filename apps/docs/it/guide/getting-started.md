@@ -1,8 +1,8 @@
 ---
 description: "Installare SnapOtter con Docker in un solo comando, accedere e aprire il primo strumento. Copre l'accelerazione GPU, le macchine piccole, Docker Compose e la compilazione da sorgente."
-i18n_source_hash: 83126a46454e
+i18n_source_hash: b40014f9f1a3
 i18n_provenance: machine
-i18n_output_hash: f63dcf28a9e3
+i18n_output_hash: 25532e5f7d34
 i18n_hash_version: 2
 ---
 
@@ -33,7 +33,7 @@ Su un Raspberry Pi, un vecchio portatile o un piccolo VPS, esegua un job alla vo
 :::
 
 ::: tip Analytics di prodotto anonime
-SnapOtter include analytics di prodotto anonime. Una nuova istanza lo chiede al suo amministratore al primo avvio e non invia nulla finché non riceve risposta. Per disattivarle in seguito, apra **Impostazioni → Sistema → Privacy** e disattivi **Analytics di prodotto anonime**. Si interrompono immediatamente per l'intera istanza.
+SnapOtter include analytics di prodotto anonime per impostazione predefinita. Per disattivarle, apra **Impostazioni → Sistema → Privacy** e disattivi **Analytics di prodotto anonime**. Si interrompono immediatamente per l'intera istanza.
 
 Può anche impostare la variabile d'ambiente `SNAPOTTER_TELEMETRY=0` (funzionano anche `false` e `off`) per disabilitare tutta la telemetria dell'istanza senza ricompilare.
 

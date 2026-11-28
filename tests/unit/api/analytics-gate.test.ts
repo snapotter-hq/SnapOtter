@@ -51,10 +51,10 @@ describe("bakedEnabled override (non-production only)", () => {
 });
 
 describe("effective enabled = baked AND toggle", () => {
-  it("an undecided instance (no answer yet) sends nothing (#4910)", async () => {
+  it("absent toggle defaults to ON", async () => {
     __setReaderForTests(async () => undefined);
     await refreshAnalyticsGate();
-    expect(analyticsEnabled()).toBe(false);
+    expect(analyticsEnabled()).toBe(true);
   });
   it("toggle=false disables even when baked is on", async () => {
     __setReaderForTests(async () => false);

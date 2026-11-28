@@ -179,13 +179,6 @@ export const nl: TranslationKeys = {
     discoverySourceLabel: "Hoe heb je ons gevonden?",
     optionalHint: "(optioneel)",
     continueLabel: "Doorgaan",
-    analyticsConsentTitle: "Anonieme gebruiksstatistieken en crashrapporten versturen?",
-    analyticsConsentBody:
-      "Je bestanden worden nooit verstuurd. Je kunt dit later wijzigen in Instellingen.",
-    analyticsConsentLearnMore: "Bekijk wat er wordt verstuurd",
-    analyticsConsentYes: "Versturen",
-    analyticsConsentNo: "Niet versturen",
-    analyticsConsentSaveFailed: "Je keuze kon niet worden opgeslagen. Probeer het opnieuw.",
   },
   categories: {
     essentials: "Basistools",
@@ -5348,7 +5341,7 @@ export const nl: TranslationKeys = {
     privacy: {
       title: "Privacy",
       description:
-        "Anonieme productanalyse helpt SnapOtter te verbeteren. Een beheerder stelt deze in voor de hele instantie.",
+        "Anonieme productanalyse helpt SnapOtter te verbeteren. Deze staat standaard aan en wordt voor de hele instantie ingesteld door een beheerder.",
       analyticsLabel: "Anonieme productanalyse",
       analyticsDescription:
         "Deel anonieme gebruiksgegevens (welke tools worden uitgevoerd, duur, foutcodes) en crashrapporten. Geen IP-adres, geen accountidentiteit. We verzamelen nooit uw bestandsnamen, bestandsinhoud, OCR-uitvoer, afbeeldingsmetadata of documenttekst. Schakel dit uit om alles te stoppen.",

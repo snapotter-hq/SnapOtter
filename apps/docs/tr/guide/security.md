@@ -1,14 +1,14 @@
 ---
 description: "SnapOtter için güvenlik sıkılaştırma rehberi. Kapsayıcı güvenliği, ağ yalıtımı, Docker secrets, Kubernetes dağıtımı ve uyumluluk çıktıları."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 3d486391c9a9
+i18n_output_hash: 96bfea278a40
 i18n_hash_version: 2
 ---
 
 # Güvenlik ve Sıkılaştırma {#security-hardening}
 
-SnapOtter dosyaları tamamen kendi altyapınızda işler. Projeyi geliştirmeye yardımcı olmak için anonim, içerik içermeyen ürün analitiği ve çökme raporları gönderebilir, ancak yeni bir kurulum önce yöneticisine sorar ve yanıt verilene kadar hiçbir şey göndermez. Dosyalarınızı, dosya adlarını, dosya içeriklerini, OCR çıktısını, görsel meta verilerini veya belge metnini asla göndermez. İsteğe bağlı geri bildirim yalnızca kullanıcı gönderdikten sonra, yalnızca analitik etkinken ve iletişim alanları yalnızca açık iletişim onayıyla gönderilir. Bir yönetici, yeniden derleme gerekmeden Ayarlar > Sistem > Gizlilik altında analitiği ve geri bildirim toplamayı tek tıkla kapatabilir. Dosya işleme her zaman kapsayıcınızın içinde kalır.
+SnapOtter dosyaları tamamen kendi altyapınızda işler. Projeyi geliştirmeye yardımcı olmak için anonim, içerik içermeyen ürün analitiği ve çökme raporları varsayılan olarak gönderir. Dosyalarınızı, dosya adlarını, dosya içeriklerini, OCR çıktısını, görsel meta verilerini veya belge metnini asla göndermez. İsteğe bağlı geri bildirim yalnızca kullanıcı gönderdikten sonra, yalnızca analitik etkinken ve iletişim alanları yalnızca açık iletişim onayıyla gönderilir. Bir yönetici, yeniden derleme gerekmeden Ayarlar > Sistem > Gizlilik altında analitiği ve geri bildirim toplamayı tek tıkla kapatabilir. Dosya işleme her zaman kapsayıcınızın içinde kalır.
 
 Kapsayıcı, gereken asgari küme dışındaki tüm Linux yetenekleri kaldırılmış olarak özel bir root olmayan kullanıcıyla (`snapotter`) çalışır. Tam güvenlik açığı bildirim ilkesi ve güvenlik mimarisi için GitHub'daki [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) dosyasına bakın.
 

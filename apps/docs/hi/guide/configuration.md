@@ -1,8 +1,8 @@
 ---
 description: "डिफ़ॉल्ट मानों के साथ SnapOtter के सभी environment variables। auth, स्टोरेज, AI मॉडल, analytics और बहुत कुछ कॉन्फ़िगर करें।"
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 756ea614b3bb
+i18n_output_hash: 141735366570
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ i18n_hash_version: 2
 | `CORS_ORIGIN` | (खाली) | CORS के लिए अल्पविराम से अलग की गई अनुमत origins, या केवल same-origin के लिए खाली। |
 | `LOG_LEVEL` | `info` | लॉग का विस्तार स्तर। इनमें से एक: `fatal`, `error`, `warn`, `info`, `debug`, `trace`। |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | कौन से peers `X-Forwarded-For` के ज़रिए क्लाइंट IP सेट कर सकते हैं। डिफ़ॉल्ट केवल प्राइवेट-नेटवर्क peer पर भरोसा करता है, इसलिए Docker नेटवर्क या LAN पर मौजूद reverse proxy पर भरोसा किया जाता है और किसी सार्वजनिक क्लाइंट के जाली header पर नहीं। `true` तभी सेट करें जब आपके नियंत्रण वाला कोई proxy सार्वजनिक पते पर सामने बैठा हो। |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (सेट नहीं) | पहले रन पर पूछे जाने वाले analytics सवाल का जवाब पहले से दे देता है, ताकि किसी से पूछा न जाए। सेट न होने पर, नया instance अपने एडमिन से पूछता है और जवाब मिलने तक कुछ नहीं भेजता। `off` उसे "Anonymous Product Analytics" बंद करके शुरू करता है; `on` उसे चालू करके शुरू करता है। यह सेटिंग को केवल तब तक भरता है जब तक किसी ने कोई मान नहीं चुना हो। एक बार सेटिंग सहेज दी जाए, चाहे एडमिन द्वारा या इस variable द्वारा, तो variable बदलने से कुछ नहीं होता; एडमिन फिर भी Settings > System > Privacy में इसे बदल सकता है। |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | नए instance को "Anonymous Product Analytics" बंद करके शुरू करने के लिए `off` सेट करें, ताकि वह पहले boot से ही कुछ न भेजे। यह सेटिंग को केवल तब तक भरता है जब तक किसी ने कोई मान नहीं चुना हो। एक बार सेटिंग सहेज दी जाए, चाहे एडमिन द्वारा या इस variable द्वारा, तो variable बदलने से कुछ नहीं होता; एडमिन फिर भी Settings > System > Privacy में analytics को चालू कर सकता है। |
 
 ### प्रमाणीकरण {#authentication}
 
@@ -91,7 +91,7 @@ i18n_hash_version: 2
 
 1.x से अपग्रेड: अपनी पुरानी `snapotter.db` को वॉल्यूम में `/data/snapotter.db` पर रखें और embedded मोड पहले boot पर उसे embedded PostgreSQL में आयात कर लेता है। आयात एक बार चलता है; बाद के boot इसे छोड़ देते हैं।
 
-Telemetry नोट: embedded मोड इमेज का analytics डिफ़ॉल्ट वैसे ही अपनाता है जैसे कोई अन्य कॉन्फ़िगरेशन। प्रकाशित इमेज analytics भेज सकती है, लेकिन नया instance पहले अपने एडमिन से पूछता है और जवाब मिलने तक कुछ नहीं भेजता। इसे बंद करने के लिए ना में जवाब दें, `--build-arg SNAPOTTER_ANALYTICS=off` के साथ बिल्ड करें, पहले boot से पहले `SNAPOTTER_ANALYTICS_DEFAULT=off` सेट करें, या ऐप में एडमिन opt-out का उपयोग करें।
+Telemetry नोट: embedded मोड इमेज का analytics डिफ़ॉल्ट वैसे ही अपनाता है जैसे कोई अन्य कॉन्फ़िगरेशन। प्रकाशित इमेज analytics चालू रखकर आती है; इसे बंद करने के लिए `--build-arg SNAPOTTER_ANALYTICS=off` के साथ बिल्ड करें, पहले boot से पहले `SNAPOTTER_ANALYTICS_DEFAULT=off` सेट करें, या ऐप में एडमिन opt-out का उपयोग करें।
 
 ### प्रोसेसिंग सीमाएँ {#processing-limits}
 

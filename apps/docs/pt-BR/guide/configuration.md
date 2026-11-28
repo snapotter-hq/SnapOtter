@@ -1,8 +1,8 @@
 ---
 description: "Todas as variáveis de ambiente do SnapOtter com seus valores padrão. Configure autenticação, armazenamento, modelos de IA, análises e mais."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: bc662e0711a0
+i18n_output_hash: 143fadca1735
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Toda a configuração é feita por meio de variáveis de ambiente. Cada variáve
 | `CORS_ORIGIN` | (vazio) | Origens permitidas para CORS, separadas por vírgula, ou vazio para aceitar apenas a mesma origem. |
 | `LOG_LEVEL` | `info` | Nível de detalhe dos logs. Um entre: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Quais peers podem definir o IP do cliente por meio de `X-Forwarded-For`. O padrão confia apenas em um peer de rede privada, então um proxy reverso em uma rede Docker ou LAN é confiável e o cabeçalho forjado de um cliente público não é. Defina `true` somente quando um proxy sob seu controle estiver à frente, em um endereço público. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (não definida) | Responde antecipadamente à pergunta sobre análises da primeira execução, para que ninguém seja perguntado. Sem ela, uma nova instância pergunta ao administrador e não envia nada até receber uma resposta. `off` a inicia com "Anonymous Product Analytics" desativado; `on` a inicia com ele ativado. A variável só preenche a configuração enquanto ninguém tiver escolhido um valor. Depois que a configuração é salva, por um administrador ou por esta variável, alterar a variável não tem efeito; um administrador ainda pode alterá-la em Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Defina `off` para iniciar uma nova instância com "Anonymous Product Analytics" desativado, de modo que ela não envie nada desde o primeiro boot. A variável só preenche a configuração enquanto ninguém tiver escolhido um valor. Depois que a configuração é salva, por um administrador ou por esta variável, alterar a variável não tem efeito; um administrador ainda pode ativar as análises em Settings > System > Privacy. |
 
 ### Autenticação {#authentication}
 
@@ -91,7 +91,7 @@ Execute a imagem sem `DATABASE_URL` e sem `REDIS_URL` e ela inicia o próprio Po
 
 Atualizando da 1.x: coloque seu `snapotter.db` antigo em `/data/snapotter.db` no volume e o modo embutido o importa para o PostgreSQL embutido no primeiro boot. A importação roda uma vez; os boots seguintes a ignoram.
 
-Nota sobre telemetria: o modo embutido herda o padrão de análises da imagem como qualquer outra configuração. A imagem publicada pode enviar análises, mas uma nova instância pergunta primeiro ao administrador e não envia nada até receber uma resposta. Para desativá-las, responda não, compile com `--build-arg SNAPOTTER_ANALYTICS=off`, defina `SNAPOTTER_ANALYTICS_DEFAULT=off` antes do primeiro boot ou use a desativação pelo administrador no app.
+Nota sobre telemetria: o modo embutido herda o padrão de análises da imagem como qualquer outra configuração. A imagem publicada vem com as análises ativadas; para desativá-las, compile com `--build-arg SNAPOTTER_ANALYTICS=off`, defina `SNAPOTTER_ANALYTICS_DEFAULT=off` antes do primeiro boot ou use a desativação pelo administrador no app.
 
 ### Limites de processamento {#processing-limits}
 

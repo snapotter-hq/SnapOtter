@@ -1,22 +1,16 @@
 ---
-description: "SnapOtter が収集する匿名の利用データ、その送信タイミング、初回起動時の選択の仕組み、そしてインスタンス全体の製品分析をオフにする方法を説明します。"
-i18n_source_hash: f3cfb0b3f961
+description: "SnapOtter が収集する匿名の利用データ、その送信タイミング、デフォルトでオンになっていること、そして管理者がインスタンス全体の製品分析をオフにする方法を説明します。"
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 3095767cd3e4
+i18n_output_hash: d59d2eb81325
 i18n_hash_version: 2
 ---
 
 # SnapOtter が収集するもの {#what-snapotter-collects}
 
-Anonymous Product Analytics は、管理者がインスタンス全体に対して設定します。新しいインスタンスは初回起動時に確認を行い、誰かが回答するまで何も送信しません。設定はいつでも Settings > System > Privacy で変更できます。
+Anonymous Product Analytics は、すべてのインスタンスでデフォルトでオンになっており、初回起動時のプロンプトはありません。管理者は Settings > System > Privacy でインスタンス全体についてオフにでき、その場合 PostHog と Sentry への分析トラフィックはすべて停止します。
 
 分析がオンの場合、SnapOtter は PostHog に対して、どのツールとパイプラインが実行されたか、所要時間、成功したかどうか、エラーコード、ファイル数を送信します。あわせて、インスタンスの匿名 ID、バージョン、CPU アーキテクチャ、オペレーティングシステム、インストール形態、GPU の有無も送信します。クラッシュレポートは、ファイル名、パス、メールアドレス、引用符で囲まれた値を取り除いたうえで Sentry に送られます。ファイルそのもの、ファイル名やパス、ファイルの内容、OCR の出力や抽出されたテキスト、画像メタデータ、アカウント情報は一切送信しません。送信先は PostHog と Sentry の 2 つだけで、分析をオフにするとどちらにも何も送信されません。
-
-## 初回起動時の選択 {#first-run-choice}
-
-管理者が新しいインスタンスを初めて開くと、SnapOtter は次のように尋ねます:「匿名の利用統計とクラッシュレポートを送信しますか? ファイルが送信されることはありません。」2 つの回答は同じ重みで、どちらも事前に選択されていません。回答せずにプロンプトを閉じると、分析はオフのままで、次回のアクセス時にもう一度尋ねられます。表示されるのは管理者だけです。`AUTH_ENABLED=false` ではアカウントがなく、ローカルユーザーが管理者として動作するため、アプリを開いた人が回答します。デスクトップアプリでも同じように尋ねられます。
-
-このプロンプトが導入される前から稼働していたインスタンスには、確認は行われません。そのインスタンスは従来の分析設定を維持します。管理者または `SNAPOTTER_ANALYTICS_DEFAULT=off` がオフにしていない限り、オンのままです。
 
 ## 送信するイベント(有効な場合) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ PostHog は、あらゆるサーバーと同様に、各リクエストの送信
 
 ## オフにする方法 {#turning-it-off}
 
-管理者: Settings > System > Privacy で "Anonymous Product Analytics" をオフにします。インスタンス全体で直ちに停止します。何も送信できないイメージをビルドするには、ビルド引数 `SNAPOTTER_ANALYTICS=off` を設定します。サーバーの環境変数に `SNAPOTTER_TELEMETRY=off` を設定すると、実行時に同じ効果があり、アプリ内に保存された回答よりも優先されます。
+管理者: Settings > System > Privacy で "Anonymous Product Analytics" をオフにします。インスタンス全体で直ちに停止し、PostHog と Sentry にはそれ以降何も送信されません。何も送信できないイメージをビルドするには、ビルド引数 `SNAPOTTER_ANALYTICS=off` を設定します。サーバーの環境変数に `SNAPOTTER_TELEMETRY=off` を設定すると、再ビルドなしで実行時に同じ効果があります。
 
-初回起動時の質問に事前に回答するには、最初の起動前にサーバーの環境変数に `SNAPOTTER_ANALYTICS_DEFAULT=off`(または `on`)を追加します。そうすれば誰にも尋ねられません。Docker Compose では、アプリサービスの `environment:` に記述してください。`.env` だけに設定してもコンテナには届きません。
+新しいインスタンスを分析がオフの状態で開始するには、最初の起動前にサーバーの環境変数に `SNAPOTTER_ANALYTICS_DEFAULT=off` を追加します。Docker Compose では、アプリサービスの `environment:` に記述してください。`.env` だけに設定してもコンテナには届きません。

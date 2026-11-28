@@ -180,13 +180,6 @@ export const ja: TranslationKeys = {
     discoverySourceLabel: "SnapOtterをどこで知りましたか?",
     optionalHint: "(任意)",
     continueLabel: "続ける",
-    analyticsConsentTitle: "匿名の利用統計とクラッシュレポートを送信しますか?",
-    analyticsConsentBody:
-      "ファイルが送信されることはありません。この設定は後から設定画面で変更できます。",
-    analyticsConsentLearnMore: "送信される内容を見る",
-    analyticsConsentYes: "送信する",
-    analyticsConsentNo: "送信しない",
-    analyticsConsentSaveFailed: "選択内容を保存できませんでした。もう一度お試しください。",
   },
   categories: {
     essentials: "基本ツール",
@@ -5279,7 +5272,7 @@ export const ja: TranslationKeys = {
     privacy: {
       title: "プライバシー",
       description:
-        "匿名のプロダクト分析は SnapOtter の改善に役立ちます。インスタンス全体に対して管理者が設定します。",
+        "匿名のプロダクト分析は SnapOtter の改善に役立ちます。既定で有効になっており、インスタンス全体に対して管理者が設定します。",
       analyticsLabel: "匿名のプロダクト分析",
       analyticsDescription:
         "匿名の使用状況データ（実行されたツール、処理時間、エラーコード）とクラッシュレポートを共有します。IP アドレスやアカウント情報は含まれません。ファイル名、ファイルの内容、OCR の出力、画像のメタデータ、ドキュメントのテキストを収集することは一切ありません。これをオフにすると、すべて停止します。",

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../db/index.js";
 import { hasFeedbackSink } from "../lib/analytics.js";
-import { analyticsConsentPending, analyticsEnabled } from "../lib/analytics-gate.js";
+import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { deployMode } from "../lib/deploy-mode.js";
 import { posthogProxyEnabled } from "../lib/posthog-proxy.js";
 
@@ -21,9 +21,6 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
         sentryDsnWeb: "",
         posthogSampleRate: 0,
         instanceId: "",
-        // Not a secret: it only tells the web app to show an admin the
-        // first-run choice. Nothing is sent while it is true (#4910).
-        consentPending: analyticsConsentPending(),
       };
     }
 
@@ -47,7 +44,6 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       posthogSampleRate: ANALYTICS_BAKED.posthogSampleRate,
       instanceId: row?.value ?? "",
       deployMode: deployMode(),
-      consentPending: false,
     };
   });
 }

@@ -1,14 +1,14 @@
 ---
 description: "Guia de hardening de segurança do SnapOtter. Segurança de contêineres, isolamento de rede, Docker secrets, implantação em Kubernetes e artefatos de conformidade."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 74c1337ab28f
+i18n_output_hash: da40269864ac
 i18n_hash_version: 2
 ---
 
 # Segurança e hardening {#security-hardening}
 
-O SnapOtter processa arquivos inteiramente na sua infraestrutura. Ele pode enviar analytics de produto anônimos e sem conteúdo, além de relatórios de falhas, para ajudar a melhorar o projeto, mas uma nova instância pergunta primeiro ao administrador e não envia nada até que ele responda. Ele nunca envia seus arquivos, nomes de arquivos, conteúdo de arquivos, saída de OCR, metadados de imagens nem texto de documentos. O feedback opcional só é enviado depois que um usuário o submete, apenas quando o analytics está ativado, e os campos de contato só são incluídos com consentimento explícito de contato. Um administrador pode desativar o analytics e a captura de feedback com um clique em Configurações > Sistema > Privacidade, sem necessidade de rebuild. O processamento de arquivos sempre permanece dentro do seu contêiner.
+O SnapOtter processa arquivos inteiramente na sua infraestrutura. Ele envia analytics de produto anônimos e sem conteúdo, além de relatórios de falhas, por padrão, para ajudar a melhorar o projeto. Ele nunca envia seus arquivos, nomes de arquivos, conteúdo de arquivos, saída de OCR, metadados de imagens nem texto de documentos. O feedback opcional só é enviado depois que um usuário o submete, apenas quando o analytics está ativado, e os campos de contato só são incluídos com consentimento explícito de contato. Um administrador pode desativar o analytics e a captura de feedback com um clique em Configurações > Sistema > Privacidade, sem necessidade de rebuild. O processamento de arquivos sempre permanece dentro do seu contêiner.
 
 O contêiner roda como um usuário dedicado não root (`snapotter`), com todas as capabilities do Linux removidas, exceto o conjunto mínimo necessário. Para a política completa de divulgação de vulnerabilidades e a arquitetura de segurança, consulte o [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) no GitHub.
 

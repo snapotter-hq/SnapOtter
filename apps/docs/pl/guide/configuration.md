@@ -1,8 +1,8 @@
 ---
 description: "Wszystkie zmienne środowiskowe SnapOtter wraz z wartościami domyślnymi. Konfiguracja uwierzytelniania, przechowywania danych, modeli AI, analityki i nie tylko."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 1934601b4aaf
+i18n_output_hash: 579fca5549b0
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Cała konfiguracja odbywa się za pomocą zmiennych środowiskowych. Każda zmie
 | `CORS_ORIGIN` | (puste) | Dozwolone źródła (origin) dla CORS, oddzielone przecinkami, lub puste, aby dopuścić tylko to samo źródło. |
 | `LOG_LEVEL` | `info` | Szczegółowość logów. Jedna z wartości: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Określa, które węzły mogą ustawiać adres IP klienta przez `X-Forwarded-For`. Wartość domyślna ufa wyłącznie węzłowi z sieci prywatnej, więc zaufany jest reverse proxy w sieci Docker lub w sieci LAN, a sfałszowany nagłówek publicznego klienta nie. Ustawiać `true` tylko wtedy, gdy przed aplikacją stoi kontrolowany przez użytkownika proxy z publicznym adresem. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (nieustawiona) | Odpowiada z góry na pytanie o analitykę zadawane przy pierwszym uruchomieniu, więc nikt nie jest pytany. Gdy nie jest ustawiona, nowa instancja pyta swojego administratora i nie wysyła niczego, dopóki nie dostanie odpowiedzi. `off` uruchamia ją z wyłączonym ustawieniem „Anonymous Product Analytics”, a `on` z włączonym. Zmienna jedynie wypełnia to ustawienie, dopóki nikt go nie wybrał. Gdy ustawienie zostanie zapisane, przez administratora lub przez tę zmienną, zmiana zmiennej nie daje żadnego efektu; administrator nadal może je zmienić w Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Ustaw `off`, aby nowa instancja startowała z wyłączonym ustawieniem „Anonymous Product Analytics”, dzięki czemu nie wysyła niczego od pierwszego uruchomienia. Zmienna jedynie wypełnia to ustawienie, dopóki nikt go nie wybrał. Gdy ustawienie zostanie zapisane, przez administratora lub przez tę zmienną, zmiana zmiennej nie daje żadnego efektu; administrator nadal może włączyć analitykę w Settings > System > Privacy. |
 
 ### Uwierzytelnianie {#authentication}
 
@@ -91,7 +91,7 @@ Uruchomienie obrazu bez `DATABASE_URL` i bez `REDIS_URL` powoduje, że wewnątrz
 
 Aktualizacja z wersji 1.x: umieścić dawny `snapotter.db` w `/data/snapotter.db` na wolumenie, a tryb wbudowany zaimportuje go do wbudowanego PostgreSQL przy pierwszym rozruchu. Import odbywa się jednorazowo; kolejne rozruchy go pomijają.
 
-Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu, jak każda inna konfiguracja. Opublikowany obraz może wysyłać dane analityczne, ale nowa instancja najpierw pyta swojego administratora i nie wysyła niczego, dopóki nie dostanie odpowiedzi. Aby ją wyłączyć, należy odpowiedzieć przecząco, zbudować obraz z `--build-arg SNAPOTTER_ANALYTICS=off`, ustawić `SNAPOTTER_ANALYTICS_DEFAULT=off` przed pierwszym rozruchem lub użyć wyłączenia w aplikacji przez administratora.
+Uwaga dotycząca telemetrii: tryb wbudowany dziedziczy domyślne ustawienie analityki obrazu, jak każda inna konfiguracja. Opublikowany obraz jest dostarczany z włączoną analityką; aby ją wyłączyć, należy zbudować obraz z `--build-arg SNAPOTTER_ANALYTICS=off`, ustawić `SNAPOTTER_ANALYTICS_DEFAULT=off` przed pierwszym rozruchem lub użyć wyłączenia w aplikacji przez administratora.
 
 ### Limity przetwarzania {#processing-limits}
 

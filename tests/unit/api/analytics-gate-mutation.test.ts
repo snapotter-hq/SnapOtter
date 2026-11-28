@@ -24,7 +24,7 @@ const bakedConfig = vi.hoisted(() => ({
 }));
 
 // db/index.js seam: `rows` is what the mocked query resolves to.
-const dbState = vi.hoisted(() => ({ rows: [] as Array<{ key: string; value: string }> }));
+const dbState = vi.hoisted(() => ({ rows: [] as Array<{ value: string }> }));
 
 // jobs/connection.js seam: a fake ioredis subscriber that records calls.
 const redisState = vi.hoisted(() => ({
@@ -55,7 +55,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   schema: { settings: { key: "key", value: "value" } },
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: () => "mocked-eq", inArray: () => "mocked-in" }));
+vi.mock("drizzle-orm", () => ({ eq: () => "mocked-eq" }));
 
 const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
@@ -161,10 +161,10 @@ describe("analyticsEnabled reflects the cached toggle", () => {
     expect(gate.analyticsEnabled()).toBe(false);
   });
 
-  it("treats an undecided answer (undefined) as OFF (#4910)", async () => {
+  it("treats an absent toggle (undefined) as ON (L65)", async () => {
     gate.__setReaderForTests(async () => undefined);
     await gate.refreshAnalyticsGate();
-    expect(gate.analyticsEnabled()).toBe(false);
+    expect(gate.analyticsEnabled()).toBe(true);
   });
 
   it("returns false immediately when baked is off, ignoring the cache (L54)", async () => {
@@ -205,7 +205,7 @@ describe("fail-closed anchor pins knownDisabled = !on", () => {
   });
 
   it("keeps the last enabled value across an error when disabled was never seen", async () => {
-    gate.__setReaderForTests(async () => true); // -> ON, knownDisabled stays false
+    gate.__setReaderForTests(async () => undefined); // -> ON, knownDisabled stays false
     await gate.refreshAnalyticsGate();
     gate.__setReaderForTests(async () => {
       throw new Error("db down");
@@ -312,40 +312,32 @@ describe("primeAnalyticsGate (L79)", () => {
 
 // --- defaultReader over the mocked db (L24-L25) -----------------------------
 
-describe("defaultReader reads the settings rows (L24-L25)", () => {
-  it("answers undecided when neither the toggle nor the install origin is stored", async () => {
+describe("defaultReader reads the settings row (L24-L25)", () => {
+  it("returns undefined when the settings row is absent (L24)", async () => {
     dbState.rows = [];
     gate.__setReaderForTests(null); // use the real defaultReader against mocked db
     await gate.refreshAnalyticsGate();
-    expect(gate.analyticsEnabled()).toBe(false);
-    expect(gate.analyticsConsentPending()).toBe(true);
+    // undefined -> default ON.
+    expect(gate.analyticsEnabled()).toBe(true);
     expect(gate.gatePrimed()).toBe(true);
   });
 
-  it("keeps an upgraded instance with no stored toggle on", async () => {
-    dbState.rows = [{ key: "analyticsConsentOrigin", value: "upgrade" }];
-    gate.__setReaderForTests(null);
-    await gate.refreshAnalyticsGate();
-    expect(gate.analyticsEnabled()).toBe(true);
-    expect(gate.analyticsConsentPending()).toBe(false);
-  });
-
   it("returns false when the stored value is 'false' (L25)", async () => {
-    dbState.rows = [{ key: "analyticsEnabled", value: "false" }];
+    dbState.rows = [{ value: "false" }];
     gate.__setReaderForTests(null);
     await gate.refreshAnalyticsGate();
     expect(gate.analyticsEnabled()).toBe(false);
   });
 
   it("returns true when the stored value is anything other than 'false' (L25)", async () => {
-    dbState.rows = [{ key: "analyticsEnabled", value: "true" }];
+    dbState.rows = [{ value: "true" }];
     gate.__setReaderForTests(null);
     await gate.refreshAnalyticsGate();
     expect(gate.analyticsEnabled()).toBe(true);
   });
 
   it("treats an empty-string stored value as enabled (only 'false' disables)", async () => {
-    dbState.rows = [{ key: "analyticsEnabled", value: "" }];
+    dbState.rows = [{ value: "" }];
     gate.__setReaderForTests(null);
     await gate.refreshAnalyticsGate();
     expect(gate.analyticsEnabled()).toBe(true);

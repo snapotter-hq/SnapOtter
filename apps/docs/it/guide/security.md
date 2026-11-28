@@ -1,14 +1,14 @@
 ---
 description: "Guida all'hardening della sicurezza di SnapOtter. Sicurezza dei container, isolamento di rete, Docker secrets, distribuzione su Kubernetes e artefatti di conformità."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 7fcea11d2559
+i18n_output_hash: 289e3bcb52eb
 i18n_hash_version: 2
 ---
 
 # Sicurezza e hardening {#security-hardening}
 
-SnapOtter elabora i file interamente sulla Sua infrastruttura. Può inviare analytics di prodotto anonime, prive di contenuti, e segnalazioni di crash per contribuire a migliorare il progetto, ma una nuova istanza chiede prima il consenso al proprio amministratore e non invia nulla finché non riceve una risposta. Non invia mai i Suoi file, i nomi dei file, i contenuti dei file, l'output dell'OCR, i metadati delle immagini né il testo dei documenti. Il feedback facoltativo viene inviato solo dopo che un utente lo ha inviato, solo quando le analytics sono abilitate, e i campi di contatto sono inclusi solo con esplicito consenso al contatto. Un amministratore può disattivare le analytics e la raccolta del feedback con un clic in Impostazioni > Sistema > Privacy, senza bisogno di ricompilare. L'elaborazione dei file resta sempre all'interno del Suo container.
+SnapOtter elabora i file interamente sulla Sua infrastruttura. Per impostazione predefinita invia analytics di prodotto anonime, prive di contenuti, e segnalazioni di crash per contribuire a migliorare il progetto. Non invia mai i Suoi file, i nomi dei file, i contenuti dei file, l'output dell'OCR, i metadati delle immagini né il testo dei documenti. Il feedback facoltativo viene inviato solo dopo che un utente lo ha inviato, solo quando le analytics sono abilitate, e i campi di contatto sono inclusi solo con esplicito consenso al contatto. Un amministratore può disattivare le analytics e la raccolta del feedback con un clic in Impostazioni > Sistema > Privacy, senza bisogno di ricompilare. L'elaborazione dei file resta sempre all'interno del Suo container.
 
 Il container viene eseguito come utente dedicato non root (`snapotter`) con tutte le capability Linux rimosse tranne l'insieme minimo richiesto. Per la politica completa di divulgazione delle vulnerabilità e per l'architettura di sicurezza, consulti [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) su GitHub.
 

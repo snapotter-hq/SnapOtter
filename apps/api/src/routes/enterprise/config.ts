@@ -367,9 +367,10 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       }
 
       const importsAnalytics = preparedSettings.some((s) => s.key === "analyticsEnabled");
-      // Read before the write: once it lands the prompt no longer reads as pending.
-      const consentWasPending =
-        importsAnalytics && (await import("../../lib/analytics-gate.js")).analyticsConsentPending();
+      // Read before the write, so a switch from off to on can be told apart from
+      // an import that leaves it on.
+      const analyticsWasOff =
+        importsAnalytics && !(await import("../../lib/analytics-gate.js")).analyticsEnabled();
 
       // Apply changes
       const now = new Date();
@@ -470,8 +471,8 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         } catch (err) {
           request.log.warn({ err }, "analytics gate invalidation failed (import still applied)");
         }
-        // Same first-answer census as PUT /api/v1/settings (#5014).
-        if (consentWasPending) {
+        // Same re-enable census as PUT /api/v1/settings.
+        if (analyticsWasOff && (await import("../../lib/analytics-gate.js")).analyticsEnabled()) {
           const { trackInstanceStarted } = await import("../../lib/instance-started.js");
           await trackInstanceStarted();
         }

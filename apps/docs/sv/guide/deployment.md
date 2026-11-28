@@ -1,8 +1,8 @@
 ---
 description: "Driftsätt SnapOtter i produktion med Docker. Maskinvarukrav, GPU-konfiguration och reverse proxy-konfigurationer för Nginx, Traefik och Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 06b36975b68a
+i18n_output_hash: f7152a319bcc
 i18n_hash_version: 2
 ---
 
@@ -732,7 +732,7 @@ Semantic-release avgör versionen utifrån incheckningshistoriken. Docker-taggen
 
 ## Analys {#analytics}
 
-SnapOtter innehåller anonym produktanalys (användningsmönster för verktyg, felrapporter) som hjälper till att hitta buggar och förbättra funktioner. En ny instans frågar sin administratör vid första körningen och skickar ingenting förrän frågan har besvarats. Dina filer, filnamn och personuppgifter ingår aldrig. SnapOtter fungerar normalt med analysen avstängd.
+SnapOtter innehåller anonym produktanalys (användningsmönster för verktyg, felrapporter) som hjälper till att hitta buggar och förbättra funktioner. Den är på som standard, och en administratör kan stänga av den i Inställningar. Dina filer, filnamn och personuppgifter ingår aldrig. SnapOtter fungerar normalt med analysen avstängd.
 
 ### Inaktivera analys {#disabling-analytics}
 

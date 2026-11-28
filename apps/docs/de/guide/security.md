@@ -1,14 +1,14 @@
 ---
 description: "Sicherheitshärtungsleitfaden für SnapOtter. Container-Sicherheit, Netzwerkisolierung, Docker Secrets, Kubernetes-Bereitstellung und Compliance-Artefakte."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 01adadb726fb
+i18n_output_hash: 245997c29397
 i18n_hash_version: 2
 ---
 
 # Sicherheit und Härtung {#security-hardening}
 
-SnapOtter verarbeitet Dateien vollständig auf Ihrer Infrastruktur. Es kann anonyme, inhaltsfreie Produktanalysen und Absturzberichte senden, um das Projekt zu verbessern. Eine neue Instanz fragt jedoch zuerst ihren Administrator und sendet nichts, bis dieser geantwortet hat. Es sendet niemals Ihre Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur bei aktivierten Analysen, und Kontaktfelder sind nur mit ausdrücklicher Kontakteinwilligung enthalten. Ein Administrator kann Analysen und die Feedbackerfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, ohne Neubau. Die Dateiverarbeitung bleibt immer innerhalb Ihres Containers.
+SnapOtter verarbeitet Dateien vollständig auf Ihrer Infrastruktur. Es sendet standardmäßig anonyme, inhaltsfreie Produktanalysen und Absturzberichte, um das Projekt zu verbessern. Es sendet niemals Ihre Dateien, Dateinamen, Dateiinhalte, OCR-Ausgaben, Bildmetadaten oder Dokumenttexte. Optionales Feedback wird nur gesendet, nachdem ein Benutzer es abgeschickt hat, nur bei aktivierten Analysen, und Kontaktfelder sind nur mit ausdrücklicher Kontakteinwilligung enthalten. Ein Administrator kann Analysen und die Feedbackerfassung mit einem Klick unter Einstellungen > System > Datenschutz ausschalten, ohne Neubau. Die Dateiverarbeitung bleibt immer innerhalb Ihres Containers.
 
 Der Container läuft als dedizierter Nicht-root-Benutzer (`snapotter`), bei dem alle Linux-Capabilities bis auf die minimal erforderliche Menge entfernt sind. Die vollständige Richtlinie zur Offenlegung von Schwachstellen und die Sicherheitsarchitektur finden Sie in [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) auf GitHub.
 

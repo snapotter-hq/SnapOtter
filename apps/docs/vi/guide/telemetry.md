@@ -1,22 +1,16 @@
 ---
-description: "SnapOtter thu thập những dữ liệu sử dụng ẩn danh nào, khi nào chúng được gửi, lựa chọn ở lần chạy đầu tiên hoạt động ra sao và cách tắt phân tích sản phẩm trên toàn bộ phiên bản."
-i18n_source_hash: f3cfb0b3f961
+description: "SnapOtter thu thập những dữ liệu sử dụng ẩn danh nào, khi nào chúng được gửi, việc tính năng này được bật theo mặc định và cách quản trị viên tắt phân tích sản phẩm trên toàn bộ phiên bản."
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: ba57413a0a70
+i18n_output_hash: da01883c529a
 i18n_hash_version: 2
 ---
 
 # SnapOtter thu thập những gì {#what-snapotter-collects}
 
-Anonymous Product Analytics do quản trị viên thiết lập cho toàn bộ phiên bản. Một phiên bản mới sẽ hỏi ở lần chạy đầu tiên và không gửi gì cho đến khi có người trả lời. Bạn có thể thay đổi bất cứ lúc nào tại Settings > System > Privacy.
+Anonymous Product Analytics được bật theo mặc định trên mọi phiên bản, không có lời nhắc ở lần chạy đầu tiên. Quản trị viên có thể tắt nó cho toàn bộ phiên bản tại Settings > System > Privacy, và việc đó dừng mọi lưu lượng analytics tới PostHog và Sentry.
 
 Khi phân tích được bật, SnapOtter gửi cho PostHog biết công cụ và pipeline nào được chạy, mất bao lâu, có thành công hay không, mã lỗi và số lượng tệp, cùng với ID ẩn danh của phiên bản, phiên bản phần mềm, kiến trúc CPU, hệ điều hành, loại cài đặt và việc có GPU hay không. Báo cáo sự cố được gửi đến Sentry sau khi đã loại bỏ tên tệp, đường dẫn, email và các giá trị trong dấu ngoặc kép. SnapOtter không bao giờ gửi tệp của bạn, tên hay đường dẫn của chúng, nội dung của chúng, kết quả OCR hoặc văn bản đã trích xuất, siêu dữ liệu ảnh, hay danh tính tài khoản của bạn. PostHog và Sentry là hai nơi duy nhất nó gửi dữ liệu đến, và khi phân tích tắt thì không gửi gì đến cả hai.
-
-## Lựa chọn ở lần chạy đầu tiên {#first-run-choice}
-
-Lần đầu tiên quản trị viên mở một phiên bản mới, SnapOtter hỏi: "Gửi thống kê sử dụng ẩn danh và báo cáo sự cố? Tệp của bạn không bao giờ được gửi đi." Hai câu trả lời có trọng số ngang nhau và không câu nào được chọn sẵn. Đóng hộp thoại mà không trả lời sẽ giữ phân tích ở trạng thái tắt và câu hỏi sẽ hiện lại ở lần truy cập tiếp theo. Chỉ quản trị viên mới thấy câu hỏi này. Với `AUTH_ENABLED=false`, không có tài khoản nào và người dùng cục bộ đóng vai trò quản trị viên, nên ai mở ứng dụng thì người đó trả lời. Ứng dụng máy tính hỏi theo cách tương tự.
-
-Phiên bản đã chạy từ trước khi có câu hỏi này sẽ không bị hỏi. Nó giữ nguyên thiết lập phân tích đã có: bật, trừ khi quản trị viên hoặc `SNAPOTTER_ANALYTICS_DEFAULT=off` đã tắt.
 
 ## Các sự kiện chúng tôi gửi (khi được bật) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Khi phân tích đang bật, máy chủ hỏi PostHog vài giờ một lần xem
 
 ## Tắt tính năng này {#turning-it-off}
 
-Quản trị viên: Settings > System > Privacy, tắt "Anonymous Product Analytics". Việc gửi dừng ngay lập tức, trên toàn bộ phiên bản. Để tạo một image không bao giờ gửi dữ liệu, hãy đặt build arg `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` trong môi trường của máy chủ có tác dụng tương tự khi chạy và được ưu tiên hơn mọi câu trả lời đã lưu trong ứng dụng.
+Quản trị viên: Settings > System > Privacy, tắt "Anonymous Product Analytics". Việc gửi dừng ngay lập tức, trên toàn bộ phiên bản, và không còn gì được gửi tới PostHog hay Sentry. Để tạo một image không bao giờ gửi dữ liệu, hãy đặt build arg `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` trong môi trường của máy chủ có tác dụng tương tự khi chạy mà không cần build lại.
 
-Để trả lời trước câu hỏi ở lần chạy đầu tiên, hãy thêm `SNAPOTTER_ANALYTICS_DEFAULT=off` (hoặc `on`) vào môi trường của máy chủ trước lần khởi động đầu tiên, và sẽ không ai bị hỏi. Với Docker Compose, hãy đặt nó trong `environment:` của dịch vụ ứng dụng, vì chỉ đặt trong `.env` thì giá trị không đến được container.
+Để một phiên bản mới khởi động với analytics đã tắt sẵn, hãy thêm `SNAPOTTER_ANALYTICS_DEFAULT=off` vào môi trường của máy chủ trước lần khởi động đầu tiên. Với Docker Compose, hãy đặt nó trong `environment:` của dịch vụ ứng dụng, vì chỉ đặt trong `.env` thì giá trị không đến được container.

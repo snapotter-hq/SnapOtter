@@ -28,7 +28,6 @@ interface AnalyticsConfig {
   sentryDsnWeb: string;
   posthogSampleRate: number;
   instanceId: string;
-  consentPending?: boolean;
 }
 
 async function readConfig(page: Page): Promise<AnalyticsConfig> {
@@ -96,8 +95,6 @@ test.describe("Analytics opt-out toggle", () => {
       sentryDsnWeb: "",
       posthogSampleRate: 0,
       instanceId: "",
-      // An admin answered, so the first-run prompt is not pending (#4910).
-      consentPending: false,
     });
 
     // Reopening Settings shows the toggle OFF (gate -> UI round-trip).

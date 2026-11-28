@@ -1,22 +1,16 @@
 ---
-description: "SnapOtter 收集哪些匿名使用資料、何時傳送、首次執行時的選擇如何運作,以及如何關閉整個執行個體的產品分析。"
-i18n_source_hash: f3cfb0b3f961
+description: "SnapOtter 收集哪些匿名使用資料、何時傳送、預設為開啟，以及管理員如何關閉整個執行個體的產品分析。"
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 41449e31687d
+i18n_output_hash: 92058a888c28
 i18n_hash_version: 2
 ---
 
 # SnapOtter 收集的內容 {#what-snapotter-collects}
 
-Anonymous Product Analytics 由管理員為整個執行個體設定。新的執行個體會在首次執行時詢問,在有人回答之前不會傳送任何內容。您可以隨時在 Settings > System > Privacy 中變更。
+Anonymous Product Analytics 在每個執行個體上預設開啟，首次執行時不會跳出提示。管理員可以在 Settings > System > Privacy 中為整個執行個體關閉它，關閉後會停止傳往 PostHog 與 Sentry 的所有分析流量。
 
 開啟分析後,SnapOtter 會向 PostHog 傳送執行了哪些工具與管線、耗時多久、是否成功、錯誤代碼與檔案數量,以及執行個體的匿名 ID、版本、CPU 架構、作業系統、安裝類型和是否有 GPU。當機報告會傳送到 Sentry,其中的檔案名稱、路徑、電子郵件與引號內的值都已被移除。它絕不會傳送您的檔案、檔案名稱或路徑、檔案內容、OCR 輸出或擷取的文字、影像中繼資料,也不會傳送您的帳號身分。它只會向 PostHog 和 Sentry 這兩個地方傳送資料,關閉分析後則不會向任何一方傳送任何內容。
-
-## 首次執行時的選擇 {#first-run-choice}
-
-管理員第一次開啟新的執行個體時,SnapOtter 會詢問:「要傳送匿名使用統計和當機報告嗎? 您的檔案永遠不會被傳送。」兩個答案的份量相同,且都沒有預先選取。不回答就關閉提示會讓分析維持關閉,並在下次造訪時再次詢問。只有管理員會看到它。在 `AUTH_ENABLED=false` 下沒有帳號,本機使用者即為管理員,因此誰開啟應用程式誰來回答。桌面應用程式的詢問方式相同。
-
-在此提示出現之前就已執行的執行個體不會被詢問。它會保留原有的分析設定:除非管理員或 `SNAPOTTER_ANALYTICS_DEFAULT=off` 將其關閉,否則維持開啟。
 
 ## 我們傳送的事件(啟用時) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Anonymous Product Analytics 由管理員為整個執行個體設定。新的執�
 
 ## 關閉方法 {#turning-it-off}
 
-管理員:在 Settings > System > Privacy 中將 "Anonymous Product Analytics" 關閉。它會立即停止,對整個執行個體生效。若要建置一個永遠不會傳送資料的映像檔,請設定 `SNAPOTTER_ANALYTICS=off` 建置參數。在伺服器環境中設定 `SNAPOTTER_TELEMETRY=off` 可在執行階段達到同樣效果,並且優先於應用程式中儲存的任何回答。
+管理員:在 Settings > System > Privacy 中將 "Anonymous Product Analytics" 關閉。它會立即停止，對整個執行個體生效，之後不會再向 PostHog 或 Sentry 傳送任何內容。若要建置一個永遠不會傳送資料的映像檔，請設定 `SNAPOTTER_ANALYTICS=off` 建置參數。在伺服器環境中設定 `SNAPOTTER_TELEMETRY=off` 可在執行階段達到同樣效果，無須重新建置。
 
-若要事先回答首次執行的問題,請在伺服器第一次啟動之前,將 `SNAPOTTER_ANALYTICS_DEFAULT=off`(或 `on`)加入伺服器環境中,這樣就不會詢問任何人。使用 Docker Compose 時,請把它放在應用程式服務的 `environment:` 下,因為只在 `.env` 中設定不會傳到容器裡。
+若要讓新的執行個體一開始就關閉分析，請在伺服器第一次啟動之前，將 `SNAPOTTER_ANALYTICS_DEFAULT=off` 加入伺服器環境中。使用 Docker Compose 時，請把它放在應用程式服務的 `environment:` 下，因為只在 `.env` 中設定不會傳到容器裡。

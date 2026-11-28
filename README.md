@@ -45,7 +45,7 @@ For the production Compose stack, NVIDIA GPU acceleration, and configuration, se
 - **REST API:** Every tool available via API with API key auth. Interactive docs at `/api/docs`
 - **Self-hosted:** one `docker run` for a single-container quick start (embedded Postgres 17 + Redis 8), or the same Postgres 17 + Redis 8 as a Compose stack for production. No external SaaS dependencies
 - **Multi-arch:** Runs on AMD64 and ARM64 (Intel, Apple Silicon, Raspberry Pi)
-- **Privacy first:** Your files never leave your network. A new instance asks its admin on first run before sending any anonymous usage stats or crash reports, and sends nothing until answered. [What is and isn't sent](https://docs.snapotter.com/guide/telemetry), and how to turn it off at build time with `SNAPOTTER_ANALYTICS=off` or later in the app.
+- **Privacy first:** Your files never leave your network. Basic analytics are on by default to help us catch bugs and improve tools. Admins can turn them off in Settings, which stops all analytics traffic, or disable them at build time with `SNAPOTTER_ANALYTICS=off` ([Here's how to do it](https://docs.snapotter.com/guide/deployment.html#analytics))
 
 ## Deployment
 

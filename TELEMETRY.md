@@ -2,7 +2,7 @@
 
 Contributor reference for every analytics event SnapOtter can emit, what each carries, and where it fires. For the user-facing summary and opt-out steps, see the published [telemetry guide](apps/docs/guide/telemetry.md). For the privacy stance, see the in-app privacy policy.
 
-Product analytics is set instance-wide by an admin under Settings > System > Privacy. A new instance asks on first run and sends nothing until answered; an instance upgraded from a release before that prompt keeps the setting it had (#4910). Nothing is sent when it is off.
+Product analytics is on by default for every instance, with no first-run prompt. An admin can turn it off instance-wide under Settings > System > Privacy, and nothing is sent to PostHog or Sentry while it is off.
 
 ## Source of truth
 

@@ -24,18 +24,6 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
 
 let testApp: TestApp;
 
-// A fresh test database has no analyticsEnabled answer, which the gate reads
-// as undecided and sends nothing (#4910). Tests that need analytics on store
-// the admin's yes; afterEach deletes it again.
-async function enableAnalytics(): Promise<void> {
-  process.env.ANALYTICS_BAKED_OVERRIDE = "on";
-  await db
-    .insert(schema.settings)
-    .values({ key: "analyticsEnabled", value: "true" })
-    .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
-  await refreshAnalyticsGate();
-}
-
 beforeAll(async () => {
   testApp = await buildTestApp();
 });
@@ -103,7 +91,8 @@ describe("POST /api/v1/feedback", () => {
     // A Sentry-only bake: telemetry is on, but there is no PostHog client, and
     // feedback lives only in PostHog events. Answering accepted would show the
     // thank-you for feedback that was dropped.
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     sink.present = false;
     const token = await loginAsAdmin(testApp.app);
 
@@ -120,7 +109,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("accepts explicit feedback with survey, prompt, friction, and safe error fields", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({
@@ -172,7 +162,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("accepts an onboarding usage-survey submission with the telemetry-blind answers", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({
@@ -207,7 +198,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("accepts a persona-only onboarding submission with only the usage type", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({
@@ -256,7 +248,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("drops identifying contact fields when contact consent is not checked", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({
@@ -348,7 +341,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("accepts a search_miss tool request and forwards the search query", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({
@@ -381,7 +375,8 @@ describe("POST /api/v1/feedback", () => {
   });
 
   it("accepts a bare search_miss query with no message or rating", async () => {
-    await enableAnalytics();
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+    await refreshAnalyticsGate();
     const token = await loginAsAdmin(testApp.app);
 
     const res = await testApp.app.inject({

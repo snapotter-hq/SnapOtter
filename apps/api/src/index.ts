@@ -57,7 +57,7 @@ import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { rateLimitMax } from "./lib/rate-limit-max.js";
 import { redactUrl } from "./lib/redact-url.js";
 import { requestsInFlight, trackRequestsInFlight } from "./lib/requests-in-flight.js";
-import { classifyAnalyticsConsentOrigin, ensureDefaultSettings } from "./lib/settings-helpers.js";
+import { ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
 import { parseTrustProxy } from "./lib/trust-proxy.js";
@@ -228,22 +228,6 @@ try {
     DATA_DIR: env.DATA_DIR,
     FILES_STORAGE_PATH: env.FILES_STORAGE_PATH,
   });
-}
-
-// Decide, once, whether this database held an instance before the first-run
-// analytics consent prompt existed (#4910). It has to run after the 1.x import
-// (imported data counts as an upgrade) and before any other boot write, so the
-// rows it looks at can only have come from an earlier release. It must stay
-// fatal: carrying on without the marker would let this boot seed users and
-// settings, and the next boot would then read a fresh install as an upgrade.
-try {
-  await classifyAnalyticsConsentOrigin();
-} catch (err) {
-  console.error(
-    "FATAL: Could not record whether this is a new install, which decides whether analytics needs the admin's consent. Check the database connection.",
-  );
-  console.error(err);
-  process.exit(1);
 }
 
 // Seed built-in roles (admin, editor, user) that legacy SQLite migrations

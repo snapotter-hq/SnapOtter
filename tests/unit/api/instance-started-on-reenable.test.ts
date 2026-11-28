@@ -1,17 +1,18 @@
 /**
- * A fresh install drops the boot-time instance_started because nobody has
- * answered the analytics prompt yet (#4910). The write that answers it is the
- * first moment the instance can be counted, so both settings write paths send
- * the census there, once (#5014).
+ * The boot-time instance_started is dropped while an admin has analytics off.
+ * Turning it back on is the first moment the instance can be counted again, so
+ * both settings write paths send the census there, once (#5382).
  */
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const gate = {
-  pending: false,
+  // The cached gate before the write, and what a refresh after the write reads.
+  enabled: true,
+  afterRefresh: true,
   events: [] as string[],
-  analyticsConsentPending: vi.fn(),
+  analyticsEnabled: vi.fn(),
   refreshAnalyticsGate: vi.fn(),
   publishAnalyticsGateInvalidation: vi.fn(),
 };
@@ -19,13 +20,16 @@ const trackInstanceStarted = vi.fn();
 
 function mockCommon(): void {
   vi.resetModules();
-  gate.pending = false;
+  gate.enabled = true;
+  gate.afterRefresh = true;
   gate.events = [];
-  gate.analyticsConsentPending.mockReset().mockImplementation(() => {
-    gate.events.push("pending-read");
-    return gate.pending;
+  gate.analyticsEnabled.mockReset().mockImplementation(() => {
+    gate.events.push("enabled-read");
+    return gate.enabled;
   });
-  gate.refreshAnalyticsGate.mockReset().mockResolvedValue(undefined);
+  gate.refreshAnalyticsGate.mockReset().mockImplementation(async () => {
+    gate.enabled = gate.afterRefresh;
+  });
   gate.publishAnalyticsGateInvalidation.mockReset().mockResolvedValue(undefined);
   trackInstanceStarted.mockReset().mockResolvedValue(undefined);
 
@@ -47,7 +51,7 @@ function mockCommon(): void {
     },
   }));
   vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
-    analyticsConsentPending: gate.analyticsConsentPending,
+    analyticsEnabled: gate.analyticsEnabled,
     refreshAnalyticsGate: gate.refreshAnalyticsGate,
     publishAnalyticsGateInvalidation: gate.publishAnalyticsGateInvalidation,
   }));
@@ -88,7 +92,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)", () => {
+describe("PUT /api/v1/settings sends instance_started when analytics goes back on (#5382)", () => {
   async function buildApp() {
     mockCommon();
     vi.doMock("../../../apps/api/src/permissions.js", () => ({
@@ -107,14 +111,14 @@ describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)",
     return app.inject({ method: "PUT", url: "/api/v1/settings", payload });
   }
 
-  it("sends it once, reading the pending state before the write", async () => {
+  it("sends it once, reading the gate before the write", async () => {
     const app = await buildApp();
     try {
-      gate.pending = true;
+      gate.enabled = false;
       const res = await put(app, { analyticsEnabled: "true" });
       expect(res.statusCode).toBe(200);
       expect(trackInstanceStarted).toHaveBeenCalledTimes(1);
-      expect(gate.events.indexOf("pending-read")).toBeLessThan(gate.events.indexOf("tx.begin"));
+      expect(gate.events.indexOf("enabled-read")).toBeLessThan(gate.events.indexOf("tx.begin"));
       expect(gate.refreshAnalyticsGate.mock.invocationCallOrder[0]).toBeLessThan(
         trackInstanceStarted.mock.invocationCallOrder[0],
       );
@@ -123,11 +127,24 @@ describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)",
     }
   });
 
-  it("does not send it when the prompt was already answered", async () => {
+  it("does not send it when analytics was already on", async () => {
     const app = await buildApp();
     try {
-      gate.pending = false;
+      gate.enabled = true;
       const res = await put(app, { analyticsEnabled: "true" });
+      expect(res.statusCode).toBe(200);
+      expect(trackInstanceStarted).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not send it when the save leaves analytics off", async () => {
+    const app = await buildApp();
+    try {
+      gate.enabled = false;
+      gate.afterRefresh = false;
+      const res = await put(app, { analyticsEnabled: "false" });
       expect(res.statusCode).toBe(200);
       expect(trackInstanceStarted).not.toHaveBeenCalled();
     } finally {
@@ -138,10 +155,10 @@ describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)",
   it("does not consult the gate for a save that doesn't touch analyticsEnabled", async () => {
     const app = await buildApp();
     try {
-      gate.pending = true;
+      gate.enabled = false;
       const res = await put(app, { defaultTheme: "dark" });
       expect(res.statusCode).toBe(200);
-      expect(gate.analyticsConsentPending).not.toHaveBeenCalled();
+      expect(gate.analyticsEnabled).not.toHaveBeenCalled();
       expect(trackInstanceStarted).not.toHaveBeenCalled();
     } finally {
       await app.close();
@@ -151,7 +168,7 @@ describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)",
   it("still sends it when the cross-replica invalidation fails", async () => {
     const app = await buildApp();
     try {
-      gate.pending = true;
+      gate.enabled = false;
       gate.publishAnalyticsGateInvalidation.mockRejectedValueOnce(new Error("redis down"));
       const res = await put(app, { analyticsEnabled: "true" });
       expect(res.statusCode).toBe(200);
@@ -162,7 +179,7 @@ describe("PUT /api/v1/settings sends instance_started on the first yes (#5014)",
   });
 });
 
-describe("POST /api/v1/enterprise/config/import sends instance_started on the first yes (#5014)", () => {
+describe("POST /api/v1/enterprise/config/import sends instance_started when analytics goes back on (#5382)", () => {
   async function buildApp() {
     mockCommon();
     vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
@@ -192,26 +209,26 @@ describe("POST /api/v1/enterprise/config/import sends instance_started on the fi
     });
   }
 
-  it("sends it once, reading the pending state before the write", async () => {
+  it("sends it once, reading the gate before the write", async () => {
     const app = await buildApp();
     try {
-      gate.pending = true;
+      gate.enabled = false;
       const res = await importSettings(app, { analyticsEnabled: "true" });
       expect(res.statusCode).toBe(200);
       expect(trackInstanceStarted).toHaveBeenCalledTimes(1);
-      expect(gate.events.indexOf("pending-read")).toBeLessThan(gate.events.indexOf("tx.begin"));
+      expect(gate.events.indexOf("enabled-read")).toBeLessThan(gate.events.indexOf("tx.begin"));
     } finally {
       await app.close();
     }
   });
 
-  it("does not send it on a dry run, an answered prompt, or an unrelated import", async () => {
+  it("does not send it on a dry run, when already on, or on an unrelated import", async () => {
     const app = await buildApp();
     try {
-      gate.pending = true;
+      gate.enabled = false;
       expect((await importSettings(app, { analyticsEnabled: "true" }, true)).statusCode).toBe(200);
       expect((await importSettings(app, { defaultTheme: "dark" })).statusCode).toBe(200);
-      gate.pending = false;
+      gate.enabled = true;
       expect((await importSettings(app, { analyticsEnabled: "true" })).statusCode).toBe(200);
       expect(trackInstanceStarted).not.toHaveBeenCalled();
     } finally {

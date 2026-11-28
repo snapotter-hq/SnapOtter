@@ -1,22 +1,16 @@
 ---
-description: "Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées, comment fonctionne le choix du premier lancement et comment désactiver les analyses produit de toute l'instance."
-i18n_source_hash: f3cfb0b3f961
+description: "Quelles données d'utilisation anonymes SnapOtter collecte, quand elles sont envoyées, qu'elles sont activées par défaut et comment un administrateur désactive les analyses produit de toute l'instance."
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 29ce9ef10c09
+i18n_output_hash: 7758bf26ffe4
 i18n_hash_version: 2
 ---
 
 # Ce que SnapOtter collecte {#what-snapotter-collects}
 
-Anonymous Product Analytics est défini pour toute l'instance par un administrateur. Une nouvelle instance pose la question au premier lancement et n'envoie rien tant que personne n'a répondu. Vous pouvez le modifier à tout moment dans Settings > System > Privacy.
+Anonymous Product Analytics est activé par défaut sur chaque instance, sans question au premier lancement. Un administrateur peut le désactiver pour toute l'instance dans Settings > System > Privacy, ce qui arrête tout le trafic d'analyse vers PostHog et Sentry.
 
 Lorsque les analyses sont activées, SnapOtter envoie à PostHog les outils et pipelines exécutés, leur durée, leur réussite ou leur échec, les codes d'erreur et le nombre de fichiers, ainsi que l'identifiant anonyme de l'instance, sa version, l'architecture du processeur, le système d'exploitation, le type d'installation et la présence ou non d'un GPU. Les rapports de plantage sont envoyés à Sentry sans les noms de fichiers, les chemins, les adresses e-mail ni les valeurs entre guillemets. Il n'envoie jamais vos fichiers, leurs noms ou chemins, leur contenu, les résultats d'OCR ou le texte extrait, les métadonnées d'image, ni l'identité de votre compte. PostHog et Sentry sont les deux seuls destinataires, et lorsque les analyses sont désactivées, rien n'est envoyé ni à l'un ni à l'autre.
-
-## Choix du premier lancement {#first-run-choice}
-
-La première fois qu'un administrateur ouvre une nouvelle instance, SnapOtter demande : "Envoyer des statistiques d'utilisation anonymes et des rapports de plantage ? Vos fichiers ne sont jamais envoyés." Les deux réponses ont le même poids et aucune n'est présélectionnée. Fermer la fenêtre sans répondre laisse les analyses désactivées et la question est reposée à la visite suivante. Seul un administrateur la voit. Avec `AUTH_ENABLED=false`, il n'y a pas de comptes et l'utilisateur local fait office d'administrateur, donc la personne qui ouvre l'application y répond. L'application de bureau pose la question de la même manière.
-
-Une instance déjà en service avant l'arrivée de cette question n'est pas interrogée. Elle conserve son réglage d'analyses : activées, sauf si un administrateur ou `SNAPOTTER_ANALYTICS_DEFAULT=off` les a désactivées.
 
 ## Événements que nous envoyons (lorsque c'est activé) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Tant que les analyses sont activées, le serveur demande à PostHog toutes les q
 
 ## Le désactiver {#turning-it-off}
 
-Administrateurs : Settings > System > Privacy, désactivez "Anonymous Product Analytics". L'envoi s'arrête immédiatement, pour toute l'instance. Pour construire une image qui ne peut jamais rien émettre, définissez l'argument de build `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` dans l'environnement du serveur produit le même effet à l'exécution et l'emporte sur toute réponse enregistrée dans l'application.
+Administrateurs : Settings > System > Privacy, désactivez "Anonymous Product Analytics". L'envoi s'arrête immédiatement, pour toute l'instance, et plus rien n'est envoyé à PostHog ni à Sentry. Pour construire une image qui ne peut jamais rien émettre, définissez l'argument de build `SNAPOTTER_ANALYTICS=off`. `SNAPOTTER_TELEMETRY=off` dans l'environnement du serveur produit le même effet à l'exécution, sans reconstruction.
 
-Pour répondre d'avance à la question du premier lancement, ajoutez `SNAPOTTER_ANALYTICS_DEFAULT=off` (ou `on`) à l'environnement du serveur avant son premier démarrage, et personne n'est interrogé. Avec Docker Compose, placez-le sous `environment:` du service de l'application, car le définir uniquement dans `.env` n'atteint pas le conteneur.
+Pour démarrer une nouvelle instance avec les analyses déjà désactivées, ajoutez `SNAPOTTER_ANALYTICS_DEFAULT=off` à l'environnement du serveur avant son premier démarrage. Avec Docker Compose, placez-le sous `environment:` du service de l'application, car le définir uniquement dans `.env` n'atteint pas le conteneur.

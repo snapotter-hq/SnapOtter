@@ -178,13 +178,6 @@ export const tr: TranslationKeys = {
     discoverySourceLabel: "Bizi nereden duydunuz?",
     optionalHint: "(isteğe bağlı)",
     continueLabel: "Devam et",
-    analyticsConsentTitle: "Anonim kullanım istatistikleri ve çökme raporları gönderilsin mi?",
-    analyticsConsentBody:
-      "Dosyalarınız asla gönderilmez. Bunu daha sonra Ayarlar'dan değiştirebilirsiniz.",
-    analyticsConsentLearnMore: "Neyin gönderildiğini görün",
-    analyticsConsentYes: "Gönder",
-    analyticsConsentNo: "Gönderme",
-    analyticsConsentSaveFailed: "Seçiminiz kaydedilemedi. Lütfen tekrar deneyin.",
   },
   categories: {
     essentials: "Temel Araçlar",
@@ -5332,7 +5325,7 @@ export const tr: TranslationKeys = {
     privacy: {
       title: "Gizlilik",
       description:
-        "Anonim Ürün Analitiği, SnapOtter'ı geliştirmeye yardımcı olur. Tüm örnek için bir yönetici tarafından ayarlanır.",
+        "Anonim Ürün Analitiği, SnapOtter'ı geliştirmeye yardımcı olur. Varsayılan olarak açıktır ve tüm örnek için bir yönetici tarafından ayarlanır.",
       analyticsLabel: "Anonim Ürün Analitiği",
       analyticsDescription:
         "Anonim kullanım verilerini (hangi araçların çalıştığı, süreler, hata kodları) ve çökme raporlarını paylaşın. IP adresi yok, hesap kimliği yok. Dosya adlarınızı, dosya içeriklerinizi, OCR çıktısını, görüntü meta verilerini veya belge metnini asla toplamayız. Hepsini durdurmak için bunu kapatın.",

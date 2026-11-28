@@ -1,14 +1,14 @@
 ---
 description: "Säkerhetshärdningsguide för SnapOtter. Containersäkerhet, nätverksisolering, Docker-hemligheter, Kubernetes-driftsättning och efterlevnadsartefakter."
-i18n_source_hash: bc7bf9ded9eb
+i18n_source_hash: 0336cde90b42
 i18n_provenance: machine
-i18n_output_hash: 5b9aee8851e4
+i18n_output_hash: c965b9db42b7
 i18n_hash_version: 2
 ---
 
 # Säkerhet och härdning {#security-hardening}
 
-SnapOtter bearbetar filer helt på din egen infrastruktur. Det kan skicka anonym, innehållsfri produktanalys och kraschrapporter för att hjälpa till att förbättra projektet, men en ny instans frågar först sin administratör och skickar ingenting förrän den har fått svar. Det skickar aldrig dina filer, filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Valfri feedback skickas först när en användare lämnar in den, bara när analys är aktiverat, och kontaktfält inkluderas bara med uttryckligt samtycke till kontakt. En administratör kan stänga av insamling av analys och feedback med ett klick under Settings > System > Privacy, utan ombyggnad. Filbearbetningen stannar alltid inuti din container.
+SnapOtter bearbetar filer helt på din egen infrastruktur. Det skickar anonym, innehållsfri produktanalys och kraschrapporter som standard för att hjälpa till att förbättra projektet. Det skickar aldrig dina filer, filnamn, filinnehåll, OCR-utdata, bildmetadata eller dokumenttext. Valfri feedback skickas först när en användare lämnar in den, bara när analys är aktiverat, och kontaktfält inkluderas bara med uttryckligt samtycke till kontakt. En administratör kan stänga av insamling av analys och feedback med ett klick under Settings > System > Privacy, utan ombyggnad. Filbearbetningen stannar alltid inuti din container.
 
 Containern körs som en dedikerad icke-root-användare (`snapotter`) där alla Linux-capabilities är borttagna utom den nödvändiga minimimängden. För den fullständiga policyn för sårbarhetsrapportering och säkerhetsarkitekturen, se [SECURITY.md](https://github.com/snapotter-hq/SnapOtter/blob/main/SECURITY.md) på GitHub.
 

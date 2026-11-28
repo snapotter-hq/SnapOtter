@@ -1,8 +1,8 @@
 ---
 description: "Triển khai SnapOtter lên môi trường production bằng Docker. Yêu cầu phần cứng, thiết lập GPU và cấu hình reverse proxy cho Nginx, Traefik và Cloudflare."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: 7f2fc85b6daa
+i18n_output_hash: 1218523dc0e8
 i18n_hash_version: 2
 ---
 
@@ -732,7 +732,7 @@ Semantic-release xác định phiên bản từ lịch sử commit. Tag Docker `
 
 ## Phân tích ẩn danh {#analytics}
 
-SnapOtter có phân tích sản phẩm ẩn danh (mẫu sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Một instance mới sẽ hỏi quản trị viên ở lần chạy đầu tiên và không gửi gì cho đến khi được trả lời. Tệp, tên tệp và dữ liệu cá nhân của bạn không bao giờ là một phần của nó. SnapOtter vẫn hoạt động bình thường khi tắt phân tích.
+SnapOtter có phân tích sản phẩm ẩn danh (mẫu sử dụng công cụ, báo cáo lỗi) để giúp bắt lỗi và cải thiện tính năng. Tính năng này được bật theo mặc định, và quản trị viên có thể tắt nó trong Settings. Tệp, tên tệp và dữ liệu cá nhân của bạn không bao giờ là một phần của nó. SnapOtter vẫn hoạt động bình thường khi tắt phân tích.
 
 ### Tắt phân tích {#disabling-analytics}
 

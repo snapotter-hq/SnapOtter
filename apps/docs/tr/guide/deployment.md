@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter'ı Docker ile üretime dağıtın. Donanım gereksinimleri, GPU kurulumu ve Nginx, Traefik ile Cloudflare için ters proxy yapılandırmaları."
-i18n_source_hash: 5c1e739cb3eb
+i18n_source_hash: 6191a6b1687f
 i18n_provenance: machine
-i18n_output_hash: c938395e2b6c
+i18n_output_hash: 76e5786e7347
 i18n_hash_version: 2
 ---
 
@@ -714,7 +714,7 @@ Semantic-release sürümü commit geçmişinden belirler. `latest` Docker etiket
 
 ## Analitik {#analytics}
 
-SnapOtter, hataları yakalamaya ve özellikleri geliştirmeye yardımcı olmak için anonim ürün analitiği (araç kullanım örüntüleri, hata raporları) içerir. Yeni bir örnek ilk çalıştırmada yöneticisine sorar ve yanıtlanana kadar hiçbir şey göndermez. Dosyalarınız, dosya adlarınız ve kişisel verileriniz hiçbir zaman buna dahil değildir. SnapOtter analitik devre dışıyken normal çalışır.
+SnapOtter, hataları yakalamaya ve özellikleri geliştirmeye yardımcı olmak için anonim ürün analitiği (araç kullanım örüntüleri, hata raporları) içerir. Varsayılan olarak açıktır ve bir yönetici bunu Ayarlar'dan kapatabilir. Dosyalarınız, dosya adlarınız ve kişisel verileriniz hiçbir zaman buna dahil değildir. SnapOtter analitik devre dışıyken normal çalışır.
 
 ### Analitiği devre dışı bırakma {#disabling-analytics}
 

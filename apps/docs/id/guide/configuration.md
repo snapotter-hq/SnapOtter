@@ -1,8 +1,8 @@
 ---
 description: "Semua environment variable SnapOtter beserta nilai defaultnya. Atur auth, storage, model AI, analytics, dan lainnya."
-i18n_source_hash: 8ff4e8d32091
+i18n_source_hash: 3523a064e1a6
 i18n_provenance: machine
-i18n_output_hash: 3aec95c9e59f
+i18n_output_hash: 9b8414a607af
 i18n_hash_version: 2
 ---
 
@@ -24,7 +24,7 @@ Semua konfigurasi dilakukan melalui environment variable. Setiap variabel punya 
 | `CORS_ORIGIN` | (kosong) | Origin yang diizinkan untuk CORS, dipisahkan koma, atau kosong untuk same-origin saja. |
 | `LOG_LEVEL` | `info` | Tingkat detail log. Salah satu dari: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |
 | `TRUST_PROXY` | `loopback,linklocal,uniquelocal` | Peer mana yang boleh mengatur IP klien lewat `X-Forwarded-For`. Defaultnya hanya memercayai peer jaringan privat, sehingga reverse proxy di jaringan Docker atau LAN dipercaya dan header palsu dari klien publik tidak. Atur `true` hanya jika proxy yang Anda kendalikan berada di depan pada alamat publik. |
-| `SNAPOTTER_ANALYTICS_DEFAULT` | (tidak diatur) | Menjawab pertanyaan analytics saat pertama kali dijalankan sebelumnya, sehingga tidak ada yang ditanya. Jika tidak diatur, instance baru bertanya kepada admin-nya dan tidak mengirim apa pun sampai dijawab. `off` memulainya dengan "Anonymous Product Analytics" dalam keadaan nonaktif; `on` memulainya dalam keadaan aktif. Variabel ini hanya mengisi setting tersebut selama belum ada yang memilih nilainya. Setelah setting disimpan, oleh admin atau oleh variabel ini, mengubah variabel tidak berpengaruh apa pun; admin tetap dapat mengubahnya di Settings > System > Privacy. |
+| `SNAPOTTER_ANALYTICS_DEFAULT` | `on` | Setel `off` untuk memulai instance baru dengan "Anonymous Product Analytics" dinonaktifkan, sehingga tidak mengirim apa pun sejak boot pertamanya. Variabel ini hanya mengisi setting tersebut selama belum ada yang memilih nilainya. Setelah setting disimpan, oleh admin atau oleh variabel ini, mengubah variabel tidak berpengaruh apa pun; admin tetap dapat mengaktifkan analytics di Settings > System > Privacy. |
 
 ### Authentication {#authentication}
 
@@ -91,7 +91,7 @@ Jalankan image tanpa `DATABASE_URL` dan tanpa `REDIS_URL` dan ia memulai Postgre
 
 Upgrade dari 1.x: letakkan `snapotter.db` lama Anda di `/data/snapotter.db` dalam volume dan embedded mode mengimpornya ke PostgreSQL tertanam saat first boot. Impor berjalan sekali; boot berikutnya melewatinya.
 
-Catatan telemetri: embedded mode mewarisi default analytics dari image seperti konfigurasi lainnya. Image yang dipublikasikan dapat mengirim analytics, tetapi instance baru bertanya kepada admin-nya terlebih dahulu dan tidak mengirim apa pun sampai dijawab. Untuk menonaktifkannya, jawab tidak, bangun dengan `--build-arg SNAPOTTER_ANALYTICS=off`, atur `SNAPOTTER_ANALYTICS_DEFAULT=off` sebelum boot pertama, atau gunakan opt-out admin di dalam aplikasi.
+Catatan telemetri: embedded mode mewarisi default analytics dari image seperti konfigurasi lainnya. Image yang dipublikasikan dikirim dengan analytics aktif; untuk menonaktifkannya, bangun dengan `--build-arg SNAPOTTER_ANALYTICS=off`, atur `SNAPOTTER_ANALYTICS_DEFAULT=off` sebelum boot pertama, atau gunakan opt-out admin di dalam aplikasi.
 
 ### Processing limits {#processing-limits}
 

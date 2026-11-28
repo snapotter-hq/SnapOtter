@@ -1,22 +1,16 @@
 ---
-description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, bunların ne zaman gönderildiği, ilk çalıştırma seçiminin nasıl işlediği ve örnek genelindeki ürün analizinin nasıl kapatılacağı."
-i18n_source_hash: f3cfb0b3f961
+description: "SnapOtter'ın hangi anonim kullanım verilerini topladığı, bunların ne zaman gönderildiği, varsayılan olarak açık olduğu ve bir yöneticinin örnek genelindeki ürün analizini nasıl kapatacağı."
+i18n_source_hash: 22d89115c8e5
 i18n_provenance: machine
-i18n_output_hash: 66c302d1d3ab
+i18n_output_hash: b123e0253291
 i18n_hash_version: 2
 ---
 
 # SnapOtter neler toplar {#what-snapotter-collects}
 
-Anonymous Product Analytics, tüm örnek için bir yönetici tarafından ayarlanır. Yeni bir örnek ilk çalıştırmada bunu sorar ve biri yanıtlayana kadar hiçbir şey göndermez. İstediğiniz zaman Settings > System > Privacy altından değiştirebilirsiniz.
+Anonymous Product Analytics, her örnekte varsayılan olarak açıktır ve ilk çalıştırmada herhangi bir istem gösterilmez. Bir yönetici bunu Settings > System > Privacy altından tüm örnek için kapatabilir ve bu, PostHog ve Sentry'ye giden tüm analiz trafiğini durdurur.
 
 Analiz açıkken SnapOtter, PostHog'a hangi araçların ve pipeline'ların çalıştığını, ne kadar sürdüklerini, başarılı olup olmadıklarını, hata kodlarını ve dosya sayılarını; ayrıca örneğin anonim kimliğini, sürümünü, CPU mimarisini, işletim sistemini, kurulum türünü ve GPU'su olup olmadığını gönderir. Çökme raporları, dosya adları, yollar, e-posta adresleri ve tırnak içindeki değerler çıkarılarak Sentry'ye gider. Dosyalarınızı, adlarını veya yollarını, içeriklerini, OCR çıktısını ya da çıkarılan metni, görüntü meta verilerini veya hesap kimliğinizi asla göndermez. PostHog ve Sentry bir şey gönderdiği tek iki yerdir ve analiz kapalıyken ikisine de hiçbir şey göndermez.
-
-## İlk çalıştırma seçimi {#first-run-choice}
-
-Bir yönetici yeni bir örneği ilk kez açtığında SnapOtter şunu sorar: "Anonim kullanım istatistikleri ve çökme raporları gönderilsin mi? Dosyalarınız asla gönderilmez." İki yanıt eşit ağırlıktadır ve hiçbiri önceden seçili değildir. İstemi yanıtlamadan kapatmak analizi kapalı tutar ve soru bir sonraki ziyarette yeniden sorulur. Yalnızca bir yönetici görür. `AUTH_ENABLED=false` ile hesap yoktur ve yerel kullanıcı yönetici gibi davranır, bu yüzden uygulamayı kim açarsa soruyu o yanıtlar. Masaüstü uygulaması da aynı şekilde sorar.
-
-Bu istem gelmeden önce zaten çalışmakta olan bir örneğe sorulmaz. Sahip olduğu analiz ayarını korur: bir yönetici veya `SNAPOTTER_ANALYTICS_DEFAULT=off` kapatmadıkça açıktır.
 
 ## Gönderdiğimiz olaylar (etkinleştirildiğinde) {#events-we-send-when-enabled}
 
@@ -43,6 +37,6 @@ Analiz açıkken sunucu, birkaç saatte bir PostHog'a hangi SnapOtter sürümün
 
 ## Kapatma {#turning-it-off}
 
-Yöneticiler: Settings > System > Privacy, "Anonymous Product Analytics" seçeneğini kapatın. Bu işlem hemen durur ve tüm örneği kapsar. Hiçbir zaman veri göndermeyecek bir imaj oluşturmak için `SNAPOTTER_ANALYTICS=off` derleme argümanını ayarlayın. Sunucunun ortamındaki `SNAPOTTER_TELEMETRY=off` çalışma zamanında aynı işi yapar ve uygulamada saklanan her yanıtın önüne geçer.
+Yöneticiler: Settings > System > Privacy, "Anonymous Product Analytics" seçeneğini kapatın. Bu işlem hemen durur, tüm örneği kapsar ve PostHog ya da Sentry'ye artık hiçbir şey gönderilmez. Hiçbir zaman veri göndermeyecek bir imaj oluşturmak için `SNAPOTTER_ANALYTICS=off` derleme argümanını ayarlayın. Sunucunun ortamındaki `SNAPOTTER_TELEMETRY=off` çalışma zamanında aynı işi yapar, yeniden derleme gerekmez.
 
-İlk çalıştırma sorusunu önceden yanıtlamak için `SNAPOTTER_ANALYTICS_DEFAULT=off` (veya `on`) değerini sunucunun ortamına ilk açılıştan önce ekleyin, böylece kimseye sorulmaz. Docker Compose ile bunu uygulama servisinin `environment:` bölümüne koyun, çünkü yalnızca `.env` içinde ayarlamak kapsayıcıya ulaşmaz.
+Yeni bir örneği analiz zaten kapalı olarak başlatmak için `SNAPOTTER_ANALYTICS_DEFAULT=off` değerini sunucunun ortamına ilk açılıştan önce ekleyin. Docker Compose ile bunu uygulama servisinin `environment:` bölümüne koyun, çünkü yalnızca `.env` içinde ayarlamak kapsayıcıya ulaşmaz.
