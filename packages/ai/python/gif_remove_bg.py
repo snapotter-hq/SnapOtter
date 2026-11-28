@@ -345,6 +345,15 @@ def _cached_session(model, providers):
     )
 
 
+def _with_real_device(session, providers, device):
+    """Pair a session with the device it runs on: onnxruntime may have dropped CUDA (#5372)."""
+    if device == "cuda":
+        from gpu import session_device
+
+        device = session_device(session, providers)
+    return session, device
+
+
 def _create_session(model, providers, device):
     from rembg.sessions import sessions_class
 
@@ -353,7 +362,7 @@ def _create_session(model, providers, device):
     _register_matting_session(sessions_class)
     _register_hr_matting_session(sessions_class)
     try:
-        return _cached_session(model, providers), device
+        return _with_real_device(_cached_session(model, providers), providers, device)
     except Exception as e:
         if (
             "CUDAExecutionProvider" in providers
@@ -365,7 +374,9 @@ def _create_session(model, providers, device):
             if _is_oom(e) and evict_all("GPU out of memory loading a session"):
                 # The cache was holding VRAM that is free now; stay on the GPU.
                 try:
-                    return _cached_session(model, providers), device
+                    return _with_real_device(
+                        _cached_session(model, providers), providers, device
+                    )
                 except Exception as retry_err:
                     e = retry_err
             print(

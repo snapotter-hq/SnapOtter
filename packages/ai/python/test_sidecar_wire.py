@@ -767,6 +767,7 @@ _verify_gif_cpu_oom_handling()
 def _verify_gif_cuda_session_host_oom():
     session_calls = []
     session_err = [None]
+    drop_cuda = [False]
     stderr_lines = []
 
     class _FakeFrame:
@@ -787,6 +788,10 @@ def _verify_gif_cuda_session_host_oom():
             and "CUDAExecutionProvider" in providers
         ):
             raise session_err[0][1]
+        if drop_cuda[0]:
+            return types.SimpleNamespace(
+                inner_session=types.SimpleNamespace(get_providers=lambda: ["CPUExecutionProvider"])
+            )
         return f"session:{model}:{providers[0] if providers else 'default'}"
 
     fake_rembg = types.ModuleType("rembg")
@@ -799,6 +804,7 @@ def _verify_gif_cuda_session_host_oom():
         ["CUDAExecutionProvider", "CPUExecutionProvider"],
         "cuda",
     )
+    fake_gpu.session_device = gpu.session_device
     fake_model_paths = types.ModuleType("model_paths")
     fake_model_paths.ensure_rembg_model_home = lambda: None
 
@@ -1084,6 +1090,23 @@ def _verify_gif_cuda_session_host_oom():
                 )
                 assert not any("falling back to CPU" in line for line in stderr_lines), stderr_lines
                 assert not any("retrying with u2net" in line for line in stderr_lines), stderr_lines
+        # 4) onnxruntime silently dropped CUDA: the session reports cpu (#5372).
+        session_calls.clear()
+        session_err[0] = None
+        drop_cuda[0] = True
+        session_cache.evict_all("test isolation")
+        err_buf = io.StringIO()
+        saved_stderr = sys.stderr
+        sys.stderr = err_buf
+        try:
+            _dropped, dropped_device = gif_remove_bg._create_session(
+                "birefnet-general", cuda_providers, "cuda"
+            )
+        finally:
+            sys.stderr = saved_stderr
+            drop_cuda[0] = False
+        assert dropped_device == "cpu", dropped_device
+        assert "CUDAExecutionProvider" in err_buf.getvalue(), err_buf.getvalue()
     finally:
         remove_bg._matting_registered = orig_matting_reg
         remove_bg._hr_matting_registered = orig_hr_matting_reg
@@ -1294,6 +1317,49 @@ def _verify_safe_onnx_session_host_oom():
 _verify_safe_onnx_session_host_oom()
 
 
+def _verify_session_device_reports_dropped_cuda():
+    cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+    class _OrtSession:
+        def __init__(self, providers):
+            self._providers = providers
+
+        def get_providers(self):
+            return self._providers
+
+    class _RembgSession:
+        def __init__(self, providers):
+            self.inner_session = _OrtSession(providers)
+
+    emitted = []
+    orig_emit_info = gpu.emit_info
+    gpu.emit_info = emitted.append
+    try:
+        assert gpu.session_device(_RembgSession(cuda_providers), cuda_providers) == "cuda"
+        assert gpu.session_device(_OrtSession(cuda_providers), cuda_providers) == "cuda"
+        assert emitted == [], emitted
+
+        # onnxruntime dropped the CUDA provider without raising (missing cuDNN): the
+        # caller asked for CUDA, so say so once and report the CPU it really uses (#5372).
+        assert gpu.session_device(_RembgSession(["CPUExecutionProvider"]), cuda_providers) == "cpu"
+        assert len(emitted) == 1 and "CUDAExecutionProvider" in emitted[0], emitted
+        assert gpu.session_device(_OrtSession(["CPUExecutionProvider"]), cuda_providers) == "cpu"
+
+        # A CPU request never reads the session or logs.
+        emitted.clear()
+        assert gpu.session_device(_RembgSession(["CPUExecutionProvider"]), ["CPUExecutionProvider"]) == "cpu"
+        assert emitted == [], emitted
+
+        # A session that cannot report its providers keeps the requested device.
+        assert gpu.session_device("session:opaque", cuda_providers) == "cuda"
+        assert emitted == [], emitted
+    finally:
+        gpu.emit_info = orig_emit_info
+
+
+_verify_session_device_reports_dropped_cuda()
+
+
 def _verify_remove_bg_oom_handling():
     rembg_calls = []
     session_calls = []
@@ -1301,8 +1367,19 @@ def _verify_remove_bg_oom_handling():
     active_err = [None]
     retry_err = [None]
     active_device = ["cuda"]
+    drop_cuda = [False]
     stderr_lines = []
     info_msgs = []
+
+    class _DroppedCudaRembgSession:
+        def __init__(self, model):
+            self.model = model
+            self.inner_session = types.SimpleNamespace(
+                get_providers=lambda: ["CPUExecutionProvider"]
+            )
+
+        def __repr__(self):
+            return f"session:{self.model}:dropped"
 
     fake_rembg = types.ModuleType("rembg")
 
@@ -1314,6 +1391,8 @@ def _verify_remove_bg_oom_handling():
             and "CUDAExecutionProvider" in providers
         ):
             raise session_err[0]
+        if drop_cuda[0]:
+            return _DroppedCudaRembgSession(model)
         return f"session:{model}"
 
     fake_rembg.new_session = _fake_new_session
@@ -1336,6 +1415,7 @@ def _verify_remove_bg_oom_handling():
         else (["CPUExecutionProvider"], "cpu")
     )
     fake_gpu.emit_info = lambda msg: info_msgs.append(msg)
+    fake_gpu.session_device = gpu.session_device
     fake_model_paths = types.ModuleType("model_paths")
     fake_model_paths.ensure_rembg_model_home = lambda: None
 
@@ -1663,6 +1743,26 @@ def _verify_remove_bg_oom_handling():
                 "error": "Background removal failed: corrupt image stream",
             }, cpu_non_oom_payload
             assert rembg_calls == [("session:birefnet-general", False)], rembg_calls
+
+            # onnxruntime silently dropped CUDA (missing cuDNN): report cpu, say so, and skip
+            # alpha matting like the CPU path does (#5372).
+            active_device[0] = "cuda"
+            active_err[0] = None
+            drop_cuda[0] = True
+            dropped_payload = _run_remove_bg_main({"model": "birefnet-general"})
+            assert dropped_payload == {
+                "success": True,
+                "model": "birefnet-general",
+                "device": "cpu",
+            }, dropped_payload
+            assert [(c[0].model, c[1]) for c in rembg_calls] == [("birefnet-general", False)], rembg_calls
+            dropped_info = [
+                json.loads(line)["info"]
+                for line in stderr_lines
+                if line.startswith("{") and "info" in json.loads(line)
+            ]
+            assert sum("CUDAExecutionProvider" in m for m in dropped_info) == 1, stderr_lines
+            drop_cuda[0] = False
     finally:
         remove_bg._matting_registered = orig_matting_reg
         remove_bg._hr_matting_registered = orig_hr_matting_reg
