@@ -71,6 +71,11 @@ describe("HQ erase tuning variables", () => {
     const env = buildMinimalEnv();
     for (const name of names) expect(env[name]).toBe(`value-of-${name}`);
   });
+
+  it("forwards the SNAPOTTER_GPU CPU override the docs describe", () => {
+    vi.stubEnv("SNAPOTTER_GPU", "false");
+    expect(buildMinimalEnv().SNAPOTTER_GPU).toBe("false");
+  });
 });
 
 describe("bundle installer environment", () => {
