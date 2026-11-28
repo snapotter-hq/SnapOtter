@@ -484,3 +484,114 @@ def test_try_onnx_cuda_false_when_provider_absent(monkeypatch):
     monkeypatch.setitem(sys.modules, "onnxruntime", _fake_ort(["CPUExecutionProvider"]))
     monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: True)
     assert gpu._try_onnx_cuda() is False
+
+
+# --- nvidia wheel CUDA libraries off the Docker image (issue #4924) ---------
+#
+# A venv with onnxruntime-gpu but no system cuDNN (native install, bare venv)
+# can't load the CUDA provider; onnxruntime silently runs on the CPU. Loading
+# the nvidia-* wheel libraries by absolute path fixes the provider's dlopen.
+
+def _touch(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+
+
+def test_wheel_cuda_library_paths_orders_dependencies_first(monkeypatch, tmp_path):
+    nvidia = tmp_path / "nvidia"
+    for name in (
+        "cudnn/lib/libcudnn.so.9",
+        "cudnn/lib/libcudnn_adv.so.9",
+        "cublas/lib/libcublas.so.12",
+        "cublas/lib/libcublasLt.so.12",
+        "cuda_runtime/lib/libcudart.so.12",
+        "cuda_nvrtc/lib/libnvrtc.so.12",
+        "cudnn/lib/libcudnn.so",
+    ):
+        _touch(nvidia / name)
+    spec = types.SimpleNamespace(submodule_search_locations=[str(nvidia)])
+    monkeypatch.setattr("importlib.util.find_spec", lambda name: spec)
+
+    names = [os.path.basename(p) for p in gpu._wheel_cuda_library_paths()]
+
+    assert names == [
+        "libcudart.so.12",
+        "libcublasLt.so.12",
+        "libcublas.so.12",
+        "libcudnn_adv.so.9",
+        "libcudnn.so.9",
+    ]
+
+
+def test_wheel_cuda_library_paths_empty_without_nvidia_wheels(monkeypatch):
+    monkeypatch.setattr("importlib.util.find_spec", lambda name: None)
+    assert gpu._wheel_cuda_library_paths() == []
+
+
+def test_preload_loads_only_libraries_the_loader_cannot_resolve(monkeypatch):
+    import ctypes
+
+    wheel = {
+        "libcublas.so.12": "/venv/nvidia/cublas/lib/libcublas.so.12",
+        "libcudnn.so.9": "/venv/nvidia/cudnn/lib/libcudnn.so.9",
+    }
+    monkeypatch.setattr(gpu, "_wheel_cuda_library_paths", lambda: list(wheel.values()))
+    calls = []
+
+    def fake_cdll(name, mode=ctypes.DEFAULT_MODE):
+        calls.append((name, mode))
+        # The image's system CUDA resolves cublas; cuDNN is wheel-only.
+        if name in ("libcublas.so.12", "/venv/nvidia/cudnn/lib/libcudnn.so.9"):
+            return object()
+        raise OSError(f"{name}: cannot open shared object file")
+
+    monkeypatch.setattr(ctypes, "CDLL", fake_cdll)
+    gpu.preload_wheel_cuda_libraries.cache_clear()
+
+    assert gpu.preload_wheel_cuda_libraries() == ("libcudnn.so.9",)
+    assert ("/venv/nvidia/cudnn/lib/libcudnn.so.9", ctypes.RTLD_GLOBAL) in calls
+    assert not any(name == wheel["libcublas.so.12"] for name, _ in calls)
+    gpu.preload_wheel_cuda_libraries.cache_clear()
+
+
+def test_preload_skips_a_wheel_library_that_fails_to_load(monkeypatch):
+    import ctypes
+
+    monkeypatch.setattr(gpu, "_wheel_cuda_library_paths", lambda: ["/venv/nvidia/x/lib/libcudnn.so.9"])
+    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: (_ for _ in ()).throw(OSError("bad elf")))
+    gpu.preload_wheel_cuda_libraries.cache_clear()
+
+    assert gpu.preload_wheel_cuda_libraries() == ()
+    gpu.preload_wheel_cuda_libraries.cache_clear()
+
+
+def test_try_onnx_cuda_preloads_wheel_libraries_once_the_driver_is_usable(monkeypatch):
+    monkeypatch.setitem(sys.modules, "onnxruntime", _fake_ort(["CUDAExecutionProvider"]))
+    monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: True)
+    monkeypatch.setattr(gpu, "_nvidia_smi_gpu_name", lambda: None)
+    preloads = []
+    monkeypatch.setattr(gpu, "preload_wheel_cuda_libraries", lambda: preloads.append(1))
+
+    assert gpu._try_onnx_cuda() is True
+    assert preloads == [1]
+
+
+def test_try_onnx_cuda_does_not_preload_without_a_usable_driver(monkeypatch):
+    monkeypatch.setitem(sys.modules, "onnxruntime", _fake_ort(["CUDAExecutionProvider"]))
+    monkeypatch.setattr(gpu, "_cuda_driver_usable", lambda: False)
+    preloads = []
+    monkeypatch.setattr(gpu, "preload_wheel_cuda_libraries", lambda: preloads.append(1))
+
+    assert gpu._try_onnx_cuda() is False
+    assert preloads == []
+
+
+def test_onnx_providers_preloads_when_torch_alone_answered_gpu_available(monkeypatch):
+    # gpu_available() returns on torch and never reaches the ONNX probe.
+    monkeypatch.setitem(sys.modules, "onnxruntime", _fake_ort(["CUDAExecutionProvider"]))
+    monkeypatch.setattr(gpu, "gpu_available", lambda: True)
+    preloads = []
+    monkeypatch.setattr(gpu, "preload_wheel_cuda_libraries", lambda: preloads.append(1))
+
+    assert gpu.onnx_providers() == (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
+    assert preloads == [1]

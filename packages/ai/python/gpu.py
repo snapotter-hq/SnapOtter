@@ -307,6 +307,74 @@ def _try_torch_cuda():
     return False
 
 
+# CUDA libraries onnxruntime-gpu's CUDA provider links against. The pip
+# nvidia-* wheels ship them under site-packages/nvidia/<lib>/lib, where the
+# dynamic loader does not look.
+_WHEEL_CUDA_LIB_PREFIXES = (
+    "libcudart",
+    "libcublasLt",
+    "libcublas",
+    "libcurand",
+    "libcufft",
+    "libcudnn",
+)
+
+
+def _wheel_cuda_library_paths():
+    """Paths of the CUDA libraries the nvidia-* pip wheels ship, in load order."""
+    import glob
+    import importlib.util
+
+    try:
+        spec = importlib.util.find_spec("nvidia")
+    except Exception:
+        return []
+    roots = list(getattr(spec, "submodule_search_locations", None) or [])
+    paths = []
+    for root in roots:
+        paths.extend(glob.glob(os.path.join(root, "*", "lib", "lib*.so.*")))
+
+    ranked = []
+    for path in paths:
+        name = os.path.basename(path)
+        for index, prefix in enumerate(_WHEEL_CUDA_LIB_PREFIXES):
+            if name.startswith(prefix):
+                # libcudnn.so.N pulls in the libcudnn_* parts, so it goes last.
+                ranked.append(((index, name.startswith(prefix + ".so"), name), path))
+                break
+    return [path for _, path in sorted(ranked)]
+
+
+@functools.lru_cache(maxsize=1)
+def preload_wheel_cuda_libraries():
+    """Make the nvidia-* wheel CUDA libraries visible to onnxruntime-gpu.
+
+    Off the Docker image (native and LXC installs, a bare venv) cuDNN lives
+    only in the venv's nvidia wheels. onnxruntime then can't load its CUDA
+    provider, and it silently runs every model on the CPU while we report a
+    GPU: a 1 s matting call took 15 s and 9.5 GB of RAM (#4924). Loading each
+    wheel library by absolute path registers its soname with the loader so the
+    provider's own dlopen finds it. A library the loader already resolves
+    (the image's system CUDA) is left alone. Returns the sonames it loaded.
+    """
+    import ctypes
+
+    loaded = []
+    for path in _wheel_cuda_library_paths():
+        soname = os.path.basename(path)
+        try:
+            ctypes.CDLL(soname)
+            continue
+        except OSError:
+            pass
+        try:
+            ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            continue
+        loaded.append(soname)
+    return tuple(loaded)
+
+
 def _try_onnx_cuda():
     """Check GPU via ONNX Runtime's CUDA provider confirmed by a driver probe.
 
@@ -323,6 +391,7 @@ def _try_onnx_cuda():
             return False
         if not _cuda_driver_usable():
             return False
+        preload_wheel_cuda_libraries()
     except Exception:
         return False
     label = _nvidia_smi_gpu_name() or "CUDA driver present (nvidia-smi not on PATH)"
@@ -391,6 +460,9 @@ def onnx_providers():
     if gpu_available():
         try:
             import onnxruntime as _ort
+            # gpu_available() can be answered by torch alone, which never
+            # reaches the ONNX probe that preloads these.
+            preload_wheel_cuda_libraries()
             available = _ort.get_available_providers()
             if "CUDAExecutionProvider" in available:
                 return (["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda")
