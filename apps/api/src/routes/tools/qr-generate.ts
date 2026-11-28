@@ -10,6 +10,32 @@ import { putObject } from "../../lib/object-storage.js";
 
 const QR_MARGIN_MODULES = 2;
 
+type ErrorCorrectionLevel = "L" | "M" | "Q" | "H";
+
+/**
+ * Byte-mode capacity of a Version 40 QR code per error-correction level.
+ * Numeric and alphanumeric text packs denser, so the encoder itself decides
+ * whether text fits; these numbers only make its overflow error actionable.
+ */
+const QR_BYTE_CAPACITY: Record<ErrorCorrectionLevel, number> = {
+  L: 2953,
+  M: 2331,
+  Q: 1663,
+  H: 1273,
+};
+
+function isQrCapacityError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("amount of data is too big");
+}
+
+function qrCapacityMessage(text: string, level: ErrorCorrectionLevel, logoForcedH: boolean) {
+  const bytes = Buffer.byteLength(text, "utf8");
+  let remedy = "Shorten the text or choose a lower error correction level.";
+  if (logoForcedH) remedy = "A logo always uses level H. Shorten the text or remove the logo.";
+  else if (level === "L") remedy = "Shorten the text.";
+  return `text: ${bytes} bytes is too long for error correction level ${level}, which holds at most ${QR_BYTE_CAPACITY[level]} bytes of general text (more if it is only digits or uppercase letters). ${remedy}`;
+}
+
 const settingsSchema = z.object({
   text: z.string().min(1).max(2000),
   size: z.number().min(100).max(10000).default(400),
@@ -42,7 +68,7 @@ function hexToRgb(hex: string): [number, number, number] {
  */
 function renderQrGridRgb(
   text: string,
-  errorCorrectionLevel: "L" | "M" | "Q" | "H",
+  errorCorrectionLevel: ErrorCorrectionLevel,
   foreground: string,
   background: string,
 ): { raw: Buffer; gridSize: number } {
@@ -98,12 +124,11 @@ export function registerQrGenerate(app: FastifyInstance) {
       }
 
       const settings = result.data;
+      // When a logo is present, force max error correction so the QR
+      // remains scannable despite the logo occluding the center.
+      const ecLevel = settings.logoDataUri ? "H" : settings.errorCorrection;
 
       try {
-        // When a logo is present, force max error correction so the QR
-        // remains scannable despite the logo occluding the center.
-        const ecLevel = settings.logoDataUri ? "H" : settings.errorCorrection;
-
         const { raw, gridSize } = renderQrGridRgb(
           settings.text,
           ecLevel,
@@ -155,6 +180,12 @@ export function registerQrGenerate(app: FastifyInstance) {
         });
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
+        if (isQrCapacityError(err)) {
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: qrCapacityMessage(settings.text, ecLevel, Boolean(settings.logoDataUri)),
+          });
+        }
         const tooLarge = imageSizeLimitError(err);
         if (tooLarge) return reply.status(400).send({ error: tooLarge.message });
         request.log?.warn({ err, toolId: "qr-generate" }, "QR code generation failed");
